@@ -2,29 +2,47 @@
 .garage-page h1 { margin: 0; font-size: var(--text-title); }
 .garage-page h2 { margin: 0 0 12px; font-size: 18px; }
 .garage-page h3 { margin: 0 0 8px; font-size: 16px; }
-.garage-heading, .garage-toolbar-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.garage-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .garage-heading { margin-bottom: 20px; }
 .garage-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .garage-heading-actions .btn-base { min-height: 44px; display: inline-flex; align-items: center; }
 .garage-heading p { margin: 4px 0 0; color: var(--text-secondary); }
-.garage-toolbar, .garage-notice, .garage-empty, .garage-unresolved { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); margin-bottom: 20px; }
-.garage-toolbar-heading { margin-bottom: 16px; }
-.garage-toolbar-heading p { margin: 0; }
-.garage-toolbar-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; }
-.garage-toolbar-fields > * { display: flex; flex-direction: column; min-width: 0; gap: 6px; font-size: var(--text-callout); }
-.garage-toolbar-fields :is(select,input) { box-sizing: border-box; max-width: 100%; min-height: 44px; padding: 8px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: inherit; }
-.garage-search { flex: 1 1 220px; }
+.garage-notice, .garage-empty { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); margin-bottom: 20px; }
+.garage-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; font-size: var(--text-callout); }
+.garage-toolbar :is(select,input,.btn-base), .garage-sort button { box-sizing: border-box; max-width: 100%; min-height: 36px; padding: 6px 10px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: inherit; }
+.garage-toolbar .btn-base { display: inline-flex; align-items: center; text-decoration: none; }
+.garage-page .garage-toolbar select { width: auto; flex: 0 1 auto; max-width: 190px; }
+@media (min-width: 900px) { .garage-page .garage-toolbar { flex-wrap: nowrap; } .garage-page .garage-toolbar .garage-segments { flex-wrap: nowrap; flex: none; } .garage-page .garage-toolbar .btn-base { white-space: nowrap; flex: none; } }
+.garage-toolbar .garage-search { flex: 1 1 220px; min-width: 0; width: auto; }
+.garage-sort { display: flex; gap: 4px; }
+.garage-sort button { min-width: 36px; cursor: pointer; }
+.garage-toolbar-heading { flex-basis: 100%; margin: 0; color: var(--text-secondary); }
+.garage-summary { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px 32px; align-items: start; padding: 0 0 20px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.garage-summary-record p { margin: 0; color: var(--text-secondary); font-size: var(--text-callout); }
+.garage-summary-record strong { color: var(--text); font-weight: 600; }
+.garage-summary-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 14px 20px; margin: 0; }
+.garage-summary-tiles > * { display: flex; flex-direction: column; min-width: 0; padding: 0; text-align: left; color: var(--text); border: 0; border-top: 1px solid transparent; background: none; font: inherit; }
+.garage-summary-tiles > button { cursor: pointer; }
+.garage-summary-tiles > button:hover dt, .garage-summary-tiles > button[aria-pressed=true] dt { color: var(--text); }
+.garage-summary-tiles > button[aria-pressed=true] dt { text-decoration: underline; text-underline-offset: 3px; }
+.garage-summary-tiles dt { color: var(--text-secondary); font-size: var(--text-caption, 12px); }
+.garage-summary-tiles dd { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.garage-summary-tiles dd small { display: block; color: var(--text-secondary); font-size: var(--text-caption, 12px); font-weight: 400; }
 .garage-segments { display: flex; flex-wrap: wrap; gap: 4px; }
-.garage-segments button { min-height: 44px; padding: 8px 14px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: 500 var(--text-callout)/1.4 var(--font-family); cursor: pointer; }
-.garage-segments button[aria-pressed=true] { background: var(--action); color: var(--on-action); border-color: var(--action); }
+.garage-segments button { min-height: 36px; padding: 6px 12px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: 500 var(--text-callout)/1.4 var(--font-family); cursor: pointer; }
+.garage-segments button[aria-pressed=true] { background: var(--text); color: var(--surface); border-color: var(--text); }
 .garage-page :is(button,input,select,summary,a):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
-.garage-unresolved article + article { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
-.garage-unresolved p { margin: 6px 0; }
-.garage-unresolved summary { min-height: 44px; box-sizing: border-box; padding: 10px 0; cursor: pointer; color: var(--link); }
+.garage-note { margin: -8px 0 12px; color: var(--text-secondary); font-size: var(--text-callout); }
+.garage-note button { padding: 0; margin-left: 6px; color: var(--text); border: 0; background: none; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.garage-unresolved summary { cursor: pointer; }
+.garage-unresolved summary span { font-variant-numeric: tabular-nums; }
+.garage-unresolved article { margin: 8px 0 0 16px; }
+.garage-unresolved h3 { margin: 0; font-size: var(--text-callout); color: var(--text); }
+.garage-unresolved p { margin: 2px 0; }
 .garage-empty-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .garage-sections { display: flex; flex-direction: column; gap: 24px; }
 .garage-section-heading { display: flex; align-items: baseline; gap: 8px; }
-.garage-section-heading span, .garage-unresolved h2 span { color: var(--text-secondary); font-size: var(--text-callout); font-variant-numeric: tabular-nums; }
+.garage-section-heading span { color: var(--text-secondary); font-size: var(--text-callout); font-variant-numeric: tabular-nums; }
 .garage-section-note { margin: 0 0 8px; color: var(--text-secondary); font-size: var(--text-callout); }
 .garage-vehicles { display: grid; gap: 12px; min-width: 0; }
 .garage-view-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--garage-card-min, 280px)), 1fr)); }
@@ -33,8 +51,9 @@
 .garage-view-compact .garage-vehicle-card > div { min-height: 44px; box-sizing: border-box; }
 @media (max-width: 600px) {
   .garage-page { padding: 16px 12px 32px; }
-  .garage-toolbar-fields { display: grid; grid-template-columns: minmax(0,1fr); }
-  .garage-toolbar-fields :is(select,input) { font-size: 16px; width: 100%; }
+  .garage-toolbar :is(select,input) { font-size: 16px; min-height: 44px; }
+  .garage-search { flex-basis: 100%; }
+  .garage-summary { grid-template-columns: minmax(0,1fr); }
 }
 .garage-page .garage-vehicle-card button { min-height: 44px; min-width: 44px; }
 .garage-view-compact .garage-vehicle-card > div { flex-wrap: wrap; }
@@ -45,7 +64,6 @@
 .garage-card-title { display: inline-flex; align-items: center; }
 .garage-card-image-link { position: absolute; inset: 0; z-index: 1; }
 
-.garage-relationship-note { color: var(--text-secondary); font-size: var(--text-callout); margin: 0 0 20px; }
 
 /* Grid card: photo, car, timeline, facts on record. */
 .garage-view-grid { gap: 16px; }
@@ -60,9 +78,12 @@
 .garage-card-photo-empty { color: var(--text-secondary); font-size: var(--text-caption); }
 .garage-card-eject { position: absolute; z-index: 2; top: 8px; right: 8px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-secondary); font: 600 16px/1 var(--font-family); cursor: pointer; }
 .garage-card-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 14px; min-width: 0; }
-.garage-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
-.garage-card .garage-card-title { display: block; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 600 16px/1.3 var(--font-family); }
+.garage-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
+.garage-card .garage-card-title { display: block; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--text); font: 600 16px/1.3 var(--font-family); }
 .garage-card-price { flex: 0 0 auto; color: var(--text); font: 600 16px/1.3 var(--font-family); font-variant-numeric: tabular-nums; }
+/* The figure's name sits over it, so the car's name keeps the row's width. */
+.garage-card-price { display: flex; flex-direction: column; align-items: flex-end; }
+.garage-card-price small { color: var(--text-secondary); font: 400 var(--text-caption)/1.2 var(--font-family); }
 /* Items wrap onto lines the lane does not show, so the last ones drop first as the card narrows. */
 .garage-card-lane { display: flex; flex-wrap: wrap; align-items: center; gap: 0 14px; height: 24px; overflow: hidden; color: var(--text-secondary); font-size: var(--text-caption); }
 .garage-card-lane > * { height: 24px; display: inline-flex; align-items: center; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
@@ -71,6 +92,10 @@
 .garage-card-record { margin: 0; color: var(--text-secondary); font-size: var(--text-caption); line-height: 1.4; }
 .garage-card-record { display: flex; flex-wrap: wrap; gap: 0 10px; font-variant-numeric: tabular-nums; }
 .garage-card-span { color: var(--text); }
+/* Each count is its own item; one with a page of its records is a link in the same muted type. */
+.garage-card-counts > * + *::before { content: '\00b7'; display: inline-block; margin: 0 0.4em; color: var(--text-secondary); }
+.garage-card-counts a { color: inherit; text-decoration: none; border-radius: 2px; }
+.garage-card-counts a:is(:hover, :focus-visible) { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .garage-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
 .garage-page .garage-vehicle-card .garage-card-vin, .garage-card-vin { min-height: 0; min-width: 0; padding: 0; border: 0; background: none; color: var(--text-secondary); font: var(--text-caption)/1.4 var(--font-mono); font-variant-numeric: tabular-nums lining-nums; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .garage-card-vin:hover { color: var(--text); }
@@ -116,6 +141,9 @@
 .garage-card-slot:hover .garage-card-corner, .garage-card-corner:focus-visible { opacity: 1; }
 @media (hover: none) { .garage-page .garage-card-corner { opacity: 0.6; } }
 .garage-barcode-lit { fill: none; stroke: var(--text); stroke-width: 0.16; }
+/* A card's squares slide through time under a sideways swipe or drag; the page keeps the up-and-down. */
+.garage-barcode[data-movable] { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.garage-barcode rect[data-level][data-photo] { cursor: pointer; }
 .garage-card-lane a { color: inherit; text-decoration: none; }
 .garage-card-lane a:hover { color: var(--text); text-decoration: underline; }
 .garage-card-vin-none { color: var(--text-secondary); font-size: var(--text-caption); }
@@ -142,19 +170,28 @@
 .garage-card-step[data-dir='back'] { left: 8px; }
 .garage-card-step[data-dir='next'] { right: 8px; }
 .garage-card-photo:hover .garage-card-step, .garage-card-step:focus-visible { opacity: 1; }
+/* On the analysis frame the back arrow would sit on the figures, so it shows only under the pointer itself. */
+.garage-card-photo:hover .garage-card-step[data-on='analysis']:not(:hover):not(:focus-visible) { opacity: 0; }
 @media (hover: none) { .garage-page .garage-vehicle-card .garage-card-step { display: none; } }
 @container (max-width: 210px) { .garage-page .garage-vehicle-card .garage-card-step { display: none; } }
-/* The reel's last frame: the readers' lines, a panel the size of a photo, glass over the car's own colours. */
-.garage-card-analysis { position: relative; flex: 0 0 100%; scroll-snap-align: start; box-sizing: border-box; padding: 12px 14px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; background: var(--surface); color: var(--text); font-variant-numeric: tabular-nums; }
+/* The reel's last frame: the readers' lines, a panel the size of a photo, glass over the car's own colours.
+   It scrolls only up and down, and chains both ways: an overscroll-behavior: contain here made it a scroller that
+   swallowed every sideways swipe, so a two-finger swipe could not leave it back to the photos. The bottom padding
+   keeps the record line clear of the Photos chip. */
+.garage-card-analysis { position: relative; flex: 0 0 100%; scroll-snap-align: start; box-sizing: border-box; padding: 10px 14px 38px; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; background: var(--surface); color: var(--text); font-variant-numeric: tabular-nums; }
 .garage-card-analysis dl { margin: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: 12px; }
 .garage-card-analysis dl + dl, .garage-analysis-record { padding-top: 6px; border-top: 1px dashed var(--border); }
 .garage-card-analysis dl > div { min-width: 0; }
 .garage-card-analysis dt { color: var(--text-secondary); font-size: var(--text-caption); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .garage-card-analysis dd { margin: 0; font: 600 var(--text-callout)/1.3 var(--font-family); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.garage-analysis-money dd:not(.garage-analysis-cite) { font-size: 20px; line-height: 1.2; }
+.garage-analysis-money dd:not(.garage-analysis-cite) { font-size: 18px; line-height: 1.2; }
 .garage-card-analysis dd.garage-analysis-cite { color: var(--text-secondary); font: var(--text-caption)/1.3 var(--font-family); white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.garage-card-analysis dl.garage-analysis-hours { grid-auto-columns: auto; justify-content: space-between; }
+.garage-card-analysis dl.garage-analysis-hours { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.garage-analysis-record { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .garage-analysis-record { margin: auto 0 0; color: var(--text-secondary); font-size: var(--text-caption); line-height: 1.4; }
+/* Three money figures (class value, spent, quoted) share the row: a tighter row keeps each figure whole on a 280px card. */
+.garage-card-analysis dl.garage-analysis-money:has(> div:nth-child(3)) { column-gap: 8px; }
+.garage-analysis-money:has(> div:nth-child(3)) dd:not(.garage-analysis-cite) { font-size: var(--text-callout); }
 .garage-page .garage-vehicle-card .garage-card-to-analysis, .garage-card-to-analysis { position: absolute; z-index: 3; left: 8px; bottom: 8px; min-width: 0; min-height: 0; height: 22px; padding: 0 9px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 999px; background: rgba(20, 20, 20, 0.45); -webkit-backdrop-filter: blur(12px) saturate(1.6); backdrop-filter: blur(12px) saturate(1.6); color: #fff; font: 500 var(--text-caption)/1 var(--font-family); cursor: pointer; }
 /* The agent's proposals and the keep-sessions switch: glass, quiet, no accent colour. */
 .garage-agent-proposal { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--bg) 35%, transparent); font-size: var(--text-caption); }

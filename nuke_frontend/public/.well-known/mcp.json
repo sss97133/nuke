@@ -7,7 +7,7 @@
   "transport": "streamable-http",
   "authentication": {
     "required": false,
-    "note": "Anonymous reads allowed. Optional X-API-Key for rate-limit identity."
+    "note": "No credential needed. The six advisor tools answer visitors from public records only (no private vehicles or owner data, nothing written, no photo analysis); evaluate_listing reads Bring a Trailer listings only for now."
   },
   "tools": [
     "find_asset",

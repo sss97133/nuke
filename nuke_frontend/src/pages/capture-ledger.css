@@ -32,15 +32,16 @@
 .cl-pill--on { background: var(--success-dim); color: var(--success); }
 .cl-pill--failed, .cl-pill--pulled { background: var(--warning-dim); color: var(--warning); }
 .cl-pill .k-label { color: inherit; }
-.cl-day__chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--text-secondary); transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1); }
-.cl-day[aria-expanded=true] .cl-day__chevron { transform: rotate(180deg); }
-@media (prefers-reduced-motion: reduce) { .cl-day__chevron { transition: none; } }
+.cl-day__chevron, .cl-ask__chevron { flex: 0 0 auto; width: 20px; height: 20px; color: var(--text-secondary); transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+.cl-day[aria-expanded=true] .cl-day__chevron, .cl-ask__more[aria-expanded=true] .cl-ask__chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .cl-day__chevron, .cl-ask__chevron { transition: none; } }
 
 /* one row per photo, the app's row: icon, headline, detail */
 .cl-frames { list-style: none; margin: 0; padding: 0 0 4px; border-top: 1px solid var(--border); background: var(--bg); }
 .cl-frames > li + li { border-top: 1px solid var(--border); margin-left: 16px; }
-.cl-frame { display: flex; align-items: flex-start; gap: 12px; min-height: 60px; padding: 10px 16px 10px 0; margin-left: 16px; }
-.cl-frames > li + li .cl-frame { margin-left: 0; }
+.cl-frame { display: flex; align-items: flex-start; gap: 12px; min-height: 60px; padding: 10px 16px 10px 0; }
+.cl-frame, .cl-ask { margin-left: 16px; }
+.cl-frames > li + li :is(.cl-frame, .cl-ask) { margin-left: 0; }
 .cl-frame__thumb { flex: 0 0 56px; width: 56px; height: 56px; border-radius: var(--radius-sm); object-fit: cover; background: var(--surface-hover); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
 .cl-frame__icon { flex: 0 0 22px; width: 22px; height: 22px; margin-top: 2px; color: var(--text-secondary); }
 .cl-frame--on_vehicle .cl-frame__icon { color: var(--success); }
@@ -51,13 +52,64 @@
 .cl-notice { padding: 16px; color: var(--text-secondary); }
 .cl-more { display: block; width: 100%; min-height: 48px; margin: 12px 0 0; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); cursor: pointer; }
 .cl-more:disabled { opacity: 0.55; cursor: default; }
+.cl-more--inline { display: inline-block; width: auto; margin: 0; padding: 0 16px; }
 .cl-page :is(button, a):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+
+/* "Which vehicle?" for one held set: the photos as toggles, then one choice per car (picture and name), then the
+   confirm line beside the tapped car. The photos wrap, so the block fits a 390px phone with no sideways scroll. */
+.cl-ask { padding: 12px 16px 16px 0; min-width: 0; }
+.cl-ask__head { display: flex; align-items: flex-start; gap: 12px; }
+.cl-ask__head h2 { margin: 0; }
+.cl-ask__head .cl-frame__icon { color: var(--action); }
+.cl-ask__hint { margin: 12px 0 8px; color: var(--text-secondary); }
+.cl-ask__hint .k-label { color: inherit; }
+.cl-ask__photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.cl-ask__photo { position: relative; display: block; width: 100%; aspect-ratio: 1; min-height: 44px; padding: 0; border: 2px solid var(--action); border-radius: var(--radius-sm); background: var(--surface-hover); overflow: hidden; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.cl-ask__photo > img, .cl-ask__photo > .cl-frame__thumb { display: flex; width: 100%; height: 100%; object-fit: cover; border-radius: 0; transition: opacity var(--transition), filter var(--transition); }
+.cl-ask__mark { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; color: var(--action); background: var(--surface); border-radius: 999px; }
+/* the tick is drawn on the action colour, so it takes the on-action colour in both themes */
+.cl-ask__mark path, .cl-ask__check path { stroke: var(--on-action); }
+.cl-ask__photo--out { border-color: var(--border); }
+.cl-ask__photo--out > img, .cl-ask__photo--out > .cl-frame__thumb { opacity: 0.6; filter: grayscale(1); }
+.cl-ask__photo--out .cl-ask__mark { color: var(--text-secondary); }
+.cl-ask__photo:disabled { cursor: default; }
+.cl-ask__choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cl-ask__choice { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 4px 12px 4px 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* picked: a 2px action border (padding takes the extra pixel, so nothing moves) and a check, in both lists */
+.cl-ask__choice[aria-pressed=true] { border: 2px solid var(--action); padding: 3px 11px 3px 3px; }
+.cl-ask__choice:disabled { opacity: 0.55; cursor: default; }
+.cl-ask__choice .k-body { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+/* the car's picture: the page's row thumbnail at a size two look-alike cars can be told apart */
+.cl-ask__choice .cl-frame__thumb { flex-basis: 72px; width: 72px; height: 72px; }
+/* a closest car that is not his: the hint's muted caption, set close to the choices around it, never a control */
+.cl-ask__choices > li > .cl-ask__hint { margin: 2px 0 4px; }
+.cl-ask__check { flex: 0 0 24px; width: 24px; height: 24px; color: var(--action); }
+.cl-ask__more { padding-left: 12px; }
+.cl-ask__all { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.cl-ask__filter { min-height: var(--control-height); }
+.cl-ask__add { display: inline-flex; align-items: center; min-height: 44px; color: var(--link); }
+.cl-ask__add .k-caption { color: inherit; }
+.cl-ask__retry { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; color: var(--text-secondary); }
+.cl-ask__retry p { flex: 1 1 200px; margin: 0; }
+.cl-ask__confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 6px 0 4px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-hover); }
+.cl-ask__confirm > p[role=status] { flex: 1 1 200px; margin: 0; min-width: 0; }
+.cl-ask__actions { display: flex; gap: 8px; }
+.cl-ask__failure { display: flex; align-items: flex-start; gap: 8px; flex: 1 1 100%; margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--warning-dim); color: var(--warning); }
+.cl-ask__failure svg { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 1px; }
+.cl-ask__failure .k-body { color: inherit; }
+.cl-filed { color: var(--text); }
+.cl-filed.cl-notice { display: flex; align-items: flex-start; gap: 10px; }
+.cl-filed__icon { flex: 0 0 22px; width: 22px; height: 22px; margin-top: 1px; color: var(--success); }
+.cl-filed:focus { outline: none; }
+/* what a scroll brings into view clears the fixed header above and the phone's tab bar below */
+.cl-filed, .cl-ask__confirm, .cl-ask__failure, .cl-ask__filter { scroll-margin: 64px 0 calc(72px + env(safe-area-inset-bottom)); }
 
 /* touch: a bigger thumbnail and a looser row; nothing here needs a hover */
 @media (pointer: coarse) {
   .cl-frame__thumb { flex-basis: 72px; width: 72px; height: 72px; }
   .cl-day { min-height: 64px; }
   .cl-pill { padding: 7px 12px; }
+  .cl-ask__photos { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
 }
 @media (max-width: 600px) {
   .cl-day__date { flex-basis: 100%; }

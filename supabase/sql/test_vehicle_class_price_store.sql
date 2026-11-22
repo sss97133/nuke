@@ -4,6 +4,15 @@
 -- "cohort not yet classified (k of n)" until every member is classified; get_vehicle_class_prices returns a row only to
 -- the accounts get_user_garage ties to the vehicle with money, or to the service role; get_user_garage.current_value is
 -- the stored price; nuke_build_class gives the same answers as before; get_platform_stratified_price keeps its curated pool.
+-- class_price_v2 (20261121110000): cohort resolution (exact, else the canonical name as a whole word) with its refusals,
+-- registration through register_make_model_subject, never blanking a stored price, and the refresh queue (enqueue from
+-- receipts and work sessions, drain, incomplete stays queued, errors retried, daily top-up, the controller's fifth row).
+-- class price queue own cron (20261121170000): the controller restored byte for byte to its four slices; the job's command
+-- run as pg_cron sends it (one query string): a cancelled refresh keeps its committed claim mark (attempt, error, back of
+-- the line), leaves the stored price and the other queue rows intact, is not re-claimed within 5 minutes, waits a day after 3.
+-- build_class_v6 (20261121200000): the rule reads the model year (four arguments; three = no year); a rebuilt engine is not
+-- a swap, a bare fuel-injection term counts only before 1987, named aftermarket systems, installed engines and LS swaps
+-- count; the store and the caller's view pass the year; callers differ only by named literals; a drifted rule is refused.
 \set ON_ERROR_STOP on
 CREATE ROLE anon;
 CREATE ROLE authenticated;
@@ -308,4 +317,1105 @@ SELECT public.assert((SELECT count(*) = 0 FROM public.get_vehicle_class_prices(A
   'a signed-in role without a user id gets no row');
 RESET ROLE;
 
-SELECT 'vehicle_class_price store, refresh, tied reader, garage value and classifier parity: PASS' AS result;
+-- build_class_v4 (20261121090000): word boundaries in the rule, and a class version bump the refresh acts on ----------
+SELECT set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+\ir ../migrations/20261121090000_build_class_word_boundaries.sql
+-- Idempotent.
+\ir ../migrations/20261121090000_build_class_word_boundaries.sql
+
+-- The bug: '\b' is a backspace in a PostgreSQL regular expression, '\y' the word boundary.
+SELECT public.assert(NOT ('it is built' ~* '\b(built)\b') AND ('it is built' ~* '\y(built)\y'), '\b is not a word boundary, \y is');
+
+-- Each fixed term, and the ambiguous phrases that must not decide a class (no receipts, no sessions, text only).
+CREATE TEMP TABLE rule_cases(txt text, expected text, why text);
+INSERT INTO rule_cases VALUES
+ -- build words, now matched
+ ('this car has been modified with a cam', 'modified', 'modified'),
+ ('engine upgraded to a 302', 'modified', 'upgraded'),
+ ('the 4-bolt wheels were swapped for 5-bolt', 'modified', 'swapped'),
+ ('built 289 with aluminum heads', 'modified', 'a built engine by displacement'),
+ ('built 289ci v8', 'modified', 'a built engine, displacement run into ci'),
+ ('built 302, with edelbrock heads', 'modified', 'a built engine before a comma'),
+ ('a built motor and 4 speed', 'modified', 'built motor'),
+ ('built small block ford', 'modified', 'built small block'),
+ ('professionally built by a shop', 'modified', 'professionally built'),
+ ('fully built c4 automatic', 'modified', 'fully built'),
+ ('kit-built 1932 ford coupe', 'modified', 'kit-built'),
+ ('a custom build with a shaved dash', 'modified', 'custom build'),
+ -- stock words, now matched
+ ('same owner since 1984. completely stock', 'stock', 'completely stock'),
+ ('said to remain totally stock', 'stock', 'totally stock'),
+ ('100% stock or oem parts', 'stock', '100% stock'),
+ ('numbers matching, upgraded brakes', 'stock', 'one stock and one build signal: the tie stays stock'),
+ -- ambiguous: never a class on their own
+ ('mustang stock #: 20231', 'unknown', 'a dealer stock number'),
+ ('stock number 10716', 'unknown', 'a stock number'),
+ ('inventory id: inv_026. status: in stock', 'unknown', 'in stock'),
+ ('bought with money from the stock market', 'unknown', 'the stock market'),
+ ('the stock air cleaner', 'unknown', 'a stock part'),
+ ('was built in 1973', 'unknown', 'built in a year'),
+ ('built at the san jose plant', 'unknown', 'built at a plant'),
+ ('one of 500 built', 'unknown', 'production count'),
+ ('built 1965 mustang', 'unknown', 'a year after built is not a displacement'),
+ ('ford built 607,568 mustangs for 1966', 'unknown', 'a production count'),
+ ('chevy built 221,000 camaros', 'unknown', 'a production count'),
+ ('factory built', 'unknown', 'factory built'),
+ ('factory air and power steering', 'unknown', 'a factory option'),
+ ('factory a/c', 'unknown', 'a factory option'),
+ ('it has a factory warranty', 'unknown', 'factory alone'),
+ ('1971 chevrolet c10 custom deluxe', 'unknown', 'Custom as a trim name'),
+ ('mustang custom fastback', 'unknown', 'Custom as a trim name'),
+ ('has never been modified', 'unknown', 'negated modified'),
+ ('it was not modified', 'unknown', 'negated modified'),
+ ('an un-modified example', 'unknown', 'un-modified'),
+ ('a non-modified car', 'unknown', 'non-modified'),
+ ('powered by a modified version of the 289', 'unknown', 'a modified version of (history)'),
+ ('shelby began manufacturing modified mustangs', 'unknown', 'manufacturing modified (history)'),
+ (E'\bstock\b', 'unknown', 'a literal backspace no longer counts as a stock signal'),
+ (E'\bmodified\b', 'modified', 'still a word');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected),
+  'rule cases: ' || coalesce((SELECT string_agg(format('%s [%s] got %s want %s', c.why, c.txt,
+      public.nuke_build_class_rule(0, 0, c.txt)->>'build_class', c.expected), '; ')
+    FROM rule_cases c WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected), ''));
+-- Paper still wins over words: $5,000 of receipts is a documented build whatever the text says.
+SELECT public.assert(public.nuke_build_class_rule(5000, 0, 'completely stock')->>'build_class' = 'documented_build', 'paper first');
+-- Every pre-existing fixture keeps its class (none of their texts uses a fixed word).
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM class_before b
+  WHERE b.j->>'build_class' IS DISTINCT FROM public.nuke_build_class(b.id)->>'build_class'), 'fixture classes unchanged');
+
+-- Grants as 20261121073000 set them.
+SELECT public.assert(has_function_privilege('anon', 'public.nuke_build_class_rule(numeric,integer,text)', 'EXECUTE'), 'anon runs the rule');
+SELECT public.assert(NOT has_function_privilege('authenticated', 'public.classify_vehicle_build_class(uuid[])', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)', 'EXECUTE'),
+  'writers stay service role only');
+
+-- The bump: the version the refresh treats as current is the version the writer writes.
+SELECT public.assert((SELECT substring(prosrc FROM 'c_class\s+constant text := ''([^'']+)''') FROM pg_proc
+    WHERE oid = 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure) = 'v4_store_word_terms'
+  AND (SELECT prosrc LIKE '%''v4_store_word_terms''%' AND prosrc NOT LIKE '%v3_store_text_paper%' FROM pg_proc
+    WHERE oid = 'public.classify_vehicle_build_class(uuid[])'::regprocedure),
+  'refresh c_class and the classifier''s method literal are the same new version');
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+DO $$ DECLARE r jsonb;
+BEGIN
+  PERFORM public.assert((SELECT count(*) FROM public.vehicle_build_class WHERE method_version = 'v3_store_text_paper') >= 14,
+    'before: the cohort holds v3 rows');
+  -- Every v3 member is out of date: the refresh reclassifies all 14 (the subject is always reclassified) and reprices.
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND (r->>'complete')::boolean AND (r->>'classified_this_call')::int = 14
+    AND r->>'value' = '35000' AND r->>'n' = '6', 'the bump reclassifies the whole cohort: ' || r::text);
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.cohort_members('50000000-0000-4000-8000-000000000001') m
+    JOIN public.vehicle_build_class b ON b.vehicle_id = m.vehicle_id WHERE b.method_version <> 'v4_store_word_terms'),
+    'every cohort member is on v4');
+  -- And a second refresh finds nothing out of date.
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000');
+  PERFORM public.assert((r->>'classified_this_call')::int = 0 AND r->>'status' = 'priced', 'v4 rows are current');
+END $$;
+RESET ROLE;
+
+
+-- class_price_v2 (20261121110000): cohort resolution and registration for owned cars, never blank, and the refresh queue --
+-- Fixture columns and objects the new migration reads, as live (2026-11-20).
+SELECT set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+ALTER TABLE public.canonical_models ADD COLUMN year_start int, ADD COLUMN year_end int;
+ALTER TABLE public.make_model_profiles ALTER COLUMN subject_id SET DEFAULT gen_random_uuid(),
+  ADD COLUMN cohort_label text, ADD COLUMN basis text,
+  ADD COLUMN created_at timestamptz DEFAULT now(), ADD COLUMN updated_at timestamptz DEFAULT now();
+CREATE UNIQUE INDEX make_model_profiles_cohort_key ON public.make_model_profiles
+  (canonical_make, canonical_model, year, grain, year_start, year_end) NULLS NOT DISTINCT;
+-- Signed-in writers file their own receipts (receipts_own already reads them).
+CREATE POLICY receipts_insert_own ON public.receipts FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY receipts_update_own ON public.receipts FOR UPDATE USING (user_id = auth.uid());
+-- The four existing derived queues, as stubs that record their calls.
+CREATE TABLE public.fixture_drain_calls(id bigserial PRIMARY KEY, fn text);
+GRANT USAGE ON SEQUENCE public.fixture_drain_calls_id_seq TO service_role;
+CREATE FUNCTION public.drain_vehicle_metric_queue(integer) RETURNS TABLE(processed integer, errored integer) LANGUAGE plpgsql AS
+  $$ BEGIN INSERT INTO public.fixture_drain_calls(fn) VALUES ('metric'); RETURN QUERY SELECT 0, 0; END $$;
+CREATE FUNCTION public.drain_vehicle_stats_queue(integer) RETURNS TABLE(processed integer, errored integer) LANGUAGE plpgsql AS
+  $$ BEGIN INSERT INTO public.fixture_drain_calls(fn) VALUES ('stats'); RETURN QUERY SELECT 0, 0; END $$;
+CREATE FUNCTION public.drain_vehicle_value_queue(integer) RETURNS TABLE(processed integer, errored integer) LANGUAGE plpgsql AS
+  $$ BEGIN INSERT INTO public.fixture_drain_calls(fn) VALUES ('value'); RETURN QUERY SELECT 0, 0; END $$;
+CREATE FUNCTION public.drain_vehicle_completion_queue(integer) RETURNS TABLE(processed integer, errored integer) LANGUAGE plpgsql AS
+  $$ BEGIN INSERT INTO public.fixture_drain_calls(fn) VALUES ('completion'); RETURN QUERY SELECT 0, 0; END $$;
+-- Live drain_vehicle_derived_queues, verbatim (pg_get_functiondef 2026-11-20).
+CREATE OR REPLACE FUNCTION public.drain_vehicle_derived_queues(p_include_value boolean DEFAULT false, p_budget_seconds integer DEFAULT 45)
+ RETURNS TABLE(queue text, processed integer, errored integer, skipped boolean)
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  -- A NULL or absurd budget cannot switch the time stop off.
+  v_budget integer := least(greatest(coalesce(p_budget_seconds, 45), 5), 60);
+  v_t0     timestamptz := clock_timestamp();
+  v_until  timestamptz;
+  v_p      integer;
+  v_e      integer;
+  v_chunk  integer;
+  v_cap    integer;
+  v_failed_chunks integer;
+  v_name   text;
+BEGIN
+  -- The drains' writebacks must not re-enqueue completion recomputes (update_vehicle_completion reads this).
+  PERFORM set_config('app.skip_completion_enqueue', '1', true);
+  -- Transaction-local (set_config(..., true)): it reverts when the calling transaction, the cron job's own, ends.
+  -- A vehicles row held by another writer fails that one vehicle after 2 s; the drain re-queues it.
+  PERFORM set_config('lock_timeout', '2s', true);
+
+  -- Metric starts chunks in the first half; siblings stop starting chunks at two thirds of the budget.
+  -- The reserved sixth lets stats and completion progress after a metric burst; the final third is headroom.
+  FOREACH v_name IN ARRAY ARRAY['metric', 'stats', 'value', 'completion'] LOOP
+    queue := v_name; processed := 0; errored := 0; skipped := false; v_failed_chunks := 0;
+    v_until := v_t0 + make_interval(secs => v_budget / CASE WHEN v_name = 'metric' THEN 2.0 ELSE 1.5 END);
+
+    IF v_name = 'value' AND NOT p_include_value THEN
+      skipped := true;                       -- off until the sale data is clean
+    ELSIF clock_timestamp() >= v_until THEN
+      skipped := true;                       -- this queue's slice is spent; the next run continues
+    ELSE
+      -- chunk = rows per inner call; cap = rows per run. Stats and value make one call.
+      v_chunk := CASE v_name WHEN 'metric' THEN 10 WHEN 'completion' THEN 25 WHEN 'stats' THEN 50 ELSE 100 END;
+      v_cap   := CASE v_name WHEN 'metric' THEN 500 WHEN 'completion' THEN 1000 ELSE v_chunk END;
+      LOOP
+        BEGIN
+          v_p := NULL; v_e := NULL;
+          CASE v_name
+            WHEN 'metric'     THEN SELECT d.processed, d.errored INTO v_p, v_e FROM public.drain_vehicle_metric_queue(v_chunk) d;
+            WHEN 'completion' THEN SELECT d.processed, d.errored INTO v_p, v_e FROM public.drain_vehicle_completion_queue(v_chunk) d;
+            WHEN 'stats'      THEN SELECT d.processed, d.errored INTO v_p, v_e FROM public.drain_vehicle_stats_queue(v_chunk) d;
+            WHEN 'value'      THEN SELECT d.processed, d.errored INTO v_p, v_e FROM public.drain_vehicle_value_queue(v_chunk) d;
+          END CASE;
+        EXCEPTION
+          WHEN query_canceled THEN
+            RAISE;                           -- the job's own budget fired; fail loudly, do not swallow
+          WHEN OTHERS THEN
+            errored := -1;                   -- whole-call failure; earlier chunks of this run stay done
+            RAISE WARNING 'drain_vehicle_%_queue failed: %', v_name, SQLERRM;
+        END;
+        EXIT WHEN errored = -1;
+        processed := processed + coalesce(v_p, 0);
+        errored   := errored + coalesce(v_e, 0);
+        IF coalesce(v_e, 0) > 0 THEN v_failed_chunks := v_failed_chunks + 1; END IF;
+        IF v_failed_chunks >= 3 OR errored > 0.2 * (processed + errored) THEN
+          RAISE WARNING 'drain_vehicle_%_queue stopped for this run: % failed rows in % chunks', v_name, errored, v_failed_chunks;
+          EXIT;
+        END IF;
+        -- Stop when the queue ran short, the cap is reached, or this queue's slice has no time for another chunk.
+        EXIT WHEN coalesce(v_p, 0) + coalesce(v_e, 0) < v_chunk
+               OR processed + errored >= v_cap
+               OR clock_timestamp() >= v_until;
+      END LOOP;
+    END IF;
+
+    RETURN NEXT;
+  END LOOP;
+END;
+$function$;
+-- Live register_make_model_subject, verbatim (pg_get_functiondef 2026-11-20).
+CREATE OR REPLACE FUNCTION public.register_make_model_subject(p_make text, p_model text, p_year integer DEFAULT NULL::integer, p_grain text DEFAULT 'year'::text, p_year_start integer DEFAULT NULL::integer, p_year_end integer DEFAULT NULL::integer, p_label text DEFAULT NULL::text, p_basis text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_id uuid;
+  v_cm public.canonical_models%rowtype;
+  v_ys integer;
+  v_ye integer;
+  v_swap integer;
+  v_max_year integer := extract(year from now())::int + 1;
+begin
+  if p_make is null or length(trim(p_make)) < 1 or p_model is null or length(trim(p_model)) < 1 then
+    return null;
+  end if;
+  if p_grain not in ('year','generation','model') then return null; end if;
+  if p_grain = 'year' and (p_year is null or p_year < 1885 or p_year > v_max_year) then return null; end if;
+
+  select * into v_cm from public.canonical_models cm
+   where lower(cm.make) = lower(p_make)
+     and (lower(cm.canonical_model) = lower(p_model)
+          or lower(p_model) = any (select lower(a) from unnest(cm.aliases) a))
+   limit 1;
+
+  if p_grain <> 'year' then
+    v_ys := coalesce(p_year_start, v_cm.year_start, 1885);
+    v_ye := coalesce(p_year_end, v_cm.year_end, v_max_year);
+    if v_ys > v_ye then
+      v_swap := v_ys; v_ys := v_ye; v_ye := v_swap;
+    end if;
+    if v_ye > v_max_year then v_ye := v_max_year; end if;
+    if v_ys < 1885 then v_ys := 1885; end if;
+  end if;
+
+  insert into public.make_model_profiles
+    (canonical_make, canonical_model, grain, year, year_start, year_end, canonical_model_id, cohort_label, basis)
+  values (
+    upper(coalesce(v_cm.make, p_make)),
+    coalesce(v_cm.canonical_model, p_model),
+    p_grain,
+    case when p_grain = 'year' then p_year end,
+    case when p_grain <> 'year' then v_ys end,
+    case when p_grain <> 'year' then v_ye end,
+    v_cm.id, p_label, p_basis
+  )
+  on conflict (canonical_make, canonical_model, year, grain, year_start, year_end) do update
+    set updated_at = now(),
+        canonical_model_id = coalesce(excluded.canonical_model_id, public.make_model_profiles.canonical_model_id),
+        cohort_label = coalesce(excluded.cohort_label, public.make_model_profiles.cohort_label),
+        basis = coalesce(excluded.basis, public.make_model_profiles.basis)
+  returning subject_id into v_id;
+  return v_id;
+end;
+$function$
+;
+SELECT public.assert(md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure))
+  = 'f2e15e76d18ecfdd966451635b0fa677', 'fixture drain controller is the live body'); -- gitleaks:allow (function fingerprint, not a secret)
+SELECT public.assert(md5(pg_get_functiondef('public.register_make_model_subject(text,text,integer,text,integer,integer,text,text)'::regprocedure))
+  = 'd32567070a7695b3aa77d82d9014d540', 'fixture register_make_model_subject is the live body'); -- gitleaks:allow (function fingerprint, not a secret)
+SELECT public.assert(md5(pg_get_functiondef('public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure))
+  = '90041fe7e3651974716ed3ac40a78bfd', 'refresh is the 20261121090000 body, as live'); -- gitleaks:allow (function fingerprint, not a secret)
+CREATE TEMP TABLE drain_pre AS SELECT pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure) AS d;
+
+-- A make with the shapes the live table has: duplicate-looking aliases across models, numeric aliases, junk aliases,
+-- recorded and unrecorded years, a name that is another model's alias.
+INSERT INTO public.canonical_models(id, make, canonical_model, aliases, year_start, year_end) VALUES
+ ('c1000000-0000-4000-8000-000000000001', 'Truckco', 'K10', ARRAY['k10', 'k-10', 'cheyenne'], 1960, 1987),
+ ('c1000000-0000-4000-8000-000000000002', 'Truckco', 'K20', ARRAY['k20'], 1960, 1987),
+ ('c1000000-0000-4000-8000-000000000003', 'Truckco', 'C2500', ARRAY['c2500', '2500'], NULL, NULL),
+ ('c1000000-0000-4000-8000-000000000004', 'Truckco', 'Suburban', ARRAY['suburban', 'sub', 'jimmy'], 1935, NULL),
+ ('c1000000-0000-4000-8000-000000000005', 'Truckco', 'Jimmy', ARRAY['jimmy'], 1970, 1991),
+ ('c1000000-0000-4000-8000-000000000006', 'Truckco', 'Silverado', ARRAY['silverado', 'silverado 1500'], NULL, NULL),
+ ('c1000000-0000-4000-8000-000000000007', 'Truckco', 'Deluxe', ARRAY['deluxe', 'hot rod', 'f'], NULL, NULL),
+ ('c1000000-0000-4000-8000-000000000008', 'Truckco', 'K1500', ARRAY['k1500', 'k2500'], 1960, NULL),
+ ('c1000000-0000-4000-8000-000000000009', 'Truckco', 'Pickup', ARRAY['pickup', 'custom', 'k2500'], NULL, NULL),
+ ('c1000000-0000-4000-8000-000000000010', 'Truckco', 'Blazer', ARRAY['blazer'], 1965, NULL),
+ ('c1000000-0000-4000-8000-000000000011', 'Truckco', 'K5 Blazer', ARRAY['k5', 'blazer'], 1969, 1991),
+ ('c1000000-0000-4000-8000-000000000012', 'Truckco', 'Coupe', ARRAY['3-window', 'coupe'], 1908, NULL);
+INSERT INTO public.make_model_profiles(subject_id, canonical_make, canonical_model, canonical_model_id, grain, year) VALUES
+ ('51000000-0000-4000-8000-000000000001', 'TRUCKCO', 'Jimmy', 'c1000000-0000-4000-8000-000000000005', 'year', 1977),
+ ('51000000-0000-4000-8000-000000000002', 'TRUCKCO', 'Rat Rod', NULL, 'year', 1950),
+ ('51000000-0000-4000-8000-000000000003', 'TRUCKCO', 'K20', 'c1000000-0000-4000-8000-000000000002', 'year', 1975);
+
+\ir ../migrations/20261121110000_class_price_cohorts_and_queue.sql
+-- Idempotent: a second apply passes the guard on this migration's own bodies and changes nothing.
+CREATE TEMP TABLE bodies_after AS SELECT p.oid::regprocedure::text AS fn, pg_get_functiondef(p.oid) AS d FROM pg_proc p
+  WHERE p.oid IN ('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure,
+                  'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure);
+\ir ../migrations/20261121110000_class_price_cohorts_and_queue.sql
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM bodies_after b WHERE b.d IS DISTINCT FROM pg_get_functiondef(b.fn::regprocedure)),
+  're-apply leaves the bodies as they were');
+
+-- The four existing slices are byte-identical: the new controller is the live body through its FOREACH loop.
+SELECT public.assert((SELECT left(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure),
+    length(d) - length(E'END;\n$function$\n'))
+  = left(d, length(d) - length(E'END;\n$function$\n')) FROM drain_pre), 'controller unchanged through its four slices');
+
+-- Resolution: the cases, with the refusals --------------------------------------------------------------------------------
+CREATE TEMP TABLE resolve_cases(make text, model text, year int, tier text, canon text, register boolean, subject uuid, refusal text, why text);
+INSERT INTO resolve_cases VALUES
+ ('Truckco', 'K10 SWB', 1972, 'word', 'K10', true, NULL, NULL, 'the name K10 is a whole word of the model'),
+ ('Truckco', 'Suburban 2500', 1995, 'word', 'Suburban', true, NULL, NULL, '"2500" is an alias of C2500, and aliases are not word-matched'),
+ ('Truckco', 'K10', 1972, 'exact', 'K10', true, NULL, NULL, 'exact name'),
+ ('Truckco', 'Silverado 1500', 2004, 'exact', 'Silverado', true, NULL, NULL, 'exact alias; the name is a whole word, so it may be registered'),
+ ('Truckco', 'Coupe', 1932, 'exact', 'Coupe', true, NULL, NULL, 'exact name inside its years'),
+ ('Truckco', 'Hot Rod', 1932, 'exact', 'Deluxe', false, NULL, 'Deluxe is matched only through an alias%', 'a junk alias resolves but never registers'),
+ ('Truckco', 'K2500', 1983, 'none', NULL, false, NULL, 'the model matches 2 canonical models exactly (k1500, pickup)', 'exact tie, no profile: refused'),
+ ('Truckco', 'Jimmy', 1977, 'exact', 'Jimmy', false, '51000000-0000-4000-8000-000000000001', NULL, 'exact tie broken by the existing year profile'),
+ ('Truckco', 'Jimmy', 1978, 'none', NULL, false, NULL, 'the model matches 2 canonical models exactly (jimmy, suburban)', 'exact tie, no profile: refused'),
+ ('Truckco', 'Silverado K10', 1980, 'none', NULL, false, NULL, 'the model names 2 canonical models (k10, silverado)', 'two names: refused'),
+ ('Truckco', 'Blazer Chalet', 1975, 'word', 'Blazer', false, NULL, 'another canonical model of the make lists Blazer as an alias%', 'register would re-resolve the name with LIMIT 1'),
+ ('Truckco', '3-Window Coupe (kit)', 1932, 'none', NULL, false, NULL, 'the model names a kit or replica%', 'kit'),
+ ('Truckco', 'Coupe Replica', 1932, 'none', NULL, false, NULL, 'the model names a kit or replica%', 'replica'),
+ ('Truckco', 'K20 LWB', 1995, 'none', NULL, false, NULL, NULL, 'outside the recorded years of K20'),
+ ('Truckco', 'Custom 10', 1972, 'none', NULL, false, NULL, NULL, 'an alias ("custom") is not word-matched'),
+ ('Truckco', 'K100', 1972, 'none', NULL, false, NULL, NULL, 'no substring: K10 is not a word of K100'),
+ ('Truckco', 'Subway', 1972, 'none', NULL, false, NULL, NULL, 'no substring: sub is an alias, not a word here'),
+ ('Truckco', 'Rat Rod', 1950, 'raw', NULL, false, '51000000-0000-4000-8000-000000000002', NULL, 'a profile under the raw string is still read'),
+ ('Truckco', '', 1972, 'none', NULL, false, NULL, 'vehicle missing year, make or model', 'no model');
+GRANT SELECT ON resolve_cases TO service_role;
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM resolve_cases c, LATERAL (SELECT public.resolve_class_price_cohort(c.make, c.model, c.year) j) r
+  WHERE r.j->>'tier' IS DISTINCT FROM c.tier OR r.j->>'canonical_model' IS DISTINCT FROM c.canon
+     OR (r.j->>'register')::boolean IS DISTINCT FROM c.register OR (r.j->>'subject_id')::uuid IS DISTINCT FROM c.subject
+     OR NOT (coalesce(r.j->>'refusal', r.j->>'register_refusal', '') LIKE coalesce(c.refusal, ''))),
+  'resolution cases: ' || coalesce((SELECT string_agg(format('%s [%s %s] got %s', c.why, c.model, c.year,
+      public.resolve_class_price_cohort(c.make, c.model, c.year)), '; ')
+    FROM resolve_cases c, LATERAL (SELECT public.resolve_class_price_cohort(c.make, c.model, c.year) j) r
+    WHERE r.j->>'tier' IS DISTINCT FROM c.tier OR r.j->>'canonical_model' IS DISTINCT FROM c.canon
+       OR (r.j->>'register')::boolean IS DISTINCT FROM c.register OR (r.j->>'subject_id')::uuid IS DISTINCT FROM c.subject
+       OR NOT (coalesce(r.j->>'refusal', r.j->>'register_refusal', '') LIKE coalesce(c.refusal, ''))), ''));
+-- The existing fixture cohort resolves as before.
+SELECT public.assert(public.resolve_class_price_cohort('Fixture', 'Coupe GT', 1973)->>'subject_id' = '50000000-0000-4000-8000-000000000001',
+  'an exact alias still finds its registered cohort');
+RESET ROLE;
+
+-- Registration through the refresh ---------------------------------------------------------------------------------------
+-- R0 is O's 1972 "K10 SWB" (a build); R1-R5 sold K10 builds, R6 a sold build named by an alias; H0 a "Hot Rod", G0 a kit.
+INSERT INTO public.vehicles(id, year, make, model, description, user_id) VALUES
+ ('d0000000-0000-4000-8000-000000000000', 1972, 'Truckco', 'K10 SWB', 'lifted', '10000000-0000-4000-8000-000000000001'),
+ ('d0000000-0000-4000-8000-000000000001', 1972, 'Truckco', 'K10', 'lifted', NULL),
+ ('d0000000-0000-4000-8000-000000000002', 1972, 'Truckco', 'K10', 'lifted', NULL),
+ ('d0000000-0000-4000-8000-000000000003', 1972, 'Truckco', 'K10', 'lifted', NULL),
+ ('d0000000-0000-4000-8000-000000000004', 1972, 'Truckco', 'K10', 'lifted', NULL),
+ ('d0000000-0000-4000-8000-000000000005', 1972, 'Truckco', 'K10', 'lifted', NULL),
+ ('d0000000-0000-4000-8000-000000000006', 1972, 'Truckco', 'Cheyenne', 'lifted', NULL),
+ ('d0000000-0000-4000-8000-000000000007', 1932, 'Truckco', 'Hot Rod', 'lifted', NULL),
+ ('d0000000-0000-4000-8000-000000000008', 1932, 'Truckco', '3-Window Coupe (kit)', 'lifted', NULL);
+INSERT INTO public.vehicle_events(vehicle_id, final_price) VALUES
+ ('d0000000-0000-4000-8000-000000000001', 10000), ('d0000000-0000-4000-8000-000000000002', 20000),
+ ('d0000000-0000-4000-8000-000000000003', 30000), ('d0000000-0000-4000-8000-000000000004', 40000),
+ ('d0000000-0000-4000-8000-000000000005', 50000), ('d0000000-0000-4000-8000-000000000006', 60000);
+SET ROLE service_role;
+DO $$ DECLARE r jsonb; v_subject uuid;
+BEGIN
+  r := public.refresh_vehicle_class_price('d0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND (r->>'registered')::boolean AND r->>'resolution' = 'word'
+    AND r->>'value' = '35000' AND r->>'n' = '6' AND r->>'cohort' = '1972 Truckco K10', 'K10 SWB registers 1972 K10 and prices: ' || r::text);
+  SELECT subject_id INTO v_subject FROM public.make_model_profiles WHERE canonical_model = 'K10' AND year = 1972;
+  PERFORM public.assert((SELECT count(*) = 1 AND bool_and(canonical_make = 'TRUCKCO' AND grain = 'year'
+      AND canonical_model_id = 'c1000000-0000-4000-8000-000000000001')
+    FROM public.make_model_profiles WHERE lower(canonical_model) = 'k10' AND year = 1972), 'one year profile, under the canonical name and row');
+  PERFORM public.assert(EXISTS (SELECT 1 FROM public.cohort_members(v_subject) WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000000'),
+    'the subject is a member of the cohort it resolved to');
+  PERFORM public.assert((SELECT cohort_subject_id = v_subject AND method_version = 'class_price_v2'
+    FROM public.vehicle_class_price WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000000'), 'stored against the registered cohort');
+  -- A second refresh finds the profile and registers nothing.
+  r := public.refresh_vehicle_class_price('d0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND NOT (r->>'registered')::boolean, 'second refresh reuses the profile: ' || r::text);
+  PERFORM public.assert((SELECT count(*) FROM public.make_model_profiles WHERE lower(canonical_model) = 'k10') = 1, 'no duplicate profile');
+
+  -- Refused registrations write a definitive blocked reason and no profile; never the raw string.
+  r := public.refresh_vehicle_class_price('d0000000-0000-4000-8000-000000000007', 5000);
+  PERFORM public.assert(r->>'status' = 'blocked' AND r->>'reason' LIKE 'no registered cohort for this year-make-model: Deluxe is matched only through an alias%',
+    'Hot Rod is not registered as Deluxe: ' || r::text);
+  r := public.refresh_vehicle_class_price('d0000000-0000-4000-8000-000000000008', 5000);
+  PERFORM public.assert(r->>'status' = 'blocked' AND r->>'reason' LIKE 'no registered cohort for this year-make-model: the model names a kit or replica%',
+    'the kit is refused: ' || r::text);
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.make_model_profiles WHERE canonical_make = 'TRUCKCO'
+    AND lower(canonical_model) IN ('deluxe', 'hot rod', '3-window coupe (kit)', 'coupe')), 'nothing registered for them');
+  -- A vehicle with no canonical model at all keeps the plain reason.
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000033', 5000);
+  PERFORM public.assert(r->>'reason' = 'no registered cohort for this year-make-model', 'T unchanged: ' || r::text);
+END $$;
+RESET ROLE;
+
+-- Never blank -----------------------------------------------------------------------------------------------------------
+-- A fixture switch makes each classification statement take 1.1 s, so a 1 s budget cannot finish a cohort.
+CREATE FUNCTION public.fixture_slow_classify() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN IF current_setting('fixture.slow_classify', true) = 'on' THEN PERFORM pg_sleep(1.1); END IF; RETURN NULL; END $$;
+CREATE TRIGGER fixture_slow_classify AFTER INSERT ON public.vehicle_build_class FOR EACH STATEMENT EXECUTE FUNCTION public.fixture_slow_classify();
+-- A new, unclassified member of S's cohort.
+INSERT INTO public.vehicles(id, year, make, model, description) VALUES
+ ('a0000000-0000-4000-8000-000000000008', 1973, 'Fixture', 'Coupe', 'lifted, unsold');
+CREATE TEMP TABLE s_before AS SELECT * FROM public.vehicle_class_price WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+GRANT SELECT ON s_before TO service_role;
+SELECT public.assert((SELECT status = 'priced' AND value = 35000 FROM s_before), 'S starts priced');
+SET ROLE service_role;
+SELECT set_config('fixture.slow_classify', 'on', false);
+DO $$ DECLARE r jsonb;
+BEGIN
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 1000);
+  PERFORM public.assert(r->>'status' = 'pending' AND NOT (r->>'complete')::boolean AND (r->>'kept_prior_price')::boolean
+    AND r->>'reason' = 'cohort not yet classified (15 of 16)', 'an unfinished cohort keeps the price: ' || r::text);
+  PERFORM public.assert((SELECT (c.*)::text = (b.*)::text FROM public.vehicle_class_price c, s_before b
+    WHERE c.vehicle_id = 'a0000000-0000-4000-8000-000000000000'), 'the stored priced row is untouched, computed_at included');
+END $$;
+SELECT set_config('fixture.slow_classify', 'off', false);
+DO $$ DECLARE r jsonb;
+BEGIN
+  -- Finished: replaced by the completed computation.
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND (r->>'complete')::boolean AND r->>'value' = '35000', 'completed: ' || r::text);
+  PERFORM public.assert((SELECT cohort_members = 16 AND cohort_classified = 16 AND computed_at > (SELECT computed_at FROM s_before)
+    FROM public.vehicle_class_price WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'), 'the completed row replaces it');
+END $$;
+RESET ROLE;
+-- A definitive blocked reason does replace a priced row: P loses its only build signal.
+UPDATE public.vehicles SET description = NULL WHERE id = 'a0000000-0000-4000-8000-000000000031';
+SET ROLE service_role;
+DO $$ DECLARE r jsonb;
+BEGIN
+  PERFORM public.assert((SELECT status = 'priced' FROM public.vehicle_class_price WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000031'), 'P was priced');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000031', 0);
+  PERFORM public.assert(r->>'status' = 'blocked' AND (r->>'complete')::boolean AND r->>'reason' LIKE 'subject build class unknown%', 'P: ' || r::text);
+  PERFORM public.assert((SELECT status = 'blocked' AND value IS NULL FROM public.vehicle_class_price
+    WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000031'), 'a definitive reason replaces the price');
+END $$;
+-- First computation of a vehicle never priced: the unfinished cohort is written as blocked, k of n (as before).
+INSERT INTO public.vehicles(id, year, make, model, description) VALUES
+ ('a0000000-0000-4000-8000-000000000009', 1973, 'Fixture', 'Coupe', 'lifted, unsold too');
+SELECT set_config('fixture.slow_classify', 'on', false);
+DO $$ DECLARE r jsonb;
+BEGIN
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000012', 1000);
+  PERFORM public.assert(r->>'status' = 'blocked' AND NOT (r->>'complete')::boolean AND r->>'reason' = 'cohort not yet classified (16 of 17)',
+    'K2 first computation: ' || r::text);
+  PERFORM public.assert((SELECT status = 'blocked' AND blocked_reason = 'cohort not yet classified (16 of 17)'
+    FROM public.vehicle_class_price WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000012'), 'stored as blocked');
+END $$;
+SELECT set_config('fixture.slow_classify', 'off', false);
+RESET ROLE;
+
+-- The queue: enqueue from paper -------------------------------------------------------------------------------------------
+DELETE FROM public.vehicle_class_price_recompute_queue;
+-- O files a receipt and logs a work session as a signed-in user: both writes succeed and enqueue, without a queue grant.
+SET ROLE authenticated;
+SELECT set_config('fixture.role', 'authenticated', false), set_config('fixture.uid', '10000000-0000-4000-8000-000000000001', false);
+INSERT INTO public.receipts(id, vehicle_id, user_id, total_amount)
+  VALUES ('e0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000006', '10000000-0000-4000-8000-000000000001', 120);
+INSERT INTO public.work_sessions(vehicle_id, user_id, session_date, session_type)
+  VALUES ('d0000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000001', current_date, 'manual');
+SELECT public.refuses('SELECT * FROM public.vehicle_class_price_recompute_queue', '42501');
+SELECT public.refuses('SELECT * FROM public.drain_vehicle_class_price_queue(1, 5000)', '42501');
+SELECT public.refuses($$SELECT public.resolve_class_price_cohort('Truckco', 'K10', 1972)$$, '42501');
+SELECT public.refuses($$INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id) VALUES (gen_random_uuid())$$, '42501');
+RESET ROLE;
+SELECT set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+SELECT public.assert((SELECT array_agg(vehicle_id::text || ':' || reason ORDER BY reason) FROM public.vehicle_class_price_recompute_queue)
+  = ARRAY['d0000000-0000-4000-8000-000000000006:receipt', 'd0000000-0000-4000-8000-000000000005:work_session'],
+  'a receipt and a work session enqueue their vehicles');
+-- Only the columns the classifier reads enqueue: a change of filer does not, a supersession does, a move enqueues both
+-- vehicles, a deletion the old one.
+DELETE FROM public.vehicle_class_price_recompute_queue;
+UPDATE public.receipts SET user_id = '10000000-0000-4000-8000-000000000002' WHERE id = 'e0000000-0000-4000-8000-000000000001';
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'a filer change does not enqueue');
+UPDATE public.receipts SET superseded_at = now() WHERE id = 'e0000000-0000-4000-8000-000000000001';
+SELECT public.assert((SELECT array_agg(vehicle_id) FROM public.vehicle_class_price_recompute_queue)
+  = ARRAY['d0000000-0000-4000-8000-000000000006'::uuid], 'a supersession enqueues');
+DELETE FROM public.vehicle_class_price_recompute_queue;
+UPDATE public.receipts SET vehicle_id = 'd0000000-0000-4000-8000-000000000004' WHERE id = 'e0000000-0000-4000-8000-000000000001';
+SELECT public.assert((SELECT array_agg(vehicle_id ORDER BY vehicle_id) FROM public.vehicle_class_price_recompute_queue)
+  = ARRAY['d0000000-0000-4000-8000-000000000004'::uuid, 'd0000000-0000-4000-8000-000000000006'::uuid], 'a move enqueues both vehicles');
+DELETE FROM public.vehicle_class_price_recompute_queue;
+DELETE FROM public.receipts WHERE id = 'e0000000-0000-4000-8000-000000000001';
+SELECT public.assert((SELECT array_agg(vehicle_id) FROM public.vehicle_class_price_recompute_queue)
+  = ARRAY['d0000000-0000-4000-8000-000000000004'::uuid], 'a deletion enqueues the old vehicle');
+-- An enqueue that fails never fails the paper.
+CREATE FUNCTION public.fixture_fail_enqueue() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN IF current_setting('fixture.fail_enqueue', true) = 'on' THEN RAISE EXCEPTION 'synthetic enqueue failure'; END IF; RETURN NEW; END $$;
+CREATE TRIGGER fixture_fail_enqueue BEFORE INSERT ON public.vehicle_class_price_recompute_queue
+  FOR EACH ROW EXECUTE FUNCTION public.fixture_fail_enqueue();
+DELETE FROM public.vehicle_class_price_recompute_queue;
+SELECT set_config('fixture.fail_enqueue', 'on', false);
+SET ROLE authenticated;
+SELECT set_config('fixture.role', 'authenticated', false), set_config('fixture.uid', '10000000-0000-4000-8000-000000000001', false);
+INSERT INTO public.receipts(id, vehicle_id, user_id, total_amount)
+  VALUES ('e0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001', 80);
+RESET ROLE;
+SELECT set_config('fixture.fail_enqueue', 'off', false), set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+SELECT public.assert(EXISTS (SELECT 1 FROM public.receipts WHERE id = 'e0000000-0000-4000-8000-000000000002')
+  AND NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'the receipt landed; the failed enqueue only warned');
+
+-- The queue: drain --------------------------------------------------------------------------------------------------------
+-- Every stored row is fresh, so the daily top-up adds nothing; R0 and R5 are queued and both complete.
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES
+ ('d0000000-0000-4000-8000-000000000000', 'receipt'), ('d0000000-0000-4000-8000-000000000005', 'work_session');
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+SELECT public.assert((SELECT processed = 2 AND errored = 0 FROM public.drain_vehicle_class_price_queue(5, 5000)), 'two refreshed');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'completed ids leave the queue');
+SELECT public.assert((SELECT status = 'priced' AND value = 30000 AND n = 5 FROM public.vehicle_class_price
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'R5 priced by the drain against the other builds');
+-- Too little budget: nothing claimed. Just enough to claim but not to refresh: put back as not_reached.
+RESET ROLE;
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('d0000000-0000-4000-8000-000000000001', 'receipt');
+SET ROLE service_role;
+SELECT public.assert((SELECT processed = 0 AND errored = 0 FROM public.drain_vehicle_class_price_queue(5, 999)), 'under 1 s: nothing');
+SELECT public.assert((SELECT reason = 'receipt' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000001'), 'still queued as it was');
+RESET ROLE;
+-- A claim that takes 20 ms leaves under 1 s of a 1 s budget.
+CREATE FUNCTION public.fixture_slow_claim() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN IF current_setting('fixture.slow_claim', true) = 'on' THEN PERFORM pg_sleep(0.02); END IF; RETURN OLD; END $$;
+CREATE TRIGGER fixture_slow_claim BEFORE DELETE ON public.vehicle_class_price_recompute_queue
+  FOR EACH ROW EXECUTE FUNCTION public.fixture_slow_claim();
+SET ROLE service_role;
+SELECT set_config('fixture.slow_claim', 'on', false);
+SELECT public.assert((SELECT processed = 0 FROM public.drain_vehicle_class_price_queue(5, 1000)), 'claimed, not reached');
+SELECT set_config('fixture.slow_claim', 'off', false);
+SELECT public.assert((SELECT reason = 'not_reached' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000001'), 'not reached: back in the queue');
+RESET ROLE;
+DELETE FROM public.vehicle_class_price_recompute_queue;
+
+-- Incomplete stays queued; the stored price stays. The 1975 K20 cohort: Z0 and 5 sold builds; then one new member.
+INSERT INTO public.vehicles(id, year, make, model, description) VALUES
+ ('f0000000-0000-4000-8000-000000000000', 1975, 'Truckco', 'K20', 'lifted'),
+ ('f0000000-0000-4000-8000-000000000001', 1975, 'Truckco', 'K20', 'lifted'),
+ ('f0000000-0000-4000-8000-000000000002', 1975, 'Truckco', 'K20', 'lifted'),
+ ('f0000000-0000-4000-8000-000000000003', 1975, 'Truckco', 'K20', 'lifted'),
+ ('f0000000-0000-4000-8000-000000000004', 1975, 'Truckco', 'K20', 'lifted'),
+ ('f0000000-0000-4000-8000-000000000005', 1975, 'Truckco', 'K20', 'lifted');
+INSERT INTO public.vehicle_events(vehicle_id, final_price) VALUES
+ ('f0000000-0000-4000-8000-000000000001', 11000), ('f0000000-0000-4000-8000-000000000002', 12000),
+ ('f0000000-0000-4000-8000-000000000003', 13000), ('f0000000-0000-4000-8000-000000000004', 14000),
+ ('f0000000-0000-4000-8000-000000000005', 15000);
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('f0000000-0000-4000-8000-000000000000', 'receipt');
+SET ROLE service_role;
+SELECT set_config('fixture.slow_classify', 'on', false);
+-- First pass, never priced: incomplete, written as blocked k of n, kept in the queue.
+SELECT public.assert((SELECT processed = 1 FROM public.drain_vehicle_class_price_queue(1, 1100)), 'one refresh ran');
+SELECT public.assert((SELECT reason = 'incomplete' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'incomplete stays queued');
+SELECT public.assert((SELECT status = 'blocked' AND blocked_reason = 'cohort not yet classified (1 of 6)'
+  FROM public.vehicle_class_price WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'first pass writes k of n');
+SELECT set_config('fixture.slow_classify', 'off', false);
+SELECT public.assert((SELECT processed = 1 FROM public.drain_vehicle_class_price_queue(1, 5000)), 'second pass ran');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'complete: dequeued');
+SELECT public.assert((SELECT status = 'priced' AND value = 13000 AND n = 5 FROM public.vehicle_class_price
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'priced from the profile that already existed');
+RESET ROLE;
+INSERT INTO public.vehicles(id, year, make, model, description) VALUES ('f0000000-0000-4000-8000-000000000006', 1975, 'Truckco', 'K20', 'lifted');
+CREATE TEMP TABLE z_before AS SELECT * FROM public.vehicle_class_price WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000';
+GRANT SELECT ON z_before TO service_role;
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('f0000000-0000-4000-8000-000000000000', 'work_session');
+SET ROLE service_role;
+SELECT set_config('fixture.slow_classify', 'on', false);
+SELECT public.assert((SELECT processed = 1 FROM public.drain_vehicle_class_price_queue(1, 1100)), 'a refresh ran');
+SELECT set_config('fixture.slow_classify', 'off', false);
+SELECT public.assert((SELECT reason = 'incomplete' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'a priced vehicle with an unfinished cohort stays queued');
+SELECT public.assert((SELECT (c.*)::text = (b.*)::text FROM public.vehicle_class_price c, z_before b
+  WHERE c.vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'and its stored price is untouched');
+SELECT public.assert((SELECT processed = 1 FROM public.drain_vehicle_class_price_queue(1, 5000)), 'then completes');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue)
+  AND (SELECT status = 'priced' AND cohort_members = 7 FROM public.vehicle_class_price WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'),
+  'dequeued with the new member counted');
+RESET ROLE;
+
+-- An error is retried up to 3 times, then dropped until the daily top-up.
+CREATE FUNCTION public.fixture_fail_price() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN IF NEW.vehicle_id::text = current_setting('fixture.fail_vehicle', true) THEN RAISE EXCEPTION 'synthetic price failure'; END IF; RETURN NEW; END $$;
+CREATE TRIGGER fixture_fail_price BEFORE INSERT ON public.vehicle_class_price FOR EACH ROW EXECUTE FUNCTION public.fixture_fail_price();
+SELECT set_config('fixture.fail_vehicle', 'd0000000-0000-4000-8000-000000000002', false);
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('d0000000-0000-4000-8000-000000000002', 'receipt');
+SET ROLE service_role;
+SELECT public.assert((SELECT processed = 0 AND errored = 1 FROM public.drain_vehicle_class_price_queue(1, 5000)), 'error counted');
+SELECT public.assert((SELECT attempts = 1 AND reason = 'error' AND last_error = 'synthetic price failure'
+  FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'retried, with the error');
+SELECT public.drain_vehicle_class_price_queue(1, 5000);
+SELECT public.assert((SELECT attempts = 2 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'second attempt');
+SELECT public.drain_vehicle_class_price_queue(1, 5000);
+SELECT public.assert((SELECT attempts = 3 AND last_error = 'synthetic price failure' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'kept with its error after the third');
+SELECT public.assert((SELECT processed = 0 AND errored = 0 FROM public.drain_vehicle_class_price_queue(1, 5000)),
+  'a thrice-failed id is not claimed again within the day');
+RESET ROLE;
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '25 hours'
+ WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002';
+SET ROLE service_role;
+SELECT public.assert((SELECT errored = 1 FROM public.drain_vehicle_class_price_queue(1, 5000)), 'a day later it is tried again');
+SELECT public.assert((SELECT attempts = 4 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'and waits another day');
+RESET ROLE;
+-- New paper resets the count: the receipt trigger requeues it at attempts 0, and the fixed refresh then completes.
+SELECT set_config('fixture.fail_vehicle', '', false);
+INSERT INTO public.receipts(vehicle_id, user_id, total_amount) VALUES ('d0000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 10);
+SELECT public.assert((SELECT attempts = 0 AND reason = 'receipt' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'new paper resets attempts');
+SET ROLE service_role;
+SELECT public.assert((SELECT processed = 1 AND errored = 0 FROM public.drain_vehicle_class_price_queue(1, 5000)), 'refreshed');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'and dequeued');
+RESET ROLE;
+
+-- The daily top-up: a stored row older than 24 h is refreshed; a row whose vehicle is gone is not queued.
+UPDATE public.vehicle_class_price SET computed_at = now() - interval '25 hours' WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000003';
+INSERT INTO public.vehicle_class_price(vehicle_id, status, blocked_reason, method_version, computed_at)
+  VALUES ('d0000000-0000-4000-8000-0000000000ff', 'blocked', 'vehicle missing year/make', 'class_price_v1', now() - interval '30 hours');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000003'),
+  'R3 has no stored row yet');
+INSERT INTO public.vehicle_class_price(vehicle_id, status, blocked_reason, method_version, computed_at)
+  VALUES ('d0000000-0000-4000-8000-000000000003', 'blocked', 'old', 'class_price_v1', now() - interval '25 hours');
+SET ROLE service_role;
+SELECT public.assert((SELECT processed = 1 FROM public.drain_vehicle_class_price_queue(5, 5000)), 'the stale row was refreshed');
+SELECT public.assert((SELECT status = 'priced' AND computed_at > now() - interval '1 minute' FROM public.vehicle_class_price
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000003'), 'R3 is current');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'the orphan row is not queued');
+RESET ROLE;
+
+-- The controller: four rows as before, then class_price.
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('d0000000-0000-4000-8000-000000000000', 'receipt');
+DELETE FROM public.fixture_drain_calls;
+SET ROLE service_role;
+CREATE TEMP TABLE ctl AS SELECT * FROM public.drain_vehicle_derived_queues(false, 30);
+RESET ROLE;
+SELECT public.assert((SELECT array_agg(queue || ':' || processed || ':' || errored || ':' || skipped) FROM ctl)
+  = ARRAY['metric:0:0:false', 'stats:0:0:false', 'value:0:0:true', 'completion:0:0:false', 'class_price:1:0:false'],
+  'controller rows: ' || (SELECT string_agg(queue || ':' || processed || ':' || errored || ':' || skipped, ', ') FROM ctl));
+SELECT public.assert((SELECT array_agg(fn ORDER BY id) FROM public.fixture_drain_calls) = ARRAY['metric', 'stats', 'completion'],
+  'the existing slices are called as before');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'the controller drained the class price queue');
+SELECT public.assert(NOT has_function_privilege('authenticated', 'public.drain_vehicle_derived_queues(boolean,integer)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.drain_vehicle_class_price_queue(integer,integer)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.resolve_class_price_cohort(text,text,integer)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.enqueue_vehicle_class_price_on_paper()', 'EXECUTE'), 'grants');
+
+-- The guard: a controller body that drifted is not replaced (the migration rolls back).
+CREATE OR REPLACE FUNCTION public.drain_vehicle_derived_queues(p_include_value boolean DEFAULT false, p_budget_seconds integer DEFAULT 45)
+ RETURNS TABLE(queue text, processed integer, errored integer, skipped boolean) LANGUAGE plpgsql
+AS $function$ BEGIN queue := 'drifted'; RETURN NEXT; END; $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261121110000_class_price_cohorts_and_queue.sql
+\set ON_ERROR_STOP on
+SELECT public.assert((SELECT array_agg(queue) FROM public.drain_vehicle_derived_queues()) = ARRAY['drifted'],
+  'a drifted controller is refused, not overwritten');
+
+-- build_class_v5 (20261121160000): seven terms that matched the wrong thing, and the class version bump --------------
+SELECT set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+-- Before: S is priced from a fully classified v4 cohort.
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+SELECT public.assert((public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000))->>'status' = 'priced',
+  'before v5: S is priced');
+RESET ROLE;
+CREATE TEMP TABLE v5_price_before AS SELECT * FROM public.vehicle_class_price WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+GRANT SELECT ON v5_price_before TO service_role;
+CREATE TEMP TABLE v5_src_before AS SELECT oid, prosrc, proconfig, prosecdef, provolatile, proacl FROM pg_proc
+  WHERE oid IN ('public.classify_vehicle_build_class(uuid[])'::regprocedure,
+                'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure);
+SELECT public.assert((SELECT count(*) FROM public.vehicle_build_class WHERE method_version = 'v4_store_word_terms') > 0,
+  'before v5: the store holds v4 rows');
+
+\ir ../migrations/20261121160000_build_class_term_context.sql
+-- Idempotent: a second apply (as the deploy does on merge) changes nothing.
+\ir ../migrations/20261121160000_build_class_term_context.sql
+
+-- The bump changed one literal in each body and nothing else (settings, definer, volatility and grants too).
+SELECT public.assert((SELECT bool_and(replace(p.prosrc, '''v5_store_term_context''', '''v4_store_word_terms''') = b.prosrc
+    AND p.prosrc <> b.prosrc AND p.proconfig IS NOT DISTINCT FROM b.proconfig AND p.prosecdef = b.prosecdef
+    AND p.provolatile = b.provolatile AND p.proacl IS NOT DISTINCT FROM b.proacl) = true
+    AND count(*) = 2 FROM v5_src_before b JOIN pg_proc p ON p.oid = b.oid),
+  'classify and refresh differ from their v4 bodies only by the version literal');
+SELECT public.assert((SELECT substring(prosrc FROM 'c_class\s+constant text := ''([^'']+)''') FROM pg_proc
+    WHERE oid = 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure) = 'v5_store_term_context',
+  'refresh c_class is the version the classifier writes');
+SELECT public.assert(has_function_privilege('anon', 'public.nuke_build_class_rule(numeric,integer,text)', 'EXECUTE'), 'anon runs the rule');
+
+-- Every earlier rule case answers as before.
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected),
+  'v4 rule cases under v5: ' || coalesce((SELECT string_agg(format('%s [%s] got %s want %s', c.why, c.txt,
+      public.nuke_build_class_rule(0, 0, c.txt)->>'build_class', c.expected), '; ')
+    FROM rule_cases c WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected), ''));
+-- Each fixed term (no receipts, no sessions, text only).
+CREATE TEMP TABLE rule_cases_v5(txt text, expected text, why text);
+INSERT INTO rule_cases_v5 VALUES
+ -- Weld: the wheels count, welding does not
+ ('15-inch weld racing wheels', 'modified', 'Weld Racing wheels'),
+ ('rides on weld wheels', 'modified', 'Weld wheels'),
+ ('polished two-piece 15″ weld wheels', 'modified', 'Weld wheels after a size'),
+ ('weld draglites 15x6 front', 'modified', 'a Weld wheel line'),
+ ('weld-style aluminum wheels', 'modified', 'Weld-style wheels'),
+ ('floor pans welded in, needs welding', 'unknown', 'welding'),
+ ('previous weld repair on the case', 'unknown', 'a weld repair'),
+ ('weld in new metal. it will be a big job', 'unknown', 'weld in metal'),
+ ('all wheel welds are rust free', 'unknown', 'wheel welds'),
+ ('seller: weldingpro99', 'unknown', 'a word containing weld'),
+ -- Restored: "unrestored" and "needs restoration" are not restored
+ ('unrestored survivor', 'stock', '"unrestored" is a stock word only (two stock terms, no build)'),
+ ('an unrestored time capsule', 'stock', 'unrestored'),
+ ('an un-restored example', 'unknown', 'un-restored is not restored'),
+ ('this car needs total restoration', 'unknown', 'needs restoration'),
+ ('needing a full restoration', 'unknown', 'needing a full restoration'),
+ ('an excellent restoration candidate', 'unknown', 'restoration candidate'),
+ ('it has never been restored', 'unknown', 'never restored'),
+ ('frame-off restoration completed 2019', 'modified', 'a restoration still counts'),
+ ('restored in 2010', 'modified', 'restored still counts'),
+ -- Original owner: the manual is not the owner
+ ('includes original owner''s manual', 'unknown', 'original owner''s manual'),
+ ('original owners manual and jack', 'unknown', 'original owners manual'),
+ ('original owner’s handbook', 'unknown', 'curly apostrophe, handbook'),
+ ('bought from the original owner', 'stock', 'original owner still counts'),
+ ('original owner, with original owner''s manual', 'stock', 'the owner with the manual still counts'),
+ -- Numbers matching: the negation is not a stock signal
+ ('it is a not numbers-matching car', 'unknown', 'not numbers-matching'),
+ ('non-numbers matching 289', 'unknown', 'non-numbers matching'),
+ ('non-matching numbers engine', 'unknown', 'non-matching numbers'),
+ ('the seller admits the car isn’t numbers-matching', 'unknown', 'isn''t numbers-matching'),
+ ('non-original engine', 'unknown', 'non-original engine'),
+ ('numbers matching 327', 'stock', 'numbers matching still counts'),
+ -- Bagged, Rally wheels, Coys
+ ('when dismantled the car is bagged and tagged', 'unknown', 'bagged and tagged'),
+ ('bagged all around', 'modified', 'bagged (air bags)'),
+ ('rally wheels and redline tires', 'unknown', 'factory Rally wheels'),
+ ('event_name: coys auction - brands hatch', 'unknown', 'the Coys auction house'),
+ ('20 inch coys custom color-matched wheels', 'modified', 'Coys wheels'),
+ ('coys wheels with redline tires', 'modified', 'Coys wheels');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases_v5 c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected),
+  'v5 rule cases: ' || coalesce((SELECT string_agg(format('%s [%s] got %s want %s', c.why, c.txt,
+      public.nuke_build_class_rule(0, 0, c.txt)->>'build_class', c.expected), '; ')
+    FROM rule_cases_v5 c WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected), ''));
+SELECT public.assert(public.nuke_build_class_rule(5000, 0, 'unrestored survivor')->>'build_class' = 'documented_build', 'paper first');
+
+-- Reclassification after the bump: every v4 member is out of date. Never blank: a refresh with no budget keeps the stored
+-- price and answers incomplete; a full one reclassifies the cohort; a third finds nothing out of date.
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+DO $$ DECLARE r jsonb; n_members int;
+BEGIN
+  SELECT count(*) - 1 INTO n_members FROM public.cohort_members('50000000-0000-4000-8000-000000000001');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 0);
+  PERFORM public.assert(r->>'status' = 'pending' AND NOT (r->>'complete')::boolean AND (r->>'kept_prior_price')::boolean
+    AND (r->>'classified_this_call')::int = 0, 'no budget: the stored price is kept: ' || r::text);
+  PERFORM public.assert((SELECT p.status = 'priced' AND p.value = b.value AND p.n = b.n AND p.computed_at = b.computed_at
+    FROM public.vehicle_class_price p, v5_price_before b WHERE p.vehicle_id = b.vehicle_id), 'the priced row is untouched');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND (r->>'complete')::boolean AND (r->>'classified_this_call')::int = n_members,
+    'the bump reclassifies the whole cohort: ' || r::text);
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.cohort_members('50000000-0000-4000-8000-000000000001') m
+    JOIN public.vehicle_build_class b ON b.vehicle_id = m.vehicle_id WHERE b.method_version <> 'v5_store_term_context'),
+    'every cohort member is on v5');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000');
+  PERFORM public.assert((r->>'classified_this_call')::int = 0 AND r->>'status' = 'priced', 'v5 rows are current');
+END $$;
+RESET ROLE;
+SELECT set_config('fixture.role', '', false);
+
+-- class price queue on its own cron statement (20261121170000) -------------------------------------------------------
+-- The controller as 20261121110000 left it (the guard test above swapped in a drifted body on purpose).
+DO $$ BEGIN EXECUTE (SELECT d FROM bodies_after WHERE fn LIKE 'drain_vehicle_derived_queues(%'); END $$;
+SELECT public.assert(md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure))
+  = '2bf3f88d02acaa3244e4312893d18fd9', 'before: the five-slice controller, as live'); -- gitleaks:allow (function fingerprint, not a secret)
+-- pg_cron's job table and schedule(), reduced: schedule upserts by name as pg_cron 1.6 does.
+CREATE SCHEMA cron;
+CREATE TABLE cron.job(jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, active boolean DEFAULT true);
+CREATE FUNCTION cron.schedule(p_name text, p_schedule text, p_command text) RETURNS bigint LANGUAGE sql AS $$
+  INSERT INTO cron.job(jobname, schedule, command) VALUES (p_name, p_schedule, p_command)
+  ON CONFLICT (jobname) DO UPDATE SET schedule = EXCLUDED.schedule, command = EXCLUDED.command RETURNING jobid $$;
+
+\ir ../migrations/20261121170000_class_price_queue_own_cron.sql
+CREATE TEMP TABLE own_job_bodies AS SELECT p.oid, pg_get_functiondef(p.oid) AS d FROM pg_proc p
+  WHERE p.proname IN ('drain_vehicle_derived_queues', 'drain_vehicle_class_price_queue', 'top_up_vehicle_class_price_queue',
+                      'claim_vehicle_class_price_queue_id', 'refresh_claimed_vehicle_class_price', 'refresh_vehicle_class_price');
+-- Idempotent: a second apply (as the deploy does on merge) passes its guard and changes nothing.
+\ir ../migrations/20261121170000_class_price_queue_own_cron.sql
+SELECT public.assert((SELECT count(*) = 6 AND bool_and(b.d = pg_get_functiondef(b.oid)) FROM own_job_bodies b),
+  're-apply leaves the bodies as they were');
+
+-- The controller is byte-identical to its body before 20261121110000.
+SELECT public.assert((SELECT pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure) = d FROM drain_pre),
+  'controller restored byte for byte');
+SELECT public.assert(md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure))
+  = 'f2e15e76d18ecfdd966451635b0fa677', 'controller md5 is the pre-20261121110000 body'); -- gitleaks:allow (function fingerprint, not a secret)
+SELECT public.assert(md5(pg_get_functiondef('public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure))
+  = '3bb0a0f6c048f71bb4deda69adcdd993', 'refresh_vehicle_class_price untouched'); -- gitleaks:allow (function fingerprint, not a secret)
+
+-- The job: one row, odd minutes, both statements with their own timeouts, the claim committed before the refresh.
+SELECT public.assert((SELECT count(*) FROM cron.job WHERE jobname = 'drain-class-price-queue') = 1, 'one job, after two applies');
+SELECT public.assert((SELECT schedule = '1-59/2 * * * *'
+    AND command ~ $re$^SELECT set_config\('app\.writer', 'drain-class-price-queue', false\); SET statement_timeout = '15s'; $re$
+    AND command ~ $re$claim_vehicle_class_price_queue_id\(\)::text, ''\), false\); COMMIT; SET statement_timeout = '55s'; SELECT public\.refresh_claimed_vehicle_class_price\($re$
+  FROM cron.job WHERE jobname = 'drain-class-price-queue'), 'job schedule and command');
+
+-- The controller no longer touches the class price queue: four rows, the existing slices called, the queued id stays.
+DELETE FROM public.vehicle_class_price_recompute_queue;
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('a0000000-0000-4000-8000-000000000000', 'receipt');
+DELETE FROM public.fixture_drain_calls;
+SET ROLE service_role;
+CREATE TEMP TABLE ctl4 AS SELECT * FROM public.drain_vehicle_derived_queues(false, 30);
+RESET ROLE;
+SELECT public.assert((SELECT array_agg(queue || ':' || skipped) FROM ctl4)
+  = ARRAY['metric:false', 'stats:false', 'value:true', 'completion:false'], 'controller: the four slices only');
+SELECT public.assert((SELECT array_agg(fn ORDER BY id) FROM public.fixture_drain_calls) = ARRAY['metric', 'stats', 'completion'],
+  'the existing slices are called as before');
+SELECT public.assert((SELECT reason = 'receipt' AND attempts = 0 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'), 'the class price queue is left to its own job');
+
+-- A slow refresh. S is priced; its refresh sleeps 3 s before writing the price. The job's command runs as cron sends it
+-- (one query string, \gexec), with the refresh statement's 55 s timeout lowered to 1 s so the cancel happens here.
+CREATE FUNCTION public.fixture_sleep_price() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN IF NEW.vehicle_id::text = current_setting('fixture.sleep_vehicle', true) THEN PERFORM pg_sleep(3); END IF; RETURN NEW; END $$;
+CREATE TRIGGER fixture_sleep_price BEFORE INSERT ON public.vehicle_class_price FOR EACH ROW EXECUTE FUNCTION public.fixture_sleep_price();
+CREATE TEMP TABLE s_price_before AS SELECT * FROM public.vehicle_class_price WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+SELECT public.assert((SELECT count(*) = 1 AND bool_and(status = 'priced') FROM s_price_before), 'S starts priced');
+CREATE TEMP TABLE others_price_before AS SELECT * FROM public.vehicle_class_price
+  WHERE vehicle_id IN ('d0000000-0000-4000-8000-000000000005', 'f0000000-0000-4000-8000-000000000000');
+DELETE FROM public.vehicle_class_price_recompute_queue;
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, queued_at, reason) VALUES
+ ('a0000000-0000-4000-8000-000000000000', now() - interval '3 minutes', 'receipt'),
+ ('d0000000-0000-4000-8000-000000000005', now() - interval '2 minutes', 'work_session'),
+ ('f0000000-0000-4000-8000-000000000000', now() - interval '1 minute', 'receipt');
+SELECT set_config('fixture.sleep_vehicle', 'a0000000-0000-4000-8000-000000000000', false);
+\set ON_ERROR_STOP off
+SELECT replace(command, $q$statement_timeout = '55s'$q$, $q$statement_timeout = '1s'$q$) FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+\set ON_ERROR_STOP on
+RESET statement_timeout; RESET lock_timeout;
+-- Cancelled: the mark is the attempt, with its error, at the back of the line; nothing else moved.
+SELECT public.assert((SELECT attempts = 1 AND reason = 'running' AND last_error LIKE 'refresh started % (queued as receipt) and did not finish%'
+    AND queued_at > now() - interval '1 minute'
+  FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'),
+  'cancelled: attempt and error recorded: ' || (SELECT row_to_json(q)::text FROM public.vehicle_class_price_recompute_queue q
+    WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'));
+SELECT public.assert((SELECT (c.*)::text = (b.*)::text FROM public.vehicle_class_price c, s_price_before b
+  WHERE c.vehicle_id = b.vehicle_id), 'cancelled: S''s stored price is untouched');
+SELECT public.assert((SELECT array_agg(vehicle_id::text || ':' || reason || ':' || attempts ORDER BY queued_at)
+    FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id <> 'a0000000-0000-4000-8000-000000000000')
+  = ARRAY['d0000000-0000-4000-8000-000000000005:work_session:0', 'f0000000-0000-4000-8000-000000000000:receipt:0'],
+  'cancelled: the other queue rows are intact');
+-- The next runs (real command, 55 s) take the others first; S's mark is under 5 minutes old, so it is not claimed again.
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'the job drained the next vehicle');
+SELECT public.assert((SELECT c.status = 'priced' AND c.computed_at > b.computed_at FROM public.vehicle_class_price c, others_price_before b
+  WHERE c.vehicle_id = b.vehicle_id AND c.vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'and refreshed its price');
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'and the one after');
+CREATE TEMP TABLE s_mark AS SELECT * FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert((SELECT (q.*)::text = (m.*)::text FROM public.vehicle_class_price_recompute_queue q, s_mark m
+  WHERE q.vehicle_id = m.vehicle_id), 'a running mark under 5 minutes old is not claimed (overlap guard)');
+-- Backed off: two more cancelled tries (each after 5 minutes), then it waits a day; nothing loops.
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '6 minutes'
+ WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+\set ON_ERROR_STOP off
+SELECT replace(command, $q$statement_timeout = '55s'$q$, $q$statement_timeout = '1s'$q$) FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+\set ON_ERROR_STOP on
+RESET statement_timeout; RESET lock_timeout;
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '6 minutes'
+ WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+\set ON_ERROR_STOP off
+SELECT replace(command, $q$statement_timeout = '55s'$q$, $q$statement_timeout = '1s'$q$) FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+\set ON_ERROR_STOP on
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert((SELECT attempts = 3 AND reason = 'running' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'), 'three cancelled attempts recorded');
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '23 hours'
+ WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+SELECT public.assert(public.claim_vehicle_class_price_queue_id() IS NULL, 'after three, not claimed within the day');
+SELECT public.assert((SELECT (c.*)::text = (b.*)::text FROM public.vehicle_class_price c, s_price_before b
+  WHERE c.vehicle_id = b.vehicle_id), 'S''s stored price is still untouched');
+-- A day later it is tried again; fast now, it completes and leaves the queue.
+SELECT set_config('fixture.sleep_vehicle', '', false);
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '25 hours'
+ WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'S refreshed a day later: queue empty');
+SELECT public.assert((SELECT c.status = 'priced' AND c.value = b.value AND c.computed_at > b.computed_at
+  FROM public.vehicle_class_price c, s_price_before b WHERE c.vehicle_id = b.vehicle_id), 'S priced again, same value');
+
+-- An error in the refresh: kept with its message and the attempt; the run itself succeeds.
+SELECT set_config('fixture.fail_vehicle', 'd0000000-0000-4000-8000-000000000005', false);
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('d0000000-0000-4000-8000-000000000005', 'receipt');
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT set_config('fixture.fail_vehicle', '', false);
+SELECT public.assert((SELECT attempts = 1 AND reason = 'error' AND last_error = 'synthetic price failure'
+  FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'error kept with its attempt');
+DELETE FROM public.vehicle_class_price_recompute_queue;
+
+-- Incomplete is progress: back in line, the attempt taken back, the stored price kept.
+INSERT INTO public.vehicles(id, year, make, model, description) VALUES ('f0000000-0000-4000-8000-000000000007', 1975, 'Truckco', 'K20', 'lifted');
+CREATE TEMP TABLE z_price_before AS SELECT * FROM public.vehicle_class_price WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000';
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('f0000000-0000-4000-8000-000000000000', 'receipt');
+SELECT public.assert(public.claim_vehicle_class_price_queue_id() = 'f0000000-0000-4000-8000-000000000000', 'claimed');
+SELECT set_config('fixture.slow_classify', 'on', false);
+SELECT public.assert(public.refresh_claimed_vehicle_class_price('f0000000-0000-4000-8000-000000000000', 1000)->>'outcome' = 'incomplete',
+  'a 1 s budget leaves the new member unclassified');
+SELECT set_config('fixture.slow_classify', 'off', false);
+SELECT public.assert((SELECT attempts = 0 AND reason = 'incomplete' AND last_error IS NULL FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'incomplete: queued, attempt taken back');
+SELECT public.assert((SELECT (c.*)::text = (b.*)::text FROM public.vehicle_class_price c, z_price_before b
+  WHERE c.vehicle_id = b.vehicle_id), 'incomplete: the stored price is kept (never blank)');
+-- Paper during a refresh: the trigger re-queues the id, so the finished refresh does not dequeue it.
+SELECT public.assert(public.claim_vehicle_class_price_queue_id() = 'f0000000-0000-4000-8000-000000000000', 'claimed again');
+INSERT INTO public.work_sessions(vehicle_id, session_type) VALUES ('f0000000-0000-4000-8000-000000000000', 'repair');
+SELECT public.assert((public.refresh_claimed_vehicle_class_price('f0000000-0000-4000-8000-000000000000'))->>'dequeued' = 'false',
+  'complete, but new paper keeps it queued');
+SELECT public.assert((SELECT reason = 'work_session' AND attempts = 0 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'the paper''s enqueue survives');
+-- The by-hand drain goes through the same claim and refresh.
+SET ROLE service_role;
+SELECT public.assert((SELECT processed = 1 AND errored = 0 FROM public.drain_vehicle_class_price_queue(5, 5000)), 'by-hand drain');
+RESET ROLE;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'by-hand drain dequeued it');
+-- The daily top-up runs from the claim.
+UPDATE public.vehicle_class_price SET computed_at = now() - interval '25 hours' WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005';
+SELECT public.assert(public.claim_vehicle_class_price_queue_id() = 'd0000000-0000-4000-8000-000000000005', 'the claim tops up stale rows');
+SELECT public.assert((SELECT last_error LIKE '%(queued as stale)%' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'queued as stale');
+DELETE FROM public.vehicle_class_price_recompute_queue;
+SELECT public.assert(NOT has_function_privilege('anon', 'public.claim_vehicle_class_price_queue_id(uuid[])', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.refresh_claimed_vehicle_class_price(uuid,integer)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.top_up_vehicle_class_price_queue(integer)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.refresh_claimed_vehicle_class_price(uuid,integer)', 'EXECUTE'), 'own job grants');
+
+-- The guard: a controller that drifted again is not replaced (the migration rolls back).
+CREATE OR REPLACE FUNCTION public.drain_vehicle_derived_queues(p_include_value boolean DEFAULT false, p_budget_seconds integer DEFAULT 45)
+ RETURNS TABLE(queue text, processed integer, errored integer, skipped boolean) LANGUAGE plpgsql
+AS $function$ BEGIN queue := 'drifted'; RETURN NEXT; END; $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261121170000_class_price_queue_own_cron.sql
+\set ON_ERROR_STOP on
+SELECT public.assert((SELECT array_agg(queue) FROM public.drain_vehicle_derived_queues()) = ARRAY['drifted'],
+  'own job: a drifted controller is refused, not overwritten');
+
+-- build_class_v6 (20261121200000): a rebuilt engine is not a swap, factory fuel injection is not a build ---------------
+SELECT set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+SELECT public.assert((public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000))->>'status' = 'priced',
+  'before v6: S is priced');
+RESET ROLE;
+SELECT set_config('fixture.role', '', false);
+CREATE TEMP TABLE v6_src_before AS SELECT oid, prosrc, proconfig, prosecdef, provolatile, proacl FROM pg_proc
+  WHERE oid IN ('public.classify_vehicle_build_class(uuid[])'::regprocedure,
+                'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure,
+                'public.nuke_build_class(uuid)'::regprocedure);
+CREATE TEMP TABLE v6_rule3_acl AS SELECT proacl FROM pg_proc WHERE oid = 'public.nuke_build_class_rule(numeric,integer,text)'::regprocedure;
+SELECT public.assert((SELECT count(*) FROM public.vehicle_build_class WHERE method_version = 'v5_store_term_context') > 0,
+  'before v6: the store holds v5 rows');
+
+\ir ../migrations/20261121200000_build_class_rebuild_factory_efi.sql
+-- Idempotent: a second apply (as the deploy does on merge) changes nothing.
+\ir ../migrations/20261121200000_build_class_rebuild_factory_efi.sql
+
+-- The callers changed only by their named literals (settings, definer, volatility and grants too).
+SELECT public.assert((SELECT bool_and(
+      replace(replace(replace(replace(p.prosrc,
+        '''v6_store_rebuild_factory_efi''', '''v5_store_term_context'''),
+        'SELECT v.id, v.year, v.is_modified,', 'SELECT v.id, v.is_modified,'),
+        'inp.txt, inp.year)', 'inp.txt)'),
+        'v_text, (SELECT year FROM vehicles WHERE id = p_vehicle_id))', 'v_text)') = b.prosrc
+    AND p.prosrc <> b.prosrc AND p.proconfig IS NOT DISTINCT FROM b.proconfig AND p.prosecdef = b.prosecdef
+    AND p.provolatile = b.provolatile AND p.proacl IS NOT DISTINCT FROM b.proacl) = true
+    AND count(*) = 3 FROM v6_src_before b JOIN pg_proc p ON p.oid = b.oid),
+  'classify, refresh and nuke_build_class differ from their v5 bodies only by the named literals');
+SELECT public.assert((SELECT substring(prosrc FROM 'c_class\s+constant text := ''([^'']+)''') FROM pg_proc
+    WHERE oid = 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure) = 'v6_store_rebuild_factory_efi',
+  'refresh c_class is the version the classifier writes');
+SELECT public.assert(has_function_privilege('anon', 'public.nuke_build_class_rule(numeric,integer,text)', 'EXECUTE')
+  AND has_function_privilege('anon', 'public.nuke_build_class_rule(numeric,integer,text,integer)', 'EXECUTE')
+  AND (SELECT proacl FROM pg_proc WHERE oid = 'public.nuke_build_class_rule(numeric,integer,text)'::regprocedure)
+      IS NOT DISTINCT FROM (SELECT proacl FROM v6_rule3_acl)
+  AND (SELECT provolatile = 'i' AND proparallel = 's' FROM pg_proc
+        WHERE oid = 'public.nuke_build_class_rule(numeric,integer,text,integer)'::regprocedure), 'anon runs both rule forms');
+
+-- Every earlier rule case answers as before, with no year and with an early year.
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM (SELECT txt, expected FROM rule_cases UNION ALL SELECT txt, expected FROM rule_cases_v5) c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected
+     OR public.nuke_build_class_rule(0, 0, c.txt, 1966)->>'build_class' IS DISTINCT FROM c.expected),
+  'v4 and v5 rule cases under v6');
+-- Each fixed case (no receipts, no sessions): text and model year.
+CREATE TEMP TABLE rule_cases_v6(txt text, yr int, expected text, why text);
+INSERT INTO rule_cases_v6 VALUES
+ -- a rebuild is the same engine made new
+ ('the original engine was rebuilt in 2015', 1967, 'stock', 'rebuilt original engine: the original engine is a stock signal'),
+ ('freshly rebuilt engine and new brakes', 1967, 'unknown', 'rebuilt engine'),
+ ('rebuilt 350 v8 with new gaskets', 1972, 'unknown', 'rebuilt 350'),
+ ('engine rebuild completed 3,000 miles ago', 1966, 'unknown', 'engine rebuild'),
+ ('rebuilt th350 transmission', 1972, 'unknown', 'rebuilt transmission'),
+ ('numbers matching 327, engine rebuilt', 1967, 'stock', 'a rebuilt numbers-matching engine stays stock'),
+ -- a swap still counts
+ ('engine swap to a 383', 1967, 'modified', 'engine swap'),
+ ('350 swapped in from a 1979 truck', 1972, 'modified', '350 swapped in'),
+ ('ls swap', 1972, 'modified', 'LS swap, bare'),
+ ('ls swapped with a 6-speed', 1985, 'modified', 'LS swapped'),
+ ('a crate engine was installed', 1970, 'modified', 'crate engine'),
+ ('the engine was replaced with a 400', 1974, 'modified', 'replaced engine'),
+ ('rebuilt 350 replaced the original 307 engine', 1972, 'modified', 'a rebuilt engine that replaced the original'),
+ ('in 2023 a 383ci v8 was installed', 1966, 'modified', 'an engine installed'),
+ ('the 5.3-liter l83 v8 was installed in 2022', 1979, 'modified', 'an LS engine installed'),
+ ('a tremec five-speed manual transmission has been installed', 1966, 'modified', 'a gearbox installed'),
+ ('the transmission was fitted with new parts', 1966, 'unknown', 'fitted with parts is not a swap'),
+ ('a new geared starter motor was fitted', 1966, 'unknown', 'a starter motor is not an engine'),
+ -- a rebuild that changed the engine is a build signal (not a swap)
+ ('the 289 was rebuilt and stroked to 331', 1965, 'modified', 'a stroked rebuild'),
+ ('383 stroker', 1970, 'modified', 'a stroker'),
+ ('the engine was rebuilt to high-performance specifications', 1971, 'modified', 'a high-performance rebuild'),
+ ('302 rebuilt and bored out to 306ci', 1971, 'modified', 'bored to a new displacement'),
+ ('289 v8 rebuilt and bored .030 over', 1965, 'unknown', 'an overbore is part of a rebuild'),
+ ('rebuilt 327/275 hp v-8 engine', 1967, 'unknown', 'a factory rating is not a build'),
+ -- factory fuel injection from model year 1987
+ ('fuel injected 350', 1988, 'unknown', 'factory TBI on a 1988 truck'),
+ ('fuel-injected 5.7 liter v8', 1995, 'unknown', 'factory injection, 1995'),
+ ('fuel injection, 4-speed automatic', 1987, 'unknown', 'the first factory TBI year'),
+ ('tbi 350 and 4l60', 1989, 'unknown', 'TBI'),
+ ('efi 5.0', 1990, 'unknown', 'EFI'),
+ -- the bare term still counts before 1987, or with no year
+ ('fuel injected 350', 1972, 'modified', 'fuel injection on a carbureted-era car'),
+ ('fuel injected 350', 1986, 'modified', 'the year before the cutoff'),
+ ('fuel injected 350', NULL, 'modified', 'unknown year: as before'),
+ -- named aftermarket systems and conversions count at any year
+ ('holley sniper efi', 1972, 'modified', 'Holley Sniper EFI'),
+ ('holley sniper efi', 1995, 'modified', 'Holley Sniper EFI on a 1995'),
+ ('efi conversion', 1972, 'modified', 'EFI conversion'),
+ ('efi conversion', 1988, 'modified', 'EFI conversion after 1987'),
+ ('converted to fuel injection', 1990, 'modified', 'converted to fuel injection'),
+ ('fitech efi system', 1979, 'modified', 'FiTech'),
+ ('tbi swap', 1983, 'modified', 'TBI swap'),
+ ('ls swap with fuel injection', 1995, 'modified', 'LS swap after 1987');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases_v6 c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt, c.yr)->>'build_class' IS DISTINCT FROM c.expected),
+  'v6 rule cases: ' || coalesce((SELECT string_agg(format('%s [%s, %s] got %s want %s', c.why, c.txt, c.yr,
+      public.nuke_build_class_rule(0, 0, c.txt, c.yr)->>'build_class', c.expected), '; ')
+    FROM rule_cases_v6 c WHERE public.nuke_build_class_rule(0, 0, c.txt, c.yr)->>'build_class' IS DISTINCT FROM c.expected), ''));
+-- The three-argument form is the four-argument form with no year.
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases_v6 c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt) IS DISTINCT FROM public.nuke_build_class_rule(0, 0, c.txt, NULL)),
+  'three arguments = no year');
+SELECT public.assert(public.nuke_build_class_rule(5000, 0, 'fuel injected', 1995)->>'build_class' = 'documented_build', 'paper first');
+
+-- The store and the caller's view read the vehicle's year: the same text, two years, two classes.
+INSERT INTO public.vehicles(id, year, make, model, description) VALUES
+ ('a0000000-0000-4000-8000-000000000051', 1995, 'Fixture', 'Van', 'fuel injected 350, rebuilt engine'),     -- Y1
+ ('a0000000-0000-4000-8000-000000000052', 1972, 'Fixture', 'Van', 'fuel injected 350, rebuilt engine');     -- Y2
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+SELECT public.assert(public.classify_vehicle_build_class(ARRAY['a0000000-0000-4000-8000-000000000051',
+  'a0000000-0000-4000-8000-000000000052']::uuid[]) = 2, 'Y1 and Y2 classified');
+RESET ROLE;
+SELECT set_config('fixture.role', '', false);
+SELECT public.assert((SELECT string_agg(build_class || '/' || method_version, ',' ORDER BY vehicle_id) FROM public.vehicle_build_class
+    WHERE vehicle_id IN ('a0000000-0000-4000-8000-000000000051', 'a0000000-0000-4000-8000-000000000052'))
+  = 'unknown/v6_store_rebuild_factory_efi,modified/v6_store_rebuild_factory_efi', 'the store reads the year');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_build_class b
+    WHERE b.vehicle_id IN ('a0000000-0000-4000-8000-000000000051', 'a0000000-0000-4000-8000-000000000052')
+      AND public.nuke_build_class(b.vehicle_id)->>'build_class' IS DISTINCT FROM b.build_class), 'the caller''s view agrees with the store');
+
+-- Reclassification after the bump: every v5 member is out of date; a full refresh puts the cohort on v6.
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+DO $$ DECLARE r jsonb; n_members int;
+BEGIN
+  SELECT count(*) - 1 INTO n_members FROM public.cohort_members('50000000-0000-4000-8000-000000000001');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND (r->>'complete')::boolean AND (r->>'classified_this_call')::int = n_members,
+    'the v6 bump reclassifies the whole cohort: ' || r::text);
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.cohort_members('50000000-0000-4000-8000-000000000001') m
+    JOIN public.vehicle_build_class b ON b.vehicle_id = m.vehicle_id WHERE b.method_version <> 'v6_store_rebuild_factory_efi'),
+    'every cohort member is on v6');
+END $$;
+RESET ROLE;
+SELECT set_config('fixture.role', '', false);
+
+-- The guard: a four-argument rule that drifted is not replaced (the migration rolls back).
+CREATE OR REPLACE FUNCTION public.nuke_build_class_rule(p_receipts numeric, p_sessions integer, p_text text, p_year integer)
+ RETURNS jsonb LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path TO pg_catalog, pg_temp
+AS $function$ SELECT '{"build_class": "drifted"}'::jsonb $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261121200000_build_class_rebuild_factory_efi.sql
+\set ON_ERROR_STOP on
+SELECT public.assert(public.nuke_build_class_rule(0, 0, 'lifted', 1972)->>'build_class' = 'drifted',
+  'a drifted v6 rule is refused, not overwritten');
+
+-- The guard: a rule body that drifted is not replaced (the migration rolls back).
+CREATE OR REPLACE FUNCTION public.nuke_build_class_rule(p_receipts numeric, p_sessions integer, p_text text)
+ RETURNS jsonb LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path TO pg_catalog, pg_temp
+AS $function$ SELECT '{"build_class": "drifted"}'::jsonb $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261121160000_build_class_term_context.sql
+\set ON_ERROR_STOP on
+SELECT public.assert(public.nuke_build_class_rule(0, 0, 'lifted')->>'build_class' = 'drifted',
+  'a drifted rule is refused, not overwritten');
+
+SELECT 'vehicle_class_price store, refresh, tied reader, garage value, classifier parity, cohort resolution and registration, never blank, refresh queue, v5 terms and version bump, own cron job, v6 rebuild/factory-injection terms and model year: PASS' AS result;

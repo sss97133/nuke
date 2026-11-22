@@ -8,6 +8,8 @@
 --   migrations/20261019031934_work_order_image_objects.sql (image lane; needs the canonical image-object fixture)
 --   migrations/20261020185000_invoice_party_reads_and_description_redaction.sql (security lane: generated_invoices read
 --   policy and the vehicle row readers, no job-loop function; test_invoice_party_reads_and_description_redaction.sql)
+--   migrations/20261121233000_receipt_quote_kind.sql (receipts lane: receipt_doc_kind 'quote' and the receipt spend
+--   readers, no job-loop function; test_receipt_quote_kind.sql)
 --   and the non-job files of 2026-10-19: facet, truck, auction bids, org signals, lotus/honda identity, cab custody,
 --   device capture, live auction board, profile reader role, merge identity, source species, broadcast profile, org
 --   name trgm, canonical make, identity marks/handle index, family sales, fold docket, marketplace listings.
@@ -431,6 +433,8 @@ ALTER TABLE public.work_order_payments ADD COLUMN IF NOT EXISTS amount numeric,
  ADD COLUMN IF NOT EXISTS payment_date timestamptz;
 \echo REPLAY 20261030192441_work_order_workload_read.sql
 \ir ../migrations/20261030192441_work_order_workload_read.sql
+\echo REPLAY 20261121231500_correct_work_order_vehicle_writer.sql
+\ir ../migrations/20261121231500_correct_work_order_vehicle_writer.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));

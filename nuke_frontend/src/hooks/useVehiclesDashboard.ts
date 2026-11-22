@@ -32,7 +32,7 @@ export type RelationshipType =
   | 'DOCUMENTING';
 
 export type ViewMode = 'GRID' | 'LIST' | 'COMPACT';
-export type SortMode = 'RECENT' | 'FIRST' | 'VALUE' | 'HEALTH' | 'NAME';
+export type SortMode = 'RECENT' | 'FIRST' | 'DAYS' | 'PHOTOS' | 'WORK' | 'EVENTS' | 'DOCS' | 'YEAR' | 'MAKE' | 'NAME' | 'ADDED' | 'OWNED' | 'CLASS' | 'VALUE' | 'HEALTH';
 export type FilterMode = 'ALL' | 'OWNED' | 'CONTRIBUTED';
 
 export interface EventSummary {
@@ -161,6 +161,9 @@ export interface VehiclesDashboardState {
   filterMode: FilterMode;
   setViewMode: (m: ViewMode) => void;
   setSortMode: (m: SortMode) => void;
+  /** The chosen order turned around; cars with nothing to order by stay last either way. */
+  sortReversed?: boolean;
+  setSortReversed?: (reversed: boolean) => void;
   setFilterMode: (m: FilterMode) => void;
   refresh: () => void;
   /** Dashboard page shape: my_vehicles, client_vehicles, business_fleets, summary */
@@ -373,32 +376,44 @@ export function garageFirstDay(v: Pick<GarageVehicle, 'timeline' | 'event_summar
   return v.timeline?.first_day ?? v.event_summary?.first_event_date?.slice(0, 10) ?? null;
 }
 
-/** Dated cars in order, undated cars after them. */
-function byDay(a: string | null, b: string | null, newestFirst: boolean): number {
-  if (a === b) return 0;
-  if (a === null) return 1;
-  if (b === null) return -1;
-  return newestFirst ? b.localeCompare(a) : a.localeCompare(b);
-}
+const finite = (value: unknown): number | null => {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+const carName = (v: GarageVehicle, parts: (keyof GarageVehicle)[]) => parts.map(part => v[part] ?? '').join(' ').trim() || null;
 
-function sortVehicles(a: GarageVehicle, b: GarageVehicle, sort: SortMode): number {
-  switch (sort) {
-    case 'FIRST':
-      return byDay(garageFirstDay(a), garageFirstDay(b), false);
-    case 'VALUE':
-      return (b.estimated_value ?? 0) - (a.estimated_value ?? 0);
-    case 'HEALTH':
-      return (b.health_score ?? 0) - (a.health_score ?? 0);
-    case 'NAME': {
-      const nameA = `${a.year ?? ''} ${a.make ?? ''} ${a.model ?? ''}`.trim();
-      const nameB = `${b.year ?? ''} ${b.make ?? ''} ${b.model ?? ''}`.trim();
-      return nameA.localeCompare(nameB);
-    }
-    case 'RECENT':
-    default:
-      // A row's updated_at moves with any backfill; the order follows dated activity instead.
-      return byDay(garageLastDay(a), garageLastDay(b), true);
-  }
+/** What each order reads from a car, and whether its usual direction is largest or newest first. */
+const SORTS: Record<SortMode, { key: (v: GarageVehicle) => number | string | null; desc: boolean }> = {
+  // A row's updated_at moves with any backfill; the order follows dated activity instead.
+  RECENT: { key: garageLastDay, desc: true },
+  FIRST: { key: garageFirstDay, desc: false },
+  DAYS: { key: v => v.timeline ? v.timeline.active_days : null, desc: true },
+  // image_count also holds undated photos, so it is the photo total when it is larger.
+  PHOTOS: { key: v => v.timeline || v.image_count != null ? Math.max(v.timeline?.photos ?? 0, v.image_count ?? 0) : null, desc: true },
+  WORK: { key: v => v.timeline ? v.timeline.work_days : null, desc: true },
+  EVENTS: { key: v => v.timeline ? v.timeline.events : finite(v.event_count), desc: true },
+  DOCS: { key: v => v.timeline ? v.timeline.documents : null, desc: true },
+  YEAR: { key: v => finite(v.year), desc: true },
+  MAKE: { key: v => carName(v, ['make', 'model', 'year']), desc: false },
+  NAME: { key: v => carName(v, ['year', 'make', 'model']), desc: false },
+  ADDED: { key: v => v.created_at || null, desc: true },
+  OWNED: { key: v => v.ownership_start_date ?? null, desc: true },
+  CLASS: { key: v => finite(v.class_price?.value) || null, desc: true },
+  VALUE: { key: v => finite(v.estimated_value) || null, desc: true },
+  HEALTH: { key: v => finite(v.health_score), desc: true },
+};
+
+export function sortVehicles(a: GarageVehicle, b: GarageVehicle, sort: SortMode, reversed = false): number {
+  const order = SORTS[sort] ?? SORTS.RECENT;
+  const x = order.key(a);
+  const y = order.key(b);
+  if (x === y) return 0;
+  // A car with nothing to order by comes after the ones that have it, in either direction.
+  if (x === null) return 1;
+  if (y === null) return -1;
+  const up = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y));
+  return order.desc !== reversed ? -up : up;
 }
 
 function garageToMyVehicle(v: GarageVehicle): MyVehicle {
@@ -568,6 +583,7 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('GRID');
   const [sortMode, setSortMode] = useState<SortMode>('RECENT');
+  const [sortReversed, setSortReversed] = useState(false);
   const [filterMode, setFilterMode] = useState<FilterMode>('ALL');
   const [refreshKey, setRefreshKey] = useState(0);
   const [activity, setActivity] = useState<GarageActivityContext | null>(null);
@@ -901,8 +917,8 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
   const vehicles = useMemo(() => (sameViewer && userId ? rawVehicles : [])
     .map((v) => activity ? { ...v, custody_org: activity.custody.get(v.id) ?? null, recent_work_at: activity.recentWork.get(v.id) ?? null } : v)
     .filter((v) => matchesFilter(v, filterMode))
-    .sort((a, b) => sortVehicles(a, b, sortMode)),
-  [sameViewer, userId, rawVehicles, activity, filterMode, sortMode]);
+    .sort((a, b) => sortVehicles(a, b, sortMode, sortReversed)),
+  [sameViewer, userId, rawVehicles, activity, filterMode, sortMode, sortReversed]);
 
   const sections = buildSections(vehicles);
 
@@ -929,6 +945,8 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
     filterMode,
     setViewMode,
     setSortMode,
+    sortReversed,
+    setSortReversed,
     setFilterMode,
     refresh,
     data,

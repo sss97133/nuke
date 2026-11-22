@@ -109,7 +109,7 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
     inputSchema: {
       type: "object",
       properties: {
-        url: { type: "string", description: "Public listing URL (BaT, Cars & Bids, Craigslist, …)" },
+        url: { type: "string", description: "Bring a Trailer listing URL (https://bringatrailer.com/listing/…). Other sources are not supported yet." },
       },
       required: ["url"],
     },

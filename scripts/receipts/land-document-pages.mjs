@@ -24,8 +24,8 @@ const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) =>
 }, []));
 for (const k of ['extract', 'manifest', 'originals', 'owner', 'vehicle', 'run']) if (!args[k] || args[k] === true) { console.error(`--${k} required`); process.exit(2); }
 const DRY = args.dry === true;
-const RECORD_TYPES = new Set(['invoice', 'work_order', 'packing_slip', 'receipt', 'alignment_report', 'order_confirmation', 'estimate', 'statement', 'other']);
-const PAPER_TYPES = new Set(['invoice', 'work_order', 'packing_slip', 'receipt', 'alignment_report', 'order_confirmation', 'estimate', 'statement']);
+const RECORD_TYPES = new Set(['invoice', 'work_order', 'packing_slip', 'receipt', 'alignment_report', 'order_confirmation', 'estimate', 'quote', 'agreement', 'statement', 'other']);
+const PAPER_TYPES = new Set(['invoice', 'work_order', 'packing_slip', 'receipt', 'alignment_report', 'order_confirmation', 'estimate', 'quote', 'agreement', 'statement']);
 
 const manifest = Object.fromEntries(readFileSync(args.manifest, 'utf8').trim().split('\n').map(l => {
   const [frame, sha256, bucketPath] = l.split('\t');
@@ -64,6 +64,8 @@ for (const [parent, frames] of docs) {
   const contentPages = frames.filter(f => f.role !== 'duplicate_confirmation').map(f => extracts[f.frame]);
   const lines = contentPages.flatMap(pg => (pg.lines || []).map(l => {
     const o = { description: String(l.description || '').slice(0, 500) || 'line' };
+    // A quote's alternative options ride on the line category ("option A"); the quoted reader never adds options together.
+    if (l.category) o.category = String(l.category).slice(0, 60);
     if (l.part_number) o.part_number = String(l.part_number).slice(0, 100);
     if (l.qty != null) o.quantity = money(l.qty);
     if (l.unit_price != null) o.unit_price = money(l.unit_price);

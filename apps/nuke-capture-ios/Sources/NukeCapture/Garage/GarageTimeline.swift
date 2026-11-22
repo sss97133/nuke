@@ -271,12 +271,18 @@ enum GarageCardText {
 
     private static func plural(_ n: Int, _ one: String, _ many: String) -> String { "\(n.formatted()) \(n == 1 ? one : many)" }
 
-    /// Counts that exist; a zero is left out. image_count also holds undated photos, so the larger is the photo total.
-    static func counts(_ t: GarageTimeline?, imageCount: Int) -> [String] {
-        guard let t else { return imageCount > 0 ? [plural(imageCount, "photo", "photos")] : [] }
-        let photos = max(t.photos, imageCount)
+    /// Counts that exist; a zero is left out. Every count is the day reader's, the same rows the squares draw, so
+    /// the number and the year of squares can't disagree. The photo count is camera-dated photos only (no
+    /// duplicates, no rejected frames, no photo dated by its load), and says so.
+    ///
+    /// vehicles.image_count is never shown: it is a stored column that matches neither the rows nor this reader
+    /// (live, 2026-11-21: a 1980 K10 stored 1,193 against 210 dated photos here and 4,857 rows in vehicle_images;
+    /// a 1983 K2500 stored 3,460 against 2,831 and 4,429). Until the day reader answers, the card states no count.
+    static func counts(_ t: GarageTimeline?) -> [String] {
+        guard let t else { return [] }
+        let photos = t.photos
         return [
-            photos > 0 ? plural(photos, "photo", "photos") : nil,
+            photos > 0 ? plural(photos, "dated photo", "dated photos") : nil,
             t.work_days > 0 ? plural(t.work_days, "work day", "work days") : nil,
             t.events > 0 ? plural(t.events, "event", "events") : nil,
             t.documents > 0 ? plural(t.documents, "paper", "papers") : nil,

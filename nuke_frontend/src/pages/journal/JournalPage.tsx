@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { getGridImageUrl } from "../../lib/imageOptimizer";
 import { callTool } from "../../lib/mcp";
 import { readVehicleNames } from "./vehicleNames";
 
@@ -121,30 +122,51 @@ export default function JournalPage() {
     };
     // The day's public record from /api/journal/:date (well under a second) renders first; the projection
     // from the MCP tool (seconds) replaces it when it arrives, adding the atoms and the confidence.
+    // The projection tool answers only a signed-in administrator, and this page sends no credential, so for a
+    // visitor it is refused (401) and the public record stands. A failure is shown only when both reads have
+    // answered and neither produced a record.
     let shown = false;
     let projected = false;
+    let pending = 2;
+    let fastError: string | null = null;
+    let projectionError: string | null = null;
+    const settled = () => {
+      pending -= 1;
+      if (cancelled || pending > 0) return;
+      setLoading(false);
+      if (!shown && !projected) setError(fastError ?? projectionError ?? "no record for this day");
+    };
     fetch(`/api/journal/${encodeURIComponent(date)}`)
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) fastError = `day record: HTTP ${r.status}`;
+        return r.ok ? r.json() : null;
+      })
       .then((fast: Response | null) => {
         if (cancelled || projected || !fast?.work_log) return;
         shown = true;
         setData(fast);
         setLoading(false);
         name(fast);
-      }, () => undefined);
+      }, (e) => { fastError = `day record: ${String(e?.message || e)}`; })
+      .finally(settled);
     callTool<Response>("project_work_log", { date })
       .then((result) => {
         if (cancelled) return;
         projected = true;
         setData(result);
+        setLoading(false);
         name(result);
       })
-      .catch((e) => { if (!cancelled && !shown) setError(String(e?.message || e)); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .catch((e) => { projectionError = String(e?.message || e); })
+      .finally(settled);
     return () => { cancelled = true; };
   }, [date]);
 
   if (!date) return <div style={styles.page}>missing date</div>;
+
+  // The public record can stand without the projection, so a day with nothing in it says so itself.
+  const log = data?.work_log;
+  const emptyDay = !!log && log.photos.length === 0 && log.work_orders.length === 0 && (log.receipts?.length ?? 0) === 0;
 
   return (
     <div style={styles.page}>
@@ -165,10 +187,15 @@ export default function JournalPage() {
         )}
       </div>
 
-      {data?.result === "insufficient_substrate" && (
+      {(data?.result === "insufficient_substrate" || emptyDay) && (
         <div style={styles.empty}>
-          NO SHOP WORK IN THE PUBLIC RECORD FOR {date}.<br />
-          <span style={styles.meta}>{data.note}</span>
+          NO SHOP WORK IN THE PUBLIC RECORD FOR {date}.
+          {data?.note && (
+            <>
+              <br />
+              <span style={styles.meta}>{data.note}</span>
+            </>
+          )}
         </div>
       )}
 
@@ -181,7 +208,8 @@ export default function JournalPage() {
                 {data.work_log.photos.map((p) => (
                   <div key={p.id} style={styles.photoCell}>
                     {p.url ? (
-                      <img src={p.url} alt={p.angle ?? "photo"} loading="lazy" style={styles.photoImg} />
+                      // A resized copy, not the original: iPhone originals are HEIC, which most browsers cannot draw.
+                      <img src={getGridImageUrl(p.url) ?? p.url} alt={p.angle ?? "photo"} loading="lazy" style={styles.photoImg} />
                     ) : (
                       <div style={{ ...styles.photoImg, display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>NO URL</div>
                     )}

@@ -31,8 +31,11 @@ import {
 // read-only Nuke Asset Advisor (7 cited tools) on /mcp/advisor — see ./ADVISOR.md.
 //
 // Protocol: MCP Streamable HTTP (2025-03-26)
-// Auth: X-API-Key (nk_live_...) or Authorization: Bearer (service role);
-//       advisor + most reads allow anonymous (advisor has best-effort IP rate limit)
+// Auth: X-API-Key (nk_live_...) or Authorization: Bearer (the service key, or a nuke_oauth_ login token).
+//       With no credential only the tools in PUBLIC_TOOLS run (see the HTTP entry point). Every other tool on /mcp
+//       reads through the service client, so it answers only the service key or an active admin until its reads are
+//       proven to return what a logged-out visitor may see. On /mcp/advisor a visitor may call the tools in
+//       ADVISOR_PUBLIC_TOOLS, which then run in the public scope (advisor/public.ts).
 // Deploy: supabase functions deploy mcp-connector --no-verify-jwt
 // =============================================================================
 
@@ -152,6 +155,42 @@ async function authenticate(req: Request): Promise<AuthResult> {
 
   // 3. No auth — reject
   return { ok: false, error: "Missing authentication. Provide X-API-Key or Authorization header.", status: 401 };
+}
+
+/**
+ * True for the service key, or for a credential whose user has an active admin_users row (the rule
+ * requireAdminOrService applies to a user JWT). An agent key with no user is never privileged. It fails closed:
+ * if admin_users cannot be read, only the service key passes.
+ */
+async function isPrivilegedCaller(auth: AuthResult): Promise<boolean> {
+  if (!auth.ok || !auth.userId) return false;
+  if (auth.userId === "service-role") return true;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(auth.userId)) return false;
+  try {
+    const { data, error } = await getSupabase()
+      .from("admin_users")
+      .select("user_id")
+      .eq("user_id", auth.userId)
+      .eq("is_active", true)
+      .limit(1);
+    return !error && Array.isArray(data) && data[0]?.user_id === auth.userId;
+  } catch {
+    return false;
+  }
+}
+
+/** The answer to a tool call the caller may not make: 401 with the login challenge, or 403 for a valid credential. */
+function toolRefused(id: string | number | undefined, status: 401 | 403, message: string): Response {
+  return new Response(JSON.stringify(rpcError(id, status === 401 ? -32000 : -32003, message)), {
+    status,
+    headers: {
+      ...CORS,
+      "Content-Type": "application/json",
+      ...(status === 401
+        ? { "WWW-Authenticate": `Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"` }
+        : {}),
+    },
+  });
 }
 
 // ── Edge Function Proxy ─────────────────────────────────────────────────────
@@ -2261,10 +2300,18 @@ async function handleQueryMarketHistory(args: Record<string, unknown>): Promise<
 
 // ── Reference Library ───────────────────────────────────────────────────────
 
+// The reference library is these four tables, the ones the tool's schema lists. `type` chooses among
+// them; it is never a table name the caller supplies. Keep this list and the schema's enum the same.
+const LIBRARY_TYPES = ["paint_codes", "condition_knowledge", "condition_taxonomy", "vehicle_nomenclature"];
+const LIBRARY_MAX_LIMIT = 100;
+
 async function handleQueryLibrary(args: Record<string, unknown>): Promise<ToolResult> {
-  const supabase = sb();
   const type = String(args.type);
-  const limit = Number(args.limit) || 25;
+  if (!LIBRARY_TYPES.includes(type)) {
+    return toolErr(`Unknown library type. Use one of: ${LIBRARY_TYPES.join(", ")}`);
+  }
+  const limit = Math.min(Math.max(Math.trunc(Number(args.limit)) || 25, 1), LIBRARY_MAX_LIMIT);
+  const supabase = sb();
 
   let query = supabase.from(type as any).select("*").limit(limit);
 
@@ -6247,9 +6294,22 @@ Deno.serve(async (req: Request) => {
       { status: 400, headers: { ...CORS, "Content-Type": "application/json" } },
     );
   }
+  // One JSON-RPC request object per POST. A batch (an array) has no method or tool name of its own for the checks
+  // below to judge; it used to be accepted with a 202 and ignored. It is refused.
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return new Response(
+      JSON.stringify(rpcError(undefined, -32600, "Invalid Request: send one JSON-RPC request object per POST")),
+      { status: 400, headers: { ...CORS, "Content-Type": "application/json" } },
+    );
+  }
 
   // Asset Advisor: read-only curated surface. No write/admin/SQL tools are registered.
-  // Anonymous reads are allowed with a best-effort per-IP rate limit; API keys skip it.
+  // Its tools read through the service client. The service key or an active admin (isPrivilegedCaller) gets them as
+  // they are. Any other caller (no credential, or a valid credential that is not an admin's) may call a tool in
+  // ADVISOR_PUBLIC_TOOLS, and it runs in the public scope (advisor/public.ts): vehicles reads see is_public rows only,
+  // private observations are dropped, nothing is written, no edge function (vision, comps fallback) is called,
+  // evaluate_listing reads Bring a Trailer pages only, and internal flags are mapped to plain language.
+  // initialize, tools/list and ping stay open. A best-effort per-IP rate limit covers requests without a credential.
   if (advisorSurface) {
     const rate = checkAdvisorRateLimit(req);
     if (!rate.ok) {
@@ -6268,6 +6328,7 @@ Deno.serve(async (req: Request) => {
     // If a key/bearer is presented, still validate it (bad key fails fast).
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
+    let advisorAuth: AuthResult | undefined;
     if (authHeader || apiKey) {
       const auth = await authenticate(req);
       if (!auth.ok) {
@@ -6283,9 +6344,27 @@ Deno.serve(async (req: Request) => {
           },
         );
       }
+      advisorAuth = auth;
+    }
+    // Open to a visitor in the public scope. Each was audited (2026-11-21) for what it returns in that scope; a tool
+    // added to the advisor catalog is closed to visitors until it is named here and pinned in oauth_test.ts.
+    const ADVISOR_PUBLIC_TOOLS = new Set(["find_asset", "get_asset", "get_comps", "value_asset", "evaluate_listing", "budget_options"]);
+    let publicCaller = false;
+    if (body.method === "tools/call") {
+      const advisorTool = body.params?.name;
+      const openToVisitors = typeof advisorTool === "string" && ADVISOR_PUBLIC_TOOLS.has(advisorTool);
+      if (!advisorAuth) {
+        if (!openToVisitors) return toolRefused(body.id, 401, "Authentication required for this Nuke Asset Advisor tool.");
+        publicCaller = true;
+      } else if (!(await isPrivilegedCaller(advisorAuth))) {
+        if (!openToVisitors) {
+          return toolRefused(body.id, 403, "This Nuke Asset Advisor tool answers only an administrator's credential for now.");
+        }
+        publicCaller = true;
+      }
     }
 
-    const response = await handleAdvisorJsonRpc(body);
+    const response = await handleAdvisorJsonRpc(body, { publicCaller });
     if (response === null) {
       return new Response(null, { status: 202, headers: CORS });
     }
@@ -6319,8 +6398,8 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // Auth — required for write tools, optional for read tools.
-  // When a write tool is called without valid auth, return 401 + WWW-Authenticate
+  // Auth — required for every tool that is not in PUBLIC_TOOLS.
+  // When such a tool is called without valid auth, return 401 + WWW-Authenticate
   // pointing at the OAuth resource metadata, which names https://nuke.ag (magic-link login)
   // as the authorization server. Accepted here: the service key, and API keys on X-API-Key.
   // Write tools are tiered. Governed append-only claims need write:observations (autonomous for
@@ -6344,15 +6423,26 @@ Deno.serve(async (req: Request) => {
   const ADMIN_OR_SERVICE_TOOLS = new Set(["execute_sql"]);
   // Read tools that return one person's private rows: no anonymous call, so a client without a token is sent to log in.
   const SIGN_IN_READ_TOOLS = new Set(["read_owner_statements"]);
+  // The only tools that run with no credential. Every tool not named here or in the three groups above reads or
+  // acts through the service client, which sees every row and column, so it answers only the service key or an
+  // active admin (isPrivilegedCaller). A new tool is therefore closed until someone opens it: add a name here only
+  // with proof that the handler returns nothing a logged-out visitor may not read, and pin it in oauth_test.ts.
+  // query_library reads four reference tables (query_library_test.ts). The three schema tools read constants in
+  // this file and no database; an agent with a write scope needs them to shape a submission.
+  const PUBLIC_TOOLS = new Set(["query_library", "get_event_schema", "get_event_checklist", "get_attribute_checklist"]);
   // Who called, for the handlers that act as the caller. Set only from a credential this request presented.
   let caller: CallerContext | undefined;
   if (body.method === "tools/call") {
     const toolName = body?.params?.name as string | undefined;
+    const named = typeof toolName === "string";
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
-    const requiredTier: WriteTier | undefined = toolName ? WRITE_TIERS[toolName] : undefined;
-    const isWrite = Boolean(requiredTier) || (typeof toolName === "string" && SIGN_IN_READ_TOOLS.has(toolName));
-    const adminOrService = typeof toolName === "string" && ADMIN_OR_SERVICE_TOOLS.has(toolName);
+    const requiredTier: WriteTier | undefined = named && Object.hasOwn(WRITE_TIERS, toolName) ? WRITE_TIERS[toolName] : undefined;
+    const signInRead = named && SIGN_IN_READ_TOOLS.has(toolName);
+    const adminOrService = named && ADMIN_OR_SERVICE_TOOLS.has(toolName);
+    const isPublic = named && PUBLIC_TOOLS.has(toolName);
+    // Everything else, a name this server does not know included: the service key or an active admin.
+    const privilegedOnly = !isPublic && !requiredTier && !signInRead && !adminOrService;
 
     if (adminOrService) {
       // Does not go through the connector's own authenticate(): writeGuard verifies the token and the admin row.
@@ -6385,20 +6475,14 @@ Deno.serve(async (req: Request) => {
           { status: 403, headers: { ...CORS, "Content-Type": "application/json" } },
         );
       }
+      // A valid credential that is neither the service key nor an active admin's stops here for every other tool.
+      if (privilegedOnly && !(await isPrivilegedCaller(auth))) {
+        return toolRefused(body.id, 403, `Tool '${named ? toolName : "?"}' answers only an administrator's credential for now.`);
+      }
       caller = { userId: auth.userId, scopes: auth.scopes, oauthToken: auth.oauthToken };
-    } else if (isWrite) {
-      // No auth + write tool → trigger OAuth flow via 401 + WWW-Authenticate.
-      return new Response(
-        JSON.stringify(rpcError(body.id, -32000, `Authentication required for tool '${toolName}'.`)),
-        {
-          status: 401,
-          headers: {
-            ...CORS,
-            "Content-Type": "application/json",
-            "WWW-Authenticate": `Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"`,
-          },
-        },
-      );
+    } else if (!isPublic) {
+      // No auth + a tool that is not public → trigger OAuth flow via 401 + WWW-Authenticate.
+      return toolRefused(body.id, 401, `Authentication required for tool '${named ? toolName : "?"}'.`);
     }
   }
 

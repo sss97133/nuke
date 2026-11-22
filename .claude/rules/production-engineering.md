@@ -102,6 +102,17 @@ Noted drift:
   (`deployed`, `fn_dirs`); refresh it with `npm run ledger:facts`. Do not
   sweep them: `docs/ledger/CAPABILITY_MAP.md` marks the ones whose source
   must be recovered from git history before anything is touched.
+- 2026-11-21: `ingest-artifact` and `ingest-video-frame` (both never on main) are back in the repository,
+  recovered from their deployed bundles (versions 36 and 35) with the write guard added, so 113 remain.
+  A function recovered this way goes through `scripts/guardrails/check-write-guard.mjs` like any other.
+- 2026-11-21: `classify-receipt-scope`, `get-auction-briefing`, `geo-cross-check` and `document-pipeline-status` are
+  back the same way (deployed versions 35, 36, 23 and 80), each answering the service key only, so 109 remain.
+  CI deploys every function with the gateway's token check off, so a function that was deployed by hand with the
+  check on (`geo-cross-check`) is protected by its handler alone once it is recovered: the caller check ships in
+  the same merge as the source, never after.
+- 2026-11-21: `fb-photo-upload` and `upload-fb-image` are back the same way (deployed versions 37 and 36), each
+  answering the service key only, so 107 remain. The caller of the first is
+  `scripts/photos/upload-listing-photos.mjs`, which sends the project secret key.
 
 ## Fleet Rules (workflows / crons / daemons)
 

@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ vehicles: [] as any[], result: null as any, pending: false }));
+const fixture = vi.hoisted(() => ({ vehicles: [] as any[], result: null as any, pending: false, refused: false }));
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: () => ({
@@ -14,7 +14,12 @@ vi.mock('../../lib/supabase', () => ({
     }),
   },
 }));
-vi.mock('../../lib/mcp', () => ({ callTool: () => (fixture.pending ? new Promise(() => {}) : Promise.resolve(fixture.result)) }));
+// refused: what the connector answers a caller with no credential (the page sends none).
+vi.mock('../../lib/mcp', () => ({
+  callTool: () => (fixture.refused
+    ? Promise.reject(new Error("MCP transport failed for 'project_work_log': HTTP 401"))
+    : fixture.pending ? new Promise(() => {}) : Promise.resolve(fixture.result)),
+}));
 import JournalPage from './JournalPage';
 
 const PUBLIC_ID = 'a90c008a-0000-0000-0000-000000000001';
@@ -39,7 +44,7 @@ describe('JournalPage', () => {
     };
     container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   });
-  afterEach(async () => { await act(async () => root.unmount()); container.remove(); fixture.pending = false; vi.unstubAllGlobals(); });
+  afterEach(async () => { await act(async () => root.unmount()); container.remove(); fixture.pending = false; fixture.refused = false; vi.unstubAllGlobals(); });
 
   async function render() {
     await act(async () => {
@@ -52,6 +57,14 @@ describe('JournalPage', () => {
     await render();
     const link = container.querySelector(`a[href="/vehicle/${PUBLIC_ID}"]`);
     expect(link?.textContent).toBe('1977 Chevrolet Blazer');
+  });
+
+  it('draws a stored original as a resized copy, so an iPhone HEIC shows in any browser', async () => {
+    fixture.result.work_log.photos[0].url = 'https://proj.supabase.co/storage/v1/object/public/vehicle-photos/u/shot.heic';
+    await render();
+    const srcs = [...container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
+    expect(srcs[0]).toBe('https://proj.supabase.co/storage/v1/render/image/public/vehicle-photos/u/shot.heic?width=300&quality=80&resize=contain');
+    expect(srcs[1]).toBe('https://example.test/2.jpg');
   });
 
   it('shows no id fragments: a private vehicle is labelled, not linked', async () => {
@@ -68,6 +81,46 @@ describe('JournalPage', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(fast), { status: 200 })));
     await render();
     expect(container.querySelector(`a[href="/vehicle/${PUBLIC_ID}"]`)?.textContent).toBe('1977 Chevrolet Blazer');
+    expect(container.textContent).not.toContain('LOADING');
+  });
+
+  it('keeps the public record and shows no error when the projection is refused before the fast read answers', async () => {
+    fixture.refused = true;
+    const fast = { date: '2026-09-24', audience: 'public', work_log: fixture.result.work_log };
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+      return new Response(JSON.stringify(fast), { status: 200 });
+    }));
+    await render();
+    expect(container.querySelector(`a[href="/vehicle/${PUBLIC_ID}"]`)?.textContent).toBe('1977 Chevrolet Blazer');
+    expect(container.textContent).not.toContain('ERROR');
+    expect(container.textContent).not.toContain('LOADING');
+    expect(container.textContent).not.toContain('401');
+    expect(container.textContent).not.toContain('NO SHOP WORK');
+  });
+
+  it('says there is no shop work when the public record for the day is empty and the projection is refused', async () => {
+    fixture.refused = true;
+    const log = fixture.result.work_log;
+    const empty = { date: '2026-09-24', audience: 'public', work_log: { ...log, photos: [], summary: { ...log.summary, photo_count: 0 } } };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(empty), { status: 200 })));
+    await render();
+    for (let i = 0; i < 20 && !container.textContent?.includes('NO SHOP WORK'); i++) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    expect(container.textContent).toContain('NO SHOP WORK IN THE PUBLIC RECORD FOR 2026-09-24.');
+    expect(container.textContent).not.toContain('ERROR');
+    expect(container.textContent).not.toContain('LOADING');
+    expect(container.textContent).not.toContain('401');
+  });
+
+  it('says the day record failed only when both reads have failed', async () => {
+    fixture.refused = true;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+      return new Response('{}', { status: 502 });
+    }));
+    await render();
+    for (let i = 0; i < 20 && !container.textContent?.includes('ERROR'); i++) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    expect(container.textContent).toContain('ERROR · day record: HTTP 502');
     expect(container.textContent).not.toContain('LOADING');
   });
 });

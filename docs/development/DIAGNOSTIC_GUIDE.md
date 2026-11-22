@@ -70,15 +70,19 @@ ORDER BY tc.constraint_name;
 
 ### Step 3: Test RPC Function Manually
 
-Replace `YOUR_USER_ID` with your actual user ID:
+Replace `YOUR_USER_ID` with your actual user ID. The function answers only its own account or the service role
+(migration `20261121191500`), so a SQL session names the caller first:
 
 ```sql
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub":"YOUR_USER_ID","role":"authenticated"}', true);
 SELECT get_user_vehicle_relationships('YOUR_USER_ID'::uuid);
+ROLLBACK;
 ```
 
 **Expected Result**: Should return JSON with `user_added_vehicles`, `discovered_vehicles`, `verified_ownerships`.
 
-**If Error**: Check the error message - likely permission or schema issue.
+**If Error**: `42501` means the caller named in the claims is not that account. Anything else is likely a schema issue.
 
 ---
 

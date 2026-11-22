@@ -5,7 +5,7 @@ import Link from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl as sharedOptimizeImageUrl } from '../../lib/imageOptimizer';
 import { GarageCardAnalysis, readCardAnalysis, type AnalysisLine } from '../garage/GarageCardAnalysis';
-import { appendFrames, coverDayOf, readReelPage, readReelStart, REEL_PAGE, type ReelFrame } from '../garage/garageReel';
+import { appendFrames, coverDayOf, dayFrameIndex, dayReadSize, readReelPage, readReelStart, REEL_DAY_READS, REEL_PAGE, type ReelFrame, type ReelRow } from '../garage/garageReel';
 import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
 import '../garage/garage.css';
 
@@ -37,7 +37,7 @@ function formatVehicleTitle(v: GarageVehicle): string {
     .toUpperCase();
 }
 
-function formatCurrency(n: number): string {
+export function formatCurrency(n: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -301,35 +301,172 @@ export function garageAxis(vehicles: GarageVehicle[], now = new Date()): GarageA
   return { start, end: today, weeks: TIMELINE_WEEKS, steps: [at(0.25), at(0.5), at(0.75)], grid };
 }
 
-function MiniBarcode({ vehicle, axis, litDay }: { vehicle: GarageVehicle; axis?: GarageAxis; litDay?: string | null }) {
-  const drawn = useMemo(() => {
-    const frame = axis ?? garageAxis([vehicle]);
-    const cells: { key: string; x: number; y: number; level: number; title: string }[] = [];
-    for (const [day, n] of dayTotals(vehicle)) {
-      const at = Date.parse(`${day}T00:00:00Z`);
-      if (!Number.isFinite(at) || n <= 0 || at < frame.start || at > frame.end) continue;
-      const index = Math.round((at - frame.start) / DAY_MS);
-      cells.push({
+const WEEK_MS = 7 * DAY_MS;
+const gridPaths = new Map<number, string>();
+/** Every day of `weeks` week columns: a window moved into the past has no unlived days to leave out. */
+function fullGrid(weeks: number): string {
+  let grid = gridPaths.get(weeks);
+  if (grid === undefined) {
+    grid = '';
+    for (let index = 0; index < weeks * 7; index++) grid += `M${Math.floor(index / 7)} ${index % 7}h.84v.84h-.84z`;
+    gridPaths.set(weeks, grid);
+  }
+  return grid;
+}
+
+/** The garage's window moved `shift` weeks into the past: the same squares and the same shading steps. */
+export function shiftedAxis(axis: GarageAxis, shift: number): GarageAxis {
+  if (shift <= 0) return axis;
+  const start = axis.start - shift * WEEK_MS;
+  return { ...axis, start, end: start + axis.weeks * WEEK_MS - DAY_MS, grid: fullGrid(axis.weeks) };
+}
+
+/** "Aug 2023 – Aug 2024": the months a window covers. */
+export function windowMonths(axis: GarageAxis): string {
+  const from = monthLabel(new Date(axis.start).toISOString().slice(0, 7));
+  const to = monthLabel(new Date(axis.end).toISOString().slice(0, 7));
+  return from === to ? from : `${from} – ${to}`;
+}
+
+/** Weeks the window can move back: far enough that the car's first recorded day is in it. */
+function shiftLimit(totals: Map<string, number>, axis: GarageAxis): number {
+  let first = Infinity;
+  for (const [day, n] of totals) {
+    const at = Date.parse(`${day}T00:00:00Z`);
+    if (n > 0 && at < first) first = at;
+  }
+  return Number.isFinite(first) && first < axis.start ? Math.ceil((axis.start - first) / WEEK_MS) : 0;
+}
+
+/** Screen pixels per square column, from the drawn width ("meet" keeps the squares square). */
+function squareScale(node: SVGSVGElement, frame: GarageAxis): { box: DOMRect; scale: number } {
+  const box = node.getBoundingClientRect();
+  return { box, scale: Math.min(box.width / (frame.weeks - 0.16), box.height / 6.84) };
+}
+
+/** The day under a point, nearest square, so a fingertip on five-pixel squares still lands. */
+function dayAtPoint(node: SVGSVGElement, frame: GarageAxis, clientX: number, clientY: number): string | null {
+  const { box, scale } = squareScale(node, frame);
+  if (!(scale > 0)) return null;
+  const column = Math.floor((clientX - box.left) / scale + 0.08);
+  const row = Math.floor((clientY - box.top - (box.height - 6.84 * scale) / 2) / scale + 0.08);
+  if (column < 0 || column >= frame.weeks || row < 0 || row > 6) return null;
+  const at = frame.start + (column * 7 + row) * DAY_MS;
+  return at > frame.end ? null : new Date(at).toISOString().slice(0, 10);
+}
+
+/**
+ * `movable`: a sideways two-finger swipe, a finger or a mouse drag slides the window through the car's past, a
+ * week per column; a double-click goes back to the latest year. `onWindow` hears the moved window's months (null at
+ * the latest year). `onDay`: a click on a day with photos asks for that day.
+ */
+export function MiniBarcode({ vehicle, axis, litDay, movable = false, onWindow, onDay }: {
+  vehicle: GarageVehicle; axis?: GarageAxis; litDay?: string | null;
+  movable?: boolean; onWindow?: (months: string | null) => void; onDay?: (day: string) => void;
+}) {
+  const base = useMemo(() => axis ?? garageAxis([vehicle]), [axis, vehicle]);
+  const totals = useMemo(() => dayTotals(vehicle), [vehicle]);
+  // Only the day reader says which days have photos; the event-week fallback and the garage's sum do not.
+  const photoDays = useMemo(() => new Set(onDay ? (vehicle.timeline?.days ?? []).filter(row => Number(row[1]) > 0).map(row => row[0]) : []), [vehicle, onDay]);
+  const limit = movable ? shiftLimit(totals, base) : 0;
+  const [shift, setShift] = useState(0);
+  const at = Math.min(shift, limit);
+  const frame = useMemo(() => shiftedAxis(base, at), [base, at]);
+  const cells = useMemo(() => {
+    const drawn: { key: string; x: number; y: number; level: number; photo: boolean; title: string }[] = [];
+    for (const [day, n] of totals) {
+      const when = Date.parse(`${day}T00:00:00Z`);
+      if (!Number.isFinite(when) || n <= 0 || when < frame.start || when > frame.end) continue;
+      const index = Math.round((when - frame.start) / DAY_MS);
+      drawn.push({
         key: day, x: Math.floor(index / 7), y: index % 7,
         // Above each quartile of the garage's active days the square steps up one shade.
         level: 1 + frame.steps.filter(step => n > step).length,
+        photo: photoDays.has(day),
         title: `${monthLabel(day.slice(0, 7)).replace(' ', ` ${Number(day.slice(8, 10))}, `)}: ${n.toLocaleString('en-US')} recorded`,
       });
     }
-    return { frame, cells };
-  }, [vehicle, axis]);
+    return drawn;
+  }, [totals, frame, photoDays]);
 
-  const { frame, cells } = drawn;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const state = useRef({ at, limit, frame, carry: 0, onWindow });
+  state.current.at = at;
+  state.current.limit = limit;
+  state.current.frame = frame;
+  state.current.onWindow = onWindow;
+  useEffect(() => { state.current.onWindow?.(at > 0 ? windowMonths(frame) : null); }, [at, frame]);
+  /** `px` of travel, positive when the squares follow the fingers to the right (into the past). */
+  const move = useCallback((px: number) => {
+    const node = svgRef.current;
+    const s = state.current;
+    const column = node ? squareScale(node, s.frame).scale : 0;
+    s.carry += px;
+    const weeks = Math.trunc(s.carry / (column > 0 ? column : 6));
+    if (!weeks) return;
+    s.carry -= weeks * (column > 0 ? column : 6);
+    const next = Math.max(0, Math.min(s.limit, s.at + weeks));
+    if (next === 0 || next === s.limit) s.carry = 0;
+    s.at = next;
+    setShift(next);
+  }, []);
+  // A native listener: React's wheel listener is passive, and only a cancelled wheel keeps a sideways swipe from
+  // scrolling the page or going back a page.
+  useEffect(() => {
+    const node = svgRef.current;
+    if (!node || !movable) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+      event.preventDefault();
+      move(-event.deltaX * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? node.clientWidth || 300 : 1));
+    };
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return () => node.removeEventListener('wheel', onWheel);
+  }, [movable, move]);
+  const drag = useRef<{ id: number; x: number; moved: boolean } | null>(null);
+  const dragged = useRef(false);
+
   // The day of the photo showing in the card's viewer, when it falls inside the window.
   const litAt = litDay ? Date.parse(`${litDay}T00:00:00Z`) : NaN;
   const litIndex = Number.isFinite(litAt) && litAt >= frame.start && litAt <= frame.end ? Math.round((litAt - frame.start) / DAY_MS) : null;
-  const label = `${cells.length} active ${cells.length === 1 ? 'day' : 'days'} recorded in the last year`;
+  const label = `${cells.length} active ${cells.length === 1 ? 'day' : 'days'} recorded ${at > 0 ? windowMonths(frame) : 'in the last year'}`;
   return (
-    <svg className="garage-barcode" role="img" aria-label={label}
-      viewBox={`0 0 ${frame.weeks - 0.16} 6.84`} preserveAspectRatio="xMinYMid meet">
+    <svg ref={svgRef} className="garage-barcode" role="img" aria-label={label} data-movable={movable ? '' : undefined}
+      viewBox={`0 0 ${frame.weeks - 0.16} 6.84`} preserveAspectRatio="xMinYMid meet"
+      onPointerDown={movable ? event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        drag.current = { id: event.pointerId, x: event.clientX, moved: false };
+        dragged.current = false;
+        state.current.carry = 0;
+      } : undefined}
+      onPointerMove={movable ? event => {
+        const d = drag.current;
+        if (!d || d.id !== event.pointerId) return;
+        const dx = event.clientX - d.x;
+        if (!d.moved) {
+          if (Math.abs(dx) < 6) return;
+          d.moved = true;
+          try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* the pointer already left */ }
+        }
+        d.x = event.clientX;
+        move(dx);
+      } : undefined}
+      onPointerUp={movable ? () => { dragged.current = !!drag.current?.moved; drag.current = null; } : undefined}
+      onPointerCancel={movable ? () => { drag.current = null; } : undefined}
+      onDoubleClick={movable ? () => { state.current.carry = 0; setShift(0); } : undefined}
+      onClick={onDay || movable ? event => {
+        // The end of a drag is not a click on a square.
+        if (dragged.current) { dragged.current = false; return; }
+        // The second click of a double-click is the reset's, not another jump.
+        if (!onDay || event.detail > 1) return;
+        const square = (event.target as Element).closest?.('rect[data-day]');
+        const day = square?.getAttribute('data-day') ?? dayAtPoint(event.currentTarget, frame, event.clientX, event.clientY);
+        if (day && photoDays.has(day)) onDay(day);
+      } : undefined}>
       <path className="garage-barcode-grid" d={frame.grid} />
       {cells.map(cell => (
-        <rect key={cell.key} x={cell.x} y={cell.y} width={0.84} height={0.84} rx={0.15} data-level={cell.level}><title>{cell.title}</title></rect>
+        <rect key={cell.key} x={cell.x} y={cell.y} width={0.84} height={0.84} rx={0.15} data-level={cell.level}
+          data-day={cell.photo ? cell.key : undefined} data-photo={cell.photo ? '' : undefined}><title>{cell.title}</title></rect>
       ))}
       {litIndex != null && <rect className="garage-barcode-lit" x={Math.floor(litIndex / 7) - 0.08} y={(litIndex % 7) - 0.08} width={1} height={1} rx={0.2} />}
     </svg>
@@ -502,18 +639,27 @@ function recordSpan(vehicle: GarageVehicle): string | null {
   return from === to ? from : `${from} – ${to}`;
 }
 
-/** Counts that exist; a zero is left out instead of printed. */
-function recordCounts(vehicle: GarageVehicle): string[] {
+/**
+ * Counts that exist; a zero is left out instead of printed. `to`, when set, is a page that lists those records. None
+ * has one yet: work days and events show only as days on the profile timeline, and the profile's receipt pages
+ * (#build-receipt-pages) load after the page, so a link to them lands short. `photos: false` leaves the photo count
+ * to the photo's own counter.
+ */
+interface RecordCount { key: string; text: string; to?: string; title?: string }
+function recordItems(vehicle: GarageVehicle, photos = true): RecordCount[] {
   const t = vehicle.timeline;
-  if (!t) return vehicle.image_count ? [plural(vehicle.image_count, 'photo', 'photos')] : [];
   // image_count also holds undated photos, so it is the photo total when it is larger.
-  const photos = Math.max(t.photos, vehicle.image_count ?? 0);
-  return [
-    photos > 0 ? plural(photos, 'photo', 'photos') : null,
-    t.work_days > 0 ? plural(t.work_days, 'work day', 'work days') : null,
-    t.events > 0 ? plural(t.events, 'event', 'events') : null,
-    t.documents > 0 ? plural(t.documents, 'paper', 'papers') : null,
-  ].filter((part): part is string => part !== null);
+  const photoTotal = Math.max(t?.photos ?? 0, vehicle.image_count ?? 0);
+  const items: (RecordCount | null)[] = [
+    photos && photoTotal > 0 ? { key: 'photos', text: plural(photoTotal, 'photo', 'photos') } : null,
+    t && t.work_days > 0 ? { key: 'work', text: plural(t.work_days, 'work day', 'work days') } : null,
+    t && t.events > 0 ? { key: 'events', text: plural(t.events, 'event', 'events') } : null,
+    t && t.documents > 0 ? { key: 'papers', text: plural(t.documents, 'paper', 'papers') } : null,
+  ];
+  return items.filter((item): item is RecordCount => item !== null);
+}
+function recordCounts(vehicle: GarageVehicle): string[] {
+  return recordItems(vehicle).map(item => item.text);
 }
 
 /** The profile header's own read, so a card and its profile state the same price and configuration. */
@@ -592,52 +738,113 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
     // The garage already read this car's class price; the frame reuses that row instead of asking again.
     readCardAnalysis(vehicle.id, vehicle.class_price).then(setAnalysis).catch(() => { analysisAsked.current = false; });
   }, [vehicle.id, vehicle.class_price]);
-  const loadReel = useCallback(() => {
-    if (reelAsked.current || (!cover && !vehicle.image_count)) return;
+  // What has loaded, read synchronously by a square's jump between reads (the state lands a render later).
+  const loaded = useRef<{ frames: ReelFrame[]; total: number; coverDay: string | null; runStart: number }>({ frames: [], total: 0, coverDay: null, runStart: 0 });
+  const land = useCallback((rows: ReelRow[], offset: number, asked: number) => {
+    const now = loaded.current;
+    now.frames = appendFrames(now.frames, rows, cover);
+    now.coverDay = now.coverDay ?? coverDayOf(rows, cover);
+    // A short read is the end of the reel (or the reader's deadline); the reel never asks for that stretch again.
+    nextOffset.current = offset + asked;
+    setCoverDay(now.coverDay);
+    setReel(now.frames);
+  }, [cover]);
+  const reelStart = useRef<Promise<void> | null>(null);
+  const loadReel = useCallback((): Promise<void> => {
+    if (reelStart.current) return reelStart.current;
+    if (reelAsked.current || (!cover && !vehicle.image_count)) return Promise.resolve();
     reelAsked.current = true;
     // Asked for with the reel, so the Analysis chip is there however many photos sit in front of the frame.
     loadAnalysis();
-    readReelStart(vehicle.id)
+    reelStart.current = readReelStart(vehicle.id)
       .then(({ sequence, page, total }) => {
-        const frames = appendFrames([], [...sequence, ...page], cover);
-        setCoverDay(coverDayOf([...sequence, ...page], cover));
-        setReel(frames);
+        // The lead views come first; the newest-first run starts after them.
+        loaded.current.runStart = appendFrames([], sequence, cover).length;
+        loaded.current.total = total;
+        land([...sequence, ...page], 0, REEL_PAGE);
         setPhotoTotal(total);
         // A short reel is already at its end.
-        if ((cover ? 1 : 0) + frames.length <= 3) loadAnalysis();
+        if ((cover ? 1 : 0) + loaded.current.frames.length <= 3) loadAnalysis();
       })
-      .catch(() => { reelAsked.current = false; });
-  }, [vehicle.id, cover, vehicle.image_count, loadAnalysis]);
+      .catch(() => { reelAsked.current = false; reelStart.current = null; });
+    return reelStart.current;
+  }, [vehicle.id, cover, vehicle.image_count, loadAnalysis, land]);
   const loadMore = useCallback(() => {
     if (paging.current || nextOffset.current >= photoTotal) return;
     paging.current = true;
     const offset = nextOffset.current;
     readReelPage(vehicle.id, offset)
-      .then(rows => {
-        nextOffset.current = offset + REEL_PAGE;
-        setCoverDay(day => day ?? coverDayOf(rows, cover));
-        setReel(frames => appendFrames(frames, rows, cover));
-      })
+      .then(rows => land(rows, offset, REEL_PAGE))
       .catch(() => {})
       .finally(() => { paging.current = false; });
-  }, [vehicle.id, cover, photoTotal]);
+  }, [vehicle.id, photoTotal, land]);
+  // A square's day: the reel moves to that day's first photo, reading on (in reads of up to 1,000, at most
+  // REEL_DAY_READS of them and REEL_DAY_CAP photos in all) when the day lies past what has loaded.
+  const [jumpTo, setJumpTo] = useState<{ index: number } | null>(null);
+  const jumpAsk = useRef(0);
+  const toDay = useCallback(async (day: string) => {
+    const ask = ++jumpAsk.current;
+    await loadReel();
+    for (let reads = 0; ; reads++) {
+      const now = loaded.current;
+      const frames = cover ? now.frames.filter(item => item.url !== cover) : now.frames;
+      const found = dayFrameIndex(frames, day, Math.min(now.runStart, frames.length));
+      // The newest-first run is the better landing (a swipe forward walks that day); the cover or a lead view
+      // stands in once the run has passed the day without it.
+      const inRun = found >= now.runStart;
+      const size = inRun || reads >= REEL_DAY_READS || paging.current ? 0 : dayReadSize({
+        day, lastDay: frames.length > now.runStart ? frames[frames.length - 1].day : undefined,
+        loaded: nextOffset.current, total: now.total, days: vehicle.timeline?.days,
+      });
+      if (!size) {
+        if (ask !== jumpAsk.current) return;
+        const index = found >= 0 ? found + (cover ? 1 : 0) : cover && now.coverDay === day ? 0 : -1;
+        if (index >= 0) setJumpTo({ index });
+        return;
+      }
+      paging.current = true;
+      const offset = nextOffset.current;
+      try {
+        land(await readReelPage(vehicle.id, offset, size), offset, size);
+      } catch {
+        return;
+      } finally {
+        paging.current = false;
+      }
+    }
+  }, [cover, loadReel, land, vehicle.id, vehicle.timeline]);
+  const onDay = useCallback((day: string) => { void toDay(day); }, [toDay]);
   // Frame one is the cover when there is one; the reel's photos follow it; the analysis is always last.
   const photoFrames = (cover ? 1 : 0) + reel.length;
-  const hasAnalysis = !!analysis?.length;
+  // A frame needs something to say: counts of questions and observations alone are a record, not an analysis.
+  const hasAnalysis = !!analysis?.some(line => line.group !== 'record');
   const lastFrame = photoFrames - 1 + (hasAnalysis ? 1 : 0);
   const onAnalysis = hasAnalysis && frame >= photoFrames;
+  // The photo he was on before the analysis, so the chip takes him back to it.
+  const lastPhoto = useRef(0);
   const onReelScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const at = Math.round(event.currentTarget.scrollLeft / Math.max(1, event.currentTarget.clientWidth));
     setFrame(at);
+    if (at < photoFrames) lastPhoto.current = at;
     // Three frames from the end of what has loaded, the next page is asked for (not while the analysis shows,
     // so a page never lands in front of it), and the analysis with it.
     if (at >= photoFrames - 3) { if (at < photoFrames) loadMore(); loadAnalysis(); }
   };
-  const toAnalysis = () => {
+  // At once, so the photos passed on the way do not ask for more pages.
+  const jump = (index: number) => {
     const node = reelRef.current;
-    // At once, so the photos passed on the way do not ask for more pages.
-    if (node) node.scrollTo({ left: photoFrames * node.clientWidth });
+    if (!node) return;
+    node.scrollTo({ left: index * node.clientWidth });
+    setFrame(index);
   };
+  const toAnalysis = () => { lastPhoto.current = Math.min(frame, photoFrames - 1); jump(photoFrames); };
+  // A square's photo lands once its frame is in the strip.
+  useEffect(() => {
+    if (!jumpTo || jumpTo.index >= photoFrames) return;
+    lastPhoto.current = jumpTo.index;
+    jump(jumpTo.index);
+    setJumpTo(null);
+  }, [jumpTo, photoFrames]);
   const step = (by: number) => {
     loadReel();
     const node = reelRef.current;
@@ -664,8 +871,18 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
     vehicle.custody_org ? `at ${vehicle.custody_org.name}` : null,
     /\d{4}-\d{2}-\d{2}/.test(period) ? period : null,
   ].filter(Boolean).join(' · ');
-  const span = recordSpan(vehicle);
-  const counts = recordCounts(vehicle);
+  // The moved window's months stand in for the record's span while the squares look back.
+  const [windowSpan, setWindowSpan] = useState<string | null>(null);
+  const span = windowSpan ?? recordSpan(vehicle);
+  // The photo counter carries the photo count whenever the photo can be rolled; the line under the squares keeps the rest.
+  const counted = !!cover && (vehicle.image_count ?? 0) > 1;
+  const counts = recordItems(vehicle, !counted);
+  // Built once per loaded reel, so a frame change does not re-render thousands of photos.
+  const reelFrames = useMemo(() => reel.map(({ url }) => (
+    <Link key={url} to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
+      <img src={sharedOptimizeImageUrl(url, 'medium') || url} alt="" width={600} height={450} loading="lazy" decoding="async" />
+    </Link>
+  )), [reel, vehicle.id]);
 
   return (
     <div className="garage-vehicle-card" ref={cardRef}>
@@ -706,20 +923,20 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
                 <span className="garage-card-photo-empty">No photo yet</span>
               )}
             </Link>}
-            {reel.map(({ url }) => (
-              <Link key={url} to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
-                <img src={sharedOptimizeImageUrl(url, 'medium') || url} alt="" width={600} height={450} loading="lazy" decoding="async" />
-              </Link>
-            ))}
+            {reelFrames}
             {hasAnalysis && <GarageCardAnalysis lines={analysis!} />}
           </div>
           {lastFrame > 0 && <>
-            {frame > 0 && <button type="button" className="garage-card-step" data-dir="back" aria-label="Previous frame" onClick={() => step(-1)}>‹</button>}
+            {frame > 0 && <button type="button" className="garage-card-step" data-dir="back" data-on={onAnalysis ? 'analysis' : undefined} aria-label="Previous frame" onClick={() => step(-1)}>‹</button>}
             {frame < lastFrame && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next frame" onClick={() => step(1)}>›</button>}
-            {hasAnalysis && !onAnalysis && <button type="button" className="garage-card-to-analysis" onClick={toAnalysis}>Analysis</button>}
-            {!onAnalysis && photoFrames > 1 && <span className="garage-card-frame">{Math.min(frame + 1, photoFrames)} / {Math.max(photoTotal, photoFrames).toLocaleString('en-US')}</span>}
+            {/* One chip, both ways: to the analysis, and from it back to the photo he was on. */}
+            {hasAnalysis && <button type="button" className="garage-card-to-analysis" aria-pressed={onAnalysis}
+              onClick={onAnalysis ? () => jump(Math.min(lastPhoto.current, photoFrames - 1)) : toAnalysis}>{onAnalysis ? 'Photos' : 'Analysis'}</button>}
+            {!onAnalysis && (photoFrames > 1 || counted) && <span className="garage-card-frame">{Math.min(frame + 1, photoFrames)} / {(photoTotal > 0 ? Math.max(photoTotal, photoFrames) : Math.max(photoFrames, vehicle.image_count ?? 0)).toLocaleString('en-US')}</span>}
           </>}
           {lastFrame <= 0 && (vehicle.image_count ?? 0) > 1 && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next photo" onClick={() => step(1)}>›</button>}
+          {/* Before the reel loads, the counter reads from the roster's count. */}
+          {counted && lastFrame <= 0 && <span className="garage-card-frame">1 / {(vehicle.image_count ?? 0).toLocaleString('en-US')}</span>}
 
           {/* This RPC revokes discovery membership, not an ownership period. */}
           {vehicle.relationship_source === 'discovered' && (
@@ -754,7 +971,9 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
             <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title">
               {name || 'Unknown vehicle'}
             </Link>
-            {price != null && <span className="garage-card-price" title={priceTitle}>{formatCurrency(price)}</span>}
+            {price != null && <span className="garage-card-price" title={priceTitle}>
+              {/* A class figure is a fallback from comps, never this car's price: it carries its name in the head. */}
+              <small>{header?.price == null ? 'class median' : (header.priceLabel ?? 'recorded price').replace(/^Last recorded sale$/i, 'last sale').toLowerCase()}</small>{formatCurrency(price)}</span>}
           </div>
           {/* One lane, most important first; what the card's width cannot hold drops off the end. */}
           <div className="garage-card-lane">
@@ -764,11 +983,14 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
             {actions.map(action => <button key={action.label} type="button" onClick={action.onPress}>{action.label}</button>)}
           </div>
 
-          <MiniBarcode vehicle={vehicle} axis={axis} litDay={cover ? (frame === 0 ? coverDay : reel[frame - 1]?.day) : reel[frame]?.day} />
+          <MiniBarcode vehicle={vehicle} axis={axis} litDay={cover ? (frame === 0 ? coverDay : reel[frame - 1]?.day) : reel[frame]?.day}
+            movable onWindow={setWindowSpan} onDay={onDay} />
           {(span || counts.length > 0) && (
             <p className="garage-card-record">
               {span && <span className="garage-card-span">{span}</span>}
-              {counts.length > 0 && <span>{counts.join(' · ')}</span>}
+              {counts.length > 0 && <span className="garage-card-counts">{counts.map(item => <React.Fragment key={item.key}>
+                {item.to ? <Link to={item.to} title={item.title}>{item.text}</Link> : <span>{item.text}</span>}
+              </React.Fragment>)}</span>}
             </p>
           )}
 

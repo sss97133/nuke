@@ -13,19 +13,36 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // Repo-root api/ is never uploaded (commit f07181e05 moved these handlers
 // there and prod /api/journal/* fell through to the mailbox 404).
 
+// This route has no session, so every caller is a logged-out visitor. It reads with the publishable key, and the
+// database's logged-out row policies and column grants decide what comes back: a caller without owner rights reads
+// what a logged-out visitor reads. SUPABASE_PUBLISHABLE_KEY is set for production only; VITE_SUPABASE_ANON_KEY (the
+// publishable key the web bundle ships) is set in every environment.
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Profiles whose photos the day read covers: 100 ids keep the request line under 4 KB.
+const MAX_PROFILES = 100;
 
 async function rest(path: string): Promise<any[]> {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY!,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_PUBLISHABLE_KEY!,
+      Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
       Accept: 'application/json',
     },
   });
+  // A table or column a visitor may not read answers 42501: that part of the day is empty, not an error. Any other
+  // refusal (a rejected key) stays an error so a misconfigured key cannot pass for an empty day.
+  if (r.status === 401 || r.status === 403) {
+    const body: any = await r.json().catch(() => null);
+    if (body?.code === '42501') {
+      console.warn(`journal: ${path.split('?')[0]} answered ${r.status}/42501 for a visitor`);
+      return [];
+    }
+  }
   if (!r.ok) throw new Error(`${path.split('?')[0]}: ${r.status}`);
   return r.json();
 }
@@ -43,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!date || !DATE_RE.test(date)) {
     return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
   }
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     return res.status(500).json({ error: 'Server misconfigured' });
   }
 
@@ -51,21 +68,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const dayEnd = `${date}T23:59:59Z`;
 
   try {
+    // Photos: vehicle_images has no index that leads with taken_at, so a day-range read across every photo is a
+    // scan (17 s cold, measured 2026-11-21). (user_id, taken_at) is indexed, so the day is read per documenting
+    // profile: first the profiles a visitor may read, then their photos for the day. Both reads use the publishable
+    // key, so the logged-out photo policy decides which rows come back. The profile list is capped; past the cap the
+    // day needs a database reader that walks profiles itself, the way vw_journal_density does.
+    const profiles = await rest(`profiles?select=id&order=id.asc&limit=${MAX_PROFILES}`);
+    if (profiles.length >= MAX_PROFILES) {
+      console.warn(`journal: the profile list reached its cap of ${MAX_PROFILES}; later profiles' photos are not listed`);
+    }
+    const profileIds = profiles
+      .map((p: any) => p?.id)
+      .filter((id: unknown): id is string => typeof id === 'string' && UUID_RE.test(id));
     const [photos, labor, parts, payments, receipts] = await Promise.all([
+      profileIds.length
+        ? rest(
+            `vehicle_images?select=id,vehicle_id,image_url,angle,taken_at` +
+              `&user_id=in.(${profileIds.join(',')})` +
+              `&taken_at=gte.${dayStart}&taken_at=lte.${dayEnd}&order=taken_at.asc&limit=200`,
+          )
+        : Promise.resolve([] as any[]),
       rest(
-        `vehicle_images?select=id,vehicle_id,image_url,angle,taken_at` +
-          `&taken_at=gte.${dayStart}&taken_at=lte.${dayEnd}&limit=200`,
-      ),
-      rest(
-        `work_order_labor?select=id,work_order_id,hours,total_cost` +
+        `work_order_labor?select=id,work_order_id` +
           `&created_at=gte.${dayStart}&created_at=lte.${dayEnd}`,
       ),
       rest(
-        `work_order_parts?select=id,work_order_id,total_price` +
+        `work_order_parts?select=id,work_order_id` +
           `&created_at=gte.${dayStart}&created_at=lte.${dayEnd}`,
       ),
       rest(
-        `work_order_payments?select=id,work_order_id,amount,status` +
+        `work_order_payments?select=id,work_order_id,status` +
           `&payment_date=gte.${dayStart}&payment_date=lte.${dayEnd}&status=eq.completed`,
       ),
       rest(
