@@ -64,6 +64,8 @@ struct ExplorePagerCard: View {
     /// This lot's projected-hammer reading from the feed's single board read, and whether that board is fresh.
     var finish: FinishEstimate? = nil
     var finishFresh = false
+    /// This ask's fair range from close sales (nil: no opinion yet).
+    var fair: AskFairRange? = nil
     let onDrill: (ExploreCardDrill) -> Void
     let onOpenProfile: (ExploreFeedItem) -> Void
     let onChoice: (ExploreSignalEvent.Choice, ExploreFeedItem) -> Void
@@ -200,7 +202,7 @@ struct ExplorePagerCard: View {
             }
             .overlay(alignment: .bottomLeading) {
                 ExploreCardOverlay(item: item, hasBidReading: hasBidReading, onDrill: onDrill,
-                                   rail: ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh),
+                                   rail: ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh, fair: fair),
                                    onWhy: whyAction)
                     .padding(NukeSpace.lg)
             }
