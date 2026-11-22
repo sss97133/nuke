@@ -48,6 +48,12 @@ CREATE TABLE public.vehicle_images (
   vehicle_id uuid NOT NULL,
   taken_at timestamptz,
   created_at timestamptz DEFAULT now(),
+  occurred_at timestamptz,
+  exif_data jsonb,
+  dhash text,
+  phash text,
+  filename text,
+  storage_path text,
   ai_scan_metadata jsonb,
   is_superseded boolean DEFAULT false,
   is_duplicate boolean DEFAULT false
@@ -63,13 +69,26 @@ CREATE TABLE public.vehicle_observations (
   content_text text,
   confidence_score numeric,
   observed_at timestamptz NOT NULL,
+  observed_at_basis text,
+  source_event_at timestamptz,
+  source_event_date date,
+  source_event_time_precision text,
   ingested_at timestamptz,
   is_superseded boolean DEFAULT false,
   superseded_by uuid,
   superseded_at timestamptz,
   subject_type text NOT NULL DEFAULT 'vehicle',
   analysis_deferred boolean NOT NULL DEFAULT false,
-  rank text NOT NULL DEFAULT 'normal'
+  rank text NOT NULL DEFAULT 'normal',
+  CHECK ((source_event_time_precision IS NULL) OR (source_event_time_precision = ANY (ARRAY['exact','day','unknown']))),
+  CHECK (
+    ((source_event_time_precision IS NULL) AND (source_event_at IS NULL) AND (source_event_date IS NULL))
+    OR ((source_event_time_precision IS NOT NULL) AND (observed_at_basis IS NOT NULL) AND (
+      ((source_event_time_precision = 'exact') AND (source_event_at IS NOT NULL))
+      OR ((source_event_time_precision = 'day') AND (source_event_date IS NOT NULL) AND (source_event_at IS NULL))
+      OR ((source_event_time_precision = 'unknown') AND (source_event_at IS NULL) AND (source_event_date IS NULL))
+    ))
+  )
 );
 
 \ir ../migrations/20261122081000_replica_target_byok_component_fold.sql
@@ -78,8 +97,10 @@ INSERT INTO vehicles(id, make, model, year, vin, is_replica, replica_quote, is_p
 VALUES ('00000000-0000-0000-0000-0000000000a1', 'Pontiac', 'Firebird', 1973, '2S87D3N143591',
         true, 'Built as a Trans Am SD-455 clone', true);
 
-INSERT INTO vehicle_images(id, vehicle_id, taken_at, ai_scan_metadata) VALUES
- ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a1', '2024-06-01 12:00:00+00',
+-- Import-time taken_at differs across images; real capture clocks absent → groups must not key on import hour.
+INSERT INTO vehicle_images(id, vehicle_id, taken_at, created_at, filename, dhash, ai_scan_metadata) VALUES
+ ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a1',
+  '2026-10-01 12:00:00+00', '2026-10-01 12:00:00+00', 'IMG_0100.jpg', 'abcd1234',
   '{"byok_deep_analysis":{"scene_type":"body_exterior","build_phase_guess":"final_assembly","components_seen":[
      {"label":"Red shaker scoop","confidence":0.99},
      {"label":"Hood bird graphic","confidence":0.95},
@@ -87,10 +108,27 @@ INSERT INTO vehicle_images(id, vehicle_id, taken_at, ai_scan_metadata) VALUES
      {"label":"Left front wheel and white-letter tire","confidence":0.9},
      {"label":"Unrelated chrome trim bit","confidence":0.8}
    ]}}'::jsonb),
- ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000a1', '2024-06-01 12:05:00+00',
+ ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000a1',
+  '2026-10-02 18:00:00+00', '2026-10-02 18:00:00+00', 'IMG_0105.jpg', 'abcd9999',
   '{"byok_deep_analysis":{"scene_type":"engine_bay","build_phase_guess":"final_assembly","components_seen":[
      {"label":"Partial plated brake vacuum booster","confidence":0.99},
-     {"label":"Blue-painted intake manifold","confidence":0.96}
+     {"label":"Blue-painted intake manifold","confidence":0.96},
+     {"label":"Chrome valve cover","confidence":0.93},
+     {"label":"Alternator","confidence":0.9}
+   ]}}'::jsonb),
+ ('00000000-0000-0000-0000-0000000000d3', '00000000-0000-0000-0000-0000000000a1',
+  '2026-10-03 09:00:00+00', '2026-10-03 09:00:00+00', 'printout_scan.jpg', 'ffff0001',
+  '{"byok_deep_analysis":{"scene_type":"receipt_document","build_phase_guess":"unknown","text_regions":["a","b","c"],"components_seen":[
+     {"label":"Build sheet printout","confidence":0.95}
+   ]}}'::jsonb);
+
+-- Real EXIF capture on a fourth image (same scene/area/phase/dhash4/seq as d1 would diverge on capture hour).
+INSERT INTO vehicle_images(id, vehicle_id, taken_at, created_at, filename, dhash, exif_data, ai_scan_metadata) VALUES
+ ('00000000-0000-0000-0000-0000000000d4', '00000000-0000-0000-0000-0000000000a1',
+  '2026-10-01 12:00:00+00', '2026-10-01 12:00:00+00', 'IMG_0110.jpg', 'abcd5678',
+  '{"DateTimeOriginal":"2024:05:15 14:30:00"}'::jsonb,
+  '{"byok_deep_analysis":{"scene_type":"body_exterior","build_phase_guess":"final_assembly","components_seen":[
+     {"label":"Bumper","confidence":0.9}
    ]}}'::jsonb);
 
 -- Normalizer unit checks.
@@ -112,20 +150,80 @@ SELECT public.assert(
 SELECT public.assert(
   (public.normalize_byok_component_label('Rally II wheels')->>'value') = 'rally',
   'rally ii (lowercased) maps after lower()');
+SELECT public.assert(
+  (public.normalize_byok_component_label('Chrome valve cover')->>'property_key') = 'image_visible_valve_cover',
+  'valve cover maps to engine internals');
+SELECT public.assert(
+  (public.normalize_byok_component_label('Build sheet printout')->>'property_key') = 'image_visible_reference_document',
+  'printout maps to reference document');
+SELECT public.assert(
+  public.byok_normalize_build_phase('receipt_document', 'unknown', NULL) = 'document_printout',
+  'receipt scene becomes document_printout phase');
+SELECT public.assert(
+  public.byok_real_capture_at('{"DateTimeOriginal":"2024:05:15 14:30:00"}'::jsonb, NULL) IS NOT NULL,
+  'EXIF DateTimeOriginal parses');
+SELECT public.assert(
+  public.byok_real_capture_at(NULL, NULL) IS NULL,
+  'no real capture when EXIF and occurred_at absent');
 
 -- Dry-run proposes claims without writing.
 SELECT public.assert(
   (public.fold_byok_component_observations('00000000-0000-0000-0000-0000000000a1', true)
-    ->>'claims_proposed')::int >= 6,
+    ->>'claims_proposed')::int >= 8,
   'dry-run proposes keyed claims from parsed labels');
 SELECT public.assert(
   (SELECT count(*) FROM vehicle_observations) = 0,
   'dry-run writes no observations');
 
+-- Grouping ignores import taken_at: d1 and d2 have different import hours but different scenes → ≥2 groups;
+-- neither group_key embeds an import YYYY-MM hour from taken_at.
+SELECT public.assert(
+  (public.group_vehicle_images_for_reading('00000000-0000-0000-0000-0000000000a1', true)
+    ->>'group_count')::int >= 3,
+  'grouping returns multiple scene/area/phase groups');
+SELECT public.assert(
+  NOT EXISTS (
+    SELECT 1
+      FROM jsonb_array_elements(
+        public.group_vehicle_images_for_reading('00000000-0000-0000-0000-0000000000a1', true)->'groups'
+      ) g
+     WHERE g.value->>'capture_hour_key' LIKE '2026-10-%'
+  ),
+  'grouping does not key on Oct-2026 import taken_at');
+SELECT public.assert(
+  EXISTS (
+    SELECT 1
+      FROM jsonb_array_elements(
+        public.group_vehicle_images_for_reading('00000000-0000-0000-0000-0000000000a1', true)->'groups'
+      ) g
+     WHERE g.value->>'build_phase' = 'document_printout'
+  ),
+  'document_printout phase appears in groups');
+SELECT public.assert(
+  EXISTS (
+    SELECT 1
+      FROM jsonb_array_elements(
+        public.vehicle_build_phase_windows('00000000-0000-0000-0000-0000000000a1')->'phases'
+      ) p
+     WHERE p.value->>'phase' = 'document_printout'
+  ),
+  'phase windows include document_printout');
+SELECT public.assert(
+  EXISTS (
+    SELECT 1
+      FROM jsonb_array_elements(
+        public.vehicle_build_phase_windows('00000000-0000-0000-0000-0000000000a1')->'phases'
+      ) p
+     WHERE p.value->>'phase' = 'final_assembly'
+       AND (p.value->>'dated_count')::int >= 1
+       AND p.value->>'earliest' IS NOT NULL
+  ),
+  'phase windows carry earliest from real EXIF when present');
+
 -- Apply once.
 SELECT public.fold_byok_component_observations('00000000-0000-0000-0000-0000000000a1', false);
 SELECT public.assert(
-  (SELECT count(*) FROM vehicle_observations WHERE property_id IS NOT NULL) >= 6,
+  (SELECT count(*) FROM vehicle_observations WHERE property_id IS NOT NULL) >= 8,
   'apply lands keyed observations');
 SELECT public.assert(
   EXISTS (
@@ -134,6 +232,28 @@ SELECT public.assert(
     WHERE op.property_key = 'image_visible_hood_scoop_style'
       AND vo.structured_data->>'image_visible_hood_scoop_style' = 'shaker'
   ), 'shaker scoop keyed');
+SELECT public.assert(
+  EXISTS (
+    SELECT 1 FROM vehicle_observations vo
+    JOIN observation_properties op ON op.id = vo.property_id
+    WHERE op.property_key = 'image_visible_valve_cover'
+  ), 'valve cover keyed');
+SELECT public.assert(
+  EXISTS (
+    SELECT 1 FROM vehicle_observations vo
+    WHERE vo.structured_data->>'image_id' = '00000000-0000-0000-0000-0000000000d1'
+      AND vo.source_event_time_precision = 'unknown'
+      AND vo.source_event_at IS NULL
+      AND vo.observed_at_basis = 'ingest_knowledge_clock'
+  ), 'no-EXIF fold writes precision unknown');
+SELECT public.assert(
+  EXISTS (
+    SELECT 1 FROM vehicle_observations vo
+    WHERE vo.structured_data->>'image_id' = '00000000-0000-0000-0000-0000000000d4'
+      AND vo.source_event_time_precision = 'exact'
+      AND vo.source_event_at IS NOT NULL
+      AND vo.observed_at_basis = 'exif_DateTimeOriginal'
+  ), 'EXIF fold writes source_event_at exact');
 
 -- Idempotent re-apply.
 SELECT public.assert(
@@ -142,10 +262,22 @@ SELECT public.assert(
   'second apply inserts nothing');
 SELECT public.assert(
   (public.fold_byok_component_observations('00000000-0000-0000-0000-0000000000a1', false)
-    ->>'claims_unchanged')::int >= 6,
+    ->>'claims_unchanged')::int >= 8,
   'second apply reports unchanged');
 
 -- Value change for same image+property supersedes prior current row.
+-- Mutate after capturing parsed_claims so null-filter assertion still sees original labels.
+SELECT public.assert(
+  NOT EXISTS (
+    SELECT 1
+      FROM jsonb_array_elements(
+        public.read_vehicle_image_group('00000000-0000-0000-0000-0000000000a1')->'groups'
+      ) g
+      CROSS JOIN LATERAL jsonb_array_elements(g.value->'parsed_claims') c
+     WHERE c.value->>'property_key' IS NULL
+  ),
+  'parsed_claims exclude unparsed null normalizations');
+
 UPDATE vehicle_images
    SET ai_scan_metadata = jsonb_set(
      ai_scan_metadata,
@@ -178,16 +310,6 @@ SELECT public.assert(
   (public.read_vehicle_image_group('00000000-0000-0000-0000-0000000000a1')
     ->>'group_count')::int >= 1,
   'group-level read returns combined labels');
-SELECT public.assert(
-  NOT EXISTS (
-    SELECT 1
-      FROM jsonb_array_elements(
-        public.read_vehicle_image_group('00000000-0000-0000-0000-0000000000a1')->'groups'
-      ) g
-      CROSS JOIN LATERAL jsonb_array_elements(g.value->'parsed_claims') c
-     WHERE c.value->>'property_key' IS NULL
-  ),
-  'parsed_claims exclude unparsed null normalizations');
 SELECT public.assert(
   (public.gap_vs_build_replica_components('00000000-0000-0000-0000-0000000000a1', true)
     ->>'gap_count')::int >= 1

@@ -35,14 +35,18 @@ CREATE TABLE public.observation_properties (
 );
 CREATE TABLE public.vehicle_images (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL,
-  taken_at timestamptz, created_at timestamptz DEFAULT now(), ai_scan_metadata jsonb,
+  taken_at timestamptz, created_at timestamptz DEFAULT now(),
+  occurred_at timestamptz, exif_data jsonb, dhash text, phash text,
+  filename text, storage_path text, ai_scan_metadata jsonb,
   is_superseded boolean DEFAULT false, is_duplicate boolean DEFAULT false
 );
 CREATE TABLE public.vehicle_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, kind text NOT NULL,
   property_id uuid, extraction_method text, structured_data jsonb NOT NULL DEFAULT '{}'::jsonb,
   content_text text, confidence_score numeric, observed_at timestamptz NOT NULL,
-  ingested_at timestamptz,   is_superseded boolean DEFAULT false, superseded_by uuid, superseded_at timestamptz,
+  observed_at_basis text, source_event_at timestamptz, source_event_date date,
+  source_event_time_precision text, ingested_at timestamptz,
+  is_superseded boolean DEFAULT false, superseded_by uuid, superseded_at timestamptz,
   subject_type text NOT NULL DEFAULT 'vehicle', analysis_deferred boolean NOT NULL DEFAULT false,
   rank text NOT NULL DEFAULT 'normal'
 );

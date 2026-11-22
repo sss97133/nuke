@@ -221,6 +221,66 @@ SELECT * FROM (VALUES
   ('image_visible_carburetor', 'Visible carburetor in image', 'enum', 'core', 'drivetrain',
    '{condition}'::text[], 'multi',
    'Grain: one byok reading of one image. Values: present, absent, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_valve_cover', 'Visible valve cover in image', 'enum', 'core', 'drivetrain',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_alternator', 'Visible alternator in image', 'enum', 'core', 'drivetrain',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_starter', 'Visible starter in image', 'enum', 'core', 'drivetrain',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_exhaust', 'Visible exhaust hardware in image', 'enum', 'core', 'drivetrain',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_driveshaft', 'Visible driveshaft in image', 'enum', 'core', 'drivetrain',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_fuel_tank', 'Visible fuel tank in image', 'enum', 'core', 'drivetrain',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_exterior_mirror', 'Visible exterior mirror in image', 'enum', 'core', 'appearance',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_bumper', 'Visible bumper in image', 'enum', 'core', 'appearance',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_headlamp', 'Visible headlamp in image', 'enum', 'core', 'appearance',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_door_handle', 'Visible door handle in image', 'enum', 'core', 'appearance',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_fender_extractor', 'Visible fender air extractor in image', 'enum', 'core', 'appearance',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_instrument_fascia', 'Visible instrument fascia in image', 'enum', 'core', 'interior',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_headliner', 'Visible headliner in image', 'enum', 'core', 'interior',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_paint_stage', 'Visible paint stage in image', 'enum', 'core', 'paint',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image. Values: primer, basecoat, clearcoat, paint, present, not_visible, cannot_tell.',
+   'image_id', 'instance', now()),
+  ('image_visible_reference_document', 'Visible reference document/printout in image', 'enum', 'core', 'document',
+   '{condition}'::text[], 'multi',
+   'Grain: one byok reading of one image of a printout/receipt/data plate. Values: present, not_visible, cannot_tell.',
    'image_id', 'instance', now())
 ) AS v(property_key, label, data_type, namespace, category, applies_to_kinds,
        cardinality, description, discriminator_key, verification_scope, ratified_at)
@@ -296,6 +356,116 @@ BEGIN
       'component_key', 'intake_carb');
   END IF;
 
+  IF lab ~ 'valve cover' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_valve_cover',
+      'value', 'present',
+      'component_key', 'engine_internals');
+  END IF;
+
+  IF lab ~ 'alternator' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_alternator',
+      'value', 'present',
+      'component_key', 'engine_internals');
+  END IF;
+
+  IF lab ~ 'starter( motor)?' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_starter',
+      'value', 'present',
+      'component_key', 'engine_internals');
+  END IF;
+
+  IF lab ~ 'exhaust (outlet|pipe)|dual exhaust|muffler' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_exhaust',
+      'value', 'present',
+      'component_key', 'drivetrain');
+  END IF;
+
+  IF lab ~ 'driveshaft' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_driveshaft',
+      'value', 'present',
+      'component_key', 'drivetrain');
+  END IF;
+
+  IF lab ~ 'fuel tank' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_fuel_tank',
+      'value', 'present',
+      'component_key', 'drivetrain');
+  END IF;
+
+  IF lab ~ '(exterior|side) mirror|rearview mirror' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_exterior_mirror',
+      'value', 'present',
+      'component_key', 'body');
+  END IF;
+
+  IF lab ~ 'bumper' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_bumper',
+      'value', 'present',
+      'component_key', 'body');
+  END IF;
+
+  IF lab ~ 'headlamp|headlight' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_headlamp',
+      'value', 'present',
+      'component_key', 'body');
+  END IF;
+
+  IF lab ~ 'door handle' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_door_handle',
+      'value', 'present',
+      'component_key', 'body');
+  END IF;
+
+  IF lab ~ 'fender (air )?extractor|fender vent|air extractor' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_fender_extractor',
+      'value', 'present',
+      'component_key', 'body');
+  END IF;
+
+  IF lab ~ 'instrument fascia|engine-turned|rally gauge|gauge cluster' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_instrument_fascia',
+      'value', 'present',
+      'component_key', 'interior');
+  END IF;
+
+  IF lab ~ 'headliner' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_headliner',
+      'value', 'present',
+      'component_key', 'interior');
+  END IF;
+
+  IF lab ~ 'primer|basecoat|clearcoat|paint booth|spray pattern' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_paint_stage',
+      'value', CASE
+        WHEN lab ~ 'primer' THEN 'primer'
+        WHEN lab ~ 'clearcoat' THEN 'clearcoat'
+        WHEN lab ~ 'basecoat|paint' THEN 'paint'
+        ELSE 'present'
+      END,
+      'component_key', 'paint');
+  END IF;
+
+  IF lab ~ 'receipt|printout|data plate|vin plate|build sheet|window sticker' THEN
+    RETURN jsonb_build_object(
+      'property_key', 'image_visible_reference_document',
+      'value', 'present',
+      'component_key', 'document');
+  END IF;
+
   RETURN NULL; -- unparsed label; never invent a key
 END
 $fn$;
@@ -308,7 +478,89 @@ REVOKE ALL ON FUNCTION public.normalize_byok_component_label(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.normalize_byok_component_label(text) TO anon, authenticated, service_role;
 
 -- =============================================================================
--- 6. Group images (scene + phase + hour bucket)
+-- 6a. Phase / area / capture-time helpers (no import-time grouping)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.byok_normalize_build_phase(
+  p_scene_type text,
+  p_phase_guess text,
+  p_text_regions jsonb DEFAULT NULL
+)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN lower(coalesce(p_scene_type, '')) IN ('receipt_document', 'data_plate', 'cross_reference')
+      THEN 'document_printout'
+    WHEN jsonb_typeof(p_text_regions) = 'array'
+         AND jsonb_array_length(p_text_regions) >= 3
+         AND lower(coalesce(p_scene_type, '')) NOT IN (
+           'engine_bay', 'body_exterior', 'body_interior', 'undercarriage', 'wheel_assembly', 'paint_booth')
+      THEN 'document_printout'
+    WHEN nullif(btrim(p_phase_guess), '') IS NOT NULL THEN lower(btrim(p_phase_guess))
+    ELSE 'unknown'
+  END
+$$;
+
+CREATE OR REPLACE FUNCTION public.byok_infer_image_area(p_scene_type text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE lower(coalesce(p_scene_type, ''))
+    WHEN 'engine_bay' THEN 'engine'
+    WHEN 'body_interior' THEN 'interior'
+    WHEN 'undercarriage' THEN 'undercarriage'
+    WHEN 'wheel_assembly' THEN 'wheels'
+    WHEN 'body_exterior' THEN 'body'
+    WHEN 'paint_booth' THEN 'paint'
+    WHEN 'receipt_document' THEN 'document'
+    WHEN 'data_plate' THEN 'document'
+    WHEN 'cross_reference' THEN 'document'
+    ELSE 'unknown'
+  END
+$$;
+
+-- Real capture clock only: EXIF DateTimeOriginal or occurred_at. Never taken_at/created_at (often import).
+CREATE OR REPLACE FUNCTION public.byok_real_capture_at(
+  p_exif jsonb,
+  p_occurred_at timestamptz
+)
+RETURNS timestamptz
+LANGUAGE plpgsql
+IMMUTABLE
+AS $fn$
+DECLARE
+  raw text;
+  parsed timestamptz;
+BEGIN
+  IF p_occurred_at IS NOT NULL THEN
+    RETURN p_occurred_at;
+  END IF;
+  raw := coalesce(p_exif->>'DateTimeOriginal', p_exif->>'DateTime');
+  IF raw IS NULL OR btrim(raw) = '' THEN
+    RETURN NULL;
+  END IF;
+  BEGIN
+    -- Common EXIF form: YYYY:MM:DD HH:MM:SS
+    parsed := to_timestamp(left(btrim(raw), 19), 'YYYY:MM:DD HH24:MI:SS');
+  EXCEPTION WHEN others THEN
+    RETURN NULL;
+  END;
+  RETURN parsed;
+END
+$fn$;
+
+REVOKE ALL ON FUNCTION public.byok_normalize_build_phase(text, text, jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.byok_infer_image_area(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.byok_real_capture_at(jsonb, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.byok_normalize_build_phase(text, text, jsonb) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.byok_infer_image_area(text) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.byok_real_capture_at(jsonb, timestamptz) TO anon, authenticated, service_role;
+
+-- =============================================================================
+-- 6b. Group images: scene + area + phase + dhash/filename — not import hour
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.group_vehicle_images_for_reading(
@@ -325,36 +577,71 @@ DECLARE
   groups jsonb := '[]'::jsonb;
   g record;
   new_id uuid;
-  version text := 'group_vehicle_images_for_reading/20261122081000';
+  version text := 'group_vehicle_images_for_reading/20261122091000';
   v_group_key text;
 BEGIN
   FOR g IN
+    WITH base AS (
+      SELECT
+        vi.id,
+        coalesce(byok->>'scene_type', 'unknown') AS scene_type,
+        public.byok_infer_image_area(byok->>'scene_type') AS area_key,
+        public.byok_normalize_build_phase(
+          byok->>'scene_type', byok->>'build_phase_guess', byok->'text_regions'
+        ) AS build_phase,
+        -- dhash is nearly unique per image; use for member order, not hard partition.
+        coalesce(vi.dhash, vi.phash, '') AS visual_hash,
+        CASE
+          WHEN upper(coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), ''))
+               ~ 'IMG[_-]?[0-9]+'
+            THEN (substring(
+                   upper(coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), ''))
+                   from 'IMG[_-]?([0-9]+)')::int / 20)::text
+          ELSE 'noseq'
+        END AS seq_bucket,
+        public.byok_real_capture_at(vi.exif_data, vi.occurred_at) AS capture_at,
+        coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), vi.id::text) AS sort_name
+      FROM vehicle_images vi
+      CROSS JOIN LATERAL (SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS byok) b
+      WHERE vi.vehicle_id = p_vehicle_id
+        AND coalesce(vi.is_superseded, false) IS NOT TRUE
+        AND coalesce(vi.is_duplicate, false) IS NOT TRUE
+        AND vi.ai_scan_metadata ? 'byok_deep_analysis'
+    )
     SELECT
-      coalesce(byok->>'scene_type', 'unknown') AS scene_type,
-      coalesce(byok->>'build_phase_guess', 'unknown') AS build_phase,
-      date_trunc('hour', coalesce(vi.taken_at, vi.created_at)) AS hour_bucket,
-      to_char(
-        date_trunc('hour', coalesce(vi.taken_at, vi.created_at)) AT TIME ZONE 'UTC',
-        'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-      ) AS hour_key,
-      array_agg(vi.id ORDER BY coalesce(vi.taken_at, vi.created_at), vi.id) AS member_ids,
-      count(*)::int AS n
-    FROM vehicle_images vi
-    CROSS JOIN LATERAL (SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS byok) b
-    WHERE vi.vehicle_id = p_vehicle_id
-      AND coalesce(vi.is_superseded, false) IS NOT TRUE
-      AND coalesce(vi.is_duplicate, false) IS NOT TRUE
-      AND vi.ai_scan_metadata ? 'byok_deep_analysis'
+      scene_type,
+      area_key,
+      build_phase,
+      seq_bucket,
+      CASE WHEN count(*) FILTER (WHERE capture_at IS NOT NULL) = count(*)
+           THEN to_char(date_trunc('hour', min(capture_at))
+                        AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+           ELSE 'notime'
+      END AS capture_hour_key,
+      array_agg(id ORDER BY visual_hash, sort_name, id) AS member_ids,
+      count(*)::int AS n,
+      count(*) FILTER (WHERE capture_at IS NOT NULL)::int AS with_real_capture,
+      count(DISTINCT left(nullif(visual_hash, ''), 4)) FILTER (WHERE visual_hash <> '')::int AS distinct_dhash4
+    FROM base
     GROUP BY 1, 2, 3, 4
   LOOP
-    v_group_key := format('%s|%s|%s', g.scene_type, g.build_phase, g.hour_key);
+    v_group_key := format('%s|%s|%s|%s|%s',
+      g.scene_type, g.area_key, g.build_phase, g.seq_bucket, g.capture_hour_key);
     groups := groups || jsonb_build_object(
       'group_key', v_group_key,
       'scene_type', g.scene_type,
+      'area_key', g.area_key,
       'build_phase', g.build_phase,
-      'hour_bucket', g.hour_bucket,
+      'seq_bucket', g.seq_bucket,
+      'capture_hour_key', g.capture_hour_key,
+      'with_real_capture', g.with_real_capture,
+      'distinct_dhash4', g.distinct_dhash4,
       'member_count', g.n,
-      'member_image_ids', to_jsonb(g.member_ids)
+      'member_image_ids', to_jsonb(g.member_ids),
+      'member_order', 'dhash_then_filename',
+      'time_basis', CASE WHEN g.capture_hour_key = 'notime'
+        THEN 'unknown_no_exif_or_occurred_at'
+        ELSE 'real_capture_hour' END
     );
     IF NOT p_dry_run THEN
       new_id := gen_random_uuid();
@@ -364,7 +651,7 @@ BEGIN
       ) VALUES (
         new_id, p_vehicle_id, v_group_key,
         g.scene_type, g.build_phase, g.member_ids,
-        'scene_phase_hour_bucket', version
+        'scene_area_phase_seq_dhash_order', version
       )
       ON CONFLICT (vehicle_id, group_key, grouping_version) DO UPDATE SET
         member_image_ids = EXCLUDED.member_image_ids,
@@ -379,6 +666,7 @@ BEGIN
     'group_count', jsonb_array_length(groups),
     'groups', groups,
     'logic_version', version,
+    'note', 'Import taken_at/created_at are not grouping keys; capture hour only when EXIF/occurred_at exists',
     'as_of', now()
   );
 END
@@ -386,6 +674,97 @@ $fn$;
 
 REVOKE ALL ON FUNCTION public.group_vehicle_images_for_reading(uuid, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.group_vehicle_images_for_reading(uuid, boolean) TO service_role;
+
+-- =============================================================================
+-- 6c. Per-phase time windows (not per-photo import timestamps)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.vehicle_build_phase_windows(p_vehicle_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+SET timezone TO 'UTC'
+AS $fn$
+DECLARE
+  version text := 'vehicle_build_phase_windows/20261122091000';
+  phases jsonb := '[]'::jsonb;
+  p record;
+BEGIN
+  FOR p IN
+    WITH imgs AS (
+      SELECT
+        public.byok_normalize_build_phase(
+          byok->>'scene_type', byok->>'build_phase_guess', byok->'text_regions'
+        ) AS phase,
+        public.byok_real_capture_at(vi.exif_data, vi.occurred_at) AS capture_at,
+        vi.id
+      FROM vehicle_images vi
+      CROSS JOIN LATERAL (SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS byok) b
+      WHERE vi.vehicle_id = p_vehicle_id
+        AND coalesce(vi.is_superseded, false) IS NOT TRUE
+        AND coalesce(vi.is_duplicate, false) IS NOT TRUE
+        AND vi.ai_scan_metadata ? 'byok_deep_analysis'
+    ),
+    peaks AS (
+      SELECT phase, day AS peak_day
+        FROM (
+          SELECT phase, date_trunc('day', capture_at) AS day, count(*) AS n,
+                 row_number() OVER (PARTITION BY phase ORDER BY count(*) DESC, date_trunc('day', capture_at)) AS rn
+            FROM imgs
+           WHERE capture_at IS NOT NULL
+           GROUP BY phase, date_trunc('day', capture_at)
+        ) x
+       WHERE rn = 1
+    )
+    SELECT
+      i.phase,
+      count(*)::int AS image_count,
+      count(*) FILTER (WHERE i.capture_at IS NOT NULL)::int AS dated_count,
+      min(i.capture_at) AS earliest,
+      max(i.capture_at) AS latest,
+      max(pk.peak_day) AS peak_day
+    FROM imgs i
+    LEFT JOIN peaks pk ON pk.phase = i.phase
+    GROUP BY i.phase
+    ORDER BY i.phase
+  LOOP
+    phases := phases || jsonb_build_object(
+      'phase', p.phase,
+      'image_count', p.image_count,
+      'dated_count', p.dated_count,
+      'earliest', p.earliest,
+      'latest', p.latest,
+      'peak_day', p.peak_day,
+      'confidence', CASE
+        WHEN p.dated_count = 0 THEN 0
+        WHEN p.dated_count::numeric / p.image_count >= 0.8 THEN 0.8
+        WHEN p.dated_count::numeric / p.image_count >= 0.3 THEN 0.4
+        ELSE 0.15
+      END,
+      'time_basis', CASE WHEN p.dated_count = 0
+        THEN 'unknown_no_real_capture_clock'
+        ELSE 'exif_or_occurred_at' END
+    );
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'vehicle_id', p_vehicle_id,
+    'phases', phases,
+    'phase_count', jsonb_array_length(phases),
+    'logic_version', version,
+    'as_of', now()
+  );
+END
+$fn$;
+
+COMMENT ON FUNCTION public.vehicle_build_phase_windows(uuid) IS
+  'Per normalized build phase (incl. document_printout): earliest/latest/peak/confidence from real '
+  'capture clocks only. Import taken_at is never used.';
+
+REVOKE ALL ON FUNCTION public.vehicle_build_phase_windows(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.vehicle_build_phase_windows(uuid) TO service_role;
 
 -- =============================================================================
 -- 7. Fold byok → keyed observations (priority step 4)
@@ -401,7 +780,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $fn$
 DECLARE
-  version text := 'fold_byok_component_observations/20261122081000';
+  version text := 'fold_byok_component_observations/20261122091000';
   img record;
   lab jsonb;
   norm jsonb;
@@ -418,11 +797,16 @@ DECLARE
   new_obs_id uuid;
   sd jsonb;
   produced_this_image boolean;
+  v_event_at timestamptz;
+  v_event_precision text;
+  v_event_basis text;
 BEGIN
   FOR img IN
     SELECT vi.id AS image_id,
            vi.taken_at,
            vi.created_at,
+           vi.exif_data,
+           vi.occurred_at,
            vi.ai_scan_metadata->'byok_deep_analysis' AS byok,
            (SELECT vo.id FROM vehicle_observations vo
              WHERE vo.vehicle_id = p_vehicle_id
@@ -439,12 +823,21 @@ BEGIN
   LOOP
     images_with_byok := images_with_byok + 1;
     produced_this_image := false;
+    v_event_at := public.byok_real_capture_at(img.exif_data, img.occurred_at);
+    IF v_event_at IS NOT NULL THEN
+      v_event_precision := 'exact';
+      v_event_basis := CASE WHEN img.occurred_at IS NOT NULL THEN 'image_occurred_at' ELSE 'exif_DateTimeOriginal' END;
+    ELSE
+      v_event_precision := 'unknown';
+      v_event_basis := 'no_real_capture_clock';
+      v_event_at := NULL;
+    END IF;
 
     FOR lab IN
       SELECT value FROM jsonb_array_elements(coalesce(img.byok->'components_seen', '[]'::jsonb))
     LOOP
       labels_seen := labels_seen + 1;
-      norm := public.normalize_byok_component_label(lab->>'label');
+      norm := public.normalize_byok_component_label(coalesce(lab->>'label', lab->>'name'));
       IF norm IS NULL THEN
         CONTINUE;
       END IF;
@@ -463,11 +856,15 @@ BEGIN
         (norm->>'property_key'), norm->>'value',
         'image_id', img.image_id,
         'source_observation_id', img.source_observation_id,
-        'source_label', lab->>'label',
+        'source_label', coalesce(lab->>'label', lab->>'name'),
         'component_key', norm->>'component_key',
         'fold_method', version,
         'claim_role', 'inferred',
         'scene_type', img.byok->>'scene_type',
+        'build_phase', public.byok_normalize_build_phase(
+           img.byok->>'scene_type', img.byok->>'build_phase_guess', img.byok->'text_regions'),
+        'area_key', public.byok_infer_image_area(img.byok->>'scene_type'),
+        'source_event_time_precision', v_event_precision,
         'limitation', 'Deterministic parse of stored byok components_seen label. Not originality or whole-vehicle completeness.'
       );
 
@@ -476,8 +873,10 @@ BEGIN
         'property_key', norm->>'property_key',
         'value', norm->>'value',
         'component_key', norm->>'component_key',
-        'source_label', lab->>'label',
+        'source_label', coalesce(lab->>'label', lab->>'name'),
         'property_id', prop_id,
+        'source_event_at', v_event_at,
+        'source_event_time_precision', v_event_precision,
         'structured_data', sd
       );
 
@@ -516,13 +915,18 @@ BEGIN
           INSERT INTO vehicle_observations (
             id, vehicle_id, kind, property_id, extraction_method,
             structured_data, content_text, confidence_score,
-            observed_at, ingested_at, is_superseded
+            observed_at, observed_at_basis,
+            source_event_at, source_event_time_precision,
+            ingested_at, is_superseded
           ) VALUES (
             new_obs_id, p_vehicle_id, 'condition', prop_id, version,
             sd,
-            format('byok fold: %s=%s from label %s', norm->>'property_key', norm->>'value', lab->>'label'),
+            format('byok fold: %s=%s from label %s', norm->>'property_key', norm->>'value', coalesce(lab->>'label', lab->>'name')),
             least(0.95, greatest(0.5, coalesce((lab->>'confidence')::numeric, 0.7))),
-            coalesce(img.taken_at, img.created_at, now()),
+            coalesce(v_event_at, img.taken_at, img.created_at, now()),
+            CASE WHEN v_event_at IS NOT NULL THEN v_event_basis ELSE 'ingest_knowledge_clock' END,
+            v_event_at,
+            v_event_precision,
             now(), false
           );
           inserted := inserted + 1;
@@ -1113,40 +1517,66 @@ SET search_path = public
 SET timezone TO 'UTC'
 AS $fn$
 DECLARE
-  version text := 'read_vehicle_image_group/20261122081000';
+  version text := 'read_vehicle_image_group/20261122091000';
   groups jsonb := '[]'::jsonb;
   g record;
   combined jsonb;
   labels jsonb;
   parsed jsonb;
+  v_group_key text;
 BEGIN
   FOR g IN
-    SELECT
-      coalesce(byok->>'scene_type', 'unknown') AS scene_type,
-      coalesce(byok->>'build_phase_guess', 'unknown') AS build_phase,
-      to_char(
-        date_trunc('hour', coalesce(vi.taken_at, vi.created_at)) AT TIME ZONE 'UTC',
-        'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-      ) AS hour_key,
-      array_agg(vi.id ORDER BY coalesce(vi.taken_at, vi.created_at), vi.id) AS member_ids,
-      jsonb_agg(DISTINCT coalesce(byok->>'scene_type', 'unknown')) AS scenes
-    FROM vehicle_images vi
-    CROSS JOIN LATERAL (SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS byok) b
-    WHERE vi.vehicle_id = p_vehicle_id
-      AND coalesce(vi.is_superseded, false) IS NOT TRUE
-      AND coalesce(vi.is_duplicate, false) IS NOT TRUE
-      AND vi.ai_scan_metadata ? 'byok_deep_analysis'
-      AND (
-        p_group_key IS NULL
-        OR format('%s|%s|%s',
-             coalesce(byok->>'scene_type', 'unknown'),
-             coalesce(byok->>'build_phase_guess', 'unknown'),
-             to_char(date_trunc('hour', coalesce(vi.taken_at, vi.created_at)) AT TIME ZONE 'UTC',
-                     'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+    WITH base AS (
+      SELECT
+        vi.id,
+        coalesce(byok->>'scene_type', 'unknown') AS scene_type,
+        public.byok_infer_image_area(byok->>'scene_type') AS area_key,
+        public.byok_normalize_build_phase(
+          byok->>'scene_type', byok->>'build_phase_guess', byok->'text_regions'
+        ) AS build_phase,
+        coalesce(vi.dhash, vi.phash, '') AS visual_hash,
+        CASE
+          WHEN upper(coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), ''))
+               ~ 'IMG[_-]?[0-9]+'
+            THEN (substring(
+                   upper(coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), ''))
+                   from 'IMG[_-]?([0-9]+)')::int / 20)::text
+          ELSE 'noseq'
+        END AS seq_bucket,
+        public.byok_real_capture_at(vi.exif_data, vi.occurred_at) AS capture_at,
+        coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), vi.id::text) AS sort_name
+      FROM vehicle_images vi
+      CROSS JOIN LATERAL (SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS byok) b
+      WHERE vi.vehicle_id = p_vehicle_id
+        AND coalesce(vi.is_superseded, false) IS NOT TRUE
+        AND coalesce(vi.is_duplicate, false) IS NOT TRUE
+        AND vi.ai_scan_metadata ? 'byok_deep_analysis'
+    ),
+    grouped AS (
+      SELECT
+        scene_type,
+        area_key,
+        build_phase,
+        seq_bucket,
+        CASE WHEN count(*) FILTER (WHERE capture_at IS NOT NULL) = count(*)
+             THEN to_char(date_trunc('hour', min(capture_at))
+                          AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+             ELSE 'notime'
+        END AS capture_hour_key,
+        array_agg(id ORDER BY visual_hash, sort_name, id) AS member_ids
+      FROM base
+      GROUP BY 1, 2, 3, 4
+    )
+    SELECT *
+      FROM grouped
+     WHERE p_group_key IS NULL
+        OR format('%s|%s|%s|%s|%s',
+             scene_type, area_key, build_phase, seq_bucket, capture_hour_key
            ) = p_group_key
-      )
-    GROUP BY 1, 2, 3
   LOOP
+    v_group_key := format('%s|%s|%s|%s|%s',
+      g.scene_type, g.area_key, g.build_phase, g.seq_bucket, g.capture_hour_key);
+
     SELECT coalesce(jsonb_agg(jsonb_build_object(
              'image_id', x.image_id,
              'label', x.lab,
@@ -1179,14 +1609,21 @@ BEGIN
        AND nullif(n.n->>'property_key', '') IS NOT NULL;
 
     combined := jsonb_build_object(
-      'group_key', format('%s|%s|%s', g.scene_type, g.build_phase, g.hour_key),
+      'group_key', v_group_key,
       'scene_type', g.scene_type,
+      'area_key', g.area_key,
       'build_phase', g.build_phase,
+      'seq_bucket', g.seq_bucket,
+      'capture_hour_key', g.capture_hour_key,
       'member_image_ids', to_jsonb(g.member_ids),
       'member_count', coalesce(array_length(g.member_ids, 1), 0),
       'labels', labels,
       'parsed_claims', parsed,
-      'read_mode', 'group_together'
+      'read_mode', 'group_together',
+      'member_order', 'dhash_then_filename',
+      'time_basis', CASE WHEN g.capture_hour_key = 'notime'
+        THEN 'unknown_no_exif_or_occurred_at'
+        ELSE 'real_capture_hour' END
     );
     groups := groups || combined;
   END LOOP;
