@@ -87,6 +87,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
         summary.error_classes[cls] = (summary.error_classes[cls] ?? 0) + 1;
       }
       if (a.stopped) summary.stopped = String(a.stopped).slice(0, 120);
+      // frames/read in the frame reader's terms: doubts taken up and doubts answered. reader-heartbeat.mjs carries a
+      // zero-read run across fires on these, so a loop whose every answer fails is seen, not left green.
+      summary.frames = summary.answered + summary.failed;
+      summary.read = summary.answered;
     } catch (e) { err('answer'); summary.stopped = String(e.message).slice(0, 120); }
   }
   // a receipt file only when the fire did something (the wrapper keeps no empty files)

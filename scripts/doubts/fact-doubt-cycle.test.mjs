@@ -56,4 +56,6 @@ test('failed answers are counted by class without their values', async () => {
   assert.ok(Object.keys(s.error_classes).some((k) => k.startsWith("answer: Cannot find package")));
   assert.ok(!JSON.stringify(s).includes('1234'), 'a refused value stays out of the summary');
   assert.equal(s.errors, 0, 'answer failures do not make the fire an error (the heartbeat still lands)');
+  assert.equal(s.frames, 2, 'doubts taken up');
+  assert.equal(s.read, 0, 'none answered: the heartbeat starts a zero-read run');
 });
