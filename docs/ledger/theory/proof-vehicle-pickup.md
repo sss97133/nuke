@@ -54,7 +54,8 @@ or wrong, correct this table in your next pull request.
 | Drivetrain and body-tag decode | methods `cowl_tag_decode_v1`, `engine_block_decode_v1`, `trans_id_stamp_decode_v1`, `physical_transcription_v1`; #3401, #3428, #3456 | keyed readings on the 20 properties approved 2026-11-12 16:21 UTC; the rest of its rows keyed or waiting on a filed proposal |
 | Photo keys | method `photo_map_harvest_v1`, 446 rows landed 2026-11-11 | the keyed claims the work records must cite; the decisions memory, which has no store but a file |
 | Receipts and catalog | `receipt_work_lines`; #3360 to #3362 | stored catalog rows a price can cite; a zone for the 114 lines that have none (read 2026-11-12 00:12 UTC) |
-| Documented spend + replica accuracy | `vehicle_documented_spend`, `promote_vehicle_decode_entities`, `reconcile_identity_field_provenance`, `vehicle_replica_accuracy` (20261122032000) | one net spend number (~$21,161.81 with credits, not the $21,213.41 positive-only lens); decode→entity dry-run; VIN/cowl make over stale Corvette provenance; replica accuracy distinct from originality |
+| Documented spend + decode promote | `vehicle_documented_spend`, `promote_vehicle_decode_entities`, `reconcile_identity_field_provenance` (20261122032000) | one net spend number (~$21,161.81 with credits, not the $21,213.41 positive-only lens); decode→entity dry-run; VIN/cowl make over stale Corvette provenance |
+| Replica accuracy + byok component fold | follow-on migration (target specs, image groups, component decisions, raw→keyed byok fold) | tribute closeness distinct from originality; never score identity absence as non_correct; never guess unknown |
 | Profile readers | `vehicle_profile_read`, `vehicle_build_log_public`; #3393, #3429, #3433 | readers that show what the lanes above land, on web and phone |
 | Gates and scoreboards | #3365, #3373, #3405, #3410, #3436, #3443, #3470 | the two readers above; refusals that name their legal move |
 

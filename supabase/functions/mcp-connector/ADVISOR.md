@@ -72,7 +72,7 @@ ChatGPT / Grok Bot / other agents: add a custom MCP connector pointing at `https
 | Tool | Job |
 |---|---|
 | `find_asset` | Find by VIN, listing URL, or year/make/model text |
-| `get_asset` | Identity, price facts, documented spend (`vehicle_documented_spend`), replica accuracy when `is_replica`, coverage, and sale/relist history |
+| `get_asset` | Identity, price facts, documented spend (`vehicle_documented_spend`), coverage, and sale/relist history |
 | `get_comps` | Variant-matched confirmed sales with source URLs and dates |
 | `value_asset` | Value range from recent same-asset sale and comps (confidence capped at 0.6); also exposes documented spend (not a market value) |
 | `evaluate_listing` | **Hero tool** — listing URL → verdict, value range, prior sales/relists, top comps, red flags |
