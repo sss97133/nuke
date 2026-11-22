@@ -38,6 +38,8 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: Sources
+      # The Live Activity contract (NukeWorkAttributes), compiled into the app AND the widget extension.
+      - path: Shared
       # Privacy manifest must land in the app bundle root as a resource —
       # App Store Connect scans for it at upload time.
       - path: PrivacyInfo.xcprivacy
@@ -50,6 +52,8 @@ targets:
         product: Supabase
       - package: GRDB
         product: GRDB
+      # The photo-work Live Activity (Dynamic Island + Lock Screen); embedded in PlugIns.
+      - target: NukeCaptureWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture
@@ -133,6 +137,42 @@ targets:
         # App makes HTTPS-only calls (Supabase) → exempt from export
         # compliance docs; answering here skips the question on every upload.
         ITSAppUsesNonExemptEncryption: false
+        # Photo work shows as a Live Activity (Shared/NukeWorkActivity.swift, drawn by the
+        # NukeCaptureWidgets extension). Without this key ActivityKit refuses every request.
+        NSSupportsLiveActivities: true
+
+  # The widget extension: draws the photo-work Live Activity on the Lock Screen and in the Dynamic
+  # Island. Drawing only; the app starts, updates and ends the activity (WorkLiveActivity.swift).
+  # No App Group, no entitlements: ActivityKit carries the state. Its bundle id is a child of the
+  # app's (ag.nuke.capture.widgets); automatic signing registers it.
+  NukeCaptureWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Widgets
+      - path: Shared
+    info:
+      path: Generated/NukeCaptureWidgets-Info.plist
+      properties:
+        CFBundleDisplayName: Nuke
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        # Same rule as the app: ci_pre_xcodebuild.sh stamps this with the app's epoch build number,
+        # so the extension's version always matches its host (App Store validation compares them).
+        CFBundleVersion: "33"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture.widgets
+        PRODUCT_NAME: NukeCaptureWidgets
+        MARKETING_VERSION: "1.2.0"
+        CURRENT_PROJECT_VERSION: 33
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        SKIP_INSTALL: YES
 
   # Unit tests for the payload decoders and the rules the app enforces client-side. Run by
   # .github/workflows/ios-build.yml on every iOS pull request and locally with

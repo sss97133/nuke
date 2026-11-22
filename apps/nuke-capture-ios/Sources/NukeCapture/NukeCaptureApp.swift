@@ -278,6 +278,11 @@ struct NukeCaptureApp: App {
     /// personal automation "When Camera is closed → Open Nuke" opens this URL, so a frame uploads
     /// the moment the shutter is put away, with no tap in the app.
     private func handleOpenURL(_ url: URL) {
+        // The photo-work Live Activity's tap: open the per-photo list (MainTabView presents it).
+        if WorkProgressRoute.handles(url) {
+            if session.isSignedIn { WorkProgressRoute.shared.showList = true }
+            return
+        }
         guard url.scheme == Config.oauthRedirectURL.scheme, url.host == Config.syncURLHost else { return }
         guard session.isSignedIn, ignitionComplete else { return }
         Task { await SyncEngine.shared.start() }

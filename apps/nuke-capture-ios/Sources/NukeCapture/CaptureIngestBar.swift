@@ -1,4 +1,8 @@
-// CaptureIngestBar.swift — the slim live ingest status bar pinned to the top of the app.
+// CaptureIngestBar.swift — the per-photo ingest list, and the slim fallback bar.
+//
+// The Live Activity (WorkLiveActivity.swift) is where progress shows now; tapping it opens
+// CaptureIngestListSheet. The bar below is drawn only when Live Activities are switched off and
+// work is live (MainTabView.showsFallbackBar).
 //
 // One line of plain words ("12 uploaded · 9 classified · 9 on 1973 Firebird · 1 failed"). Tap it and
 // it opens a list: one entry per photo with where it is, plus a live line of what the app is doing
@@ -62,6 +66,46 @@ struct CaptureIngestBar: View {
             }
         }
         .frame(maxHeight: 340)
+    }
+}
+
+/// The full per-photo list as a sheet: what the Live Activity's tap opens.
+struct CaptureIngestListSheet: View {
+    @ObservedObject var store: CaptureIngestStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if store.rows.isEmpty {
+                    ContentUnavailableView("No photos in motion", systemImage: "photo.stack",
+                                           description: Text("Photos you shoot show here while they upload and are read."))
+                } else {
+                    List {
+                        Section {
+                            ForEach(store.rows) { row in
+                                CaptureIngestRowView(row: row, names: store.vehicleNames)
+                                    .listRowInsets(EdgeInsets())
+                            }
+                        } header: {
+                            Text(store.summary.text)
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("Photos")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                if !store.rows.isEmpty {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Clear") { store.clear() }
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
