@@ -377,6 +377,31 @@ Deno.test("evaluate_listing: without an invoker (tests, harness) a miss only que
   assert(cov.args.p_vehicle_id === null, "queued");
 });
 
+Deno.test("evaluate_listing: a public-scope paste never instant-ingests and never queues a miss", async () => {
+  _resetInstantIngestState();
+  const s = stubDb({ landed: true });
+  let invoked = 0;
+  const res = await withPage(
+    200,
+    LOT,
+    () =>
+      handleEvaluateListing({
+        sb: () => s.db,
+        callEdgeApi: () => Promise.reject(new Error("no edge api in public scope")),
+        // Even if an invoker leaked into public deps, the public scope must not use it.
+        invokeFunction: () => {
+          invoked++;
+          return Promise.resolve({ status: 200, body: { success: true, created_vehicle_ids: [VID] } });
+        },
+        publicOnly: true,
+      }, { url: LOT }),
+  );
+  const sc = res.structuredContent as unknown as Record<string, unknown>;
+  assert(invoked === 0, `invoked ${invoked}`);
+  assert(!s.rpcs.some((r) => r.name === "log_listing_coverage"), "no coverage row / queued miss");
+  assert(sc.matched_asset_id === null, "not landed");
+});
+
 Deno.test("a just-listed lot with no bids reads 'no bids yet', not 'current bid $0 — below'", async () => {
   _resetInstantIngestState();
   const until = Math.floor(Date.now() / 1000) + 7 * 86400;
