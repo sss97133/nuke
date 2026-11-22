@@ -38,19 +38,19 @@ CREATE FUNCTION public.get_service_role_key_for_cron() RETURNS text LANGUAGE sql
 
 INSERT INTO public.live_auction_sources VALUES ('00000000-0000-0000-0000-0000000000ba', 'bat'),
                                                ('00000000-0000-0000-0000-0000000000cb', 'carsandbids');
--- Live lots. Board = BaT's /auctions/ feed (origin_metadata.source_current_bid, source_read_at); stored = auction_events.
+-- Live lots (board ages kept clear of the 1 h line: psql autocommits, so now() moves between statements). Board = BaT's /auctions/ feed (origin_metadata.source_current_bid, source_read_at); stored = auction_events.
 CREATE TEMP TABLE lots (k text, src text, board numeric, board_age interval, stored numeric, stored_age interval,
                         ends interval, synced_age interval, stream boolean);
 INSERT INTO lots VALUES
   ('a206',  'ba', 39993, '90 minutes', 20993, '18 hours', '3 days',     '18 hours', false), -- #206: behind -> dispatch
   ('same',  'ba', 50000, '1 hour',  50000, '2 hours',  '2 days',     '5 hours',  false), -- in step
-  ('soon',  'ba', 60000, '1 hour',  55000, '2 hours',  '10 minutes', '5 hours',  false), -- behind, stream window
-  ('fresh', 'ba', 70000, '1 hour',  65000, '2 hours',  '2 days',     '5 minutes',false), -- behind, just dispatched
+  ('soon',  'ba', 60000, '45 minutes',  55000, '2 hours',  '10 minutes', '5 hours',  false), -- behind, stream window
+  ('fresh', 'ba', 70000, '45 minutes',  65000, '2 hours',  '2 days',     '5 minutes',false), -- behind, just dispatched
   ('none',  'ba', 12000, '30 minutes', NULL, NULL,     '4 days',     NULL,       false), -- no stored row -> dispatch
   ('newer', 'ba', 30000, '3 hours', 31000, '1 hour',   '2 days',     '5 hours',  false), -- stored is newer than board
   ('cb',    'cb', 80000, '1 hour',  70000, '5 hours',  '2 days',     '5 hours',  false), -- not BaT
   ('zero',  'ba', 0,     '1 hour',  NULL,  NULL,       '6 days',     '5 hours',  false), -- no bids yet
-  ('strm',  'ba', 90000, '1 hour',  85000, '2 hours',  '1 day',      '5 hours',  true);  -- live stream connected
+  ('strm',  'ba', 90000, '45 minutes',  85000, '2 hours',  '1 day',      '5 hours',  true);  -- live stream connected
 INSERT INTO public.vehicles (id, source, sale_status, high_bid, origin_metadata)
 SELECT md5('v' || k)::uuid, 'bat', 'auction_live', board::int,
        jsonb_build_object('source_current_bid', board, 'source_read_at', now() - board_age)
