@@ -1,4 +1,6 @@
 -- Revert 20261122081000 replica / byok fold.
+DROP FUNCTION IF EXISTS public.gap_vs_build_replica_components(uuid, boolean);
+DROP FUNCTION IF EXISTS public.read_vehicle_image_group(uuid, text);
 DROP FUNCTION IF EXISTS public.vehicle_replica_accuracy(uuid);
 DROP FUNCTION IF EXISTS public.decide_replica_components(uuid, boolean);
 DROP FUNCTION IF EXISTS public.fold_byok_component_observations(uuid, boolean);

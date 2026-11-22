@@ -1166,6 +1166,7 @@ BEGIN
       ) x
      WHERE x.lab <> '';
 
+    -- jsonb null from normalize is still a JSON value; require a property_key.
     SELECT coalesce(jsonb_agg(DISTINCT jsonb_build_object(
              'property_key', n->>'property_key',
              'value', n->>'value',
@@ -1174,7 +1175,8 @@ BEGIN
       INTO parsed
       FROM jsonb_array_elements(labels) e
       CROSS JOIN LATERAL (SELECT e.value->'normalized' AS n) n
-     WHERE n.n IS NOT NULL;
+     WHERE jsonb_typeof(n.n) = 'object'
+       AND nullif(n.n->>'property_key', '') IS NOT NULL;
 
     combined := jsonb_build_object(
       'group_key', format('%s|%s|%s', g.scene_type, g.build_phase, g.hour_key),

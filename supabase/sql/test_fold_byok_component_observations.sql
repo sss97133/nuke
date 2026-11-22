@@ -179,6 +179,16 @@ SELECT public.assert(
     ->>'group_count')::int >= 1,
   'group-level read returns combined labels');
 SELECT public.assert(
+  NOT EXISTS (
+    SELECT 1
+      FROM jsonb_array_elements(
+        public.read_vehicle_image_group('00000000-0000-0000-0000-0000000000a1')->'groups'
+      ) g
+      CROSS JOIN LATERAL jsonb_array_elements(g.value->'parsed_claims') c
+     WHERE c.value->>'property_key' IS NULL
+  ),
+  'parsed_claims exclude unparsed null normalizations');
+SELECT public.assert(
   (public.gap_vs_build_replica_components('00000000-0000-0000-0000-0000000000a1', true)
     ->>'gap_count')::int >= 1
   OR (public.gap_vs_build_replica_components('00000000-0000-0000-0000-0000000000a1', true)
