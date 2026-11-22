@@ -24,7 +24,7 @@ import process from 'node:process';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export const READERS = ['subscription-document-reader', 'subscription-frame-classifier'];
+export const READERS = ['subscription-document-reader', 'subscription-frame-classifier', 'fact-doubt-cycle'];
 // record_reader_heartbeat refuses a reading over 20 kB of jsonb text, which is longer than compact JSON (a space after
 // every ':' and ','); 12 kB compact stays under it.
 export const MAX_READING_BYTES = 12000;

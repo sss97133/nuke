@@ -47,6 +47,7 @@ case "$script" in
   subscription-document-reader.mjs)
     out="$(arg --out "$@")"; [ -n "$out" ] && echo '{}' > "$out"
     echo "{\\"frames\\":0,\\"read\\":0,\\"page\\":0,\\"landed\\":0,\\"waiting_no_vehicle\\":0,\\"vehicle_document\\":0,\\"errors\\":0,\\"error_classes\\":{},\\"receipts\\":0,\\"receipt_errors\\":0,\\"stopped\\":null,\\"by_type\\":{},\\"read_seconds\\":0,\\"to_land\\":\${FAKE_RELANDED:-0},\\"relanded\\":\${FAKE_RELANDED:-0},\\"reland_vehicle_document\\":0,\\"reland_errors\\":0}" ;;
+  fact-doubt-cycle.mjs) echo '{"cli":"fact-doubt-cycle","raised":0,"answered":0,"errors":0}' ;;
   reader-heartbeat.mjs) echo "heartbeat $READER_NAME HTTP 200" ;;
 esac
 `;
@@ -57,7 +58,8 @@ const FAKE_PGREP = `#!/bin/bash
 [ -n "\${FAKE_READER_RUNNING:-}" ] && exit 0
 exit 1
 `;
-const FULL = ['subscription-document-reader.mjs', 'reader-heartbeat.mjs', 'subscription-frame-classifier.mjs', 'reader-heartbeat.mjs'];
+const FULL = ['subscription-document-reader.mjs', 'reader-heartbeat.mjs', 'subscription-frame-classifier.mjs', 'reader-heartbeat.mjs',
+  'fact-doubt-cycle.mjs', 'reader-heartbeat.mjs'];
 
 async function withHome(fn) {
   const home = mkdtempSync(join(tmpdir(), 'reader-batch-'));

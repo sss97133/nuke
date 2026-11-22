@@ -217,7 +217,10 @@ export async function reopenForSecondReader({ db, vehicleId, agent, model, runId
 export async function main(argv = process.argv.slice(2), env = process.env) {
   const vehicleId = arg(argv, '--vehicle'); const limit = Number(arg(argv, '--limit', 12));
   const dry = argv.includes('--dry-run'); const reclaim = Number(arg(argv, '--reclaim-minutes', 30)); // a claim older than this is re-claimable (a run that died)
-  if (!vehicleId) throw new Error('--vehicle <uuid> required');
+  // --all-vehicles (the scheduled cycle, fact-doubt-cycle.mjs): claim department-wide. Each blind task is built from its own
+  // question row, so nothing of one vehicle reaches another's task.
+  const allVehicles = argv.includes('--all-vehicles');
+  if (!vehicleId && !allVehicles) throw new Error('--vehicle <uuid> or --all-vehicles required');
   if (!(limit >= 1 && limit <= 50)) throw new Error('--limit must be 1..50');
   const db = client(env); const version = producerVersion(SCRIPT); const runId = randomUUID(); const claimedBy = `${AGENT}:${runId}`;
   const exportDir = arg(argv, '--export'); const submitDir = arg(argv, '--submit');
@@ -227,8 +230,9 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const reg = new Map((await db.req('observation_properties?select=id,property_key,label,description,unit,data_type&limit=5000')).map((p) => [p.property_key, p]));
   if (submitDir) return submitAnswers({ db, dir: submitDir, agent: arg(argv, '--agent'), model: arg(argv, '--model'), version: arg(argv, '--version'), summary });
   const pending = await db.req(`evidence_judgment_requests?select=id,vehicle_id,params,status&question_kind=eq.${QUESTION}&department=eq.${DEPARTMENT}&status=eq.pending&order=priority.desc,created_at&limit=500`);
-  const other = pending.filter((r) => r.vehicle_id !== vehicleId);
+  const other = allVehicles ? [] : pending.filter((r) => r.vehicle_id !== vehicleId);
   summary.pending_for_vehicle = pending.length - other.length;
+  if (allVehicles && submitDir == null && (exportDir || argv.includes('--second-reader'))) throw new Error('--all-vehicles answers only; no --export or --second-reader');
   if (other.length) throw new Error(`${other.length} pending doubt(s) belong to other vehicles; claiming is department-wide, refusing`);
   if (exportDir) return exportTasks({ db, dir: exportDir, limit, reclaim, claimedBy, reg, summary, runId });
   if (dry) {
