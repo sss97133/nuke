@@ -238,7 +238,7 @@ final class NavigationFlowTests: XCTestCase {
         XCTAssertEqual(MainTabView.availableTab(.garage, signedIn: false, fullAccess: false), .explore)
     }
 
-    func testGarageFindsAnExistingZeroPhotoProfileByVehicleAndVINWithoutClaimingOwnership() {
+    func testGarageFindsAnExistingZeroPhotoProfileByVehicleNotVINWithoutClaimingOwnership() {
         let record = GarageVehicle(vehicle_id: "test-record", year: 1973, make: "Pontiac", model: "Firebird",
                                    trim_name: nil, image_url: nil, current_value: nil, image_count: 0,
                                    relationship: "profile_record", vin: "TEST1234567")
@@ -246,7 +246,7 @@ final class NavigationFlowTests: XCTestCase {
                                       trim_name: nil, image_url: nil, current_value: nil, image_count: 0, relationship: "contributor")
         let rows = [unrelated, record]
         XCTAssertEqual(GarageSections.matching(rows, query: "1973 firebird").map(\.id), [record.id])
-        XCTAssertEqual(GarageSections.matching(rows, query: "1234567").map(\.id), [record.id])
+        XCTAssertTrue(GarageSections.matching(rows, query: "1234567").isEmpty, "the garage is not searched by VIN")
         XCTAssertTrue(GarageSections.matching(rows, query: "1973 mustang").isEmpty)
         XCTAssertEqual(GarageSections.matching(rows, query: "  ").map(\.id), rows.map(\.id))
         XCTAssertFalse(GarageRelation.isOwned(record))

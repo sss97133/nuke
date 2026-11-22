@@ -1,4 +1,4 @@
-// GarageView.swift — searchable account vehicles as cards in the order of their recorded activity. The phone's
+// GarageView.swift — account vehicles, searchable by year, make or model, as cards in the order of their recorded activity. The phone's
 // copy of the web garage (PR #3612): one list, newest dated activity first, year headings, undated cars last;
 // the relationship is the first item on the card's lane, not a section.
 // Relationship and work controls remain under Garage details (the card's menu).
@@ -87,7 +87,7 @@ struct GarageView: View {
         }
         .navigationTitle("Garage")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Vehicle or VIN")
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Year, make or model")
         .refreshable { await load() }
         .task(id: userId) { await load() }
         .onChange(of: scenePhase) { _, phase in
