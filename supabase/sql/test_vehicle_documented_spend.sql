@@ -110,6 +110,7 @@ BEGIN
   dim.confidence := 'high';
   dim.notes := FORMAT('VIN: Yes | Mileage: Unknown | Receipts: %s | Documented spend: $%s',
     rec_count, TO_CHAR(cost_documented, 'FM999,999.00'));
+  -- Migration strips Documented spend: $%s → present (no dollar cache on grades).
   dimensions := array_append(dimensions, dim);
   result.dimensions := dimensions;
   result.grade := 5;
@@ -202,8 +203,13 @@ SELECT public.assert(
 
 SELECT public.assert(
   (public.compute_vehicle_grade('00000000-0000-0000-0000-0000000000a1')).dimensions[1].notes
-    LIKE '%Documented spend: $90%',
-  'grades Documented spend reads the fold, not service_records');
+    LIKE '%Documented spend: present%'
+  AND (public.compute_vehicle_grade('00000000-0000-0000-0000-0000000000a1')).dimensions[1].notes
+    NOT LIKE '%$90%',
+  'grades use fold for score but notes omit dollar amounts');
+SELECT public.assert(
+  (public.compute_vehicle_grade('00000000-0000-0000-0000-0000000000a1')).dimensions[1].evidence_count = 2,
+  'grades evidence_count still from fold receipt+work counts');
 
 SELECT public.assert(
   (public._vehicle_documented_spend_unmasked('00000000-0000-0000-0000-0000000000a1')->>'net_spend')::numeric

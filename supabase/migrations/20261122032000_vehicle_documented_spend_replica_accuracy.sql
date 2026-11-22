@@ -372,8 +372,10 @@ DECLARE
          coalesce((spend_fold->>'net_spend')::numeric, 0)
   INTO rec_count, cost_documented
   FROM (SELECT public._vehicle_documented_spend_unmasked(p_vehicle_id) AS spend_fold) s;$a$;
+  -- Do not embed dollar amounts in notes: vehicle_grades.dimensions is readable
+  -- without the tied-viewer money mask. Score still uses cost_documented internally.
   anchor2 text := $a$dim.notes := FORMAT('VIN: %s | Mileage: %s | Service records: %s | Documented spend: $%s',$a$;
-  repl2 text := $a$dim.notes := FORMAT('VIN: %s | Mileage: %s | Receipts: %s | Documented spend: $%s',$a$;
+  repl2 text := $a$dim.notes := FORMAT('VIN: %s | Mileage: %s | Receipts: %s | Documented spend: present',$a$;
 BEGIN
   IF to_regprocedure('public.compute_vehicle_grade(uuid)') IS NULL THEN
     RAISE NOTICE 'compute_vehicle_grade absent; skip grade spend patch';
@@ -383,22 +385,27 @@ BEGIN
   -- Already patched (replay).
   IF position('_vehicle_documented_spend_unmasked(p_vehicle_id)' IN def) > 0
      OR position('vehicle_documented_spend(p_vehicle_id)' IN def) > 0 THEN
-    RAISE NOTICE 'compute_vehicle_grade already uses documented spend fold; skip';
-    RETURN;
-  END IF;
-  IF position('FROM service_records' IN def) > 0
+    RAISE NOTICE 'compute_vehicle_grade already uses documented spend fold; skip fold swap';
+  ELSIF position('FROM service_records' IN def) > 0
      AND (position(anchor1 IN def) = 0 OR position(anchor2 IN def) = 0) THEN
     RAISE EXCEPTION 'compute_vehicle_grade still reads service_records but anchors moved; refuse spend patch';
+  ELSIF position(anchor1 IN def) = 0 OR position(anchor2 IN def) = 0 THEN
+    RAISE NOTICE 'compute_vehicle_grade has no service_records spend anchors (shim/contract); skip fold swap';
+  ELSE
+    new_def := replace(replace(def, anchor1, repl1), anchor2, repl2);
+    IF new_def = def THEN
+      RAISE EXCEPTION 'compute_vehicle_grade spend patch produced no change';
+    END IF;
+    EXECUTE new_def;
+    def := new_def;
   END IF;
-  IF position(anchor1 IN def) = 0 OR position(anchor2 IN def) = 0 THEN
-    RAISE NOTICE 'compute_vehicle_grade has no service_records spend anchors (shim/contract); skip';
-    RETURN;
+
+  -- Always strip dollar amounts from Documented spend notes (replay-safe).
+  def := pg_get_functiondef('public.compute_vehicle_grade(uuid)'::regprocedure);
+  IF position('Documented spend: $%s' IN def) > 0 THEN
+    new_def := replace(def, 'Documented spend: $%s', 'Documented spend: present');
+    EXECUTE new_def;
   END IF;
-  new_def := replace(replace(def, anchor1, repl1), anchor2, repl2);
-  IF new_def = def THEN
-    RAISE EXCEPTION 'compute_vehicle_grade spend patch produced no change';
-  END IF;
-  EXECUTE new_def;
 END
 $patch$;
 
