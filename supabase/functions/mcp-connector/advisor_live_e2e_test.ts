@@ -187,6 +187,22 @@ Deno.test("handler get_asset against fixture-backed mock returns BaT sale and hi
         return api;
       },
       rpc(name: string) {
+        if (name === "vehicle_documented_spend") {
+          return Promise.resolve({
+            data: {
+              net_spend: 0, gross_charges: 0, credits: 0, receipt_count: 0,
+              basis: "fixture", as_of: "2024-07-07T00:00:00Z",
+              logic_version: "vehicle_documented_spend/test",
+            },
+            error: null,
+          });
+        }
+        if (name === "vehicle_replica_accuracy") {
+          return Promise.resolve({
+            data: { applicable: false, reason: "fixture vehicle is not a replica" },
+            error: null,
+          });
+        }
         assert(name === "vehicle_price_facts", "canonical price reader");
         return Promise.resolve({ data: [{ price_kind: price.kind, price_amount: price.amount,
           price_as_of: price.as_of, price_live: price.live, outcome: price.outcome,
