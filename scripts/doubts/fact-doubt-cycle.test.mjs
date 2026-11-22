@@ -44,3 +44,18 @@ test('a dry run passes --dry-run through and writes no cursor', async () => {
   assert.equal(s.raised, 1);
   assert.throws(() => readFileSync(cursorFile, 'utf8'));
 });
+
+test('failed answers are counted by class without their values', async () => {
+  const db = { req: async (path) => path.startsWith('vehicles?') ? [] : [] };
+  const answer = async () => ({ answered: [], failed: [
+    { id: 'a', key: 'k', error: "Cannot find package '@anthropic-ai/sdk' imported from /x/y.mjs" },
+    { id: 'b', key: 'k', problems: ['value 1234 not allowed'] }] });
+  const s = await main(['--owner', OWNER, '--vehicles', '0'], {}, { db, raise: async () => ({}), answer, cursorFile: join(mkdtempSync(join(tmpdir(), 'fdc-')), 'c') });
+  assert.equal(s.failed, 2);
+  assert.equal(s.error_classes.refused_locally, 1);
+  assert.ok(Object.keys(s.error_classes).some((k) => k.startsWith("answer: Cannot find package")));
+  assert.ok(!JSON.stringify(s).includes('1234'), 'a refused value stays out of the summary');
+  assert.equal(s.errors, 0, 'answer failures do not make the fire an error (the heartbeat still lands)');
+  assert.equal(s.frames, 2, 'doubts taken up');
+  assert.equal(s.read, 0, 'none answered: the heartbeat starts a zero-read run');
+});
