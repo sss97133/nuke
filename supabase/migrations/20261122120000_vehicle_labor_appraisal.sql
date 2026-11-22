@@ -79,9 +79,9 @@ INSERT INTO public.labor_stage_rules (
    'stage_transition_labor_map:electrical original→rewire', 40),
   ('body_metal', 'body', 'panel_tail', 'stripped', 'fabricated',
    '{"all":[
-      {"type":"part_line_match","description_regex":"tail panel|radiator support|rr bdy pnl|deck fllr","min":1}
+      {"type":"part_line_match","description_regex":"tail panel|rad(iator)? support|rr bdy pnl|deck fllr","min":1}
     ],
-    "panel_multiplier_regex":"tail panel|radiator support|rr bdy pnl|deck fllr",
+    "panel_multiplier_regex":"tail panel|rad(iator)? support|rr bdy pnl|deck fllr",
     "panel_multiplier_cap":2}'::jsonb,
    4, 6, 12,
    'stage_transition_labor_map:body panel_* stripped→fabricated (×evidenced panels)', 50),
@@ -622,7 +622,7 @@ BEGIN
       -- Prefer distinct panel families when ≥2 families present.
       SELECT count(DISTINCT CASE
                WHEN lower(w.description) ~ 'tail panel|rr bdy pnl|deck fllr' THEN 'tail'
-               WHEN lower(w.description) ~ 'radiator support' THEN 'radiator_support'
+               WHEN lower(w.description) ~ 'rad(iator)? support' THEN 'radiator_support'
                ELSE 'other'
              END)::int INTO panel_n
         FROM public.receipt_work_lines(p_vehicle_id) w
