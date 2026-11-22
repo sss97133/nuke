@@ -1318,7 +1318,7 @@ async function handleGetAsset(
     .select(
       "id, vin, year, make, model, trim, series, body_style, engine_type, engine_displacement, " +
         "transmission, drivetrain, color, interior_color, mileage, " +
-        "canonical_platform, status, " +
+        "canonical_platform, status, is_replica, " +
         "nuke_estimate, nuke_estimate_confidence, " +
         "primary_image_url, image_count, observation_count, " +
         "description, location, city, state, country, " +
@@ -1334,7 +1334,7 @@ async function handleGetAsset(
   }
   if (!vehicle) return err("Asset not found", "get_asset");
 
-  const [price, obsRes] = await Promise.all([
+  const [price, obsRes, spendRes, replicaRes] = await Promise.all([
     priceFacts(sb, vid),
     sb
       .from("vehicle_observations")
@@ -1343,7 +1343,11 @@ async function handleGetAsset(
       .eq("is_superseded", false)
       .order("ingested_at", { ascending: false })
       .limit(20),
+    sb.rpc("vehicle_documented_spend", { p_vehicle_id: vid }),
+    sb.rpc("vehicle_replica_accuracy", { p_vehicle_id: vid }),
   ]);
+  const documentedSpend = (spendRes.data ?? null) as Record<string, unknown> | null;
+  const replicaAccuracy = (replicaRes.data ?? null) as Record<string, unknown> | null;
 
   const obs = obsRes.data || [];
   const sourceMap = await loadSources(sb, obs.map((o: { source_id: string }) => o.source_id));
@@ -1448,6 +1452,49 @@ async function handleGetAsset(
     claims.push(notRecordedClaim("nuke_estimate", { checked_sources: ["vehicle_price_facts", "nuke_estimates"] }));
   }
 
+  // Documented spend from the single money fold (receipts net of credits; same number as grades/value_breakdown).
+  if (documentedSpend && documentedSpend.net_spend != null) {
+    claims.push(
+      recordedClaim("documented_spend", documentedSpend.net_spend, {
+        confidence: 0.9,
+        confidence_basis: "claim_score",
+        citations: [
+          emptyCitation({
+            source_name: "vehicle_documented_spend",
+            source_url: null,
+            observation_id: null,
+            event_time: documentedSpend.as_of ? String(documentedSpend.as_of) : null,
+            ingested_at: documentedSpend.as_of ? String(documentedSpend.as_of) : null,
+            is_superseded: false,
+          }),
+        ],
+        note: `basis=${documentedSpend.basis}; gross=${documentedSpend.gross_charges}; credits=${documentedSpend.credits}; receipts=${documentedSpend.receipt_count}`,
+      }),
+    );
+  } else {
+    claims.push(notRecordedClaim("documented_spend", { checked_sources: ["vehicle_documented_spend"] }));
+  }
+
+  if (replicaAccuracy && replicaAccuracy.applicable === true) {
+    claims.push(
+      recordedClaim("replica_accuracy_score", replicaAccuracy.accuracy_score_known_only ?? null, {
+        confidence: replicaAccuracy.accuracy_score_known_only != null ? 0.55 : null,
+        confidence_basis: replicaAccuracy.accuracy_score_known_only != null ? "claim_score" : "none",
+        citations: [
+          emptyCitation({
+            source_name: "vehicle_replica_accuracy",
+            source_url: null,
+            observation_id: null,
+            event_time: replicaAccuracy.as_of ? String(replicaAccuracy.as_of) : null,
+            ingested_at: replicaAccuracy.as_of ? String(replicaAccuracy.as_of) : null,
+            is_superseded: false,
+          }),
+        ],
+        note: `unknown_share=${replicaAccuracy.unknown_share}; known_weight=${replicaAccuracy.known_weight}; distinct_from=originality_score`,
+      }),
+    );
+  }
+
   // History + coverage folded in (no separate tools on this surface).
   const [{ data: events }, { count: eventCount }, { count: imageCount }] = await Promise.all([
     sb
@@ -1499,6 +1546,18 @@ async function handleGetAsset(
       },
       price,
       history,
+      documented_spend: documentedSpend
+        ? {
+            net_spend: documentedSpend.net_spend ?? null,
+            gross_charges: documentedSpend.gross_charges ?? null,
+            credits: documentedSpend.credits ?? null,
+            receipt_count: documentedSpend.receipt_count ?? null,
+            basis: documentedSpend.basis ?? null,
+            as_of: documentedSpend.as_of ?? null,
+            logic_version: documentedSpend.logic_version ?? null,
+          }
+        : null,
+      replica_accuracy: replicaAccuracy,
       coverage: {
         recorded_fields: recordedFields,
         missing_fields: missingFields,
@@ -2203,12 +2262,45 @@ async function handleValueAsset(
     );
   }
 
+  const { data: spendForValue } = await sb.rpc("vehicle_documented_spend", { p_vehicle_id: vid });
+  const documentedSpendValue = (spendForValue ?? null) as Record<string, unknown> | null;
+  if (documentedSpendValue && documentedSpendValue.net_spend != null) {
+    claims.push(
+      recordedClaim("documented_spend", documentedSpendValue.net_spend, {
+        confidence: 0.9,
+        confidence_basis: "claim_score",
+        citations: [
+          emptyCitation({
+            source_name: "vehicle_documented_spend",
+            source_url: null,
+            observation_id: null,
+            event_time: documentedSpendValue.as_of ? String(documentedSpendValue.as_of) : null,
+            ingested_at: documentedSpendValue.as_of ? String(documentedSpendValue.as_of) : null,
+            is_superseded: false,
+          }),
+        ],
+        note: "Receipt/work-record net spend — not a market value",
+      }),
+    );
+  } else {
+    claims.push(notRecordedClaim("documented_spend", { checked_sources: ["vehicle_documented_spend"] }));
+  }
+
   return ok(
     makeEnvelope("value_asset", "vehicle", vid, claims, {
       value_low: valueLow,
       value_high: valueHigh,
       estimated_value: valuePoint,
       estimate_source: estimateSource,
+      documented_spend: documentedSpendValue
+        ? {
+            net_spend: documentedSpendValue.net_spend ?? null,
+            gross_charges: documentedSpendValue.gross_charges ?? null,
+            credits: documentedSpendValue.credits ?? null,
+            receipt_count: documentedSpendValue.receipt_count ?? null,
+            logic_version: documentedSpendValue.logic_version ?? null,
+          }
+        : null,
       // adjusted_* estimates are hammer prices (buyer premium excluded); add the venue premium for all-in.
       price_basis: estimateSource.startsWith("adjusted_") || estimateSource === "recent_sold_comps_12m"
         ? "hammer"
