@@ -48,13 +48,53 @@ CREATE POLICY feed_signals_insert_own ON public.feed_signals
 REVOKE ALL ON public.feed_signals FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON public.feed_signals TO authenticated;
 
--- The phone's writer: a JSON array of at most 200 events, stamped with the caller, repeats ignored.
--- Answers {"ok":true,"accepted":n,"received":m}, or {"ok":false,"error":...} (the batch is refused whole and the
--- phone keeps it). SECURITY INVOKER: the insert policy above is what admits the rows.
+-- The valid events of a batch, typed and clamped: numbers into their column's range, unknown optional values to null.
+-- An event with no valid id, time, item or known kind is left out. Pure; used by record_feed_signals.
+CREATE OR REPLACE FUNCTION public.feed_signals_parse(p_events jsonb)
+RETURNS TABLE(id uuid, session_id uuid, at timestamptz, item_id text, vehicle_id uuid, source text, kind text,
+              page_kind text, page_index smallint, photo_index smallint, dwell_ms integer, choice text,
+              "position" integer, tuned text)
+LANGUAGE sql STABLE SET search_path TO 'public'
+AS $fn$
+  WITH typed AS (
+    SELECT
+      CASE WHEN e->>'id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN (e->>'id')::uuid END AS id,
+      CASE WHEN e->>'session_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN (e->>'session_id')::uuid END AS session_id,
+      CASE WHEN e->>'at' ~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$' THEN e->>'at' END AS at_text,
+      e->>'item_id' AS item_id,
+      CASE WHEN e->>'vehicle_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN (e->>'vehicle_id')::uuid END AS vehicle_id,
+      left(e->>'source', 80) AS source,
+      e->>'kind' AS kind,
+      CASE WHEN e->>'page_kind' IN ('photos','location','analytics','listing') THEN e->>'page_kind' END AS page_kind,
+      CASE WHEN e->>'page_index' ~ '^\d{1,9}$' THEN (e->>'page_index')::bigint END AS page_index,
+      CASE WHEN e->>'photo_index' ~ '^\d{1,9}$' THEN (e->>'photo_index')::bigint END AS photo_index,
+      CASE WHEN e->>'dwell_ms' ~ '^\d{1,15}$' THEN (e->>'dwell_ms')::bigint END AS dwell_ms,
+      CASE WHEN e->>'choice' IN ('more','less','hide') THEN e->>'choice' END AS choice,
+      CASE WHEN e->>'position' ~ '^\d{1,15}$' THEN (e->>'position')::bigint END AS pos,
+      CASE WHEN e->>'tuned' ~ '^[a-z,]{0,80}$' THEN e->>'tuned' END AS tuned
+    FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_events) = 'array' THEN p_events ELSE '[]'::jsonb END) e
+    WHERE jsonb_typeof(e) = 'object'
+  )
+  SELECT id, session_id, least(at_text::timestamptz, now() + interval '5 minutes'), item_id, vehicle_id, source, kind,
+         page_kind, least(page_index, 100)::smallint, least(photo_index, 1000)::smallint, least(dwell_ms, 3600000)::int,
+         choice, least(pos, 100000)::int, tuned
+    FROM typed
+   WHERE id IS NOT NULL AND at_text IS NOT NULL
+     AND item_id IS NOT NULL AND length(item_id) BETWEEN 1 AND 120
+     AND kind IN ('impression','dwell','page','photo','open_listing','open_profile',
+                  'press','choice','follow','share','comment_open','tune')
+$fn$;
+REVOKE ALL ON FUNCTION public.feed_signals_parse(jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.feed_signals_parse(jsonb) TO authenticated;
+
+-- The phone's writer: a JSON array of at most 200 events, stamped with the caller, repeats ignored. One bad event never
+-- blocks the rest (the phone retries its oldest events first, so a refused batch would stall it): it is skipped and
+-- counted. Answers {"ok":true,"accepted":n,"skipped":k,"received":m}, or {"ok":false,"error":...} for a call that is not
+-- a batch (the phone keeps it). SECURITY INVOKER: the insert policy above admits the rows.
 CREATE OR REPLACE FUNCTION public.record_feed_signals(p_events jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO 'public'
 AS $fn$
-DECLARE v_uid uuid := auth.uid(); v_n int; v_ok int;
+DECLARE v_uid uuid := auth.uid(); v_n int; v_valid int; v_ok int;
 BEGIN
   IF v_uid IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'auth_required'); END IF;
   IF p_events IS NULL OR jsonb_typeof(p_events) <> 'array' THEN
@@ -62,21 +102,15 @@ BEGIN
   END IF;
   v_n := jsonb_array_length(p_events);
   IF v_n > 200 THEN RETURN jsonb_build_object('ok', false, 'error', 'too_many', 'max', 200); END IF;
-
+  SELECT count(*) INTO v_valid FROM public.feed_signals_parse(p_events);
   INSERT INTO public.feed_signals (id, user_id, session_id, at, item_id, vehicle_id, source, kind, page_kind,
                                    page_index, photo_index, dwell_ms, choice, position, tuned)
-  SELECT (e->>'id')::uuid, v_uid, nullif(e->>'session_id','')::uuid,
-         least((e->>'at')::timestamptz, now() + interval '5 minutes'),
-         e->>'item_id', nullif(e->>'vehicle_id','')::uuid, e->>'source', e->>'kind', e->>'page_kind',
-         (e->>'page_index')::smallint, (e->>'photo_index')::smallint, (e->>'dwell_ms')::int, e->>'choice',
-         (e->>'position')::int, e->>'tuned'
-    FROM jsonb_array_elements(p_events) e
+  SELECT p.id, v_uid, p.session_id, p.at, p.item_id, p.vehicle_id, p.source, p.kind, p.page_kind,
+         p.page_index, p.photo_index, p.dwell_ms, p.choice, p."position", p.tuned
+    FROM public.feed_signals_parse(p_events) p
   ON CONFLICT (user_id, id) DO NOTHING;
   GET DIAGNOSTICS v_ok = ROW_COUNT;
-  RETURN jsonb_build_object('ok', true, 'accepted', v_ok, 'received', v_n);
-EXCEPTION WHEN invalid_text_representation OR check_violation OR not_null_violation OR datetime_field_overflow
-               OR numeric_value_out_of_range OR invalid_datetime_format THEN
-  RETURN jsonb_build_object('ok', false, 'error', 'invalid_event', 'detail', SQLERRM);
+  RETURN jsonb_build_object('ok', true, 'accepted', v_ok, 'skipped', v_n - v_valid, 'received', v_n);
 END;
 $fn$;
 

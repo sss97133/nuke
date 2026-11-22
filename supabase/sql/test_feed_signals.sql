@@ -38,7 +38,8 @@ SELECT t_assert((SELECT relrowsecurity FROM pg_class WHERE oid = 'public.feed_si
 SELECT t_assert((SELECT count(*) FROM pg_policies WHERE tablename = 'feed_signals') = 2, 'two policies: read own, insert own');
 SELECT t_assert(NOT has_table_privilege('anon', 'public.feed_signals', 'SELECT')
             AND NOT has_table_privilege('anon', 'public.feed_signals', 'INSERT'), 'anon has no table privilege');
-SELECT t_assert(NOT has_function_privilege('anon', 'public.record_feed_signals(jsonb)', 'EXECUTE'), 'anon cannot call the writer');
+SELECT t_assert(NOT has_function_privilege('anon', 'public.record_feed_signals(jsonb)', 'EXECUTE')
+            AND NOT has_function_privilege('anon', 'public.feed_signals_parse(jsonb)', 'EXECUTE'), 'anon cannot call the writer');
 SELECT t_assert(NOT has_table_privilege('authenticated', 'public.feed_signals', 'UPDATE')
             AND NOT has_table_privilege('authenticated', 'public.feed_signals', 'DELETE'), 'append-only');
 
@@ -67,16 +68,20 @@ INSERT INTO r SELECT 'repeat', public.record_feed_signals($j$[
   {"id":"10000000-0000-0000-0000-000000000001","at":"2026-11-21T10:00:00Z","item_id":"ask:e1","source":"Craigslist","kind":"impression"}]$j$);
 INSERT INTO r SELECT 'bad', public.record_feed_signals($j$[
   {"id":"10000000-0000-0000-0000-000000000004","at":"2026-11-21T10:02:00Z","item_id":"ask:e2","kind":"impression"},
-  {"id":"10000000-0000-0000-0000-000000000005","at":"2026-11-21T10:02:00Z","item_id":"ask:e2","kind":"stolen"}]$j$);
+  {"id":"10000000-0000-0000-0000-000000000005","at":"2026-11-21T10:02:00Z","item_id":"ask:e2","kind":"stolen"},
+  {"id":"10000000-0000-0000-0000-000000000006","at":"2026-11-21T10:02:00Z","item_id":"ask:e2","kind":"dwell","dwell_ms":7200000}]$j$);
 INSERT INTO r SELECT 'many', public.record_feed_signals((SELECT jsonb_agg(jsonb_build_object('id', gen_random_uuid(),
   'at', '2026-11-21T10:00:00Z', 'item_id', 'ask:m', 'kind', 'impression')) FROM generate_series(1, 201)));
 RESET ROLE;
 
 SELECT t_assert((SELECT v->>'ok' = 'true' AND (v->>'accepted')::int = 3 FROM r WHERE k = 'first'), 'three accepted');
 SELECT t_assert((SELECT v->>'ok' = 'true' AND (v->>'accepted')::int = 0 FROM r WHERE k = 'repeat'), 'a repeated id is a no-op');
-SELECT t_assert((SELECT v->>'ok' = 'false' AND v->>'error' = 'invalid_event' FROM r WHERE k = 'bad'), 'a bad event refuses the batch');
+SELECT t_assert((SELECT v->>'ok' = 'true' AND (v->>'accepted')::int = 2 AND (v->>'skipped')::int = 1 FROM r WHERE k = 'bad'),
+  'a bad event is skipped, the rest land');
+SELECT t_assert((SELECT dwell_ms FROM public.feed_signals WHERE id = '10000000-0000-0000-0000-000000000006') = 3600000,
+  'an hour-plus dwell is clamped, not refused');
 SELECT t_assert((SELECT v->>'error' = 'too_many' FROM r WHERE k = 'many'), 'more than 200 refused');
-SELECT t_assert((SELECT count(*) FROM public.feed_signals) = 3, 'only the three rows exist');
+SELECT t_assert((SELECT count(*) FROM public.feed_signals) = 5, 'five rows exist');
 SELECT t_assert((SELECT bool_and(user_id = '00000000-0000-0000-0000-00000000000a') FROM public.feed_signals), 'stamped with the caller');
 
 -- A inserting a row for B directly is refused by the policy; B reads none of A's rows
@@ -88,7 +93,7 @@ DO $$ BEGIN
   RAISE EXCEPTION 'Contract failed: insert for another user was admitted';
 EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE 'PASS insert for another user refused';
 END $$;
-SELECT t_assert((SELECT count(*) FROM public.feed_signals) = 3, 'A reads own three');
+SELECT t_assert((SELECT count(*) FROM public.feed_signals) = 5, 'A reads own five');
 SELECT set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', false);
 SELECT t_assert((SELECT count(*) FROM public.feed_signals) = 0, 'B reads none of A''s rows');
 SELECT set_config('request.jwt.claims', '{"role":"authenticated"}', false);
@@ -96,6 +101,6 @@ SELECT t_assert((SELECT public.record_feed_signals('[]')->>'error') = 'auth_requ
 RESET ROLE;
 
 \ir revert_20261122063000_feed_signals.sql
-SELECT t_assert(to_regclass('public.feed_signals') IS NULL, 'revert drops the table');
+SELECT t_assert(to_regclass('public.feed_signals') IS NULL AND to_regprocedure('public.feed_signals_parse(jsonb)') IS NULL, 'revert drops the table and functions');
 \ir ../migrations/20261122063000_feed_signals.sql
 SELECT t_assert(to_regclass('public.feed_signals') IS NOT NULL, 're-apply');
