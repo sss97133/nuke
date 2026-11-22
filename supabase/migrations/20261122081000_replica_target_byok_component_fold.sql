@@ -826,7 +826,7 @@ DECLARE
   unknown_weight numeric := 0;
   total_weight numeric := 0;
   score numeric;
-  d record;
+  comp record;
   base_chassis jsonb;
 BEGIN
   SELECT * INTO v FROM vehicles WHERE id = p_vehicle_id;
@@ -871,15 +871,15 @@ BEGIN
 
   SELECT jsonb_build_object(
            'component', 'base_chassis',
-           'category', d.category,
-           'evidence', d.evidence,
+           'category', bc.category,
+           'evidence', bc.evidence,
            'excluded_from_score', true
          )
     INTO base_chassis
-    FROM vehicle_replica_component_decisions d
-   WHERE d.vehicle_id = p_vehicle_id AND d.target_key = v_target_key
-     AND d.component_key = 'base_chassis'
-     AND coalesce(d.is_superseded, false) IS NOT TRUE
+    FROM vehicle_replica_component_decisions bc
+   WHERE bc.vehicle_id = p_vehicle_id AND bc.target_key = v_target_key
+     AND bc.component_key = 'base_chassis'
+     AND coalesce(bc.is_superseded, false) IS NOT TRUE
    LIMIT 1;
 
   IF base_chassis IS NULL THEN
@@ -892,7 +892,7 @@ BEGIN
     );
   END IF;
 
-  FOR d IN
+  FOR comp IN
     SELECT s.component_key, s.weight, s.factory_value, s.sourced,
            coalesce(dec.category, 'unknown') AS category,
            dec.evidence, dec.evidence_image_ids, dec.evidence_observation_ids,
@@ -906,22 +906,22 @@ BEGIN
      WHERE s.target_key = v_target_key
      ORDER BY s.weight DESC, s.component_key
   LOOP
-    total_weight := total_weight + d.weight;
+    total_weight := total_weight + comp.weight;
     components := components || jsonb_build_object(
-      'component', d.component_key,
-      'weight', d.weight,
-      'category', d.category,
-      'factory_value', d.factory_value,
-      'sourced_spec', d.sourced,
-      'evidence', coalesce(d.evidence, '{}'::jsonb),
-      'evidence_image_ids', to_jsonb(coalesce(d.evidence_image_ids, '{}'::uuid[])),
-      'decision_version', d.decision_version
+      'component', comp.component_key,
+      'weight', comp.weight,
+      'category', comp.category,
+      'factory_value', comp.factory_value,
+      'sourced_spec', comp.sourced,
+      'evidence', coalesce(comp.evidence, '{}'::jsonb),
+      'evidence_image_ids', to_jsonb(coalesce(comp.evidence_image_ids, '{}'::uuid[])),
+      'decision_version', comp.decision_version
     );
-    IF d.category = 'unknown' THEN
-      unknown_weight := unknown_weight + d.weight;
+    IF comp.category = 'unknown' THEN
+      unknown_weight := unknown_weight + comp.weight;
     ELSE
-      known_weight := known_weight + d.weight;
-      match_weight := match_weight + d.weight * CASE d.category
+      known_weight := known_weight + comp.weight;
+      match_weight := match_weight + comp.weight * CASE comp.category
         WHEN 'factory_correct' THEN 1.0
         WHEN 'correct_reproduction' THEN 0.85
         WHEN 'period_correct_substitute' THEN 0.55
