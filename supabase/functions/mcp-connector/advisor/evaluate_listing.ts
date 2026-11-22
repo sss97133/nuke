@@ -1718,7 +1718,8 @@ export async function handleEvaluateListing(
       const row = (aeRows?.[0] ?? null) as
         | { id: string; high_bid: number | null; updated_at: string | null; outcome: string | null }
         | null;
-      storedBid = checkStoredBid(row, Number(listing.current_bid), lotUrl, deps.invokeFunction, {
+      // A public-scope call never dispatches a re-read (no writes from an anonymous paste).
+      storedBid = checkStoredBid(row, Number(listing.current_bid), lotUrl, deps.publicOnly ? undefined : deps.invokeFunction, {
         justIngested: ingest?.status === "ingested",
       });
       if (storedBid.behind) {
