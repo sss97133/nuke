@@ -80,6 +80,7 @@ CREATE TABLE public.vehicle_observations (
   subject_type text NOT NULL DEFAULT 'vehicle',
   analysis_deferred boolean NOT NULL DEFAULT false,
   rank text NOT NULL DEFAULT 'normal',
+  CHECK ((observed_at_basis IS NULL) OR (observed_at_basis = ANY (ARRAY['event_time','source_capture_time','source_publication_time']))),
   CHECK ((source_event_time_precision IS NULL) OR (source_event_time_precision = ANY (ARRAY['exact','day','unknown']))),
   CHECK (
     ((source_event_time_precision IS NULL) AND (source_event_at IS NULL) AND (source_event_date IS NULL))
@@ -163,8 +164,20 @@ SELECT public.assert(
   public.byok_real_capture_at('{"DateTimeOriginal":"2024:05:15 14:30:00"}'::jsonb, NULL) IS NOT NULL,
   'EXIF DateTimeOriginal parses');
 SELECT public.assert(
+  public.byok_real_capture_at('{"DateTime":"2024:05:15 14:30:00"}'::jsonb, NULL) IS NULL,
+  'EXIF DateTime (mtime) is not a capture clock');
+SELECT public.assert(
+  public.byok_real_capture_at(
+    '{"DateTimeOriginal":"2024:05:15 14:30:00","OffsetTimeOriginal":"-07:00"}'::jsonb, NULL
+  ) = '2024-05-15 21:30:00+00'::timestamptz,
+  'OffsetTimeOriginal pins the instant');
+SELECT public.assert(
   public.byok_real_capture_at(NULL, NULL) IS NULL,
   'no real capture when EXIF and occurred_at absent');
+SELECT public.assert(
+  public.byok_img_seq_bucket('IMG20241122143000.jpg') IS NOT NULL
+  AND public.byok_img_seq_bucket('IMG20241122143000.jpg') <> 'noseq',
+  'datetime-style IMG digit runs use bigint seq bucket');
 
 -- Dry-run proposes claims without writing.
 SELECT public.assert(
@@ -244,16 +257,17 @@ SELECT public.assert(
     WHERE vo.structured_data->>'image_id' = '00000000-0000-0000-0000-0000000000d1'
       AND vo.source_event_time_precision = 'unknown'
       AND vo.source_event_at IS NULL
-      AND vo.observed_at_basis = 'ingest_knowledge_clock'
-  ), 'no-EXIF fold writes precision unknown');
+      AND vo.observed_at_basis = 'source_capture_time'
+  ), 'no-EXIF fold writes precision unknown with allowed basis');
 SELECT public.assert(
   EXISTS (
     SELECT 1 FROM vehicle_observations vo
     WHERE vo.structured_data->>'image_id' = '00000000-0000-0000-0000-0000000000d4'
       AND vo.source_event_time_precision = 'exact'
       AND vo.source_event_at IS NOT NULL
-      AND vo.observed_at_basis = 'exif_DateTimeOriginal'
-  ), 'EXIF fold writes source_event_at exact');
+      AND vo.observed_at_basis = 'event_time'
+      AND vo.structured_data->>'capture_clock_source' = 'exif_DateTimeOriginal'
+  ), 'EXIF fold writes source_event_at exact with event_time basis');
 
 -- Idempotent re-apply.
 SELECT public.assert(

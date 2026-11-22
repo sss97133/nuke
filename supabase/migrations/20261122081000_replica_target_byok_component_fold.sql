@@ -522,7 +522,9 @@ AS $$
   END
 $$;
 
--- Real capture clock only: EXIF DateTimeOriginal or occurred_at. Never taken_at/created_at (often import).
+-- Real capture clock only: EXIF DateTimeOriginal (+ OffsetTimeOriginal) or occurred_at.
+-- Never taken_at/created_at (often import) and never EXIF DateTime (file modify).
+-- Naive DateTimeOriginal is pinned to America/Los_Angeles, matching derive-image-exif.
 CREATE OR REPLACE FUNCTION public.byok_real_capture_at(
   p_exif jsonb,
   p_occurred_at timestamptz
@@ -533,18 +535,38 @@ IMMUTABLE
 AS $fn$
 DECLARE
   raw text;
+  off text;
+  wall timestamp;
   parsed timestamptz;
 BEGIN
   IF p_occurred_at IS NOT NULL THEN
     RETURN p_occurred_at;
   END IF;
-  raw := coalesce(p_exif->>'DateTimeOriginal', p_exif->>'DateTime');
-  IF raw IS NULL OR btrim(raw) = '' THEN
+  raw := nullif(btrim(coalesce(p_exif->>'DateTimeOriginal', '')), '');
+  IF raw IS NULL THEN
     RETURN NULL;
   END IF;
   BEGIN
-    -- Common EXIF form: YYYY:MM:DD HH:MM:SS
-    parsed := to_timestamp(left(btrim(raw), 19), 'YYYY:MM:DD HH24:MI:SS');
+    -- Common EXIF form: YYYY:MM:DD HH:MM:SS (reject 0000 year)
+    IF left(raw, 4) = '0000' THEN
+      RETURN NULL;
+    END IF;
+    wall := to_timestamp(left(raw, 19), 'YYYY:MM:DD HH24:MI:SS')::timestamp;
+  EXCEPTION WHEN others THEN
+    RETURN NULL;
+  END;
+  off := nullif(btrim(coalesce(
+    p_exif->>'OffsetTimeOriginal',
+    p_exif->>'OffsetTimeDigitized',
+    p_exif->>'OffsetTime',
+    ''
+  )), '');
+  BEGIN
+    IF off ~ '^[+-][0-9]{2}:[0-9]{2}$' THEN
+      parsed := (to_char(wall, 'YYYY-MM-DD HH24:MI:SS') || off)::timestamptz;
+    ELSE
+      parsed := wall AT TIME ZONE 'America/Los_Angeles';
+    END IF;
   EXCEPTION WHEN others THEN
     RETURN NULL;
   END;
@@ -552,12 +574,27 @@ BEGIN
 END
 $fn$;
 
+-- Filename IMG_* sequence bucket; bigint so datetime-style digit runs do not abort.
+CREATE OR REPLACE FUNCTION public.byok_img_seq_bucket(p_name text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN upper(coalesce(p_name, '')) ~ 'IMG[_-]?[0-9]+'
+      THEN (substring(upper(p_name) from 'IMG[_-]?([0-9]+)')::bigint / 20)::text
+    ELSE 'noseq'
+  END
+$$;
+
 REVOKE ALL ON FUNCTION public.byok_normalize_build_phase(text, text, jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.byok_infer_image_area(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.byok_real_capture_at(jsonb, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.byok_img_seq_bucket(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.byok_normalize_build_phase(text, text, jsonb) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.byok_infer_image_area(text) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.byok_real_capture_at(jsonb, timestamptz) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.byok_img_seq_bucket(text) TO anon, authenticated, service_role;
 
 -- =============================================================================
 -- 6b. Group images: scene + area + phase + dhash/filename — not import hour
@@ -591,14 +628,9 @@ BEGIN
         ) AS build_phase,
         -- dhash is nearly unique per image; use for member order, not hard partition.
         coalesce(vi.dhash, vi.phash, '') AS visual_hash,
-        CASE
-          WHEN upper(coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), ''))
-               ~ 'IMG[_-]?[0-9]+'
-            THEN (substring(
-                   upper(coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), ''))
-                   from 'IMG[_-]?([0-9]+)')::int / 20)::text
-          ELSE 'noseq'
-        END AS seq_bucket,
+        public.byok_img_seq_bucket(
+          coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), '')
+        ) AS seq_bucket,
         public.byok_real_capture_at(vi.exif_data, vi.occurred_at) AS capture_at,
         coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), vi.id::text) AS sort_name
       FROM vehicle_images vi
@@ -826,10 +858,11 @@ BEGIN
     v_event_at := public.byok_real_capture_at(img.exif_data, img.occurred_at);
     IF v_event_at IS NOT NULL THEN
       v_event_precision := 'exact';
-      v_event_basis := CASE WHEN img.occurred_at IS NOT NULL THEN 'image_occurred_at' ELSE 'exif_DateTimeOriginal' END;
+      -- Closed enum: event_time | source_capture_time | source_publication_time
+      v_event_basis := 'event_time';
     ELSE
       v_event_precision := 'unknown';
-      v_event_basis := 'no_real_capture_clock';
+      v_event_basis := 'source_capture_time';
       v_event_at := NULL;
     END IF;
 
@@ -865,6 +898,11 @@ BEGIN
            img.byok->>'scene_type', img.byok->>'build_phase_guess', img.byok->'text_regions'),
         'area_key', public.byok_infer_image_area(img.byok->>'scene_type'),
         'source_event_time_precision', v_event_precision,
+        'capture_clock_source', CASE
+          WHEN img.occurred_at IS NOT NULL THEN 'image_occurred_at'
+          WHEN v_event_at IS NOT NULL THEN 'exif_DateTimeOriginal'
+          ELSE 'none'
+        END,
         'limitation', 'Deterministic parse of stored byok components_seen label. Not originality or whole-vehicle completeness.'
       );
 
@@ -923,8 +961,8 @@ BEGIN
             sd,
             format('byok fold: %s=%s from label %s', norm->>'property_key', norm->>'value', coalesce(lab->>'label', lab->>'name')),
             least(0.95, greatest(0.5, coalesce((lab->>'confidence')::numeric, 0.7))),
-            coalesce(v_event_at, img.taken_at, img.created_at, now()),
-            CASE WHEN v_event_at IS NOT NULL THEN v_event_basis ELSE 'ingest_knowledge_clock' END,
+            coalesce(v_event_at, now()),
+            v_event_basis,
             v_event_at,
             v_event_precision,
             now(), false
@@ -1544,14 +1582,9 @@ BEGIN
           byok->>'scene_type', byok->>'build_phase_guess', byok->'text_regions'
         ) AS build_phase,
         coalesce(vi.dhash, vi.phash, '') AS visual_hash,
-        CASE
-          WHEN upper(coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), ''))
-               ~ 'IMG[_-]?[0-9]+'
-            THEN (substring(
-                   upper(coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), ''))
-                   from 'IMG[_-]?([0-9]+)')::int / 20)::text
-          ELSE 'noseq'
-        END AS seq_bucket,
+        public.byok_img_seq_bucket(
+          coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), '')
+        ) AS seq_bucket,
         public.byok_real_capture_at(vi.exif_data, vi.occurred_at) AS capture_at,
         coalesce(vi.filename, reverse(split_part(reverse(coalesce(vi.storage_path, '')), '/', 1)), vi.id::text) AS sort_name
       FROM vehicle_images vi

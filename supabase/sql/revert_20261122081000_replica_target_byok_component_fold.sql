@@ -6,6 +6,7 @@ DROP FUNCTION IF EXISTS public.decide_replica_components(uuid, boolean);
 DROP FUNCTION IF EXISTS public.fold_byok_component_observations(uuid, boolean);
 DROP FUNCTION IF EXISTS public.vehicle_build_phase_windows(uuid);
 DROP FUNCTION IF EXISTS public.group_vehicle_images_for_reading(uuid, boolean);
+DROP FUNCTION IF EXISTS public.byok_img_seq_bucket(text);
 DROP FUNCTION IF EXISTS public.byok_real_capture_at(jsonb, timestamptz);
 DROP FUNCTION IF EXISTS public.byok_infer_image_area(text);
 DROP FUNCTION IF EXISTS public.byok_normalize_build_phase(text, text, jsonb);
