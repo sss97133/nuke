@@ -331,13 +331,17 @@ BEGIN
   IF public_flag THEN score := score + 5; END IF;
   score := score + LEAST(10, GREATEST(0, completeness * 10));
 
+  -- Do not cache dollar amounts on vehicles.value_breakdown (public column).
+  -- Amounts live behind vehicle_documented_spend (amounts_visible). Score still
+  -- uses the unmasked fold for the receipts contribution.
   UPDATE public.vehicles SET value_score = round(score::numeric, 2),
     value_breakdown = jsonb_build_object(
       'approved_images', approved_img_count,
       'tags', tag_count,
       'recent_events_30d', recent_events,
-      'receipts_total', receipts_total,
-      'documented_spend', receipts_total,
+      'receipts_total', NULL,
+      'documented_spend', NULL,
+      'documented_spend_present', receipts_total > 0,
       'documented_spend_basis', spend->>'basis',
       'documented_spend_as_of', spend->>'as_of',
       'verified_owner', verified_owner,

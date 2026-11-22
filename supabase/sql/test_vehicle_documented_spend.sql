@@ -189,9 +189,16 @@ SELECT public.assert(
 
 SELECT public.compute_vehicle_value('00000000-0000-0000-0000-0000000000a1');
 SELECT public.assert(
-  (SELECT (value_breakdown->>'receipts_total')::numeric FROM vehicles
-    WHERE id = '00000000-0000-0000-0000-0000000000a1') = 90,
-  'value_breakdown.receipts_total uses the fold (completed status included)');
+  (SELECT value_breakdown->>'receipts_total' FROM vehicles
+    WHERE id = '00000000-0000-0000-0000-0000000000a1') IS NULL
+  AND (SELECT value_breakdown->>'documented_spend' FROM vehicles
+    WHERE id = '00000000-0000-0000-0000-0000000000a1') IS NULL
+  AND (SELECT (value_breakdown->>'documented_spend_present')::boolean FROM vehicles
+    WHERE id = '00000000-0000-0000-0000-0000000000a1') IS TRUE,
+  'value_breakdown caches spend presence, not dollar amounts');
+SELECT public.assert(
+  (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'net_spend')::numeric = 90,
+  'dollar amounts remain on vehicle_documented_spend (service_role)');
 
 SELECT public.assert(
   (public.compute_vehicle_grade('00000000-0000-0000-0000-0000000000a1')).dimensions[1].notes

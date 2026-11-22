@@ -1450,7 +1450,8 @@ async function handleGetAsset(
     claims.push(notRecordedClaim("nuke_estimate", { checked_sources: ["vehicle_price_facts", "nuke_estimates"] }));
   }
 
-  // Documented spend from the single money fold (receipts net of credits; same number as grades/value_breakdown).
+  // Documented spend from the single money fold (receipts net of credits; same fold as grades).
+  // Dollar amounts are not cached on vehicles.value_breakdown (public column).
   // Amounts are tied-viewer / service only (amounts_visible); strangers get not recorded.
   if (documentedSpend && documentedSpend.amounts_visible === true && documentedSpend.net_spend != null) {
     claims.push(
