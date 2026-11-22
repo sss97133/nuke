@@ -174,7 +174,21 @@ SELECT public.assert(
   'second promote is idempotent');
 SELECT public.assert((SELECT count(*) FROM engine_blocks) = 1, 'no duplicate engine rows');
 
--- Identity: Corvette ai_visual superseded; VIN 2… → Pontiac wins.
+-- Supersede-before-insert: changed casting must not trip one-current unique index.
+UPDATE vehicle_observations
+   SET structured_data = '{"engine_block_casting":"3970010","claim_role":"engine_block_casting"}'
+ WHERE id = '00000000-0000-0000-0000-0000000000e1';
+SELECT public.assert(
+  (public.promote_vehicle_decode_entities('00000000-0000-0000-0000-0000000000a1', false) #>> '{engine_block,action}')
+    = 'superseded_prior',
+  'changed casting supersedes prior current row');
+SELECT public.assert(
+  (SELECT count(*) FROM engine_blocks) = 2
+  AND (SELECT casting_number FROM engine_blocks WHERE coalesce(is_superseded,false) IS NOT TRUE) = '3970010'
+  AND (SELECT count(*) FROM engine_blocks WHERE is_superseded IS TRUE) = 1,
+  'one current engine row after supersede');
+
+-- Identity: Corvette ai_visual superseded; 13-char VIN 2… → Pontiac wins.
 INSERT INTO field_evidence(vehicle_id, field_name, proposed_value, source_type, source_confidence, status)
 VALUES
  ('00000000-0000-0000-0000-0000000000a1', 'make', 'Corvette', 'ai_visual', 95, 'accepted'),
@@ -192,5 +206,24 @@ SELECT public.assert(
 SELECT public.assert(
   (SELECT count(*) FROM field_evidence WHERE proposed_value = 'Corvette') = 1,
   'superseded row kept');
+
+-- 17-char modern VIN must not use the pre-1981 first-digit GM map (1G2… ≠ Chevrolet).
+INSERT INTO vehicles(id, make, model, year, vin, is_public)
+VALUES ('00000000-0000-0000-0000-0000000000a2', 'Toyota', 'Supra', 1994, 'JT2JA82J0R0012345', true);
+INSERT INTO field_evidence(vehicle_id, field_name, proposed_value, source_type, source_confidence, status)
+VALUES ('00000000-0000-0000-0000-0000000000a2', 'make', 'Toyota', 'title', 99, 'accepted');
+INSERT INTO vehicle_field_provenance(vehicle_id, field_name, current_value, total_confidence, primary_source)
+VALUES ('00000000-0000-0000-0000-0000000000a2', 'make', 'Toyota', 99, 'field_evidence:title');
+SELECT public.reconcile_identity_field_provenance('00000000-0000-0000-0000-0000000000a2', false);
+SELECT public.assert(
+  (SELECT current_value FROM vehicle_field_provenance
+    WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a2' AND field_name = 'make') = 'Toyota',
+  '17-char VIN does not overwrite make via GM first-digit map');
+SELECT public.assert(
+  NOT EXISTS (
+    SELECT 1 FROM field_evidence
+     WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a2'
+       AND source_type = 'gm_vin_chart'),
+  'no gm_vin_chart row minted for modern VIN');
 
 SELECT public.assert(true, 'promote_decode_entities contract complete');

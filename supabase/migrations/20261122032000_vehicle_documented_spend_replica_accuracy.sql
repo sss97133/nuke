@@ -162,17 +162,17 @@ BEGIN
     RETURN raw;
   END IF;
 
-  -- Stranger on a public vehicle: counts yes, amounts NULL (2026-11-09 money mask).
+  -- Stranger on a public vehicle: counts yes (JSON numbers), amounts NULL (2026-11-09 money mask).
   RETURN jsonb_build_object(
     'vehicle_id', p_vehicle_id,
     'net_spend', NULL,
     'gross_charges', NULL,
     'credits', NULL,
     'work_record_net', NULL,
-    'receipt_count', raw->>'receipt_count',
-    'charge_count', raw->>'charge_count',
-    'credit_count', raw->>'credit_count',
-    'work_record_count', raw->>'work_record_count',
+    'receipt_count', (raw->>'receipt_count')::int,
+    'charge_count', (raw->>'charge_count')::int,
+    'credit_count', (raw->>'credit_count')::int,
+    'work_record_count', (raw->>'work_record_count')::int,
     'amounts_visible', false,
     'basis', raw->>'basis',
     'as_of', raw->>'as_of',
@@ -185,52 +185,81 @@ COMMENT ON FUNCTION public.vehicle_documented_spend(uuid) IS
   'Single documented-spend fold: linked/scoped non-quote receipts with verified|plausible amounts, '
   'netting credits, plus uncited work_record amounts. Public undeleted vehicles only for strangers; '
   'amounts only for a tied viewer or service_role (amounts_visible). Null when the caller may not '
-  'see the vehicle. Grades/value/invested use _vehicle_documented_spend_unmasked.';
+  'see the vehicle. Grades/value writers use _vehicle_documented_spend_unmasked.';
 
 REVOKE ALL ON FUNCTION public.vehicle_documented_spend(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_documented_spend(uuid) TO anon, authenticated, service_role;
 
 -- get_vehicle_total_invested: receipts lens = documented spend net (credits included).
+-- Same public/tied money mask as vehicle_documented_spend (anon must not read unmasked).
 CREATE OR REPLACE FUNCTION public.get_vehicle_total_invested(p_vehicle_id uuid)
 RETURNS jsonb
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $fn$
-  WITH
-    vehicle_te AS (SELECT id FROM timeline_events WHERE vehicle_id = p_vehicle_id),
-    parts AS (
-      SELECT coalesce(sum(wop.total_price), 0) AS total, count(*) AS cnt
-        FROM work_order_parts wop WHERE wop.timeline_event_id IN (SELECT id FROM vehicle_te)
-    ),
-    labor AS (
-      SELECT coalesce(sum(wol.total_cost), 0) AS total, count(*) AS cnt
-        FROM work_order_labor wol WHERE wol.timeline_event_id IN (SELECT id FROM vehicle_te)
-    ),
-    te_costs AS (
-      SELECT coalesce(sum(cost_amount), 0) AS total FROM timeline_events
-       WHERE vehicle_id = p_vehicle_id AND cost_amount IS NOT NULL AND cost_amount > 0
-    ),
-    spend AS (
-      SELECT public._vehicle_documented_spend_unmasked(p_vehicle_id) AS j
-    ),
-    rcpts AS (
-      SELECT coalesce((j->>'net_spend')::numeric, 0) AS total,
-             coalesce((j->>'receipt_count')::int, 0)
-               + coalesce((j->>'work_record_count')::int, 0) AS cnt
-        FROM spend
-    )
-  SELECT jsonb_build_object(
-    'total_invested', greatest(parts.total + labor.total, te_costs.total, rcpts.total),
+DECLARE
+  spend jsonb;
+  parts_total numeric := 0;
+  labor_total numeric := 0;
+  te_total numeric := 0;
+  parts_cnt int := 0;
+  labor_cnt int := 0;
+  rcpt_total numeric;
+  rcpt_cnt int;
+BEGIN
+  spend := public.vehicle_documented_spend(p_vehicle_id);
+  IF spend IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  IF coalesce((spend->>'amounts_visible')::boolean, false) IS NOT TRUE THEN
+    RETURN jsonb_build_object(
+      'total_invested', NULL,
+      'amounts_visible', false,
+      'breakdown', jsonb_build_object(
+        'parts', NULL, 'labor', NULL, 'materials', NULL, 'overhead', NULL, 'tools', NULL,
+        'financial_records_total', NULL, 'timeline_costs', NULL, 'receipts', NULL,
+        'documented_spend', NULL),
+      'components_count', jsonb_build_object(
+        'parts_items', 0, 'labor_tasks', 0, 'materials_items', 0,
+        'events_with_work', 0,
+        'receipts', coalesce((spend->>'receipt_count')::int, 0)
+                     + coalesce((spend->>'work_record_count')::int, 0)));
+  END IF;
+
+  SELECT coalesce(sum(wop.total_price), 0), count(*)
+    INTO parts_total, parts_cnt
+    FROM work_order_parts wop
+    JOIN timeline_events te ON te.id = wop.timeline_event_id
+   WHERE te.vehicle_id = p_vehicle_id;
+
+  SELECT coalesce(sum(wol.total_cost), 0), count(*)
+    INTO labor_total, labor_cnt
+    FROM work_order_labor wol
+    JOIN timeline_events te ON te.id = wol.timeline_event_id
+   WHERE te.vehicle_id = p_vehicle_id;
+
+  SELECT coalesce(sum(cost_amount), 0) INTO te_total
+    FROM timeline_events
+   WHERE vehicle_id = p_vehicle_id AND cost_amount IS NOT NULL AND cost_amount > 0;
+
+  rcpt_total := coalesce((spend->>'net_spend')::numeric, 0);
+  rcpt_cnt := coalesce((spend->>'receipt_count')::int, 0)
+            + coalesce((spend->>'work_record_count')::int, 0);
+
+  RETURN jsonb_build_object(
+    'total_invested', greatest(parts_total + labor_total, te_total, rcpt_total),
+    'amounts_visible', true,
     'breakdown', jsonb_build_object(
-      'parts', parts.total, 'labor', labor.total, 'materials', 0, 'overhead', 0, 'tools', 0,
-      'financial_records_total', 0, 'timeline_costs', te_costs.total, 'receipts', rcpts.total,
-      'documented_spend', rcpts.total),
+      'parts', parts_total, 'labor', labor_total, 'materials', 0, 'overhead', 0, 'tools', 0,
+      'financial_records_total', 0, 'timeline_costs', te_total, 'receipts', rcpt_total,
+      'documented_spend', rcpt_total),
     'components_count', jsonb_build_object(
-      'parts_items', parts.cnt, 'labor_tasks', labor.cnt, 'materials_items', 0,
-      'events_with_work', 0, 'receipts', rcpts.cnt))
-  FROM parts, labor, te_costs, rcpts;
+      'parts_items', parts_cnt, 'labor_tasks', labor_cnt, 'materials_items', 0,
+      'events_with_work', 0, 'receipts', rcpt_cnt));
+END
 $fn$;
 
 -- compute_vehicle_value: receipts_total from the same fold (fixes 'completed' status miss).
@@ -506,7 +535,10 @@ BEGIN
         ) THEN
           v_engine := v_engine || jsonb_build_object('action', 'unchanged', 'id', old_id);
         ELSE
+          -- Supersede the current row first so the one-current unique index allows the insert.
           new_id := gen_random_uuid();
+          UPDATE engine_blocks SET is_superseded = true, superseded_by = new_id, superseded_at = now()
+           WHERE id = old_id;
           INSERT INTO engine_blocks (
             id, vehicle_id, casting_number, block_suffix, displacement_ci, is_original,
             provenance, provenance_detail, source_observation_ids, fold_method, folded_at
@@ -516,8 +548,6 @@ BEGIN
             format('folded from observations %s', eng_obs),
             eng_obs, 'promote_vehicle_decode_entities/20261122032000', now()
           );
-          UPDATE engine_blocks SET is_superseded = true, superseded_by = new_id, superseded_at = now()
-           WHERE id = old_id;
           v_engine := v_engine || jsonb_build_object('action', 'superseded_prior', 'id', new_id, 'prior_id', old_id);
         END IF;
       ELSE
@@ -577,6 +607,19 @@ BEGIN
            AND t.source_observation_ids IS NOT DISTINCT FROM tr_obs
       ) THEN
         v_trans := v_trans || jsonb_build_object('action', 'unchanged', 'id', old_id);
+      ELSIF old_id IS NOT NULL THEN
+        new_id := gen_random_uuid();
+        UPDATE transmission_cases SET is_superseded = true, superseded_by = new_id, superseded_at = now()
+         WHERE id = old_id;
+        INSERT INTO transmission_cases (
+          id, vehicle_id, casting_number, serial_number, tail_housing_type,
+          provenance_detail, source_observation_ids, fold_method, folded_at
+        ) VALUES (
+          new_id, p_vehicle_id, case_cast, id_stamp, tail_cast,
+          format('folded from observations %s', tr_obs),
+          tr_obs, 'promote_vehicle_decode_entities/20261122032000', now()
+        );
+        v_trans := v_trans || jsonb_build_object('action', 'superseded_prior', 'id', new_id, 'prior_id', old_id);
       ELSE
         new_id := gen_random_uuid();
         INSERT INTO transmission_cases (
@@ -587,13 +630,7 @@ BEGIN
           format('folded from observations %s', tr_obs),
           tr_obs, 'promote_vehicle_decode_entities/20261122032000', now()
         );
-        IF old_id IS NOT NULL THEN
-          UPDATE transmission_cases SET is_superseded = true, superseded_by = new_id, superseded_at = now()
-           WHERE id = old_id;
-          v_trans := v_trans || jsonb_build_object('action', 'superseded_prior', 'id', new_id, 'prior_id', old_id);
-        ELSE
-          v_trans := v_trans || jsonb_build_object('action', 'inserted', 'id', new_id);
-        END IF;
+        v_trans := v_trans || jsonb_build_object('action', 'inserted', 'id', new_id);
       END IF;
     ELSE
       v_trans := v_trans || jsonb_build_object('action', 'dry_run');
@@ -705,9 +742,10 @@ DECLARE
   fe record;
 BEGIN
   SELECT vin INTO v_vin FROM vehicles WHERE id = p_vehicle_id;
-  -- 2S87… / 2F… Pontiac Firebird-era VIN: digit 1 = make family (2 = Pontiac).
-  IF v_vin IS NOT NULL AND length(v_vin) >= 1 THEN
-    vin_make := CASE substring(upper(v_vin) FROM 1 FOR 1)
+  -- Pre-1981 GM 13-character VIN only: first digit is division (2 = Pontiac).
+  -- Never apply this map to 17-character modern VINs (1G2… would wrongly become Chevrolet).
+  IF v_vin IS NOT NULL AND length(btrim(v_vin)) = 13 THEN
+    vin_make := CASE substring(upper(btrim(v_vin)) FROM 1 FOR 1)
       WHEN '1' THEN 'Chevrolet'
       WHEN '2' THEN 'Pontiac'
       WHEN '3' THEN 'Oldsmobile'
@@ -728,7 +766,7 @@ BEGIN
    ORDER BY vo.observed_at DESC NULLS LAST
    LIMIT 1;
 
-  -- Cowl 2FS87 is a Firebird body style code; make remains Pontiac when VIN says so.
+  -- Cowl 2FS87 is a Firebird body style code → Pontiac when no 13-char VIN map applied.
   IF cowl_style ~* '^2F' AND vin_make IS NULL THEN
     vin_make := 'Pontiac';
   END IF;

@@ -157,14 +157,20 @@ SELECT public.assert(
   (public._vehicle_documented_spend_unmasked('00000000-0000-0000-0000-0000000000a1')->>'receipt_count')::int = 2,
   'quote excluded from receipt_count');
 
--- Anon stranger on a public vehicle: counts yes, amounts NULL.
+-- Anon stranger on a public vehicle: counts yes (JSON numbers), amounts NULL.
 SELECT set_config('test.auth_role', 'anon', false);
 SELECT set_config('test.auth_uid', '', false);
 SELECT public.assert(
   (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'amounts_visible')::boolean IS FALSE
   AND public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'net_spend' IS NULL
+  AND jsonb_typeof(public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->'receipt_count') = 'number'
   AND (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'receipt_count')::int = 2,
-  'anon sees receipt_count but not amounts');
+  'anon sees numeric receipt_count but not amounts');
+SELECT public.assert(
+  public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1')->>'total_invested' IS NULL
+  AND (public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1')->>'amounts_visible')::boolean IS FALSE
+  AND public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1') #>> '{breakdown,receipts}' IS NULL,
+  'anon get_vehicle_total_invested masks amounts');
 
 -- Service role sees amounts.
 SELECT set_config('test.auth_role', 'service_role', false);
@@ -174,7 +180,8 @@ SELECT public.assert(
   'service_role sees amounts');
 
 SELECT public.assert(
-  (public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1') #>> '{breakdown,receipts}')::numeric = 90,
+  (public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1') #>> '{breakdown,receipts}')::numeric = 90
+  AND (public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1')->>'amounts_visible')::boolean IS TRUE,
   'get_vehicle_total_invested receipts lens = net spend');
 SELECT public.assert(
   (public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1')->>'total_invested')::numeric = 90,
