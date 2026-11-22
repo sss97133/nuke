@@ -345,6 +345,9 @@ struct AskRow: Decodable, Equatable, Identifiable {
     var region: String? = nil
     var taste: Int? = nil
     var in_band: Bool? = nil
+    /// Where the listing is, rounded to 0.01° (about a kilometre) by the read; nil when the row has none.
+    var lat: Double? = nil
+    var lng: Double? = nil
     let position: AskPosition?
 
     private enum CodingKeys: String, CodingKey {
@@ -352,6 +355,7 @@ struct AskRow: Decodable, Equatable, Identifiable {
         case year, make, model, title, ask, asking_price
         case miles, mileage, listing_mileage, read_miles
         case odometer, condition, title_status, image, location, city, region, taste, in_band, position
+        case lat, lng
     }
 
     init(from decoder: Decoder) throws {
@@ -395,6 +399,8 @@ struct AskRow: Decodable, Equatable, Identifiable {
         self.taste = try? c.decodeIfPresent(Int.self, forKey: .taste)
         self.in_band = try? c.decodeIfPresent(Bool.self, forKey: .in_band)
         self.position = try? c.decodeIfPresent(AskPosition.self, forKey: .position)
+        self.lat = (try? c.decodeIfPresent(Double.self, forKey: .lat)) ?? nil
+        self.lng = (try? c.decodeIfPresent(Double.self, forKey: .lng)) ?? nil
     }
 
     var id: String { event_id }
