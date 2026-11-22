@@ -119,6 +119,12 @@ actor ExploreSignalLog {
         return Array(items.suffix(keep))
     }
 
+    /// True only when the writer's answer says ok:true.
+    static func accepted(_ data: Data) -> Bool {
+        struct Answer: Decodable { let ok: Bool? }
+        return (try? JSONDecoder().decode(Answer.self, from: data))?.ok == true
+    }
+
     // MARK: Log
 
     func append(_ event: ExploreSignalEvent) {
@@ -192,9 +198,15 @@ actor ExploreSignalLog {
         uploading = true
         defer { uploading = false }
         do {
-            _ = try await SupabaseService.client
+            // The drafted writer answers {"ok":false,...} for a refused batch instead of raising, so only an
+            // explicit ok:true removes events from the file.
+            let data = try await SupabaseService.client
                 .rpc("record_feed_signals", params: Params(p_events: events))
-                .execute()
+                .execute().data
+            guard Self.accepted(data) else {
+                NSLog("NukeCapture explore signals refused: %@", String(data: data, encoding: .utf8) ?? "")
+                return
+            }
             let sent = Set(batch.map(\.id))
             stored = load().filter { !sent.contains($0.id) }
             rewrite()

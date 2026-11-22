@@ -426,4 +426,10 @@ final class ExplorePagerTests: XCTestCase {
         let count = await log.count
         XCTAssertEqual(count, 1)
     }
+
+    func testSignalUploadCountsOnlyAnExplicitOk() {
+        XCTAssertTrue(ExploreSignalLog.accepted(Data(#"{"ok":true,"accepted":3,"received":3}"#.utf8)))
+        XCTAssertFalse(ExploreSignalLog.accepted(Data(#"{"ok":false,"error":"invalid_event"}"#.utf8)))
+        XCTAssertFalse(ExploreSignalLog.accepted(Data("null".utf8)))
+    }
 }
