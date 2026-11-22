@@ -15,7 +15,9 @@ Nothing here is applied. The next steps need the owner's explicit yes:
 
 ## Contract
 
-`ask_close_comps(p_vehicle_ids uuid[])`: STABLE, SECURITY DEFINER, EXECUTE granted to anon and authenticated. It takes
+`ask_close_comps(p_vehicle_ids uuid[])`: STABLE, SECURITY DEFINER, EXECUTE granted to anon and authenticated. Only the
+reader block between `BEGIN READER` and `END READER` has been run. The plpgsql wrapper around it has never been
+compiled. It takes
 at most 60 ids per call and raises 22023 beyond that. It returns `{"as_of", "rows": [...]}`, with one row for each
 requested id that is a public, non-deleted vehicle. Each row has these fields:
 `vehicle_id`, `verdict` (`range` | `no_opinion`), `reason`, `match {year_from, year_to, make, family, tokens, window_from,
@@ -36,8 +38,14 @@ window_to}`, `n`, `low` (p25), `mid` (p50), `high` (p75), `venues`, `condition_k
 - **The shared exclusions from `get_comps_scored`:** `outcome = 'sold'`, not `auction_event_typed_not_sold`, no
   `duplicate_of`, not `vehicle_sale_price_untrusted`, not in `record_quarantine`, and the same `lot_class_of` as the
   subject (no engines, parts or memorabilia).
-- **One row per lot.** B-J and Mecum pages are sometimes stored twice, with and without `www.` and with different end
-  dates. The URL is normalised and the earliest date is kept.
+  - `vehicle_sale_price_untrusted` is called with both the gross and the hammer price.
+  - Over the 887 sold Chevelle lots in the window, it flagged 0 under either price, so it may not matter for auction
+    lots.
+- **One row per lot.**
+  - B-J and Mecum pages are sometimes stored twice, with and without `www.` and with different end dates. The URL is
+    normalised and the earliest date is kept.
+  - The same lot page can also hang off two vehicle records, which happened in 57 subject rows before this fix. It is
+    counted once per subject.
 - **Same make and model family.** Family comes from `mv_model_family_names`, the same fold the board uses.
 - **Model year.** The exact year comes first. The reader widens to ±1 only when the exact year has fewer than 5 sales,
   and `match.year_from` and `match.year_to` say which.
@@ -75,7 +83,17 @@ window_to}`, `n`, `low` (p25), `mid` (p50), `high` (p75), `venues`, `condition_k
 - Each candidate is re-read live from `vehicles`. Its lots, prices and dates come live from `auction_events`, and only
   for cars whose words already match.
 - Known miss: a car whose `vehicles.sale_date` is older than the window is not found, even if it resold inside the
-  window. One of the 21 Chevelle comps was missed this way: a 2022 BaT sale that resold at Mecum on 2024-08-17.
+  window. Measured at 10:58 PT on four exact-year cohorts, counting cars with a gross sold lot in the window:
+
+  | Cohort | Found / live |
+  |---|---|
+  | 1967 Camaro | 261 / 276 |
+  | 1967 Chevelle | 124 / 129 |
+  | 2016 F-150 | 16 / 16 |
+  | 1999 Tacoma | 45 / 46 |
+  | **All four** | **446 / 467 (95.5%)** |
+
+  One Chevelle miss is a 2022 BaT sale that resold at Mecum on 2024-08-17.
 - It runs SECURITY DEFINER because `record_quarantine` and `vehicle_lot_class` have RLS with no read policy. Running as
   invoker (anon), it would silently skip those two exclusions. Subjects and comps are limited to public, non-deleted
   vehicles.
@@ -84,7 +102,7 @@ window_to}`, `n`, `low` (p25), `mid` (p50), `high` (p75), `venues`, `condition_k
 
 The function body was run as a plain SELECT with the ids inlined.
 
-### The Chevelle (10:45 PT)
+### The Chevelle (11:00 PT)
 
 `2a13d3be…`, asking $16,000:
 - `range`, n = 20, all exact year 1967, tokens `396 ss`, window 2023-11-22 to 2026-11-22.
@@ -94,31 +112,32 @@ The function body was run as a plain SELECT with the ids inlined.
 - The B-J "SS 396 Custom Coupe" ($104,500) is out, and so are the Mecum "Chevelle SS" lots with no "396" anywhere.
 - The family fold's answer for the same car is $41.8k to $71.5k from 465 sales.
 
-### Census (10:43 to 10:45 PT)
+### Census (10:51 to 10:55 PT)
 
 1,724 classified asks: `vehicle_events` from craigslist, facebook_marketplace and ksl created in the last 72 h, newest
 per vehicle, joined to public, non-deleted vehicles that are not `non_vehicle_item`. They ran in 44 calls of 40.
 
 | Verdict | Asks |
 |---|---|
-| `range` | 484 (28%) |
-| `no_opinion` | 1,240 |
+| `range` | 490 (28%) |
+| `no_opinion` | 1,234 |
 
 The family fold gives a range for 1,381 of the same 1,724.
 
 | Reason | Asks |
 |---|---|
-| "N close sales in 3 years; 5 needed" | 579 (346 with n = 0, 233 with n = 1–4) |
-| "Model not specific enough" | 314 |
+| "N close sales in 3 years; 5 needed" | 569 (341 with n = 0, 228 with n = 1–4) |
+| "Model not specific enough" | 317 |
 | "Not matched to a model family" | 203 |
-| "Too spread" | 144 |
+| "Too spread" | 145 |
 
-About the 484 `range` rows:
-- 153 match on distinguishing words and 331 have none (the family-year spread was already under 1.75×).
-- 338 use the exact year and 146 are widened to ±1.
-- Median n is 10 (5 to 180).
-- `condition_known` totals 1,383 comps; 251 rows have 0.
-- Of the 464 priced rows, 335 ask below `low`, 75 sit inside and 54 above. Auction sales are the clean end of the
+About the 490 `range` rows:
+- 161 match on distinguishing words. 329 have none: the whole family-year, which passed only because its spread was
+  already under 1.75×.
+- 339 use the exact year and 151 are widened to ±1.
+- Median n is 10 (5 to 179).
+- `condition_known` totals 1,389 comps; 250 rows have 0.
+- Of the 468 priced rows, 339 ask below `low`, 76 sit inside and 53 above. Auction sales are the clean end of the
   market, and most classified asks are daily drivers. The card should say "sold at auction", not "worth".
 
 ### Sample `range` rows, comps checked by eye
@@ -129,7 +148,7 @@ About the 484 `range` rows:
 | `34ad7c98` | Yukon 2001–2003, tokens `fourwd slt` | 8 | $16,666 / $18,244 / $21,853 |
 | `61fe22eb` | 1999 Tacoma, token `fourwd` | 26 | $15,449 / $18,376 / $21,919 |
 | `3a4daf05` | XK 1971–1973, token `xke` | 7 | $42,963 / $57,225 / $71,138 |
-| `687ec207` | 1967 Camaro coupe, no tokens | 159 (BaT 78, Mecum 72) | $39,375 / $50,050 / $63,400 |
+| `687ec207` | 1967 Camaro coupe, no tokens | 158 (BaT 77, Mecum 72) | $39,375 / $49,816 / $63,600 |
 
 - The 1990 F-250 comps are all XLT Lariats.
 - The Yukon comps include one Yukon XL 2500. Extra comp words are allowed.
@@ -143,6 +162,8 @@ About the 484 `range` rows:
 3. B-J duplicates (`www.` and bare docket URLs) are now one lot.
 4. Titles naming another car are now dropped.
 5. `4×4` in titles did not match `4x4` asks. It is now normalised.
+6. The one-word family name was also required in comp titles, which dropped good lots. It is now used only to strip
+   subject words. The 1967 Land Cruiser case went from 30 to 62 close sales.
 
 ### Still open, not fixed by this reader
 
@@ -153,16 +174,22 @@ About the 484 `range` rows:
 
 ### Time
 
-Server time comes from EXPLAIN ANALYZE.
+Server time comes from EXPLAIN ANALYZE, run as the privileged role. `anon` and `authenticated` have
+`statement_timeout = 15s` (`pg_roles.rolconfig`), and the function sets no limit of its own.
 
 | Call | First run | Repeat run |
 |---|---|---|
-| 40 ids (3 batches) | 2.1–2.5 s | 1.07–1.46 s |
+| 40 ids (4 batches, 10:46 to 11:00 PT) | 2.1–2.9 s | 1.07–1.64 s |
 | Chevelle alone | | 0.09 s |
 
-- On the first census pass, before the data was in memory, 40-id calls took a median 3.8 s and a worst 27 s
-  (`b_aw`, Mustang and F-series families).
-- The two largest stages are cutting candidate text into words (about 0.36 s) and the lot lookup with its exclusion
-  functions (about 0.4 s).
+- The repeat runs meet the 1.5 s target for 3 of the 4 batches. `b_ae` (Mustang, F-series, Silverado and S-Class
+  families) takes 1.64 s.
+- First passes over the 44 batches, wall time including the API round trip:
+  - Median 3.7 s and worst 37.5 s.
+  - 2 of 44 batches went over 15 s, so those calls would fail with 57014 for anon on the phone.
+- 60 ids, the contract cap, was not timed.
+- The two largest stages are cutting candidate text into words (about 0.6 s on the largest batch) and the lot lookup
+  with its exclusion functions (about 0.8 s).
 - Cold reads of the `vehicles` heap are the floor. A precomputed close-sales table would remove them, but that is a
   new fold, so it is not in this draft.
+- Until then, the phone should call with 20 ids or fewer.

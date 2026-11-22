@@ -23,7 +23,6 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
-SET statement_timeout TO '8s'
 AS $function$
 DECLARE
   v_out jsonb;
@@ -55,7 +54,7 @@ BEGIN
       ARRAY['original','orig','classic','clean','nice','rare','restored','runs','running','drives','driver','great',
             'good','excellent','condition','low','miles','mile','mi','obo','cash','trade','sale','new','beautiful',
             'stock','mint','only','owner','one','title','clear','rebuilt','fresh','must','see','cheap','chevy','ci',
-            'cu','in','cid','the','a','and','with','w','for','of','or','by','v','cyl','cylinder','manual','automatic',
+            'cu','in','cid','the','a','and','with','w','for','of','or','by','cyl','cylinder','manual','automatic',
             'auto','trans','transmission','base','edition','model','series','vintage','antique','muscle','hot','rod',
             'street','fully','loaded','used','vehicle','car','cars','motor','motors','engine','bug'] AS w_noise
   ),
@@ -144,14 +143,11 @@ BEGIN
              array_agg(DISTINCT w.w) FILTER (WHERE p.i = 5) AS w_slug
       FROM unnest(ARRAY[u.x_model, u.x_title, u.x_body, u.x_pre, u.x_slug]) WITH ORDINALITY p(x, i)
       CROSS JOIN LATERAL (
-        SELECT regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
-                 regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
-                   ' ' || regexp_replace(replace(replace(lower(p.x), '&#215;', 'x'), '×', 'x'), '[^a-z0-9]+', ' ', 'g') || ' ',
+        SELECT regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+                 ' ' || regexp_replace(replace(replace(lower(p.x), '&#215;', 'x'), '×', 'x'), '[^a-z0-9]+', ' ', 'g') || ' ',
                  '\m(4x4|4wd|4 x 4)\M', ' fourwd ', 'g'),
-                 '\m(2wd|4x2|rwd|fwd)\M', ' ', 'g'),
-                 '\m[0-9]+ ?(speed|spd)\M', ' ', 'g'),
-                 '\m(2|4|two|four) ?(door|dr)\M', ' ', 'g'),
-                 '\mv ?(6|8|10|12)\M', ' ', 'g'),
+                 -- dropped: 2wd, N-speed, 2-door, V8
+                 '\m(2wd|4x2|rwd|fwd|[0-9]+ ?(speed|spd)|(2|4|two|four) ?(door|dr)|v ?(6|8|10|12))\M', ' ', 'g'),
                '\msport coupe\M', ' coupe ', 'g'),
                '([a-z])([0-9])', '\1 \2', 'g'),
                '([0-9])([a-z])', '\1 \2', 'g'),
@@ -164,8 +160,8 @@ BEGIN
   ),
   fam_words AS MATERIALIZED (
     -- the family's words, plus the family name written as one word ("landcruiser", "roadrunner")
-    SELECT f.fam AS family_id,
-           coalesce(f.w_model, '{}') || replace(btrim(regexp_replace(lower(f.x_model), '[^a-z0-9]+', '', 'g')), ' ', '') AS family_w,
+    SELECT f.fam AS family_id, coalesce(f.w_model, '{}') AS family_w,
+           coalesce(f.w_model, '{}') || regexp_replace(lower(f.x_model), '[^a-z0-9]+', '', 'g') AS family_sub,
            coalesce((SELECT array_agg(DISTINCT x) FROM cut m, unnest(m.w_model) x WHERE m.kind = 'm' AND m.fam = f.fam), '{}') AS make_w
     FROM cut f WHERE f.kind = 'f'
   ),
@@ -173,7 +169,7 @@ BEGIN
     -- required words: the subject's model words beyond the family name, the make, body words and ad noise
     SELECT s.*, ru.*, sc.w_model AS s_model_w,
       coalesce((SELECT array_agg(x ORDER BY x) FROM unnest(sc.w_model) x
-                WHERE x <> ALL (coalesce(fw.family_w, '{}') || coalesce(fw.make_w, '{}') || ru.w_noise
+                WHERE x <> ALL (coalesce(fw.family_sub, '{}') || coalesce(fw.make_w, '{}') || ru.w_noise
                                 || ru.w_open || ru.w_wagon || ru.w_closed)), '{}') AS req_w,
       coalesce(sc.w_model, '{}') || coalesce(sc.w_body, '{}') AS all_w
     FROM subj s
@@ -229,11 +225,11 @@ BEGIN
     CROSS JOIN rules ru
     CROSS JOIN LATERAL (
       SELECT jsonb_agg(jsonb_build_object(
-               'source_url', d.source_url, 'sold_on', d.sold_on,
+               'lot', d.k, 'source_url', d.source_url, 'sold_on', d.sold_on,
                'price_usd', round(d.gross_price * fx.rate, 0),
                'venue', coalesce(public.market_venue_label(d.source), initcap(d.source)))) AS sales
       FROM (
-        SELECT DISTINCT ON (lot.k) ae.source, ae.source_url, ae.gross_price, ae.currency_code,
+        SELECT DISTINCT ON (lot.k) lot.k, ae.source, ae.source_url, ae.gross_price, ae.hammer_price, ae.currency_code,
                (ae.auction_end_date AT TIME ZONE 'UTC')::date AS sold_on
         FROM public.auction_events_canonical ae
         CROSS JOIN LATERAL (
@@ -253,13 +249,15 @@ BEGIN
       ) fx
       WHERE NOT public.auction_event_typed_not_sold(k.id, d.source_url)
         AND NOT public.vehicle_sale_price_untrusted(k.id, d.gross_price)
+        AND NOT public.vehicle_sale_price_untrusted(k.id, d.hammer_price)
     ) sl
     WHERE sl.sales IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM public.record_quarantine q
                       WHERE q.tbl = 'vehicles' AND q.row_id = k.id AND q.released_at IS NULL)
   ),
   hit AS MATERIALIZED (
-    SELECT s.id AS subject_id, k.year = s.year AS exact_year, k.id AS comp_id, k.year AS comp_year,
+    -- one row per subject and lot: the same lot page is sometimes attached to two vehicle records
+    SELECT DISTINCT ON (s.id, e->>'lot') s.id AS subject_id, k.year = s.year AS exact_year, k.id AS comp_id, k.year AS comp_year,
       k.make, k.model, k.title, k.condition_rating,
       (e->>'price_usd')::numeric AS price_usd, e->>'venue' AS venue, e->>'source_url' AS source_url,
       (e->>'sold_on')::date AS sold_on
@@ -267,6 +265,7 @@ BEGIN
     CROSS JOIN LATERAL unnest(k.subject_ids) sid(id)
     JOIN subj_b s ON s.id = sid.id AND s.lot_class = k.lot_class
     CROSS JOIN LATERAL jsonb_array_elements(k.sales) e
+    ORDER BY s.id, e->>'lot', k.year = s.year DESC, k.id
   ),
   pick AS (
     -- exact model year first; +/-1 only when the exact year has fewer than min_n
