@@ -36,6 +36,10 @@ CREATE FUNCTION pg_temp.raises(sql text) RETURNS text LANGUAGE plpgsql AS $$
 BEGIN EXECUTE sql; RETURN NULL; EXCEPTION WHEN OTHERS THEN RETURN SQLERRM; END $$;
 
 \i supabase/migrations/20261122190000_fact_doubt_cycle_heartbeat.sql
+-- the zero-answer alarm (20261122201000) on top; its other function names a table this database does not have
+SET check_function_bodies = off;
+\i supabase/migrations/20261122201000_fact_doubt_claim_cap.sql
+RESET check_function_bodies;
 
 SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.record_reader_heartbeat(text, jsonb, integer)', 'EXECUTE'), 'anon cannot record');
 SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
@@ -48,4 +52,14 @@ SELECT pg_temp.assert_true((:'a')::jsonb->>'status' = 'passed' AND (:'a')::jsonb
 SELECT pg_temp.assert_true(pg_temp.raises($$SELECT public.record_reader_heartbeat('some-other-job', '{}'::jsonb, 0)$$) LIKE '%unknown reader%', 'unknown names still refused');
 UPDATE public.job_assay_readings SET assayed_at = now() - interval '2 hours', elapsed_ms = 0 WHERE jobname = 'fact-doubt-cycle';
 SELECT pg_temp.assert_true(pg_temp.raises($$SELECT public.assay_subscription_readers()$$) LIKE '%fact-doubt-cycle%', 'a stale loop reading fails the watch');
+-- a loop that takes up doubts and answers none: two runs or a run begun under two hours ago pass; three over two hours fail
+SELECT public.record_reader_heartbeat('fact-doubt-cycle', jsonb_build_object('frames', 1, 'read', 0, 'error_classes', '{"refused_locally":1}'::jsonb,
+  'zero_read_since', to_char((now() - interval '3 hours') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'zero_read_fires', 2), 1000);
+SELECT pg_temp.assert_true((public.assay_subscription_readers())->>'status' = 'passed', 'two zero-answer runs still pass');
+SELECT public.record_reader_heartbeat('fact-doubt-cycle', jsonb_build_object('frames', 1, 'read', 0,
+  'zero_read_since', to_char((now() - interval '30 minutes') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'zero_read_fires', 3), 1000);
+SELECT pg_temp.assert_true((public.assay_subscription_readers())->>'status' = 'passed', 'a run begun 30 minutes ago still passes');
+SELECT public.record_reader_heartbeat('fact-doubt-cycle', jsonb_build_object('frames', 1, 'read', 0, 'error_classes', '{"refused_locally":3}'::jsonb,
+  'zero_read_since', to_char((now() - interval '3 hours') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'zero_read_fires', 3), 1000);
+SELECT pg_temp.assert_true(pg_temp.raises($$SELECT public.assay_subscription_readers()$$) LIKE 'fact-doubt-cycle has taken up doubts and answered none%refused_locally%', 'three zero-answer runs over two hours fail the watch');
 SELECT 'fact doubt cycle heartbeat contract: ok' AS result;
