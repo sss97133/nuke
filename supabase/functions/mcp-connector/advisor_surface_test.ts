@@ -12,6 +12,7 @@ import "./advisor/budget_test.ts";
 import "./advisor/listing_fetch_test.ts";
 // The public scope (no-credential callers, BaT-only refusals, RUF / engine-swap comps) rides along too.
 import "./advisor/public_test.ts";
+import "./advisor/instant_ingest_test.ts";
 import "./advisor/asset_status_test.ts";
 import "./advisor/find_rank_test.ts";
 // Source URL / event_time provenance rides along so CI runs it.
