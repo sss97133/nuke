@@ -415,16 +415,29 @@ final class ExplorePagerTests: XCTestCase {
         XCTAssertEqual(count, 2)
     }
 
-    func testUploadIsOffByDefault() async {
+    func testUploadIsOnByDefaultAndCanBeTurnedOff() async {
         let defaults = UserDefaults(suiteName: "explore-signals-flag-\(UUID().uuidString)")!
-        XCTAssertFalse(defaults.bool(forKey: ExploreSignalLog.uploadFlagKey))
+        XCTAssertTrue(ExploreSignalLog.uploadEnabled(defaults), "absent key = on")
+        defaults.set(false, forKey: ExploreSignalLog.uploadFlagKey)
+        XCTAssertFalse(ExploreSignalLog.uploadEnabled(defaults))
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("explore-signals-\(UUID().uuidString).jsonl")
         defer { try? FileManager.default.removeItem(at: url) }
         let log = ExploreSignalLog(fileURL: url)
         await log.append(ExploreSignalEvent.make(.impression, item: item(), position: 0))
-        await log.flushIfEnabled(defaults: defaults)   // flag off: returns without a request
+        await log.flushIfEnabled(defaults: defaults)   // turned off: returns without a request
         let count = await log.count
         XCTAssertEqual(count, 1)
+        defaults.set(true, forKey: ExploreSignalLog.uploadFlagKey)
+        XCTAssertTrue(ExploreSignalLog.uploadEnabled(defaults))
+    }
+
+    func testUploadBackoffDoublesAndCaps() {
+        XCTAssertEqual(ExploreSignalLog.backoff(failures: 0), 0)
+        XCTAssertEqual(ExploreSignalLog.backoff(failures: 1), 30)
+        XCTAssertEqual(ExploreSignalLog.backoff(failures: 2), 60)
+        XCTAssertEqual(ExploreSignalLog.backoff(failures: 4), 240)
+        XCTAssertEqual(ExploreSignalLog.backoff(failures: 7), 1800)
+        XCTAssertEqual(ExploreSignalLog.backoff(failures: 50), 1800)
     }
 
     func testSignalUploadCountsOnlyAnExplicitOk() {

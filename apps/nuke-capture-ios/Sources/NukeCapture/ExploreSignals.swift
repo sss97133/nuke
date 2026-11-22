@@ -5,10 +5,12 @@
 // which photo, a press, a choice, a follow, a share). They are the raw material for recommendations;
 // nothing in the app reads them back to rank anything yet.
 //
-// Upload is behind a flag that is off: UserDefaults bool "explore.signals.upload". When it is on, a
-// signed-in session sends batches of at most 200 to the RPC `record_feed_signals(p_events jsonb)`.
-// That function is drafted separately and may not be deployed: a failed send keeps the events and the
-// next flush tries again. A signed-out session, and any fixture-backend run, never sends.
+// Upload is on unless the person turns it off (UserDefaults bool "explore.signals.upload", absent = on; the
+// switch is in Tune Browse). A signed-in session sends batches of at most 200 to `record_feed_signals(p_events
+// jsonb)` (migration 20261122063000, owner-approved 2026-11-21): the server stamps the caller, ignores a
+// repeated event id, and answers ok:false for a refused batch. Events leave the phone only on ok:true; a failure
+// keeps them and backs off (30 s doubling, at most 30 min). A signed-out session, and any fixture run, never sends.
+// No event carries a seller or bidder name: the only text is ids, the source's name and tuned filter names.
 
 import Foundation
 import Supabase
@@ -184,34 +186,64 @@ actor ExploreSignalLog {
 
     private struct Params: Encodable { let p_events: [ExploreSignalEvent] }
 
-    /// Sends up to 200 events when the flag is on and someone is signed in; the events leave the file only
-    /// after the RPC answers. Any failure keeps them for the next flush.
-    func flushIfEnabled(defaults: UserDefaults = .standard) async {
-        guard defaults.bool(forKey: Self.uploadFlagKey), !uploading else { return }
+    /// Upload is on unless the person turned it off; an absent key means on.
+    static func uploadEnabled(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: uploadFlagKey) == nil ? true : defaults.bool(forKey: uploadFlagKey)
+    }
+
+    /// The wait after `failures` failed sends in a row: 30 s doubling, at most 30 minutes.
+    static func backoff(failures: Int) -> TimeInterval {
+        guard failures > 0 else { return 0 }
+        return min(30 * pow(2, Double(min(failures, 10) - 1)), 1800)
+    }
+
+    /// Batches per flush, so a long backlog drains without one flush holding the actor for long.
+    static let batchesPerFlush = 5
+
+    private var failures = 0
+    private var notBefore: Date = .distantPast
+
+    /// Sends the kept events, oldest first, in batches of up to 200, when upload is on and someone is signed
+    /// in. Events leave the file only after the writer answers ok:true; any failure keeps them and backs off.
+    func flushIfEnabled(defaults: UserDefaults = .standard, now: Date = Date()) async {
+        guard Self.uploadEnabled(defaults), !uploading, now >= notBefore else { return }
         #if DEBUG
         if FixtureBackend.isActive { return }
         #endif
         guard SupabaseService.currentUserId != nil else { return }
-        let batch = Array(load().prefix(Self.uploadBatch))
-        let events = batch.compactMap { Self.decode($0.line) }
-        guard !events.isEmpty else { return }
         uploading = true
         defer { uploading = false }
-        do {
-            // The drafted writer answers {"ok":false,...} for a refused batch instead of raising, so only an
-            // explicit ok:true removes events from the file.
-            let data = try await SupabaseService.client
-                .rpc("record_feed_signals", params: Params(p_events: events))
-                .execute().data
-            guard Self.accepted(data) else {
-                NSLog("NukeCapture explore signals refused: %@", String(data: data, encoding: .utf8) ?? "")
+        for _ in 0..<Self.batchesPerFlush {
+            let batch = Array(load().prefix(Self.uploadBatch))
+            let events = batch.compactMap { Self.decode($0.line) }
+            guard !events.isEmpty else { return }
+            do {
+                // The writer answers {"ok":false,...} for a refused batch instead of raising, so only an
+                // explicit ok:true removes events from the file.
+                let data = try await SupabaseService.client
+                    .rpc("record_feed_signals", params: Params(p_events: events))
+                    .execute().data
+                guard Self.accepted(data) else {
+                    NSLog("NukeCapture explore signals refused: %@", String(data: data, encoding: .utf8) ?? "")
+                    failed(now)
+                    return
+                }
+                let sent = Set(batch.map(\.id))
+                stored = load().filter { !sent.contains($0.id) }
+                rewrite()
+                failures = 0
+                notBefore = .distantPast
+                if batch.count < Self.uploadBatch { return }
+            } catch {
+                NSLog("NukeCapture explore signals not sent: %@", String(describing: error))
+                failed(now)
                 return
             }
-            let sent = Set(batch.map(\.id))
-            stored = load().filter { !sent.contains($0.id) }
-            rewrite()
-        } catch {
-            NSLog("NukeCapture explore signals not sent: %@", String(describing: error))
         }
+    }
+
+    private func failed(_ now: Date) {
+        failures += 1
+        notBefore = now.addingTimeInterval(Self.backoff(failures: failures))
     }
 }
