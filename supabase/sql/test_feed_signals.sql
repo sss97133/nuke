@@ -78,6 +78,8 @@ SELECT t_assert((SELECT v->>'ok' = 'true' AND (v->>'accepted')::int = 3 FROM r W
 SELECT t_assert((SELECT v->>'ok' = 'true' AND (v->>'accepted')::int = 0 FROM r WHERE k = 'repeat'), 'a repeated id is a no-op');
 SELECT t_assert((SELECT v->>'ok' = 'true' AND (v->>'accepted')::int = 2 AND (v->>'skipped')::int = 1 FROM r WHERE k = 'bad'),
   'a bad event is skipped, the rest land');
+SELECT t_assert((SELECT page_index IS NULL AND photo_index IS NULL AND position IS NULL FROM public.feed_signals
+                  WHERE id = '10000000-0000-0000-0000-000000000006'), 'absent numbers stay null, not their ceiling');
 SELECT t_assert((SELECT dwell_ms FROM public.feed_signals WHERE id = '10000000-0000-0000-0000-000000000006') = 3600000,
   'an hour-plus dwell is clamped, not refused');
 SELECT t_assert((SELECT v->>'error' = 'too_many' FROM r WHERE k = 'many'), 'more than 200 refused');

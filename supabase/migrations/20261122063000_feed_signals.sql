@@ -76,8 +76,13 @@ AS $fn$
     WHERE jsonb_typeof(e) = 'object'
   )
   SELECT id, session_id, least(at_text::timestamptz, now() + interval '5 minutes'), item_id, vehicle_id, source, kind,
-         page_kind, least(page_index, 100)::smallint, least(photo_index, 1000)::smallint, least(dwell_ms, 3600000)::int,
-         choice, least(pos, 100000)::int, tuned
+         page_kind,
+         -- least() skips nulls, so an absent number would become its ceiling; keep absent as null.
+         CASE WHEN page_index IS NOT NULL THEN least(page_index, 100) END::smallint,
+         CASE WHEN photo_index IS NOT NULL THEN least(photo_index, 1000) END::smallint,
+         CASE WHEN dwell_ms IS NOT NULL THEN least(dwell_ms, 3600000) END::int,
+         choice,
+         CASE WHEN pos IS NOT NULL THEN least(pos, 100000) END::int, tuned
     FROM typed
    WHERE id IS NOT NULL AND at_text IS NOT NULL
      AND item_id IS NOT NULL AND length(item_id) BETWEEN 1 AND 120
