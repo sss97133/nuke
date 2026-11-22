@@ -1334,7 +1334,7 @@ async function handleGetAsset(
   }
   if (!vehicle) return err("Asset not found", "get_asset");
 
-  const [price, obsRes, spendRes] = await Promise.all([
+  const [price, obsRes, spendRes, replicaRes] = await Promise.all([
     priceFacts(sb, vid),
     sb
       .from("vehicle_observations")
@@ -1344,8 +1344,10 @@ async function handleGetAsset(
       .order("ingested_at", { ascending: false })
       .limit(20),
     sb.rpc("vehicle_documented_spend", { p_vehicle_id: vid }),
+    sb.rpc("vehicle_replica_accuracy", { p_vehicle_id: vid }),
   ]);
   const documentedSpend = (spendRes.data ?? null) as Record<string, unknown> | null;
+  const replicaAccuracy = (replicaRes.data ?? null) as Record<string, unknown> | null;
 
   const obs = obsRes.data || [];
   const sourceMap = await loadSources(sb, obs.map((o: { source_id: string }) => o.source_id));
@@ -1475,6 +1477,26 @@ async function handleGetAsset(
     claims.push(notRecordedClaim("documented_spend", { checked_sources: ["vehicle_documented_spend"] }));
   }
 
+  if (replicaAccuracy && replicaAccuracy.applicable === true) {
+    claims.push(
+      recordedClaim("replica_accuracy_score", replicaAccuracy.accuracy_score_known_only ?? null, {
+        confidence: replicaAccuracy.accuracy_score_known_only != null ? 0.55 : null,
+        confidence_basis: replicaAccuracy.accuracy_score_known_only != null ? "claim_score" : "none",
+        citations: [
+          emptyCitation({
+            source_name: "vehicle_replica_accuracy",
+            source_url: null,
+            observation_id: null,
+            event_time: replicaAccuracy.as_of ? String(replicaAccuracy.as_of) : null,
+            ingested_at: replicaAccuracy.as_of ? String(replicaAccuracy.as_of) : null,
+            is_superseded: false,
+          }),
+        ],
+        note: `unknown_share=${replicaAccuracy.unknown_share}; known_weight=${replicaAccuracy.known_weight}; distinct_from=originality_score`,
+      }),
+    );
+  }
+
   // History + coverage folded in (no separate tools on this surface).
   const [{ data: events }, { count: eventCount }, { count: imageCount }] = await Promise.all([
     sb
@@ -1538,6 +1560,7 @@ async function handleGetAsset(
             logic_version: documentedSpend.logic_version ?? null,
           }
         : null,
+      replica_accuracy: replicaAccuracy,
       coverage: {
         recorded_fields: recordedFields,
         missing_fields: missingFields,
