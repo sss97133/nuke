@@ -509,7 +509,8 @@ struct ExplorePagerCard: View {
     private func ended() {
         guard let since = tracker.visibleSince else { return }
         tracker.visibleSince = nil
-        let ms = Int(Date().timeIntervalSince(since) * 1000)
+        // The writer clamps at an hour; clamp here too so the stored line is what the server keeps.
+        let ms = min(max(Int(Date().timeIntervalSince(since) * 1000), 0), 3_600_000)
         let pageIndex = tracker.maxPageIndex, pageKind = tracker.maxPageKind, photo = tracker.maxPhoto
         record(.dwell) { $0.dwellMs = ms }
         record(.page) { $0.pageIndex = pageIndex; $0.pageKind = pageKind.rawValue }
