@@ -120,6 +120,12 @@ fi
 #    need the newer CLI for it, so both search ~/.local/bin first.
 READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-document-reader "$MAIN/scripts/photo-pipeline/subscription-document-reader.mjs" --limit "$DOCS_LIMIT" --concurrency 2
 READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-frame-classifier "$FRAME_READER" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending --deep-limit "$DEEP_LIMIT" --keyed-limit "$KEYED_LIMIT"
+# 4. the fact-doubt loop (scripts/doubts/fact-doubt-cycle.mjs): raise doubts for the owner's vehicles (newest landings
+#    first, no model) and answer pending ones blind on the subscription. After the frame reader so it sees this fire's
+#    readings; its own heartbeat row, so a silent loop is seen like a silent reader.
+FRAME_CLEAN="$LAST_CLEAN"
+READER_PATH_FIRST="$HOME/.local/bin" run_reader fact-doubt-cycle "$MAIN/scripts/doubts/fact-doubt-cycle.mjs" --vehicles "${DOUBT_VEHICLES:-3}" --answer-limit "${DOUBT_ANSWERS:-6}"
+LAST_CLEAN="$FRAME_CLEAN"
 # fast fires run only after a full fire whose first reads ended clean; a full fire that holds them says so
 if [ "$LAST_CLEAN" -eq 1 ]; then rm -f "$FAST_HOLD"; else
   date +%s > "$FAST_HOLD"
