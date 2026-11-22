@@ -14,14 +14,21 @@
  * <out>.batches, polls and collects each one; --batch --collect-only resumes collection without submitting.
  * Already-read ids in --out are skipped, so a run resumes where it stopped.
  */
-import Anthropic from '@anthropic-ai/sdk';
-import sharp from 'sharp';
+import { createRequire } from 'node:module';
 import { readFileSync, appendFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+// Packages load when used, from this checkout or else from the working directory: the scheduled subscription reader
+// runs these scripts from a bare main checkout with no node_modules (~/.worktrees/nuke-main), from ~/nuke, and a
+// top-level import of a package only the metered reader needs stopped fetchImage from loading there (2026-11-22).
+async function pkg(name) {
+  try { const m = await import(name); return m.default ?? m; }
+  catch { const m = createRequire(join(process.cwd(), 'noop.js'))(name); return m.default ?? m; }
+}
 
 export const PASS_VERSION = 'photo_work_v2';
 
@@ -81,6 +88,7 @@ export async function fetchImage(url, edge = 768) {
   const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
   if (!res.ok) throw new Error(`fetch ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
+  const sharp = await pkg('sharp');
   let out;
   try {
     out = await sharp(buf, { failOn: 'none' }).rotate()
@@ -132,6 +140,7 @@ async function main() {
   const conc = Number(arg('concurrency', 6)); const limit = Number(arg('limit', 1e9));
   const photoKey = process.env.NUKE_PHOTO_ANTHROPIC_API_KEY;
   const workspace = photoKey ? process.env.NUKE_PHOTO_ANTHROPIC_WORKSPACE_ID : undefined;
+  const Anthropic = await pkg('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey: photoKey || process.env.ANTHROPIC_API_KEY, maxRetries: 4,
     ...(workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {}) });
   const done = new Set(existsSync(out) ? readFileSync(out, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)).filter(l => l.reading).map(l => l.id) : []);
