@@ -739,7 +739,7 @@ DECLARE
   cowl_style text;
   actions jsonb := '[]'::jsonb;
   v_vin text;
-  fe record;
+  evid record;
 BEGIN
   SELECT vin INTO v_vin FROM vehicles WHERE id = p_vehicle_id;
   -- Pre-1981 GM 13-character VIN only: first digit is division (2 = Pontiac).
@@ -772,16 +772,21 @@ BEGIN
   END IF;
 
   FOREACH fld IN ARRAY ARRAY['make','model','year','vin'] LOOP
+    -- Clear prior-field leftovers: SELECT INTO keeps old values when zero rows match.
+    best_val := NULL;
+    best_src := NULL;
+    best_conf := NULL;
     -- Ranked consensus over non-superseded evidence.
-    SELECT fe.proposed_value, fe.source_type, fe.source_confidence
+    -- Alias must not collide with a PL/pgSQL record variable (fe → "not assigned yet").
+    SELECT src.proposed_value, src.source_type, src.source_confidence
       INTO best_val, best_src, best_conf
-      FROM field_evidence fe
-     WHERE fe.vehicle_id = p_vehicle_id
-       AND fe.field_name = fld
-       AND fe.status IN ('pending', 'accepted')
-     ORDER BY public.identity_source_rank(fe.source_type) DESC,
-              fe.source_confidence DESC NULLS LAST,
-              fe.created_at DESC NULLS LAST
+      FROM field_evidence src
+     WHERE src.vehicle_id = p_vehicle_id
+       AND src.field_name = fld
+       AND src.status IN ('pending', 'accepted')
+     ORDER BY public.identity_source_rank(src.source_type) DESC,
+              src.source_confidence DESC NULLS LAST,
+              src.created_at DESC NULLS LAST
      LIMIT 1;
 
     IF fld = 'make' AND vin_make IS NOT NULL THEN
@@ -789,7 +794,7 @@ BEGIN
       best_src := 'gm_vin_chart';
       best_conf := greatest(coalesce(best_conf, 0), 95);
       -- Supersede conflicting ai_visual rows (keep the row; status=superseded).
-      FOR fe IN
+      FOR evid IN
         SELECT * FROM field_evidence
          WHERE vehicle_id = p_vehicle_id
            AND field_name = 'make'
@@ -800,8 +805,8 @@ BEGIN
         actions := actions || jsonb_build_object(
           'action', 'supersede_ai_visual',
           'field', 'make',
-          'evidence_id', fe.id,
-          'was', fe.proposed_value,
+          'evidence_id', evid.id,
+          'was', evid.proposed_value,
           'wins', vin_make
         );
         IF NOT p_dry_run THEN
@@ -809,7 +814,7 @@ BEGIN
              SET status = 'superseded',
                  assigned_at = now(),
                  assigned_by = 'reconcile_identity_field_provenance/20261122032000'
-           WHERE id = fe.id;
+           WHERE id = evid.id;
         END IF;
       END LOOP;
 
