@@ -26,6 +26,7 @@ import {
   recentSaleSanityGuard,
 } from "./variants.ts";
 import { allInCost, cohortTrend, type FeeRow, pricePosition } from "./market_position.ts";
+import { listingSourceRefusal } from "./public.ts";
 
 /** Page-observed subject facts passed to value_asset (mirrors handlers.ts SubjectOverride). */
 export interface ValueAssetOverride {
@@ -78,6 +79,8 @@ export interface EvaluateDeps {
     assetId: string,
     override?: ValueAssetOverride,
   ) => Promise<{ structuredContent: AdvisorEnvelope; isError?: boolean }>;
+  /** Public scope (advisor/public.ts): Bring a Trailer only, no photo analysis, no coverage write, public comps. */
+  publicOnly?: boolean;
 }
 
 export interface AdvisorToolResult {
@@ -98,6 +101,19 @@ function ok(envelope: AdvisorEnvelope, markdown: string): AdvisorToolResult {
       { type: "text", text: JSON.stringify(withMd, null, 2) },
     ],
     structuredContent: withMd as unknown as AdvisorEnvelope,
+  };
+}
+
+function refused(msg: string, source: string): AdvisorToolResult {
+  const envelope = makeEnvelope("evaluate_listing", "vehicle", null, [], {
+    error: msg,
+    unsupported_source: source,
+    supported_sources: ["Bring a Trailer (bringatrailer.com/listing/…)"],
+  });
+  return {
+    content: [{ type: "text", text: msg }],
+    structuredContent: envelope,
+    isError: true,
   };
 }
 
@@ -589,6 +605,10 @@ async function loadCompsForListing(
   const byId = new Map<string, Record<string, unknown>>(
     (vehRows || []).map((v: Record<string, unknown>) => [String(v.id), v]),
   );
+  // Public scope: vehRows holds public vehicles only; a comp on any other vehicle is not shown to a visitor.
+  const visibleRows = deps.publicOnly
+    ? rows.filter((r) => !r.vehicle_id || byId.has(String(r.vehicle_id)))
+    : rows;
 
   const { data: facts } = ids.length
     ? await sb.rpc("vehicle_price_facts", { p_vehicle_ids: ids })
@@ -614,7 +634,7 @@ async function loadCompsForListing(
   const comps: CompRow[] = [];
   const subjectCanon = canonicalListingUrl(listing.url);
 
-  for (const r of rows) {
+  for (const r of visibleRows) {
     const id = r.vehicle_id ? String(r.vehicle_id) : null;
     const v = id ? byId.get(id) : null;
     const fact = id ? factMap.get(id) : null;
@@ -1061,6 +1081,10 @@ export async function handleEvaluateListing(
   if (!url || !/^https?:\/\//i.test(url)) {
     return err("url is required (https listing URL)");
   }
+  // Bring a Trailer only for now: Cars & Bids and Mecum answers are wrong today (JS-shell page, 45-90 s reads), so
+  // they are refused for everyone; a public caller may fetch only a bringatrailer.com listing page.
+  const refusal = listingSourceRefusal(url, deps.publicOnly === true);
+  if (refusal) return refused(refusal.message, refusal.source);
 
   let listing: FetchedListing;
   try {
@@ -1208,14 +1232,17 @@ export async function handleEvaluateListing(
   }
   // Coverage: every listing handed to the advisor should already be in Nuke. Log hit/miss; misses are queued
   // for ingest. Best effort, never blocks the evaluation.
-  try {
-    await sb.rpc("log_listing_coverage", {
-      p_tool: "evaluate_listing",
-      p_url: url,
-      p_vehicle_id: matchedId,
-      p_match_method: matchMethod,
-    });
-  } catch (_e) { /* coverage logging must not fail the evaluation */ }
+  // A public call writes nothing: no coverage row and no import_queue miss from an anonymous paste.
+  if (!deps.publicOnly) {
+    try {
+      await sb.rpc("log_listing_coverage", {
+        p_tool: "evaluate_listing",
+        p_url: url,
+        p_vehicle_id: matchedId,
+        p_match_method: matchMethod,
+      });
+    } catch (_e) { /* coverage logging must not fail the evaluation */ }
+  }
   let matchedSale: { amount: number; on: string | null; source_url: string | null } | null = null;
   const subjectCanon = canonicalListingUrl(url);
   const sameListing = (u: unknown) => !!u && canonicalListingUrl(String(u)) === subjectCanon;
@@ -1348,7 +1375,8 @@ export async function handleEvaluateListing(
     }
   }
 
-  const photos = await analyzePhotos(deps, listing.photo_urls);
+  // Photo analysis runs paid vision compute: never for a public call.
+  const photos = deps.publicOnly ? [] : await analyzePhotos(deps, listing.photo_urls);
   const { claims: textClaims, hedges, missing } = deconstructDescription(
     listing,
     photos,

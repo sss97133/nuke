@@ -47,9 +47,9 @@ type WriteTier = string;
 // Advisor surface: the real surface test (advisor/mod.ts), and a spy in place of the advisor's own handlers.
 const isAdvisorSurface = (globalThis as any).__isAdvisorSurface as (req: Request) => boolean;
 const checkAdvisorRateLimit = (_req: Request) => ({ ok: true as const });
-const advisorCalls: Array<{ method?: string; params?: { name?: string } }> = [];
-const handleAdvisorJsonRpc = async (body: any) => {
-  advisorCalls.push(body);
+const advisorCalls: Array<{ method?: string; params?: { name?: string }; publicCaller?: boolean }> = [];
+const handleAdvisorJsonRpc = async (body: any, opts: { publicCaller?: boolean } = {}) => {
+  advisorCalls.push({ ...body, publicCaller: opts.publicCaller === true });
   return body?.id === undefined || body?.id === null ? null : { jsonrpc: "2.0", id: body.id, result: { advisor: true } };
 };
 const initAdvisorHandlers = (_deps: unknown) => {};
@@ -93,7 +93,7 @@ const IS_ADMIN_OR_SERVICE = new Set(["Bearer sb_secret_test_key", "Bearer admin-
 const connector = await import(`data:application/typescript,${encodeURIComponent(moduleSource)}`);
 const handle = connector.handle as (req: Request) => Promise<Response>;
 const calls = connector.calls as Array<{ name: string; args: Record<string, unknown>; caller?: { userId?: string; scopes?: string[]; oauthToken?: string } }>;
-const advisorCalls = connector.advisorCalls as Array<{ method?: string; params?: { name?: string } }>;
+const advisorCalls = connector.advisorCalls as Array<{ method?: string; params?: { name?: string }; publicCaller?: boolean }>;
 const dispatched = () => calls.length;
 const advised = () => advisorCalls.length;
 // The gate's own lists, read from index.ts so this file cannot drift from them.
@@ -108,6 +108,9 @@ const SQL_TOOLS = listed("const ADMIN_OR_SERVICE_TOOLS = new Set([", "]);", /"(\
 // Pinned here on purpose: a tool joins this list only with proof that it returns nothing a logged-out visitor may
 // not read (see PUBLIC_TOOLS in index.ts).
 const PUBLIC_TOOLS = ["get_attribute_checklist", "get_event_checklist", "get_event_schema", "query_library"];
+// The advisor tools a visitor may call, in the public scope (advisor/public.ts; audited 2026-11-21). Pinned on purpose.
+const ADVISOR_PUBLIC = ["budget_options", "evaluate_listing", "find_asset", "get_asset", "get_comps", "value_asset"];
+const ADVISOR_PUBLIC_IN_SOURCE = listed("const ADVISOR_PUBLIC_TOOLS = new Set([", "]);", /"(\w+)"/g);
 const sorted = (names: string[]) => JSON.stringify([...names].sort());
 const FN = "https://example.supabase.co/functions/v1/mcp-connector";
 
@@ -386,7 +389,7 @@ Deno.test("an active admin's credential and the service key reach every tool tha
   assert(dispatched() === closedByDefault.length && calls.every((c) => c.caller?.userId === "service-role"), "service key calls");
 });
 
-Deno.test("advisor surface: a tool call needs the service key or an active admin, by path, header and query; protocol methods stay open", async () => {
+Deno.test("advisor surface: a visitor's call runs in the public scope, an admin's and the service key's in the full one; an unknown tool stays closed", async () => {
   const advisor = (how: string, body: unknown, headers: Record<string, string> = {}) =>
     handle(new Request(how === "path" ? `${FN}/advisor` : how === "query" ? `${FN}?surface=advisor` : FN, {
       method: "POST",
@@ -396,35 +399,49 @@ Deno.test("advisor surface: a tool call needs the service key or an active admin
   const call = (name: string) => ({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: { asset_id: "synthetic" } } });
   const login = { authorization: "Bearer nuke_oauth_" + "e".repeat(64) };
   assert(ADVISOR_TOOL_NAMES.size === 6, `advisor tools: ${ADVISOR_TOOL_NAMES.size}`);
+  assert(sorted(ADVISOR_PUBLIC_IN_SOURCE) === sorted(ADVISOR_PUBLIC), `ADVISOR_PUBLIC_TOOLS drifted: ${sorted(ADVISOR_PUBLIC_IN_SOURCE)}`);
+  for (const name of ADVISOR_PUBLIC) assert(ADVISOR_TOOL_NAMES.has(name), `public advisor tool ${name} is not in the catalog`);
   for (const how of ["path", "header", "query"]) {
     calls.length = 0;
     advisorCalls.length = 0;
-    for (const name of [...ADVISOR_TOOL_NAMES, "no_such_tool"]) {
-      (globalThis as any).__apiKeyCheck = undefined;
-      const anonymous = await advisor(how, call(name));
-      assert(anonymous.status === 401 && (anonymous.headers.get("www-authenticate") ?? "").includes("nuke.ag"),
-        `advisor ${name} by ${how}, no credential: ${anonymous.status}`);
-      const unverified = await advisor(how, call(name), { authorization: "Bearer not-a-key" });
-      assert(unverified.status === 401, `advisor ${name} by ${how}, a credential that does not verify: ${unverified.status}`);
-      (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: NOT_ADMIN, key_id: "key", scopes: ["read"] }, error: null };
-      const member = await advisor(how, call(name), login);
-      assert(member.status === 403, `advisor ${name} by ${how}, signed-in non-admin: ${member.status}`);
-    }
+    // An unknown name is closed: no credential 401 with the login challenge, a non-admin credential 403.
+    (globalThis as any).__apiKeyCheck = undefined;
+    const unknownAnon = await advisor(how, call("no_such_tool"));
+    assert(unknownAnon.status === 401 && (unknownAnon.headers.get("www-authenticate") ?? "").includes("nuke.ag"),
+      `advisor no_such_tool by ${how}, no credential: ${unknownAnon.status}`);
+    (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: NOT_ADMIN, key_id: "key", scopes: ["read"] }, error: null };
+    const unknownMember = await advisor(how, call("no_such_tool"), login);
+    assert(unknownMember.status === 403, `advisor no_such_tool by ${how}, signed-in non-admin: ${unknownMember.status}`);
     assert(advised() === 0 && dispatched() === 0, `advisor by ${how}: a refused call reached a handler`);
 
-    (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: ADMIN, key_id: "key", scopes: ["read"] }, error: null };
-    const admin = await advisor(how, call("get_asset"), login);
-    assert(admin.status === 200 && advised() === 1 && advisorCalls[0].params?.name === "get_asset", `advisor by ${how}, admin: ${admin.status}`);
-    (globalThis as any).__apiKeyCheck = undefined;
-    const service = await advisor(how, call("get_asset"), { authorization: "Bearer sb_secret_test_key" });
-    assert(service.status === 200 && advised() === 2, `advisor by ${how}, service key: ${service.status}`);
+    for (const name of ADVISOR_TOOL_NAMES) {
+      advisorCalls.length = 0;
+      (globalThis as any).__apiKeyCheck = undefined;
+      const anonymous = await advisor(how, call(name));
+      assert(anonymous.status === 200 && advised() === 1 && advisorCalls[0].publicCaller === true,
+        `advisor ${name} by ${how}, no credential: ${anonymous.status} public=${advisorCalls[0]?.publicCaller}`);
+      const unverified = await advisor(how, call(name), { authorization: "Bearer not-a-key" });
+      assert(unverified.status === 401 && advised() === 1, `advisor ${name} by ${how}, a credential that does not verify: ${unverified.status}`);
+      (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: NOT_ADMIN, key_id: "key", scopes: ["read"] }, error: null };
+      const member = await advisor(how, call(name), login);
+      assert(member.status === 200 && advised() === 2 && advisorCalls[1].publicCaller === true,
+        `advisor ${name} by ${how}, signed-in non-admin: ${member.status} public=${advisorCalls[1]?.publicCaller}`);
+      (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: ADMIN, key_id: "key", scopes: ["read"] }, error: null };
+      const admin = await advisor(how, call(name), login);
+      assert(admin.status === 200 && advised() === 3 && advisorCalls[2].publicCaller === false, `advisor ${name} by ${how}, admin: ${admin.status}`);
+      (globalThis as any).__apiKeyCheck = undefined;
+      const service = await advisor(how, call(name), { authorization: "Bearer sb_secret_test_key" });
+      assert(service.status === 200 && advised() === 4 && advisorCalls[3].publicCaller === false, `advisor ${name} by ${how}, service key: ${service.status}`);
+    }
+    assert(dispatched() === 0, `advisor by ${how}: a call reached the full catalog`);
 
     // The protocol methods read no data and stay open with no credential.
+    advisorCalls.length = 0;
     for (const method of ["initialize", "tools/list", "ping"]) {
       const res = await advisor(how, { jsonrpc: "2.0", id: 1, method });
       assert(res.status === 200, `advisor ${method} by ${how}, no credential: ${res.status}`);
     }
-    assert(advised() === 5 && dispatched() === 0, `advisor by ${how}: protocol calls reaching the advisor handler: ${advised()}`);
+    assert(advised() === 3 && dispatched() === 0, `advisor by ${how}: protocol calls reaching the advisor handler: ${advised()}`);
   }
 });
 

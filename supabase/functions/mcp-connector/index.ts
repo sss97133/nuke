@@ -32,9 +32,10 @@ import {
 //
 // Protocol: MCP Streamable HTTP (2025-03-26)
 // Auth: X-API-Key (nk_live_...) or Authorization: Bearer (the service key, or a nuke_oauth_ login token).
-//       With no credential only the tools in PUBLIC_TOOLS run (see the HTTP entry point). Every other tool, on
-//       /mcp and on /mcp/advisor, reads through the service client, so it answers only the service key or an
-//       active admin until its reads are proven to return what a logged-out visitor may see.
+//       With no credential only the tools in PUBLIC_TOOLS run (see the HTTP entry point). Every other tool on /mcp
+//       reads through the service client, so it answers only the service key or an active admin until its reads are
+//       proven to return what a logged-out visitor may see. On /mcp/advisor a visitor may call the tools in
+//       ADVISOR_PUBLIC_TOOLS, which then run in the public scope (advisor/public.ts).
 // Deploy: supabase functions deploy mcp-connector --no-verify-jwt
 // =============================================================================
 
@@ -6303,9 +6304,12 @@ Deno.serve(async (req: Request) => {
   }
 
   // Asset Advisor: read-only curated surface. No write/admin/SQL tools are registered.
-  // Its tools read through the service client, so a tool call answers only the service key or an active admin
-  // (isPrivilegedCaller); initialize, tools/list and ping stay open. A best-effort per-IP rate limit covers
-  // requests without a credential.
+  // Its tools read through the service client. The service key or an active admin (isPrivilegedCaller) gets them as
+  // they are. Any other caller (no credential, or a valid credential that is not an admin's) may call a tool in
+  // ADVISOR_PUBLIC_TOOLS, and it runs in the public scope (advisor/public.ts): vehicles reads see is_public rows only,
+  // private observations are dropped, nothing is written, no edge function (vision, comps fallback) is called,
+  // evaluate_listing reads Bring a Trailer pages only, and internal flags are mapped to plain language.
+  // initialize, tools/list and ping stay open. A best-effort per-IP rate limit covers requests without a credential.
   if (advisorSurface) {
     const rate = checkAdvisorRateLimit(req);
     if (!rate.ok) {
@@ -6342,14 +6346,25 @@ Deno.serve(async (req: Request) => {
       }
       advisorAuth = auth;
     }
+    // Open to a visitor in the public scope. Each was audited (2026-11-21) for what it returns in that scope; a tool
+    // added to the advisor catalog is closed to visitors until it is named here and pinned in oauth_test.ts.
+    const ADVISOR_PUBLIC_TOOLS = new Set(["find_asset", "get_asset", "get_comps", "value_asset", "evaluate_listing", "budget_options"]);
+    let publicCaller = false;
     if (body.method === "tools/call") {
-      if (!advisorAuth) return toolRefused(body.id, 401, "Authentication required for Nuke Asset Advisor tools.");
-      if (!(await isPrivilegedCaller(advisorAuth))) {
-        return toolRefused(body.id, 403, "Nuke Asset Advisor tools answer only an administrator's credential for now.");
+      const advisorTool = body.params?.name;
+      const openToVisitors = typeof advisorTool === "string" && ADVISOR_PUBLIC_TOOLS.has(advisorTool);
+      if (!advisorAuth) {
+        if (!openToVisitors) return toolRefused(body.id, 401, "Authentication required for this Nuke Asset Advisor tool.");
+        publicCaller = true;
+      } else if (!(await isPrivilegedCaller(advisorAuth))) {
+        if (!openToVisitors) {
+          return toolRefused(body.id, 403, "This Nuke Asset Advisor tool answers only an administrator's credential for now.");
+        }
+        publicCaller = true;
       }
     }
 
-    const response = await handleAdvisorJsonRpc(body);
+    const response = await handleAdvisorJsonRpc(body, { publicCaller });
     if (response === null) {
       return new Response(null, { status: 202, headers: CORS });
     }

@@ -6,8 +6,8 @@
   "protocol": "2025-03-26",
   "transport": "streamable-http",
   "authentication": {
-    "required": true,
-    "note": "Listing the tools needs no credential. Calling a tool needs a signed-in administrator's credential for now; each tool reopens to visitors once it is shown to return only public data."
+    "required": false,
+    "note": "No credential needed. The six advisor tools answer visitors from public records only (no private vehicles or owner data, nothing written, no photo analysis); evaluate_listing reads Bring a Trailer listings only for now."
   },
   "tools": [
     "find_asset",

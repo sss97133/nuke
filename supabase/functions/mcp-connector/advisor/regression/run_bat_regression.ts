@@ -9,7 +9,7 @@
  * Remote: --remote https://nuke.ag/mcp/advisor  (calls the deployed tool; note the deployed tool
  *   writes one listing_coverage_log row per call, as it does for every caller).
  * Options: --impl <path to advisor dir> (score another checkout, e.g. origin/main for a before run),
- *   --only <substring>, --min-pass 19.
+ *   --only <substring>, --min-pass 19, --public (score the visitor's answer: public scope + public answer).
  *
  * A case passes when every golden field matches: title, year, make, model, mileage (+TMU flag),
  * price kind, price, end date; plus no prior sale equal to the subject listing, no "ask" wording
@@ -45,6 +45,8 @@ const impl = opt("--impl");
 const only = opt("--only");
 const jsonOut = opt("--json");
 const minPass = Number(opt("--min-pass") ?? 19);
+// --public: score the answer a visitor gets (public scope + public answer, advisor/public.ts) instead of an admin's.
+const publicScope = args.includes("--public");
 
 const here = new URL(".", import.meta.url);
 const golden = JSON.parse(
@@ -112,15 +114,23 @@ if (remote) {
   const { createAdvisorHandlers } = await import(
     new URL("./handlers.ts", advisorDir).href
   );
-  const handlers = createAdvisorHandlers({
+  const baseDeps = {
     sb: () => client,
     // Vision and edge fallbacks are off in the harness: field and price checks never depend on them.
     callEdgeApi: () =>
       Promise.reject(
         new Error("vision unavailable (harness: edge calls disabled)"),
       ),
-  });
-  evaluate = handlers.evaluate_listing;
+  };
+  if (publicScope) {
+    const { publicDeps } = await import(new URL("./protocol.ts", advisorDir).href);
+    const { publicAnswer } = await import(new URL("./public.ts", advisorDir).href);
+    const handlers = createAdvisorHandlers(publicDeps(baseDeps));
+    evaluate = async (a) => publicAnswer(await handlers.evaluate_listing(a));
+  } else {
+    const handlers = createAdvisorHandlers(baseDeps);
+    evaluate = handlers.evaluate_listing;
+  }
 }
 
 const norm = (s: unknown) =>

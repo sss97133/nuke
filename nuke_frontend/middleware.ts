@@ -34,8 +34,8 @@ const MCP_SERVER_CARD = {
   protocol: '2025-03-26',
   transport: 'streamable-http',
   authentication: {
-    required: true,
-    note: "Listing the tools needs no credential. Calling a tool needs a signed-in administrator's credential for now; each tool reopens to visitors once it is shown to return only public data.",
+    required: false,
+    note: "No credential needed. The six advisor tools answer visitors from public records only (no private vehicles or owner data, nothing written, no photo analysis); evaluate_listing reads Bring a Trailer listings only for now.",
   },
   tools: [
     'find_asset', 'get_asset', 'get_comps', 'value_asset', 'evaluate_listing', 'budget_options',
@@ -317,7 +317,7 @@ function llmsTxt(b: Board): string {
     '', '## Nuke Asset Advisor',
     'Install in any MCP client as a Streamable HTTP server at `https://nuke.ag/mcp/advisor`.',
     'Tools: find_asset, get_asset, get_comps, value_asset, evaluate_listing, budget_options.',
-    "Listing the tools needs no credential. Calling a tool needs a signed-in administrator's credential for now; each tool reopens to visitors once it is shown to return only public data.",
+    "No credential needed. The six advisor tools answer visitors from public records only (no private vehicles or owner data, nothing written, no photo analysis); evaluate_listing reads Bring a Trailer listings only for now.",
     'Every answer is an evidence envelope: cite source_name, source_url, and event_time; never invent missing fields — say not recorded.',
     'event_time is the real-world sale/auction clock; ingested_at is when Nuke learned the row — do not conflate them.',
     '', '## Sources and their coverage',

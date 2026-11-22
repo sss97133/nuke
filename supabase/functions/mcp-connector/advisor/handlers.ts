@@ -36,6 +36,7 @@ import {
 
 import { rankBudgetOptions, budgetEnvelope, type SegmentStat, type MarketSignal } from "./budget.ts";
 import { cohortTrend } from "./market_position.ts";
+import { observationIsPublic } from "./public.ts";
 
 /** Minimal PostgREST-shaped client used by advisor handlers (avoids pulling supabase-js types into Deno tests). */
 // deno-lint-ignore no-explicit-any
@@ -43,6 +44,12 @@ export type AdvisorDb = any;
 
 export interface AdvisorDeps {
   sb: () => AdvisorDb;
+  /**
+   * The public scope (advisor/public.ts): set for a caller who is not the service key or an active admin. sb() is
+   * then the public-only client; comps keep only public vehicles; evaluate_listing reads Bring a Trailer only, runs
+   * no photo analysis and writes no coverage row.
+   */
+  publicOnly?: boolean;
   callEdgeApi: (
     endpoint: string,
     path?: string,
@@ -625,11 +632,27 @@ async function resolveSoldComps(
   const facts = await loadPriceFactsMap(sb, ids);
   // Listing titles carry the variant and junk words ("Camaro-bodied track car") the model field drops.
   const titles = new Map<string, string>();
+  // Public scope: the vehicles read below sees public rows only, so a comp whose vehicle it does not return is a
+  // vehicle a visitor may not read, and is dropped.
+  const visibleIds = new Set<string>();
+  let titlesRead = true;
   for (let i = 0; i < ids.length; i += 100) {
     try {
-      const { data: tv } = await sb.from("vehicles").select("id, listing_title").in("id", ids.slice(i, i + 100));
-      for (const r of tv || []) if (r?.listing_title) titles.set(String(r.id), String(r.listing_title));
-    } catch { /* titles are additive */ }
+      const { data: tv, error: tvErr } = await sb.from("vehicles").select("id, listing_title").in("id", ids.slice(i, i + 100));
+      if (tvErr) titlesRead = false;
+      for (const r of tv || []) {
+        if (r?.id) visibleIds.add(String(r.id));
+        if (r?.listing_title) titles.set(String(r.id), String(r.listing_title));
+      }
+    } catch { titlesRead = false; /* titles are additive */ }
+  }
+  if (deps.publicOnly) {
+    if (!titlesRead) {
+      // Fail closed: without the public read no comp can be shown to a visitor.
+      rows = [];
+    } else {
+      rows = rows.filter((r) => !r.vehicle_id || visibleIds.has(String(r.vehicle_id)));
+    }
   }
   if (facts.failedChunks) {
     lookupOk = false;
@@ -1338,14 +1361,15 @@ async function handleGetAsset(
     priceFacts(sb, vid),
     sb
       .from("vehicle_observations")
-      .select("id, kind, structured_data, confidence_score, observed_at, source_url, source_id, is_superseded, ingested_at")
+      .select("id, kind, structured_data, confidence_score, observed_at, source_url, source_id, is_superseded, ingested_at, extraction_method")
       .eq("vehicle_id", vid)
       .eq("is_superseded", false)
       .order("ingested_at", { ascending: false })
       .limit(20),
   ]);
 
-  const obs = obsRes.data || [];
+  // Public scope: only observations a logged-out visitor may read (observation_is_public + the private methods).
+  const obs = (obsRes.data || []).filter((o: Record<string, unknown>) => !deps.publicOnly || observationIsPublic(o));
   const sourceMap = await loadSources(sb, obs.map((o: { source_id: string }) => o.source_id));
   type EnrichedObs = Record<string, unknown> & {
     source_name: string | null;
