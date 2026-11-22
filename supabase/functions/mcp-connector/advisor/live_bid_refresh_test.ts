@@ -169,7 +169,7 @@ Deno.test("evaluate_listing: #206-type lot â€” stored $20,993 vs page $39,993 â†
   const real = globalThis.fetch;
   globalThis.fetch =
     ((i: RequestInfo | URL) =>
-      String(i).includes("bringatrailer.com")
+      ["bringatrailer.com", "www.bringatrailer.com"].includes(new URL(i instanceof Request ? i.url : String(i)).hostname)
         ? Promise.resolve(new Response(html, { status: 200 }))
         : Promise.reject(new Error("no network"))) as typeof fetch;
   try {
