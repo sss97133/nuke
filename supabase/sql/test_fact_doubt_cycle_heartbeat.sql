@@ -2,8 +2,8 @@
 -- the assay names it when silent, passes with all three fresh, and still refuses an unknown name.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
-  IF current_database() NOT LIKE 'dm_refinement_fact_doubt_heartbeat%' OR to_regclass('public.job_assay_readings') IS NOT NULL THEN
-    RAISE EXCEPTION 'Requires empty disposable dm_refinement_fact_doubt_heartbeat* database';
+  IF current_database() NOT LIKE 'dm_refinement_fact_doubt_cycle_heartbeat%' OR to_regclass('public.job_assay_readings') IS NOT NULL THEN
+    RAISE EXCEPTION 'Requires empty disposable dm_refinement_fact_doubt_cycle_heartbeat* database';
   END IF;
 END $$;
 DO $$ BEGIN
