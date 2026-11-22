@@ -10,6 +10,7 @@ import {
   ADVISOR_TOOL_NAMES,
   ADVISOR_TOOLS,
 } from "./tools.ts";
+import { publicAnswer, publicOnlyClient } from "./public.ts";
 
 export interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -38,17 +39,39 @@ function rpcError(
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message, data } };
 }
 
-let handlers: Record<string, (args: Record<string, unknown>) => Promise<AdvisorToolResult>> | null =
-  null;
+type HandlerMap = Record<string, (args: Record<string, unknown>) => Promise<AdvisorToolResult>>;
+let handlers: HandlerMap | null = null;
+let publicHandlers: HandlerMap | null = null;
 
+/**
+ * The same six handlers twice: once on the caller's full deps (service key / active admin), once in the public scope
+ * (advisor/public.ts): public-only reads, no writes, no edge calls (vision or comps fallback), Bring a Trailer only.
+ */
 export function initAdvisorHandlers(deps: AdvisorDeps): void {
   handlers = createAdvisorHandlers(deps);
+  publicHandlers = createAdvisorHandlers(publicDeps(deps));
+}
+
+/** Deps for a caller who is not the service key or an active admin. */
+export function publicDeps(deps: AdvisorDeps): AdvisorDeps {
+  return {
+    sb: () => publicOnlyClient(deps.sb()),
+    callEdgeApi: (endpoint: string) => Promise.reject(new Error(`api-v1-${endpoint} is not available to a public call`)),
+    publicOnly: true,
+  };
+}
+
+export interface AdvisorCallOptions {
+  /** The caller is not the service key or an active admin: run the public scope and return the public answer. */
+  publicCaller?: boolean;
 }
 
 export async function handleAdvisorJsonRpc(
   body: JsonRpcRequest,
+  opts: AdvisorCallOptions = {},
 ): Promise<JsonRpcResponse | null> {
-  if (!handlers) {
+  const active = opts.publicCaller ? publicHandlers : handlers;
+  if (!active) {
     return rpcError(body.id, -32603, "Advisor handlers not initialized");
   }
 
@@ -85,15 +108,15 @@ export async function handleAdvisorJsonRpc(
             `Advisor tools: ${[...ADVISOR_TOOL_NAMES].join(", ")}`,
         );
       }
-      const handler = handlers[params.name];
+      const handler = active[params.name];
       if (!handler) {
         return rpcError(body.id, -32602, `Unknown advisor tool: ${params.name}`);
       }
       try {
         const result = await handler(params.arguments || {});
-        return rpcResult(body.id, result);
+        return rpcResult(body.id, opts.publicCaller ? publicAnswer(result) : result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = opts.publicCaller ? "The advisor could not answer this request." : e instanceof Error ? e.message : String(e);
         return rpcResult(body.id, {
           content: [{ type: "text", text: JSON.stringify({ error: msg }) }],
           structuredContent: { error: msg, tool: params.name, claims: [] },

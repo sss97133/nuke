@@ -347,10 +347,26 @@ export function identityFromListingUrl(url: string): {
 
 /**
  * Specialty markers that must match exactly between subject and comp (T3): RS, GT2, Turbo S,
- * Weissach, Clubsport, Speedster, Cup. Read only from identity text (title / model / trim / URL),
- * never from equipment lists ("Cup II wheels" is a wheel, not a Cup car).
+ * Weissach, Clubsport, Speedster, Cup, RUF, and a swapped / non-original engine. Read only from
+ * identity text (title / model / trim / URL), never from equipment lists ("Cup II wheels" is a
+ * wheel, not a Cup car).
+ *
+ * RUF: a RUF-built or RUF-modified car ("RUF-Modified 1982 911 Turbo", "1982 Porsche RUF BTR") is
+ * not a stock car and does not comp against one, and a stock car does not comp a RUF.
+ * engine_swap: Bring a Trailer titles name a non-original engine as "<engine>-Powered"
+ * ("LS3-Powered 1997 Land Rover Defender 90", "3.2L-Powered 1971 911T") or "<engine>-Swapped";
+ * such a car comps only against other swapped cars.
  */
-export type HardVariantTag = "rs" | "gt2" | "turbo_s" | "weissach" | "clubsport" | "speedster" | "cup";
+export type HardVariantTag =
+  | "rs"
+  | "gt2"
+  | "turbo_s"
+  | "weissach"
+  | "clubsport"
+  | "speedster"
+  | "cup"
+  | "ruf"
+  | "engine_swap";
 
 const HARD_TAG_RULES: Array<{ tag: HardVariantTag; re: RegExp }> = [
   { tag: "rs", re: /(?:^|[^a-z0-9])rs(?![a-z0-9])/i },
@@ -360,6 +376,11 @@ const HARD_TAG_RULES: Array<{ tag: HardVariantTag; re: RegExp }> = [
   { tag: "clubsport", re: /club[\s\-_]?sport/i },
   { tag: "speedster", re: /speedster/i },
   { tag: "cup", re: /\bcup\b(?![\s\-_]*(?:i{1,3}\b|[123]\b|wheels?|holders?|style|design))/i },
+  { tag: "ruf", re: /(?:^|[^a-z0-9])ruf(?![a-z0-9])/i },
+  {
+    tag: "engine_swap",
+    re: /[a-z0-9.]+[\s\-_]+powered\b|\b(?:engine|motor)[\s\-_]*swap(?:ped)?\b|[a-z0-9.]+[\s\-_]+swapped\b|\b(?:ls|lt|v8|v12|coyote|hellcat|hemi|2jz|rb26|k20|k24|cummins|duramax)[a-z0-9]*[\s\-_]+swap\b/i,
+  },
 ];
 
 export function hardVariantTags(text: string | null | undefined): Set<HardVariantTag> {

@@ -8,7 +8,7 @@ Read-only, citation-first MCP surface for physical assets (vehicles first). Any 
 
 ## One-line install
 
-Remote Streamable HTTP. Listing the tools needs no credential; calling one needs a signed-in administrator's credential for now (the gate is in `index.ts`: `PUBLIC_TOOLS` and `isPrivilegedCaller`):
+Remote Streamable HTTP. No credential is needed. A visitor (no credential, or one that is not an active admin's) gets the six tools in the public scope (`advisor/public.ts`, gate in `index.ts`: `ADVISOR_PUBLIC_TOOLS` and `isPrivilegedCaller`): vehicles reads see `is_public` rows only, private observations are dropped, nothing is written, no photo analysis runs, `evaluate_listing` reads Bring a Trailer listing pages only, and internal flags are mapped to plain language. The service key or an active admin gets the full answer:
 
 ### Claude Code
 
@@ -77,7 +77,7 @@ ChatGPT / Grok Bot / other agents: add a custom MCP connector pointing at `https
 | `value_asset` | Value range from recent same-asset sale and comps (confidence capped at 0.6) |
 | `evaluate_listing` | **Hero tool** — listing URL → verdict, value range, prior sales/relists, top comps, red flags |
 
-History, coverage, and field provenance are folded into `get_asset` / response metadata. No `find_listings`, write, admin, shop, SQL, or legacy catalog tools on this surface. A tool call answers only the service key or an active admin for now: the handlers read through the service client, and each tool reopens to visitors once it is shown to return only what a logged-out visitor may read. Requests without a credential get a best-effort per-IP rate limit.
+History, coverage, and field provenance are folded into `get_asset` / response metadata. No `find_listings`, write, admin, shop, SQL, or legacy catalog tools on this surface. The handlers read through the service client; a visitor's call runs through the public scope (`advisor/public.ts`), which narrows every `vehicles` read to `is_public = true`, drops private observations, refuses writes and edge calls, and maps internal flags to plain language. Cars & Bids and Mecum listing URLs are refused for every caller with a "Bring a Trailer only for now" message. Requests without a credential get a best-effort per-IP rate limit.
 
 ## Evidence envelope
 
@@ -146,3 +146,11 @@ Sample request/response (Karmann Ghia BaT sale): `fixtures/advisor-sample-respon
 ## budget_options
 
 `budget_options { budget_usd, limit? }` ranks make x era segments whose typical all-in cost (hammer + 5% buyer fee capped $7,500 + $1,800 enclosed transport + $600 paperwork) is 45-100% of the budget. Data: `market_segment_stats` (latest run). Market temperature comes from `market_signal` as a heating/cooling/flat label only (the timing model failed its backtest gate). Options, not financial advice.
+
+## Comps: hard variants
+
+A comp must carry the same hard-variant tags as the subject (`hardVariantTags` in `advisor/variants.ts`, read from title / model / URL only): RS, GT2, Turbo S, Weissach, Clubsport, Speedster, Cup, **RUF** (RUF-built or RUF-modified), and **engine_swap** (`<engine>-Powered`, `-Swapped`, `engine swap` in the title). A swapped car with no swapped comps gets no value range ("not recorded") rather than a stock-car band.
+
+## Regression harness
+
+`advisor/regression/run_bat_regression.ts` scores 20 fixed BaT URLs against goldens, read-only (see the file header). `--public` scores the answer a visitor gets (public scope + public answer); `--remote https://nuke.ag/mcp/advisor` scores the deployed function (it sends no credential, so it exercises the public path once deployed).
