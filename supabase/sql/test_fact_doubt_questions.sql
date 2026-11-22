@@ -5,7 +5,8 @@
 -- pair); the trigger key is stable until the keyed evidence changes and then the doubt is no longer eligible; a second
 -- reading is kept beside the first and agreement is counted by independent readers; vehicle_open_questions returns
 -- asked / answered / open, counts, retired apart, no amount, vendor or account id, a frame only when a visitor may see it,
--- and null for a vehicle the caller may not see; anon can execute the reader and nothing else.
+-- and null for a vehicle the caller may not see; anon can execute the reader and nothing else; a doubt claimed six times
+-- is no longer offered or accepted (20261122201000).
 DO $$ BEGIN
   IF to_regclass('public.vehicles') IS NOT NULL THEN RAISE EXCEPTION 'Requires an empty disposable database'; END IF;
 END $$;
@@ -41,6 +42,8 @@ CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_
 \ir ../migrations/20261111210500_receipt_work_reconciliation.sql
 \ir ../migrations/20261114120002_evidence_judgment_candidate_set_equality.sql
 \ir ../migrations/20261120070000_fact_doubt_questions.sql
+-- the claim cap (20261122201000) on top: every assertion below runs against the capped ineligibility
+\ir ../migrations/20261122201000_fact_doubt_claim_cap.sql
 
 -- fixtures
 INSERT INTO vehicles VALUES
@@ -229,4 +232,39 @@ BEGIN
   PERFORM set_config('test.uid', '', false);
   ASSERT public.vehicle_open_questions(gen_random_uuid()) IS NULL;
   RAISE NOTICE 'vehicle_open_questions: ok';
+END $$;
+
+-- 4. the claim cap: a doubt taken up six times without an answer is no longer offered or accepted
+DO $$
+DECLARE
+  V constant uuid := '00000000-0000-0000-0000-0000000000a1'; g1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  P constant uuid := '00000000-0000-0000-0000-0000000000e1'; U constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  st jsonb; prm jsonb; q uuid; n int; five jsonb;
+BEGIN
+  PERFORM set_config('test.role', 'service_role', false);
+  st := jsonb_build_object('db', fact_doubt_evidence_state(V, 'engine_head_date_code', ARRAY[g1], ARRAY[]::uuid[]));
+  prm := jsonb_build_object('doubt_form', 'property', 'property_key', 'engine_head_date_code', 'origin', 'simulated_reader', 'origin_ref', 'run-cap',
+    'cited_image_ids', to_jsonb(ARRAY[g1]), 'cited_receipt_item_ids', '[]'::jsonb, 'allowed', NULL::text, 'evidence_state', st);
+  SELECT id INTO q FROM raise_evidence_judgment(jsonb_build_object('department', 'fact_doubt', 'question_kind', 'fact_doubt',
+    'subject_table', 'observation_properties', 'subject_id', P, 'vehicle_id', V, 'user_id', U, 'params', prm, 'answer_schema', '{}'::jsonb,
+    'producer_agent', 'doubt-producer', 'producer_script', 'test', 'producer_version', 'test', 'dedupe_key', 'fd-cap', 'question_hash', 'hcap',
+    'trigger_evidence_dedupe_key', fact_doubt_trigger_key(st)), '00000000-0000-0000-0000-000000000002');
+  ASSERT evidence_judgment_ineligibility(q) = '{}', 'fresh: ' || evidence_judgment_ineligibility(q)::text;
+  -- five earlier claims that died (fixture: the lifecycle as five dead claims leave it)
+  SELECT jsonb_agg(jsonb_build_object('kind', 'claim', 'to', 'claimed', 'actor', 'dead-' || i)) INTO five FROM generate_series(1, 5) i;
+  UPDATE evidence_judgment_requests SET lifecycle = lifecycle || five WHERE id = q;
+  ASSERT evidence_judgment_ineligibility(q) = '{}', 'five claims: still offered';
+  SELECT count(*) INTO n FROM claim_evidence_judgments('fact_doubt', 'fact_doubt', 10, 'w-cap');
+  ASSERT n = 1, 'the sixth claim is made, got ' || n;
+  ASSERT 'claimed_6_times' = ANY (evidence_judgment_ineligibility(q)), 'six claims: refused ' || evidence_judgment_ineligibility(q)::text;
+  BEGIN
+    PERFORM answer_evidence_judgment(q, 'w-cap', '{"outcome":"cannot_tell","confidence":0.3}', 'reader-a', 'model-a', 'fx');
+    RAISE EXCEPTION 'an answer to a doubt claimed six times was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%no longer eligible: claimed_6_times%' THEN RAISE; END IF;
+  END;
+  UPDATE evidence_judgment_requests SET claimed_at = now() - interval '2 hours' WHERE id = q;
+  SELECT count(*) INTO n FROM claim_evidence_judgments('fact_doubt', 'fact_doubt', 10, 'w-cap2', 30);
+  ASSERT n = 0, 'a doubt claimed six times is not offered again, got ' || n;
+  RAISE NOTICE 'claim cap: ok';
 END $$;
