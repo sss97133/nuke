@@ -4,6 +4,9 @@
 // organization_supply_read, discovery_providers_read and the public organizations row. Never customer identity,
 // payments, contact fields or private names.
 
+import { buildCohortReport } from './cohortReport';
+export { cohortPath, displayToken } from './cohortReport';
+
 export const SITE = 'https://nuke.ag';
 export const DEFAULT_IMAGE = `${SITE}/og-image.png`;
 
@@ -300,44 +303,8 @@ export function parseCohortPath(pathname: string): { make: string; model: string
   return { make, model, year };
 }
 
-/** Stable, lowercase canonical path for a year-make-model page. */
-export function cohortPath(make: string, model: string, year: number): string {
-  return `/cohort/${encodeURIComponent(make.trim().toLowerCase())}/${encodeURIComponent(model.trim().toLowerCase())}/${year}`;
-}
-
-/** Same visual casing the cohort page applies to route params. */
-export function displayToken(s: string): string {
-  return s
-    .split(/(\s|-)/)
-    .map((part) => (/^[a-z]/.test(part) ? part.charAt(0).toUpperCase() + part.slice(1) : part))
-    .join('');
-}
-
-const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
-
 export function cohortFace(make: string, model: string, year: number, terminal: unknown): FacePage {
-  const label = `${year} ${displayToken(make)} ${displayToken(model)}`.replace(/\s+/g, ' ').trim();
-  const path = cohortPath(make, model, year);
-  const payload = obj(terminal);
-  const pd = obj(payload?.price_distribution);
-  const populated = pd?.populated === true;
-  const median = populated ? num(pd?.median) : null;
-  const n = populated ? num(pd?.n) : null;
-  const asOf = str(pd?.observed_at);
-  const title = median != null ? `${label} value: ${money(median)} | Nuke` : `${label} | Nuke`;
-  const description = median != null
-    ? `${label} median sale ${money(median)}${n != null ? ` from ${plural(n, 'recorded sale')}` : ''} on Nuke${asOf ? ` (as of ${dayOf(asOf)})` : ''}.`
-    : `${label} market record on Nuke. A median is shown when enough recorded sales are on the ledger.`;
-  const facts: string[] = [];
-  if (median != null) facts.push(`Median sale ${money(median)}`);
-  if (n != null) facts.push(plural(n, 'recorded sale'));
-  if (asOf) facts.push(`Observed ${dayOf(asOf)}`);
-  const body =
-    `<main><article><h1>${escapeHtml(label)}</h1>` +
-    (facts.length ? `<p>${escapeHtml(facts.join(' · '))}.</p>` : `<p>${escapeHtml(description)}</p>`) +
-    `<p>Figures come from recorded sales on Nuke, each with a source. <a href="${SITE}${path}">Open the cohort terminal</a>.</p>` +
-    `</article></main>`;
-  return { title, description, path, type: 'website', body };
+  return buildCohortReport(make, model, year, terminal);
 }
 
 // ── Sitemap index ─────────────────────────────────────────────────────────
