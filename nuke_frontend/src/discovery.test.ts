@@ -277,6 +277,7 @@ describe('discovery faces', () => {
     expect(out!.body).toContain('href="https://nuke.ag/valuation"');
     expect(out!.body).toContain('href="https://nuke.ag/developers"');
     expect(out!.body).toContain('href="https://nuke.ag/mcp-advisor"');
+    expect(out!.body).toContain('href="https://nuke.ag/use"');
   });
 
   it('/valuation and /developers prerender with self-canonicals and JSON-LD', async () => {
@@ -306,5 +307,19 @@ describe('discovery faces', () => {
     expect(page!.body).toContain('https://cursor.com/docs/mcp');
     expect(page!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
     expect(await call('/mcp/advisor', {})).toBeNull();
+  });
+
+  it('/use and /use/dealers prerender with self-canonicals and no invented prices', async () => {
+    const index = await call('/use', {});
+    expect(index!.body).toContain('<link rel="canonical" href="https://nuke.ag/use" />');
+    expect(index!.body).toContain('<title>Use cases | Nuke</title>');
+    expect(index!.body).toContain('href="https://nuke.ag/use/dealers"');
+    expect(index!.body).toContain('"@type":"FAQPage"');
+    const dealers = await call('/use/dealers', {});
+    expect(dealers!.body).toContain('<link rel="canonical" href="https://nuke.ag/use/dealers" />');
+    expect(dealers!.body).toContain('/dealer/:orgId/bulk-editor');
+    expect(dealers!.body).toContain('"@type":"WebPage"');
+    const auctions = await call('/use/auction-houses', {});
+    expect(auctions!.body).toContain('Bring a Trailer listing URLs only');
   });
 });
