@@ -54,6 +54,7 @@ describe('discovery faces', () => {
   beforeEach(() => {
     vi.stubEnv('SUPABASE_URL', 'https://example.supabase.co');
     vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-key-for-tests');
     vi.resetModules();
   });
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -216,5 +217,31 @@ describe('discovery faces', () => {
     const out = await call('/sitemap-work.xml', { open_requirements_read: BOARD });
     expect(out!.res.headers.get('x-nuke-sitemap')).toBe('jobs=ok;providers=unread;organizations=ok');
     expect(out!.body).toContain(`https://nuke.ag/jobs/${WO}`);
+  });
+
+  it('/vehicle/:id canonicalizes to its own URL, not the homepage', async () => {
+    const out = await call(`/vehicle/${VEH}`, {
+      'rest:vehicles': [{ id: VEH, year: 1983, make: 'GMC', model: 'K2500', trim: 'Sierra Classic', sale_price: 31000 }],
+    });
+    expect(out!.body).toContain(`<link rel="canonical" href="https://nuke.ag/vehicle/${VEH}" />`);
+    expect(out!.body).toContain('<title>1983 GMC K2500 Sierra Classic | Nuke</title>');
+    expect(out!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
+  });
+
+  it('/cohort/:make/:model/:year canonicalizes to the lowercase path and shows a median when recorded', async () => {
+    const out = await call('/cohort/Chevrolet/Chevelle/1967', {
+      get_make_model_terminal: {
+        resolved: true,
+        price_distribution: { populated: true, median: 57208, n: 105, observed_at: '2026-11-20T00:00:00Z' },
+      },
+    });
+    expect(out!.body).toContain('<link rel="canonical" href="https://nuke.ag/cohort/chevrolet/chevelle/1967" />');
+    expect(out!.body).toContain('<title>1967 Chevrolet Chevelle value: $57,208 | Nuke</title>');
+    expect(out!.body).toContain('Median sale $57,208 · 105 recorded sales · Observed 2026-11-20');
+    expect(out!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
+  });
+
+  it('an incomplete cohort path keeps the plain shell', async () => {
+    expect(await call('/cohort/chevrolet/chevelle', {})).toBeNull();
   });
 });

@@ -81,6 +81,30 @@
       "destination": "/api/og/journal/[date]?date=:date"
     },
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemaps/index"
+    },
+    {
+      "source": "/sitemap-static.xml",
+      "destination": "/api/sitemaps/static"
+    },
+    {
+      "source": "/sitemap-vehicles/:chunk.xml",
+      "destination": "/api/sitemaps/vehicles/:chunk"
+    },
+    {
+      "source": "/sitemap-cohorts/:chunk.xml",
+      "destination": "/api/sitemaps/cohorts/:chunk"
+    },
+    {
+      "source": "/api/sitemaps",
+      "destination": "/api/sitemaps/index"
+    },
+    {
+      "source": "/api/sitemaps/:path*",
+      "destination": "/api/sitemaps/:path*"
+    },
+    {
       "source": "/api/:path+",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path+"
     },

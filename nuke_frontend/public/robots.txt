@@ -1,5 +1,29 @@
 User-agent: *
 Allow: /
+Allow: /llms.txt
+Allow: /api/docs
+Allow: /api/v1/vehicle/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /settings/
+Disallow: /invoices
+Disallow: /vault/
+Disallow: /capture
+Disallow: /dealer/
+
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: PerplexityBot
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Google-Extended
+User-agent: Applebot
+Allow: /
+Allow: /llms.txt
+Allow: /api/docs
+Allow: /api/v1/vehicle/
 Disallow: /admin/
 Disallow: /api/
 Disallow: /auth/
@@ -10,4 +34,3 @@ Disallow: /capture
 Disallow: /dealer/
 
 Sitemap: https://nuke.ag/sitemap.xml
-Sitemap: https://nuke.ag/sitemap-work.xml

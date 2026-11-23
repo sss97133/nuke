@@ -230,6 +230,11 @@ function setMeta(html: string, re: RegExp, tag: string): string {
   return re.test(html) ? html.replace(re, tag) : html.replace('</head>', `${tag}\n</head>`);
 }
 
+/** Point the document at this page's own URL, even when the app shell's canonical is the homepage. */
+export function setCanonical(html: string, url: string): string {
+  return setMeta(html, /<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${escapeHtml(url)}" />`);
+}
+
 export function injectPage(html: string, page: FacePage): string {
   const t = escapeHtml(page.title);
   const d = escapeHtml(clip(page.description, 300));
@@ -237,7 +242,7 @@ export function injectPage(html: string, page: FacePage): string {
   const image = escapeHtml(page.image || DEFAULT_IMAGE);
   html = html.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`);
   html = setMeta(html, /<meta name="description" content="[^"]*"\s*\/>/, `<meta name="description" content="${d}" />`);
-  html = setMeta(html, /<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${url}" />`);
+  html = setCanonical(html, url);
   html = setMeta(html, /<meta property="og:title" content="[^"]*"\s*\/>/, `<meta property="og:title" content="${t}" />`);
   html = setMeta(html, /<meta property="og:description" content="[^"]*"\s*\/>/, `<meta property="og:description" content="${d}" />`);
   html = setMeta(html, /<meta property="og:type" content="[^"]*"\s*\/>/, `<meta property="og:type" content="${page.type ?? 'website'}" />`);
@@ -273,4 +278,72 @@ export function sitemapXml(urls: SitemapUrl[]): string {
   return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
     urls.map(u => `  <url><loc>${escapeHtml(u.loc)}</loc>${u.lastmod ? `<lastmod>${escapeHtml(u.lastmod)}</lastmod>` : ''}</url>`).join('\n') +
     '\n</urlset>\n';
+}
+
+// ── Cohort terminal (year / make / model) ─────────────────────────────────
+
+/** Decode a /cohort/:make/:model/:year path. Year must be four digits. */
+export function parseCohortPath(pathname: string): { make: string; model: string; year: number } | null {
+  const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  const m = /^\/cohort\/([^/]+)\/([^/]+)\/(\d{4})$/.exec(path);
+  if (!m) return null;
+  let make = '';
+  let model = '';
+  try {
+    make = decodeURIComponent(m[1]).trim();
+    model = decodeURIComponent(m[2]).trim();
+  } catch {
+    return null;
+  }
+  const year = Number(m[3]);
+  if (!make || !model || year < 1885 || year > 2100) return null;
+  return { make, model, year };
+}
+
+/** Stable, lowercase canonical path for a year-make-model page. */
+export function cohortPath(make: string, model: string, year: number): string {
+  return `/cohort/${encodeURIComponent(make.trim().toLowerCase())}/${encodeURIComponent(model.trim().toLowerCase())}/${year}`;
+}
+
+/** Same visual casing the cohort page applies to route params. */
+export function displayToken(s: string): string {
+  return s
+    .split(/(\s|-)/)
+    .map((part) => (/^[a-z]/.test(part) ? part.charAt(0).toUpperCase() + part.slice(1) : part))
+    .join('');
+}
+
+const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+
+export function cohortFace(make: string, model: string, year: number, terminal: unknown): FacePage {
+  const label = `${year} ${displayToken(make)} ${displayToken(model)}`.replace(/\s+/g, ' ').trim();
+  const path = cohortPath(make, model, year);
+  const payload = obj(terminal);
+  const pd = obj(payload?.price_distribution);
+  const populated = pd?.populated === true;
+  const median = populated ? num(pd?.median) : null;
+  const n = populated ? num(pd?.n) : null;
+  const asOf = str(pd?.observed_at);
+  const title = median != null ? `${label} value: ${money(median)} | Nuke` : `${label} | Nuke`;
+  const description = median != null
+    ? `${label} median sale ${money(median)}${n != null ? ` from ${plural(n, 'recorded sale')}` : ''} on Nuke${asOf ? ` (as of ${dayOf(asOf)})` : ''}.`
+    : `${label} market record on Nuke. A median is shown when enough recorded sales are on the ledger.`;
+  const facts: string[] = [];
+  if (median != null) facts.push(`Median sale ${money(median)}`);
+  if (n != null) facts.push(plural(n, 'recorded sale'));
+  if (asOf) facts.push(`Observed ${dayOf(asOf)}`);
+  const body =
+    `<main><article><h1>${escapeHtml(label)}</h1>` +
+    (facts.length ? `<p>${escapeHtml(facts.join(' · '))}.</p>` : `<p>${escapeHtml(description)}</p>`) +
+    `<p>Figures come from recorded sales on Nuke, each with a source. <a href="${SITE}${path}">Open the cohort terminal</a>.</p>` +
+    `</article></main>`;
+  return { title, description, path, type: 'website', body };
+}
+
+// ── Sitemap index ─────────────────────────────────────────────────────────
+
+export function sitemapIndexXml(sitemaps: SitemapUrl[]): string {
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    sitemaps.map((u) => `  <sitemap><loc>${escapeHtml(u.loc)}</loc>${u.lastmod ? `<lastmod>${escapeHtml(u.lastmod)}</lastmod>` : ''}</sitemap>`).join('\n') +
+    '\n</sitemapindex>\n';
 }
