@@ -121,7 +121,8 @@ INSERT INTO auction_events (id, vehicle_id, source_url, canonical_listing_url, o
   ('c0000000-0000-4000-8000-000000000005', :ta2, 'https://x/l4', 'https://x/l4', 'sold', '2026-01-01', 'USD', 999999, NULL, NULL, '{}', NULL),
   ('c0000000-0000-4000-8000-000000000006', :ta1, 'https://x/l5', 'https://x/l5', 'sold', '2026-02-01', 'USD', 1, NULL, NULL, '{}', 'c0000000-0000-4000-8000-000000000001'),
   ('c0000000-0000-4000-8000-000000000007', :ta1, 'https://x/l6', 'https://x/l6', 'bid_to', '2026-03-01', 'USD', NULL, NULL, 70000, '{}', NULL),
-  ('c0000000-0000-4000-8000-000000000008', :fb, 'https://x/own', 'https://x/own', 'sold', '2026-04-01', 'USD', 500000, NULL, NULL, '{}', NULL);
+  ('c0000000-0000-4000-8000-000000000008', :fb, 'https://x/own', 'https://x/own', 'sold', '2026-04-01', 'USD', 500000, NULL, NULL, '{}', NULL),
+  ('c0000000-0000-4000-8000-000000000009', :priv, 'https://x/hidden', 'https://x/hidden', 'sold', '2026-04-01', 'USD', 33333, NULL, NULL, '{}', NULL);
 INSERT INTO vehicle_events VALUES (:ta2, 'https://x/l4/', 'bid_to');
 INSERT INTO auction_comments (id, auction_event_id, vehicle_id, comment_type, comment_text, author_username) VALUES
   ('d0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000003', :ta2, 'observation', 'Is the SD-455 block correct? PHS docs?', 'someone'),
@@ -131,6 +132,7 @@ INSERT INTO auction_comments (id, auction_event_id, vehicle_id, comment_type, co
 
 \ir ../migrations/20261123180000_data_set_membership.sql
 \ir ../migrations/20261123181000_data_set_membership_review_fixes.sql
+\ir ../migrations/20261123182000_data_set_membership_public_comps.sql
 
 -- Grants: tables closed to anon, readers open, producer closed.
 SELECT t_assert(NOT has_table_privilege('anon', 'public.data_set_members', 'SELECT')
@@ -194,7 +196,9 @@ SELECT t_assert((SELECT count(*) FROM data_set_members m JOIN data_sets s ON s.i
 -- Readers.
 SELECT vehicle_data_sets(:fb) AS vds \gset
 SELECT t_assert(jsonb_array_length(:'vds'::jsonb->'sets') >= 11, 'vehicle_data_sets lists the sets');
-SELECT t_assert((SELECT (e->>'vehicles_in_set')::int FROM jsonb_array_elements(:'vds'::jsonb->'sets') e WHERE e->>'set_key' = '9799140') = 2, 'set size');
+SELECT t_assert((SELECT (e->>'public_vehicles_in_set')::int FROM jsonb_array_elements(:'vds'::jsonb->'sets') e WHERE e->>'set_key' = '9799140') = 2, 'set size');
+SELECT t_assert((SELECT (e->>'public_vehicles_in_set')::int FROM jsonb_array_elements(vehicle_data_sets(:priv)->'sets') e WHERE e->>'set_key' = 'pontiac:1973:s87:d') = 1,
+  'a hidden profile is not counted in its set');
 SELECT t_assert(:'vds'::jsonb->'unknown_kinds' ? 'comment_theme', 'kinds with no evidence are reported unknown');
 SELECT data_set_comps(NULL, :fb, 'hammer') AS comps \gset
 -- genuine cohort for the as-presented replica set: listings l1 (one row for two profiles), l2, l3 (GBP), l4 typed not sold, l6 bid_to; duplicate dropped
@@ -207,6 +211,8 @@ SELECT t_assert((SELECT e->'by_outcome' FROM g) @> '[{"outcome":"bid_to","median
 SELECT t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(:'comps'::jsonb->'sets') e WHERE (e->'sold'->>'max')::numeric >= 500000), 'the subject''s own sale never counts');
 SELECT t_assert((SELECT (e->'sold'->>'n')::int FROM jsonb_array_elements(data_set_comps((SELECT id FROM data_sets WHERE set_key = 'sd_authenticity'), NULL, 'gross_incl_premium')->'sets') e) = 1, 'comment theme comps on the gross basis');
 SELECT t_assert(vehicle_data_sets(:priv) ? 'sets', 'service role reads a non-public vehicle');
+SELECT t_assert((SELECT (e->'sold'->>'n')::int = 1 AND (e->'sold'->>'min')::numeric = 500000 FROM jsonb_array_elements(data_set_comps((SELECT id FROM data_sets WHERE set_kind = 'vin_cohort' AND set_key = 'pontiac:1973:s87:d'), NULL, 'hammer')->'sets') e),
+  'a hidden profile''s sale is never a comparable');
 SET request.jwt.claims = '{"role":"anon"}';
 SELECT t_assert(vehicle_data_sets(:priv)->>'error' = 'not_found_or_not_public', 'anon cannot read a non-public vehicle');
 SET request.jwt.claims = '{"role":"authenticated","sub":"0e000000-0000-4000-8000-000000000001"}';
@@ -240,6 +246,9 @@ SELECT data_set_membership_revert_v1(:r4) AS rv4 \gset
 SELECT t_assert((:'rv4'::jsonb->>'supersedes_kept_readded')::int = 1 AND (:'rv4'::jsonb->>'supersedes_restored')::int = 0, 'revert keeps a later re-add instead of colliding');
 SELECT t_assert((SELECT count(*) FROM fb_sets WHERE set_kind = 'trans_tail_casting' AND member_type = 'vehicle') = 1, 'one active tail-casting member');
 SELECT data_set_membership_revert_v1(:r5) AS rv5 \gset
+SELECT t_assert((:'rv5'::jsonb->>'earlier_supersedes_restored')::int = 1
+            AND (SELECT count(*) FROM fb_sets WHERE set_kind = 'trans_tail_casting' AND member_type = 'vehicle') = 1,
+  'reverting the re-add brings the earlier row back');
 
 -- A replica's VIN changes between plan and apply: its replica memberships are not applied.
 \set r6 '''66666666-6666-4666-8666-666666666666'''
@@ -269,6 +278,7 @@ SELECT t_assert(true, 'a reverted run cannot be applied again');
 
 -- The file's own revert.
 DROP VIEW fb_sets;
+\ir revert_20261123182000_data_set_membership_public_comps.sql
 \ir revert_20261123181000_data_set_membership_review_fixes.sql
 \ir revert_20261123180000_data_set_membership.sql
 SELECT t_assert(to_regclass('public.data_set_members') IS NULL AND to_regprocedure('public.data_set_comps(uuid, uuid, price_basis_t)') IS NULL, 'file revert drops the layer');
