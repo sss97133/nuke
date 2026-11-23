@@ -160,6 +160,21 @@ export const QUESTION_TOKENS = Object.freeze(crossCheckedValues());
 const token = (x) => (QUESTION_TOKENS.includes(x) ? x : 'unknown');
 
 /**
+ * Place tokens in the reviewed grammar name the room, not the part of the vehicle in the frame. The automatic
+ * reader posts the vehicle region. When a read uses one of these, the compared value is body_exterior (when that
+ * value is admitted), so agreed rust and paint are not dropped. A VIN plate, a document or a printed picture is
+ * not a place token and is unchanged. Measured 2026-11-23 on 20 recent shop photos: seven body exteriors in a
+ * paint booth were answered paint_booth by both passes (with agreed aged paint, and surface rust on three), then
+ * posted as scene unknown, which withheld the rust and paint.
+ */
+export const PLACE_SCENES = Object.freeze(['paint_booth', 'shop_context', 'fabrication_in_progress', 'road_test', 'off_property']);
+/** The scene value two automatic reads are compared and posted on: a place token becomes body_exterior when admitted. */
+export function sceneForAutomatic(scene, admits = NO_ADMITS) {
+  if (PLACE_SCENES.includes(scene) && (admits?.scene_type ?? []).includes('body_exterior')) return 'body_exterior';
+  return scene;
+}
+
+/**
  * Which closed values this reader may post: the database's own row (platform_config image_reading_tiers,
  * automatic.admits). A missing row, a missing field or a value that is not an array admits nothing for that field.
  * Assembly state has no entry and is never posted.
@@ -255,6 +270,8 @@ export function thinViolation(v, admits = NO_ADMITS) {
  * those are posted:
  *   - scene_type, rust_severity and paint_state: the value both reads give, when the database admits it for this
  *     reader; otherwise "unknown" with one sentence saying which (a disagreement, or an agreed value not admitted);
+ *   - a place-named scene in the reviewed grammar (a paint booth, a shop, a road or a yard) is posted as the
+ *     vehicle region this reader can admit (body_exterior); a VIN plate, a document or a printed picture is unchanged;
  *   - a reading that cannot name its scene asserts no state;
  *   - when either read says the frame is a picture of a picture (a reference scene, or its own words: saysPictureOfPicture),
  *     nothing is posted for the photo: a printed photo of the car is not the car on the day the print was photographed;
@@ -270,14 +287,16 @@ export function thinVerdict(first, second, admits = NO_ADMITS) {
   const values = {}, posted = {}, disagreements = [], open = [];
   const cannotPost = (field, value) => open.push(`Both reads say ${field} is ${token(value)}; this reader may not post that value yet.`);
   for (const [field, get] of AGREEMENT_FIELDS) {
-    const a = get(first) ?? null, b = get(second) ?? null;
-    values[field] = { first: a, second: b };
+    const rawA = get(first) ?? null, rawB = get(second) ?? null;
+    values[field] = { first: rawA, second: rawB };
+    const a = field === 'scene_type' ? sceneForAutomatic(rawA, admits) : rawA;
+    const b = field === 'scene_type' ? sceneForAutomatic(rawB, admits) : rawB;
     posted[field] = 'unknown';
     if (a !== b) {
-      disagreements.push({ field, first: a, second: b });
-      open.push(`Two independent reads of this photo disagree on ${field}: ${token(a)} vs ${token(b)}; posted as unknown.`);
+      disagreements.push({ field, first: rawA, second: rawB });
+      open.push(`Two independent reads of this photo disagree on ${field}: ${token(rawA)} vs ${token(rawB)}; posted as unknown.`);
     } else if (a !== null && a !== 'unknown') {
-      if ((admits[field] ?? []).includes(a)) posted[field] = a; else cannotPost(field, a);
+      if ((admits[field] ?? []).includes(a)) posted[field] = a; else cannotPost(field, rawA);
     }
   }
   const held = saysPictureOfPicture(first) || saysPictureOfPicture(second) ? 'picture_of_picture' : null;
@@ -543,6 +562,9 @@ export const STATE_STANDARD = `STATE VALUES: WHEN TO USE "unknown"
 - paint_state: exterior body paint only. A frame that shows no exterior body paint (an engine bay, the underside, an interior, one component) is "unknown".
 - completeness: the assembly state of the whole vehicle, or of one whole major assembly (the complete engine bay, the complete interior, a complete side or end of the body), and only when the frame shows enough of it to judge. A view of part of the car (a wheel well, a section of the underside, one component, a close-up) does not show whether the vehicle is complete: use "unknown". "partial" and "stripped" need visible evidence of missing or removed parts (open mounting points, loose wiring, bare shells), not just a limited view.
 - A document, a screen or a printed picture: "unknown" for all three.
+SCENE TYPE: THE VEHICLE REGION, NOT THE ROOM
+- scene_type names the part of the vehicle in the frame (body_exterior, body_interior, engine_bay, undercarriage, wheel_assembly), not the room the photo was taken in. A vehicle in a paint booth, a shop, a yard or on the road is still that vehicle region — typically body_exterior when the body is what you see. Do not answer paint_booth, shop_context, fabrication_in_progress, road_test or off_property for a photo of the vehicle: those name the place.
+- A close-up of a VIN or trim plate is data_plate; paperwork is receipt_document; a printed photograph or a screen is cross_reference, as above.
 A PICTURE OF A PICTURE
 - When the frame is itself a photograph of a printed page, a printed photo, a binder or album page, or a screen, scene_type is "cross_reference" (paperwork such as a receipt, an invoice or a title is "receipt_document"), never the scene shown in the print, and narrative_one_line says "printed" or "screen".`;
 
