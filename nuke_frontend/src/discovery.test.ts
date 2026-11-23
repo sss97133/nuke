@@ -274,5 +274,25 @@ describe('discovery faces', () => {
   it('home and market faces link to /cohort', async () => {
     const out = await call('/', {});
     expect(out!.body).toContain('href="https://nuke.ag/cohort"');
+    expect(out!.body).toContain('href="https://nuke.ag/valuation"');
+    expect(out!.body).toContain('href="https://nuke.ag/developers"');
+  });
+
+  it('/valuation and /developers prerender with self-canonicals and JSON-LD', async () => {
+    const valuation = await call('/valuation', {});
+    expect(valuation!.body).toContain('<link rel="canonical" href="https://nuke.ag/valuation" />');
+    expect(valuation!.body).toContain('<title>Recorded sale prices | Nuke</title>');
+    expect(valuation!.body).toContain('valuation_by_ymm');
+    expect(valuation!.body).toContain('"@type":"WebApplication"');
+    expect(valuation!.body).toContain('"@type":"FAQPage"');
+    expect(valuation!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
+
+    const dev = await call('/developers', {});
+    expect(dev!.body).toContain('<link rel="canonical" href="https://nuke.ag/developers" />');
+    expect(dev!.body).toContain('<title>Developers | Nuke</title>');
+    expect(dev!.body).toContain('https://nuke.ag/mcp/advisor');
+    expect(dev!.body).toContain('find_asset');
+    expect(dev!.body).toContain('"@type":"FAQPage"');
+    expect(dev!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
   });
 });

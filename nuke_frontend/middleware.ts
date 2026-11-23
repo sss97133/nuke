@@ -24,11 +24,12 @@ import {
 import {
   buildCohortHubFace, parseCohortHubPath, parseYearProfile, yearProfilesQuery,
 } from './src/lib/cohortHubs';
+import { productFace } from './src/lib/productFaces';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
     '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
-    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*'],
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers'],
 };
 
 const MCP_SERVER_CARD = {
@@ -287,7 +288,7 @@ function faceBody(page: FacePage, b: Board): string {
     '<li><a href="https://github.com/sss97133/nuke">The repository and its generated, dated numbers</a></li>' +
     '<li><a href="https://nuke.ag/llms.txt">llms.txt</a></li>' +
     '<li><a href="https://nuke.ag/mcp">MCP endpoint</a> · <a href="https://nuke.ag/developers">API and developers</a></li>' +
-    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a></li></ul></main>';
+    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/developers">Developers</a></li></ul></main>';
 }
 
 function injectFace(html: string, page: FacePage, b: Board): string {
@@ -625,6 +626,17 @@ export default async function middleware(request: Request): Promise<Response | u
     const [html, board] = await Promise.all([getBaseHtml(request.url), face.withBoard ? fetchBoard() : Promise.resolve(null)]);
     return new Response(injectFace(html, face, board), {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE, 'x-nuke-board': face.withBoard ? boardStatus : 'not-needed' },
+    });
+  }
+
+  const product = productFace(url.pathname);
+  if (product) {
+    const accept = request.headers.get('Accept') || '';
+    if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return undefined;
+    const html = await getBaseHtml(request.url);
+    if (!html) return undefined;
+    return new Response(injectPage(html, product), {
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
     });
   }
 
