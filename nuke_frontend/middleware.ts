@@ -25,11 +25,12 @@ import {
   buildCohortHubFace, parseCohortHubPath, parseYearProfile, yearProfilesQuery,
 } from './src/lib/cohortHubs';
 import { productFace } from './src/lib/productFaces';
+import { buildUseCaseFace } from './src/lib/useCases';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
     '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
-    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor'],
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor', '/use', '/use/:path*'],
 };
 
 const MCP_SERVER_CARD = {
@@ -288,7 +289,7 @@ function faceBody(page: FacePage, b: Board): string {
     '<li><a href="https://github.com/sss97133/nuke">The repository and its generated, dated numbers</a></li>' +
     '<li><a href="https://nuke.ag/llms.txt">llms.txt</a></li>' +
     '<li><a href="https://nuke.ag/mcp">MCP endpoint</a> · <a href="https://nuke.ag/developers">API and developers</a></li>' +
-    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/developers">Developers</a></li></ul></main>';
+    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/use">Use cases</a> · <a href="https://nuke.ag/developers">Developers</a></li></ul></main>';
 }
 
 function injectFace(html: string, page: FacePage, b: Board): string {
@@ -630,7 +631,7 @@ export default async function middleware(request: Request): Promise<Response | u
     });
   }
 
-  const product = productFace(url.pathname);
+  const product = productFace(url.pathname) ?? buildUseCaseFace(url.pathname);
   if (product) {
     const accept = request.headers.get('Accept') || '';
     if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return undefined;
