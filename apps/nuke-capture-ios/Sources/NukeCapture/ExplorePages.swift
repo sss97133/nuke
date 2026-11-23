@@ -132,10 +132,10 @@ enum ExploreAnalytics {
             }
             r.mileage = mileage(miles: item.miles, cohort: cohort)
         case .live:
-            if let listed = item.listedAt {
-                r.listed = "Listed " + listed.formatted(date: .abbreviated, time: .omitted)
-                r.length = ExploreCardDrill.runLength(listed: listed, ends: item.endsAt)
-            }
+            // Nothing for a lot. The board's listed_at is vehicles.created_at, when Nuke first wrote the row, not
+            // when the house opened bidding, so neither a "listed" date nor an auction length is shown. The end is
+            // the clock that matters and it is on the card.
+            break
         }
         return r
     }

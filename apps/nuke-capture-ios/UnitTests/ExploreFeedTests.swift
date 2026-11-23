@@ -66,4 +66,39 @@ final class ExploreFeedTests: XCTestCase {
         XCTAssertTrue(ExploreFeedPaging.endLine(tuned: false).contains("last 72 hours"))
         XCTAssertTrue(ExploreFeedPaging.endLine(tuned: true).contains("tuning"))
     }
+
+    // MARK: Clock
+
+    func testCountdownReadsSecondsInTheLastHourAndClosingAtTheEnd() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(2 * 86_400 + 4 * 3600 + 59), now: now), "2d 4h")
+        XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(3 * 3600 + 12 * 60 + 30), now: now), "3h 12m")
+        XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(12 * 60 + 7), now: now), "12:07")
+        XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(59), now: now), "0:59")
+        XCTAssertEqual(ExploreClock.text(ends: now, now: now), "Closing")
+        XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(-30), now: now), "Closing")
+    }
+
+    func testBoardIsReReadOnlyAroundALotsEnd() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        func lot(_ left: TimeInterval) -> ExploreFeedItem {
+            ExploreFeedItem(id: "live:\(left)", kind: .live, title: "t", image: "https://x/y.jpg", amount: 1000,
+                            amountLabel: "Current bid", endsAt: now.addingTimeInterval(left), source: "Bring a Trailer",
+                            location: nil, facts: nil, seen: nil, vehicleId: nil, year: nil, make: nil, model: nil, link: nil)
+        }
+        XCTAssertFalse(ExploreClock.needsRefresh([lot(3600), item("c1", .classified)], now: now))
+        XCTAssertTrue(ExploreClock.needsRefresh([lot(3600), lot(120)], now: now))
+        XCTAssertTrue(ExploreClock.needsRefresh([lot(-60)], now: now))
+        XCTAssertFalse(ExploreClock.needsRefresh([lot(-3600)], now: now))
+    }
+
+    func testServerClockReadsTheDateHeaderAndIgnoresSubSecondNoise() {
+        let server = ServerClock.parse("Mon, 23 Nov 2026 23:53:34 GMT")
+        XCTAssertNotNil(server)
+        XCTAssertEqual(server?.timeIntervalSince1970, 1_795_478_014)
+        let device = Date(timeIntervalSince1970: 1_795_478_000)
+        XCTAssertEqual(ServerClock.measured(server: server!, device: device), 14)
+        XCTAssertEqual(ServerClock.measured(server: device.addingTimeInterval(1), device: device), 0)
+        XCTAssertNil(ServerClock.parse("not a date"))
+    }
 }

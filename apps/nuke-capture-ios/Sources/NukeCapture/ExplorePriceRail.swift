@@ -112,43 +112,57 @@ extension ExploreAnalytics {
 struct ExplorePriceRailView: View {
     let item: ExploreFeedItem
     let rail: ExplorePriceRail
+    /// The card's price chip draws the label (with its chevron) itself.
+    var showsLabel = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(item.amountLabel)
-                .font(.system(.caption, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white.opacity(0.85))
+            if showsLabel {
+                Text(item.amountLabel)
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
             Text(LiveBoardView.bidNumber(item.amount))
                 .font(.nukeBigNumber)
                 .foregroundStyle(.white)
             if rail.hasBand {
                 GeometryReader { geo in
                     let w = geo.size.width
+                    // One track: the dim line is the scale, the bright segment is the range named below, and the
+                    // ringed dot is this price. Nothing else is drawn on it.
                     ZStack(alignment: .leading) {
-                        Capsule().fill(.white.opacity(0.3)).frame(height: 4)
-                        Capsule().fill(.white.opacity(0.8))
-                            .frame(width: max(3, w * (rail.bandEnd - rail.bandStart)), height: 6)
+                        Capsule().fill(.white.opacity(0.25)).frame(height: 4)
+                        Capsule().fill(Color.accentColor.opacity(0.95))
+                            .frame(width: max(4, w * (rail.bandEnd - rail.bandStart)), height: 8)
                             .offset(x: w * rail.bandStart)
                         Circle().fill(.white)
-                            .overlay(Circle().stroke(.black.opacity(0.45), lineWidth: 1))
-                            .frame(width: 10, height: 10)
-                            .offset(x: min(max(0, w * rail.marker - 5), max(0, w - 10)))
+                            .overlay(Circle().stroke(.black.opacity(0.6), lineWidth: 1.5))
+                            .frame(width: 12, height: 12)
+                            .offset(x: min(max(0, w * rail.marker - 6), max(0, w - 12)))
                     }
                     .frame(maxHeight: .infinity)
                 }
-                .frame(height: 12)
-                if let range = rail.rangeText {
-                    Text(range).font(.caption2.monospacedDigit()).foregroundStyle(.white.opacity(0.9))
-                }
+                .frame(height: 14)
             }
-            if let caption = rail.caption {
-                Text(caption).font(.caption2).foregroundStyle(.white.opacity(0.75))
+            // What the bright segment is, and its ends, in one line ("Projected hammer · $14k – $22k").
+            if let line = ExplorePriceRailView.legend(rail) {
+                Text(line).font(.caption2.weight(.medium).monospacedDigit()).foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1).minimumScaleFactor(0.8)
             }
         }
         .frame(maxWidth: 200, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(accessibility))
-        .accessibilityHint(Text(rail.hasBand || item.kind == .classified ? "Long press for why this range." : ""))
+        .accessibilityHint(Text(rail.hasBand || item.kind == .classified ? "Tap for why this range." : ""))
+    }
+
+    static func legend(_ rail: ExplorePriceRail) -> String? {
+        switch (rail.caption, rail.hasBand ? rail.rangeText : nil) {
+        case let (c?, r?): return c + " · " + r
+        case let (c?, nil): return c
+        case let (nil, r?): return r
+        default: return nil
+        }
     }
 
     private var accessibility: String {
