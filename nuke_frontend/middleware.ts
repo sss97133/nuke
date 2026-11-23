@@ -14,15 +14,18 @@
  * /jobs, /jobs/:id, /providers/:handle, /org/:id, /sitemap-work.xml — titles, descriptions, OG tags and readable text
  *                        for the open job, provider and organization pages, and their sitemap, from anon readers only
  *                        (src/lib/discoveryFace.ts). No customer identity, payments, contact fields or private names.
+ * /cohort/:make/:model/:year — title, canonical (this page, not the homepage) and a readable median when the
+ *                        terminal has one, from get_make_model_terminal (anon, read-only).
  */
 import {
-  injectPage, jobFace, jobsBoardFace, organizationFace, providerFace, sitemapXml, staticFace, workSitemapUrls,
+  cohortFace, displayToken, injectPage, jobFace, jobsBoardFace, organizationFace, parseCohortPath,
+  providerFace, setCanonical, sitemapXml, staticFace, workSitemapUrls,
 } from './src/lib/discoveryFace';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
     '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
-    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json'],
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort/:path*'],
 };
 
 const MCP_SERVER_CARD = {
@@ -519,6 +522,7 @@ function injectVehicleData(html: string, v: Record<string, unknown>): string {
     /<meta property="og:url" content="[^"]*"\s*\/>/,
     `<meta property="og:url" content="${url}" />`,
   );
+  html = setCanonical(html, url);
   html = html.replace(
     /<meta property="og:image" content="[^"]*"\s*\/>/,
     `<meta property="og:image" content="${image}" />`,
@@ -625,6 +629,26 @@ export default async function middleware(request: Request): Promise<Response | u
   const fixed = staticFace(url.pathname);
   if (fixed) {
     return new Response(injectPage(await getBaseHtml(request.url), fixed), {
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
+    });
+  }
+
+  // ── /cohort/:make/:model/:year ──
+  const cohort = parseCohortPath(url.pathname);
+  if (cohort) {
+    const accept = request.headers.get('Accept') || '';
+    if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return undefined;
+    const [html, terminal] = await Promise.all([
+      getBaseHtml(request.url),
+      anonRpc('get_make_model_terminal', {
+        p_make: displayToken(cohort.make),
+        p_model: displayToken(cohort.model),
+        p_year: cohort.year,
+        p_grain: 'year',
+      }),
+    ]);
+    if (!html) return undefined;
+    return new Response(injectPage(html, cohortFace(cohort.make, cohort.model, cohort.year, terminal)), {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
     });
   }
