@@ -136,6 +136,7 @@ INSERT INTO auction_comments (id, auction_event_id, vehicle_id, comment_type, co
 \ir ../migrations/20261123183000_data_set_comps_speed.sql
 \ir ../migrations/20261123184000_data_set_comps_event_from_basis.sql
 \ir ../migrations/20261123185000_data_set_membership_restamp_revert_scope.sql
+\ir ../migrations/20261123186000_data_set_membership_restamp_atomic.sql
 
 -- Grants: tables closed to anon, readers open, producer closed.
 SELECT t_assert(NOT has_table_privilege('anon', 'public.data_set_members', 'SELECT')
@@ -296,6 +297,10 @@ UPDATE auction_comments SET auction_event_id = 'c0000000-0000-4000-8000-00000000
 SELECT data_set_membership_plan_v1(:r11, 'vehicle', :ta2) AS p11 \gset
 SELECT t_assert((:'p11'::jsonb->'by_kind'->>'supersede:comment_theme:auction_comment')::int >= 1
             AND (:'p11'::jsonb->'by_kind'->>'add:comment_theme:auction_comment')::int >= 1, 'moved comment planned for restamp');
+SELECT count(*) AS d1_rows FROM data_set_members WHERE member_id = 'd0000000-0000-4000-8000-000000000001' AND state = 'active' \gset
+SELECT data_set_membership_apply_v1(:r11, 1, 1, false) AS a11a \gset
+SELECT t_assert((SELECT count(*) FROM data_set_members WHERE member_id = 'd0000000-0000-4000-8000-000000000001' AND state = 'active') = :d1_rows,
+  'one batch of one never leaves a restamped comment with fewer rows');
 SELECT data_set_membership_apply_v1(:r11, 1, 50, false) AS a11 \gset
 SELECT t_assert((SELECT count(*) FROM sd_stamp) = 1 AND (SELECT ev FROM sd_stamp) = 'c0000000-0000-4000-8000-000000000005', 'restamped to the new auction');
 SELECT t_assert((SELECT (e->'sold'->>'n')::int FROM jsonb_array_elements(data_set_comps((SELECT id FROM data_sets WHERE set_key = 'sd_authenticity'), NULL, 'gross_incl_premium')->'sets') e) = 0,
@@ -303,6 +308,16 @@ SELECT t_assert((SELECT (e->'sold'->>'n')::int FROM jsonb_array_elements(data_se
 SELECT data_set_membership_revert_v1(:r11) AS rv11 \gset
 SELECT t_assert((SELECT count(*) FROM sd_stamp) = 1 AND (SELECT ev FROM sd_stamp) = 'c0000000-0000-4000-8000-000000000003', 'revert puts the old stamp back');
 UPDATE auction_comments SET auction_event_id = 'c0000000-0000-4000-8000-000000000003' WHERE id = 'd0000000-0000-4000-8000-000000000001';
+-- The comment moves, is planned for restamp, then moves back before apply: the old row stays.
+\set r12 '''cccccccc-cccc-4ccc-8ccc-cccccccccccc'''
+UPDATE auction_comments SET auction_event_id = 'c0000000-0000-4000-8000-000000000005' WHERE id = 'd0000000-0000-4000-8000-000000000001';
+SELECT data_set_membership_plan_v1(:r12, 'vehicle', :ta2) AS p12 \gset
+UPDATE auction_comments SET auction_event_id = 'c0000000-0000-4000-8000-000000000003' WHERE id = 'd0000000-0000-4000-8000-000000000001';
+SELECT data_set_membership_apply_v1(:r12, 50, 5, false) AS a12 \gset
+SELECT t_assert((SELECT count(*) FROM sd_stamp) = 1 AND (SELECT ev FROM sd_stamp) = 'c0000000-0000-4000-8000-000000000003'
+            AND EXISTS (SELECT 1 FROM data_set_member_plan WHERE run_id = :r12 AND skip_reason = 'basis_live_again'),
+  'a comment back on its old auction keeps its row');
+SELECT data_set_membership_revert_v1(:r12) AS rv12 \gset
 DROP VIEW sd_stamp;
 
 -- A replica's VIN changes between plan and apply: its replica memberships are not applied.
@@ -333,6 +348,7 @@ SELECT t_assert(true, 'a reverted run cannot be applied again');
 
 -- The file's own revert.
 DROP VIEW fb_sets;
+\ir revert_20261123186000_data_set_membership_restamp_atomic.sql
 \ir revert_20261123185000_data_set_membership_restamp_revert_scope.sql
 \ir revert_20261123184000_data_set_comps_event_from_basis.sql
 \ir revert_20261123183000_data_set_comps_speed.sql
