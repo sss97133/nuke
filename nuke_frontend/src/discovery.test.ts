@@ -241,7 +241,38 @@ describe('discovery faces', () => {
     expect(out!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
   });
 
-  it('an incomplete cohort path keeps the plain shell', async () => {
-    expect(await call('/cohort/chevrolet/chevelle', {})).toBeNull();
+  it('/cohort hubs list makes, models and years from make_model_profiles and self-canonicalize', async () => {
+    const profiles = [
+      { canonical_make: 'Chevrolet', canonical_model: 'Chevelle', year: 1967, updated_at: '2026-11-20' },
+      { canonical_make: 'Chevrolet', canonical_model: 'Chevelle', year: 1966, updated_at: '2026-11-18' },
+      { canonical_make: 'Ford', canonical_model: 'Mustang', year: 1966, updated_at: '2026-09-01' },
+    ];
+    const index = await call('/cohort', { 'rest:make_model_profiles': profiles });
+    expect(index!.body).toContain('<link rel="canonical" href="https://nuke.ag/cohort" />');
+    expect(index!.body).toContain('<title>Vehicle cohorts | Nuke</title>');
+    expect(index!.body).toContain('href="https://nuke.ag/cohort/chevrolet"');
+    expect(index!.body).toContain('href="https://nuke.ag/cohort/ford"');
+    expect(index!.body).toContain('"@type":"CollectionPage"');
+    expect(index!.body).not.toContain('$');
+
+    const make = await call('/cohort/chevrolet', { 'rest:make_model_profiles': profiles });
+    expect(make!.body).toContain('<link rel="canonical" href="https://nuke.ag/cohort/chevrolet" />');
+    expect(make!.body).toContain('<title>Chevrolet cohorts | Nuke</title>');
+    expect(make!.body).toContain('href="https://nuke.ag/cohort/chevrolet/chevelle"');
+    expect(make!.body).not.toContain('/ford/');
+    expect(make!.body).not.toContain('$');
+
+    const model = await call('/cohort/chevrolet/chevelle', { 'rest:make_model_profiles': profiles });
+    expect(model!.body).toContain('<link rel="canonical" href="https://nuke.ag/cohort/chevrolet/chevelle" />');
+    expect(model!.body).toContain('<title>Chevrolet Chevelle years | Nuke</title>');
+    expect(model!.body).toContain('href="https://nuke.ag/cohort/chevrolet/chevelle/1966"');
+    expect(model!.body).toContain('href="https://nuke.ag/cohort/chevrolet/chevelle/1967"');
+    expect(model!.body).not.toContain('/1969');
+    expect(model!.body).not.toContain('$');
+  });
+
+  it('home and market faces link to /cohort', async () => {
+    const out = await call('/', {});
+    expect(out!.body).toContain('href="https://nuke.ag/cohort"');
   });
 });

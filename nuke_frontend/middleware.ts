@@ -21,11 +21,14 @@ import {
   cohortFace, displayToken, injectPage, jobFace, jobsBoardFace, organizationFace, parseCohortPath,
   providerFace, setCanonical, sitemapXml, staticFace, workSitemapUrls,
 } from './src/lib/discoveryFace';
+import {
+  buildCohortHubFace, parseCohortHubPath, parseYearProfile, yearProfilesQuery,
+} from './src/lib/cohortHubs';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
     '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
-    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort/:path*'],
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*'],
 };
 
 const MCP_SERVER_CARD = {
@@ -284,7 +287,7 @@ function faceBody(page: FacePage, b: Board): string {
     '<li><a href="https://github.com/sss97133/nuke">The repository and its generated, dated numbers</a></li>' +
     '<li><a href="https://nuke.ag/llms.txt">llms.txt</a></li>' +
     '<li><a href="https://nuke.ag/mcp">MCP endpoint</a> · <a href="https://nuke.ag/developers">API and developers</a></li>' +
-    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a></li></ul></main>';
+    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a></li></ul></main>';
 }
 
 function injectFace(html: string, page: FacePage, b: Board): string {
@@ -649,6 +652,23 @@ export default async function middleware(request: Request): Promise<Response | u
     ]);
     if (!html) return undefined;
     return new Response(injectPage(html, cohortFace(cohort.make, cohort.model, cohort.year, terminal)), {
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
+    });
+  }
+
+  const cohortHub = parseCohortHubPath(url.pathname);
+  if (cohortHub) {
+    const accept = request.headers.get('Accept') || '';
+    if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return undefined;
+    const query = cohortHub.kind === 'index'
+      ? yearProfilesQuery()
+      : cohortHub.kind === 'make'
+        ? yearProfilesQuery(cohortHub.make)
+        : yearProfilesQuery(cohortHub.make, cohortHub.model);
+    const [html, read] = await Promise.all([getBaseHtml(request.url), anonRowsRead(query)]);
+    if (!html || !read.ok) return undefined;
+    const rows = read.value.map(parseYearProfile).filter((r): r is NonNullable<typeof r> => r != null);
+    return new Response(injectPage(html, buildCohortHubFace(cohortHub, rows)), {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
     });
   }
