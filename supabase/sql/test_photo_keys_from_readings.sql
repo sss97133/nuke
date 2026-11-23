@@ -322,7 +322,7 @@ BEGIN
 END $$;
 
 -- Revert migration restores the original admits and drops the planner.
-\ir ../migrations/20261123121500_project_photo_keys_from_readings_revert.sql
+\ir ../migrations/20261123121501_project_photo_keys_from_readings_revert.sql
 
 DO $$
 DECLARE
