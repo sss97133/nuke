@@ -72,7 +72,7 @@ export function methodologyFace(): FacePage {
     `<p>Advisor claims include <code>confidence</code> and <code>confidence_basis</code>. The catalog caps confidence at 0.6 until a published sale backtest justifies more. Unrecorded fields use null confidence.</p></section>` +
     `<section><h2>Recorded sale evidence</h2>` +
     `<p>Cohort medians on year pages and the <a href="${SITE}/valuation">valuation tool</a> are computed from recorded sold prices, not asking prices or unsold high bids. Details are on those pages and in <code>valuation_by_ymm</code> / <code>get_make_model_terminal</code>.</p></section>` +
-    `<p><a href="${SITE}/sources">Sources board</a> · <a href="${SITE}/about">About</a> · <a href="${SITE}/mcp-advisor">Asset Advisor</a> · <a href="${SITE}/api/docs">API docs</a></p>` +
+    `<p><a href="${SITE}/sources">Sources board</a> · <a href="${SITE}/about">About</a> · <a href="${SITE}/grades">Grades</a> · <a href="${SITE}/mcp-advisor">Asset Advisor</a> · <a href="${SITE}/api/docs">API docs</a></p>` +
     faqs.map((f) => `<section><h2>${escapeHtml(f.q)}</h2><p>${escapeHtml(f.a)}</p></section>`).join('') +
     `</article></main>`;
   return { title, description, path, type: 'website', body, head: ldScript(faqPage(url, 'Nuke methodology', description, faqs)) };
@@ -89,12 +89,12 @@ export const ABOUT_FAQS: { q: string; a: string }[] = [
   },
 ];
 
-function renderEvidence(evidence: Evidence): string {
+function renderEvidence(evidence: Evidence, heading = 'What you can check'): string {
   const head = evidence.columns.map((c) => `<th>${escapeHtml(c)}</th>`).join('');
   const rows = evidence.models.map((m) => `<tr>${m.cells.map((c) => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('');
   const notes = evidence.notes.map((n) => `<li>${n.title ? `<strong>${escapeHtml(n.title)}.</strong> ` : ''}${escapeHtml(n.text)}</li>`).join('');
   const when = evidence.measuredAt ? evidence.measuredAt.replace('T', ' ').replace(/:00Z$/, ' UTC') : null;
-  return `<section><h2>What you can check</h2>` +
+  return `<section><h2>${heading}</h2>` +
     (when ? `<p>Measured ${escapeHtml(when)}.</p>` : '') +
     `<p>${escapeHtml(evidence.preface)}</p>` +
     `<table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>` +
@@ -120,10 +120,44 @@ export function aboutFace(evidence: Evidence | null): FacePage {
     `<section><h2>What Nuke is</h2><p>Every observation about an asset (a bid, a comment, a photo, a receipt, a title transfer) is kept with its source, its clocks, and its trust. The system computes the asset’s state, its cohort baseline, and its predictions from that log, point-in-time, so every number can be replayed and graded.</p></section>` +
     grades +
     `<section><h2>What it is not</h2><p>Not a price guide. Not a marketplace: nothing is listed or sold here; the venues are sources, and a sale is one more observation. Not a model’s opinion: a language or vision model is a sensor, never a source.</p></section>` +
-    `<p><a href="${SITE}/methodology">Methodology</a> · <a href="${SITE}/sources">Sources</a> · <a href="${EVIDENCE_URL}">evidence.md</a> · <a href="${POSITIONING_URL}">POSITIONING.md</a> · <a href="https://github.com/sss97133/nuke">Repository</a></p>` +
+    `<p><a href="${SITE}/methodology">Methodology</a> · <a href="${SITE}/grades">Grades</a> · <a href="${SITE}/sources">Sources</a> · <a href="${EVIDENCE_URL}">evidence.md</a> · <a href="${POSITIONING_URL}">POSITIONING.md</a> · <a href="https://github.com/sss97133/nuke">Repository</a></p>` +
     faqs.map((f) => `<section><h2>${escapeHtml(f.q)}</h2><p>${escapeHtml(f.a)}</p></section>`).join('') +
     `</article></main>`;
   return { title, description, path, type: 'website', body, head: ldScript(faqPage(url, 'About Nuke', description, faqs)) };
+}
+
+
+export const GRADES_FAQS: { q: string; a: string }[] = [
+  {
+    q: 'What is the grading table on /grades?',
+    a: 'It is the evidence block published at /evidence.md, rewritten every morning from the live database by scripts/data/readme-stats.mjs and also used on the About page. The preface and table on this page are that block, parsed, not a second set of numbers. A block the parser cannot read is omitted; the page never falls back to a typed count or error rate.',
+  },
+];
+
+export function gradesFace(evidence: Evidence | null): FacePage {
+  const path = '/grades';
+  const url = `${SITE}${path}`;
+  const title = 'Graded predictions | Nuke';
+  const description = evidence?.measuredAt
+    ? `Nuke’s public grading table, measured ${evidence.measuredAt.replace('T', ' ').replace(/:00Z$/, ' UTC')} from the live database.`
+    : 'Nuke’s public grading table, published daily at /evidence.md when the measurement job runs. This page does not fall back to a typed number if the file cannot be read.';
+  const faqs = GRADES_FAQS;
+  const table = evidence
+    ? renderEvidence(evidence, 'Graded models')
+    : `<section><h2>Graded models</h2><p>The grading table could not be read here. It is the evidence block published at <a href="${EVIDENCE_URL}">/evidence.md</a>, rewritten every morning from the live database by scripts/data/readme-stats.mjs. This page does not fall back to a typed number.</p></section>`;
+  const extra: Record<string, unknown> = { '@type': 'Dataset', name: 'Nuke graded predictions', isAccessibleForFree: true };
+  if (evidence?.measuredAt) extra.dateModified = evidence.measuredAt;
+  const body =
+    `<main><article>` +
+    crumbs([{ label: 'Nuke', href: `${SITE}/` }, { label: 'About', href: `${SITE}/about` }, { label: 'Methodology', href: `${SITE}/methodology` }]) +
+    `<h1>Graded predictions</h1>` +
+    `<p>Every prediction Nuke grades is published in the open. This page is the daily table from <a href="${EVIDENCE_URL}">/evidence.md</a>, the same block the About page renders. The unit is the lot, as the preface states when the file can be read.</p>` +
+    table +
+    `<p><a href="${EVIDENCE_URL}">evidence.md</a> · <a href="${SITE}/about">About</a> · <a href="${SITE}/methodology">Methodology</a> · <a href="${POSITIONING_URL}">POSITIONING.md</a></p>` +
+    faqs.map((f) => `<section><h2>${escapeHtml(f.q)}</h2><p>${escapeHtml(f.a)}</p></section>`).join('') +
+    `</article></main>`;
+  const graph = faqPage(url, 'Nuke graded predictions', description, faqs, extra);
+  return { title, description, path, type: 'website', body, head: ldScript(graph) };
 }
 
 export type SourceBoardLine = {
@@ -185,6 +219,7 @@ export function trustFace(pathname: string, opts: { evidence?: Evidence | null; 
   const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
   if (path === '/methodology') return methodologyFace();
   if (path === '/about') return aboutFace(opts.evidence === undefined ? null : opts.evidence);
+  if (path === '/grades') return gradesFace(opts.evidence === undefined ? null : opts.evidence);
   if (path === '/sources') return sourcesFace(opts.board === undefined ? null : opts.board);
   return null;
 }

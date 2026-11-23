@@ -18,6 +18,7 @@ describe('PUBLIC_DISCOVERY_LINKS', () => {
     const routes = read('nuke_frontend/src/routes/DomainRoutes.tsx');
     expect(PUBLIC_DISCOVERY_LINKS.map((l) => l.to)).toEqual([
       '/methodology',
+      '/grades',
       '/sources',
       '/compare',
       '/use',

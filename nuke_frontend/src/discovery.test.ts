@@ -366,7 +366,7 @@ describe('discovery faces', () => {
     expect(auctions!.body).toContain('Bring a Trailer listing URLs only');
   });
 
-  it('/about, /methodology, and /sources prerender with self-canonicals and no invented prices', async () => {
+  it('/about, /methodology, /grades, and /sources prerender with self-canonicals and no invented prices', async () => {
     const about = await call('/about', {});
     expect(about!.body).toContain('<link rel="canonical" href="https://nuke.ag/about" />');
     expect(about!.body).toContain('<title>About | Nuke</title>');
@@ -379,6 +379,13 @@ describe('discovery faces', () => {
     expect(method!.body).toContain('<title>Methodology | Nuke</title>');
     expect(method!.body).toContain('capped at 0.6');
     expect(method!.body).toContain('"@type":"WebPage"');
+
+    const grades = await call('/grades', {});
+    expect(grades!.body).toContain('<link rel="canonical" href="https://nuke.ag/grades" />');
+    expect(grades!.body).toContain('<title>Graded predictions | Nuke</title>');
+    expect(grades!.body).toContain('does not fall back to a typed number');
+    expect(grades!.body).toContain('"@type":"Dataset"');
+    expect(grades!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
 
     const sources = await call('/sources', {
       market_sources_read: {

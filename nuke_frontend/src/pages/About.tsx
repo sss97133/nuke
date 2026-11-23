@@ -95,6 +95,8 @@ const About: React.FC = () => {
           <dd><Text role="body"><Link to="/search">A vehicle, a VIN or a listing URL</Link>.</Text></dd>
           <dt><Text role="label">Methodology</Text></dt>
           <dd><Text role="body"><Link to="/methodology">How Nuke cites sources, clocks, and confidence</Link>.</Text></dd>
+          <dt><Text role="label">Grades</Text></dt>
+          <dd><Text role="body"><Link to="/grades">The public grading table, measured daily from the live database</Link>.</Text></dd>
           <dt><Text role="label">Sources</Text></dt>
           <dd><Text role="body"><Link to="/sources">Every source, ranked by the lots Nuke holds</Link>.</Text></dd>
           <dt><Text role="label">Compare</Text></dt>
