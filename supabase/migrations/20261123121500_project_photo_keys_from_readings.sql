@@ -50,25 +50,8 @@ CREATE TABLE public.photo_key_projection_runs (
   receipt jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 
-CREATE TABLE public.photo_key_projection_items (
-  run_id uuid NOT NULL REFERENCES public.photo_key_projection_runs(id),
-  image_id uuid NOT NULL,
-  vehicle_id uuid NOT NULL,
-  source_observation_id uuid NOT NULL,
-  property_key text NOT NULL,
-  value text NOT NULL,
-  confidence_score numeric NOT NULL,
-  observation_id uuid,
-  witness_id uuid,
-  PRIMARY KEY (run_id, source_observation_id, property_key)
-);
-
-CREATE INDEX photo_key_projection_items_observation
-  ON public.photo_key_projection_items (observation_id)
-  WHERE observation_id IS NOT NULL;
-
 COMMENT ON TABLE public.photo_key_projection_runs IS
-  'Ledger for project_photo_keys_v1 / scripts/photo-pipeline/project-photo-keys.mjs. A row is one signed run; revert_project_photo_keys_v1 supersedes observations recorded in photo_key_projection_items for that run.';
+  'Ledger for project_photo_keys_v1 / scripts/photo-pipeline/project-photo-keys.mjs. A row is one signed run. Applied items, including observation_id and witness_id, live in receipt.items (no per-photo table). revert_project_photo_keys_v1 supersedes those observation ids.';
 
 -- The planner signature. Changing the admitted map or the skip rules is a new version.
 CREATE OR REPLACE FUNCTION public.project_photo_keys_signature_v1()
@@ -328,28 +311,12 @@ BEGIN
     p_run, p_granted_by, p_user, false,
     public.project_photo_keys_signature_v1(),
     now(),
-    coalesce(p_receipt, '{}'::jsonb)
+    coalesce(p_receipt, '{}'::jsonb) || jsonb_build_object('items', p_items, 'recorded', jsonb_array_length(p_items))
   );
-
-  INSERT INTO public.photo_key_projection_items (
-    run_id, image_id, vehicle_id, source_observation_id, property_key, value,
-    confidence_score, observation_id, witness_id
-  )
-  SELECT
-    p_run,
-    (item->>'image_id')::uuid,
-    (item->>'vehicle_id')::uuid,
-    (item->>'source_observation_id')::uuid,
-    item->>'property_key',
-    item->>'value',
-    (item->>'confidence_score')::numeric,
-    nullif(item->>'observation_id', '')::uuid,
-    nullif(item->>'witness_id', '')::uuid
-  FROM jsonb_array_elements(p_items) AS item;
 
   RETURN jsonb_build_object(
     'run_id', p_run,
-    'recorded', (SELECT count(*) FROM public.photo_key_projection_items WHERE run_id = p_run),
+    'recorded', jsonb_array_length(p_items),
     'signature', public.project_photo_keys_signature_v1()
   );
 END;
@@ -387,10 +354,11 @@ BEGIN
 
   UPDATE public.vehicle_observations o
   SET is_superseded = true
-  FROM public.photo_key_projection_items i
-  WHERE i.run_id = p_run
-    AND i.observation_id IS NOT NULL
-    AND o.id = i.observation_id
+  FROM public.photo_key_projection_runs r,
+       jsonb_array_elements(coalesce(r.receipt->'items', '[]'::jsonb)) AS item
+  WHERE r.id = p_run
+    AND nullif(item->>'observation_id', '')::uuid IS NOT NULL
+    AND o.id = (item->>'observation_id')::uuid
     AND coalesce(o.is_superseded, false) = false;
 
   GET DIAGNOSTICS v_n = ROW_COUNT;
@@ -419,4 +387,3 @@ GRANT EXECUTE ON FUNCTION public.record_project_photo_keys_v1(uuid, uuid, uuid, 
 GRANT EXECUTE ON FUNCTION public.revert_project_photo_keys_v1(uuid, uuid, uuid) TO service_role;
 
 GRANT SELECT, INSERT, UPDATE ON public.photo_key_projection_runs TO service_role;
-GRANT SELECT, INSERT, UPDATE ON public.photo_key_projection_items TO service_role;
