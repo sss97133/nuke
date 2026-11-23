@@ -3,6 +3,7 @@
 
 export const PUBLIC_DISCOVERY_LINKS = [
   { to: '/methodology', label: 'Methodology' },
+  { to: '/grades', label: 'Grades' },
   { to: '/sources', label: 'Sources' },
   { to: '/compare', label: 'Compare' },
   { to: '/use', label: 'Use cases' },

@@ -35,6 +35,7 @@ export const STATIC_SITEMAP_URLS: SitemapUrl[] = [
   { loc: `${SITE}/use/auction-houses` },
   { loc: `${SITE}/about` },
   { loc: `${SITE}/methodology` },
+  { loc: `${SITE}/grades` },
   { loc: `${SITE}/sources` },
   { loc: `${SITE}/developers` },
   { loc: `${SITE}/api/docs` },

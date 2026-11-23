@@ -6,6 +6,8 @@ import { moneyAmounts } from './lib/cohortReport';
 import {
   ABOUT_FAQS,
   aboutFace,
+  GRADES_FAQS,
+  gradesFace,
   METHODOLOGY_FAQS,
   methodologyFace,
   POSITIONING_URL,
@@ -158,7 +160,37 @@ describe('trustFace', () => {
     expect(trustFace('/methodology')?.path).toBe('/methodology');
     expect(trustFace('/about', { evidence: null })?.path).toBe('/about');
     expect(trustFace('/sources', { board: null })?.path).toBe('/sources');
+    expect(trustFace('/grades', { evidence: null })?.path).toBe('/grades');
     expect(trustFace('/sources/bring-a-trailer')).toBeNull();
     expect(trustFace('/compare/nuke-vs-hagerty')).toBeNull();
+  });
+});
+
+describe('gradesFace', () => {
+  it('omits the table when evidence is missing and invents no numbers', () => {
+    const page = gradesFace(null);
+    expect(page.path).toBe('/grades');
+    expect(page.title).toBe('Graded predictions | Nuke');
+    expect(page.body).toContain('does not fall back to a typed number');
+    expect(page.body).toContain('href="https://nuke.ag/evidence.md"');
+    expect(page.body).not.toContain('<table');
+    expect(moneyAmounts(page.body + page.head)).toEqual([]);
+    expect(page.body).not.toMatch(/\d[\d,]*%/);
+    for (const f of GRADES_FAQS) expect(page.body).toContain(f.q);
+    expect(page.head).toContain('"@type":"Dataset"');
+    expect(page.head).toContain('"@type":"FAQPage"');
+  });
+
+  it('renders only cells from a parsed evidence fixture', () => {
+    const evidence = parseEvidence(EVIDENCE_MD);
+    expect(evidence).not.toBeNull();
+    const page = gradesFace(evidence!);
+    expect(page.body).toContain('<table>');
+    expect(page.body).toContain(evidence!.preface);
+    for (const m of evidence!.models) {
+      for (const cell of m.cells) expect(page.body).toContain(cell);
+    }
+    expect(page.description).toContain('2026-11-23');
+    expect(moneyAmounts(page.body)).toEqual([]);
   });
 });

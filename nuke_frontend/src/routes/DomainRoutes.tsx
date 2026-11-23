@@ -7,6 +7,7 @@ import { warmJobRoute } from '../pages/jobs/jobWarm';
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
 const Methodology = React.lazy(() => import('../pages/Methodology'));
+const Grades = React.lazy(() => import('../pages/Grades'));
 const NotFound = React.lazy(() => import('../pages/NotFound'));
 const PrivacyPolicy = React.lazy(() => import('../pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('../pages/TermsOfService'));
@@ -163,6 +164,7 @@ export const DomainRoutes = () => {
         {/* ── Static / legal ────────────────────────────────────────────── */}
         <Route path="/about" element={<About />} />
         <Route path="/methodology" element={<Methodology />} />
+        <Route path="/grades" element={<Grades />} />
         <Route path="/compare" element={<Compare />} />
         <Route path="/compare/:slug" element={<Compare />} />
         <Route path="/alternatives" element={<Compare />} />

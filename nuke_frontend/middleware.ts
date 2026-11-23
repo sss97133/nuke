@@ -34,7 +34,7 @@ import { buildVehicleReport } from './src/lib/vehicleReport';
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
     '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
-    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor', '/use', '/use/:path*', '/about', '/methodology', '/sources', '/compare', '/compare/:path*', '/alternatives'],
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor', '/use', '/use/:path*', '/about', '/methodology', '/grades', '/sources', '/compare', '/compare/:path*', '/alternatives'],
 };
 
 const MCP_SERVER_CARD = {
@@ -281,7 +281,7 @@ function faceBody(page: FacePage, b: Board): string {
     '<li><a href="https://github.com/sss97133/nuke">The repository and its generated, dated numbers</a></li>' +
     '<li><a href="https://nuke.ag/llms.txt">llms.txt</a></li>' +
     '<li><a href="https://nuke.ag/mcp">MCP endpoint</a> · <a href="https://nuke.ag/developers">API and developers</a></li>' +
-    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/use">Use cases</a> · <a href="https://nuke.ag/developers">Developers</a> · <a href="https://nuke.ag/about">About</a> · <a href="https://nuke.ag/methodology">Methodology</a> · <a href="https://nuke.ag/sources">Sources</a> · <a href="https://nuke.ag/api/docs">API docs</a> · <a href="https://nuke.ag/compare">Compare</a></li></ul></main>';
+    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/use">Use cases</a> · <a href="https://nuke.ag/developers">Developers</a> · <a href="https://nuke.ag/about">About</a> · <a href="https://nuke.ag/methodology">Methodology</a> · <a href="https://nuke.ag/grades">Grades</a> · <a href="https://nuke.ag/sources">Sources</a> · <a href="https://nuke.ag/api/docs">API docs</a> · <a href="https://nuke.ag/compare">Compare</a></li></ul></main>';
 }
 
 function injectFace(html: string, page: FacePage, b: Board): string {
@@ -317,6 +317,7 @@ function llmsTxt(b: Board): string {
     '- [API docs](https://nuke.ag/api/docs)',
     '- [Methodology](https://nuke.ag/methodology)',
     '- [About](https://nuke.ag/about)',
+    '- [Grades](https://nuke.ag/grades)',
     '- [Sources](https://nuke.ag/sources)',
     '- [Compare](https://nuke.ag/compare)',
     '- [Sitemap](https://nuke.ag/sitemap.xml)',
@@ -568,13 +569,13 @@ export default async function middleware(request: Request): Promise<Response | u
   }
 
   const trustPath = url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : url.pathname;
-  if (trustPath === '/methodology' || trustPath === '/about' || trustPath === '/sources') {
+  if (trustPath === '/methodology' || trustPath === '/about' || trustPath === '/grades' || trustPath === '/sources') {
     const accept = request.headers.get('Accept') || '';
     if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return undefined;
     const origin = new URL(request.url).origin;
     const [html, evidence, board] = await Promise.all([
       getBaseHtml(request.url),
-      trustPath === '/about' ? fetchEvidence(origin) : Promise.resolve(null),
+      trustPath === '/about' || trustPath === '/grades' ? fetchEvidence(origin) : Promise.resolve(null),
       trustPath === '/sources' ? fetchBoard() : Promise.resolve(null),
     ]);
     if (!html) return undefined;
