@@ -19,7 +19,7 @@
  */
 import {
   cohortFace, displayToken, injectPage, jobFace, jobsBoardFace, organizationFace, parseCohortPath,
-  providerFace, setCanonical, sitemapXml, staticFace, workSitemapUrls,
+  providerFace, sitemapXml, staticFace, workSitemapUrls,
 } from './src/lib/discoveryFace';
 import {
   buildCohortHubFace, parseCohortHubPath, parseYearProfile, yearProfilesQuery,
@@ -29,6 +29,7 @@ import { buildUseCaseFace } from './src/lib/useCases';
 import { trustFace } from './src/lib/trustFaces';
 import { parseEvidence } from './src/pages/aboutEvidence';
 import { buildCompareFace } from './src/lib/compareFaces';
+import { buildVehicleReport } from './src/lib/vehicleReport';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
@@ -80,58 +81,6 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;');
 }
 
-function vehicleTitle(v: Record<string, unknown>): string {
-  const parts = [v.year, v.make, v.model].filter(Boolean);
-  if (v.trim) parts.push(v.trim as string);
-  return parts.join(' ');
-}
-
-function vehicleDescription(v: Record<string, unknown>): string {
-  const parts: string[] = [];
-  const title = vehicleTitle(v);
-  parts.push(title);
-  if (v.color) parts.push(`${v.color}`);
-  if (v.engine_type) parts.push(`${v.engine_type}`);
-  if (v.transmission) parts.push(`${v.transmission}`);
-  if (v.mileage) parts.push(`${Number(v.mileage).toLocaleString()} miles`);
-  if (v.sale_price) parts.push(`Sold for $${Number(v.sale_price).toLocaleString()}`);
-  if (v.city && v.state) parts.push(`${v.city}, ${v.state}`);
-  return parts.join(' · ');
-}
-
-function buildJsonLd(v: Record<string, unknown>): string {
-  const ld: Record<string, unknown> = {
-    '@context': 'https://schema.org',
-    '@type': 'Vehicle',
-    name: vehicleTitle(v),
-    url: `https://nuke.ag/vehicle/${v.id}`,
-    vehicleIdentificationNumber: v.vin || undefined,
-    modelDate: v.year ? String(v.year) : undefined,
-    manufacturer: v.make || undefined,
-    model: v.model || undefined,
-    bodyType: v.body_style || undefined,
-    driveWheelConfiguration: v.drivetrain || undefined,
-    vehicleTransmission: v.transmission || undefined,
-    color: v.color || undefined,
-    vehicleInteriorColor: v.interior_color || undefined,
-    mileageFromOdometer: v.mileage
-      ? { '@type': 'QuantitativeValue', value: v.mileage, unitCode: 'SMI' }
-      : undefined,
-    description: v.description || undefined,
-  };
-  if (v.primary_image_url) ld.image = v.primary_image_url;
-  if (v.sale_price) {
-    ld.offers = {
-      '@type': 'Offer',
-      price: v.sale_price,
-      priceCurrency: 'USD',
-      availability: 'https://schema.org/SoldOut',
-    };
-  }
-  // Strip undefined values
-  return JSON.stringify(ld, (_, val) => (val === undefined ? undefined : val));
-}
-
 // ── Fetch vehicle from PostgREST ─────────────────────────────────────────────
 
 /**
@@ -174,6 +123,32 @@ async function fetchVehicle(vehicleId: string): Promise<Read<Record<string, unkn
   }
 }
 
+
+
+/** Sold events for a vehicle already known to be public. Null value means the read failed. */
+async function fetchVehicleEvents(vehicleId: string): Promise<Read<Record<string, unknown>[] | null>> {
+  const select = 'id,source_platform,source_url,event_status,ended_at,final_price,currency_code,fx_to_usd,sold_at,price_verification,sale_truth_role';
+  const apiUrl = `${SUPABASE_URL}/rest/v1/vehicle_events?vehicle_id=eq.${vehicleId}&event_status=eq.sold&final_price=gt.0&select=${select}&order=sold_at.desc.nullslast&limit=20`;
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 4000);
+    const resp = await fetch(apiUrl, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Accept: 'application/json',
+      },
+      signal: ctl.signal,
+    });
+    clearTimeout(timer);
+    if (!resp.ok) return { ok: false, status: resp.status };
+    const rows = await resp.json();
+    if (!Array.isArray(rows)) return { ok: false, status: null };
+    return { ok: true, value: rows };
+  } catch {
+    return { ok: false, status: null };
+  }
+}
 
 // ── Public face: readable text for crawlers and AI readers ──────────────────
 
@@ -521,85 +496,13 @@ async function getBaseHtml(requestUrl: string): Promise<string> {
 
 // ── Inject vehicle data into HTML ────────────────────────────────────────────
 
-function injectVehicleData(html: string, v: Record<string, unknown>): string {
-  const title = escapeHtml(vehicleTitle(v));
-  const desc = escapeHtml(vehicleDescription(v));
-  const pageTitle = `${vehicleTitle(v)} | Nuke`;
-  const url = `https://nuke.ag/vehicle/${v.id}`;
-  const image = (v.primary_image_url as string) || 'https://nuke.ag/og-image.png';
-
-  // Replace title
-  html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(pageTitle)}</title>`);
-
-  // Replace meta description
-  html = html.replace(
-    /<meta name="description" content="[^"]*"\s*\/>/,
-    `<meta name="description" content="${desc}" />`,
-  );
-
-  // Replace OG tags
-  html = html.replace(
-    /<meta property="og:title" content="[^"]*"\s*\/>/,
-    `<meta property="og:title" content="${title}" />`,
-  );
-  html = html.replace(
-    /<meta property="og:description" content="[^"]*"\s*\/>/,
-    `<meta property="og:description" content="${desc}" />`,
-  );
-  html = html.replace(
-    /<meta property="og:url" content="[^"]*"\s*\/>/,
-    `<meta property="og:url" content="${url}" />`,
-  );
-  html = setCanonical(html, url);
-  html = html.replace(
-    /<meta property="og:image" content="[^"]*"\s*\/>/,
-    `<meta property="og:image" content="${image}" />`,
-  );
-  html = html.replace(
-    /<meta property="og:type" content="[^"]*"\s*\/>/,
-    `<meta property="og:type" content="product" />`,
-  );
-
-  // Replace Twitter tags
-  html = html.replace(
-    /<meta name="twitter:title" content="[^"]*"\s*\/>/,
-    `<meta name="twitter:title" content="${title}" />`,
-  );
-  html = html.replace(
-    /<meta name="twitter:description" content="[^"]*"\s*\/>/,
-    `<meta name="twitter:description" content="${desc}" />`,
-  );
-  html = html.replace(
-    /<meta name="twitter:image" content="[^"]*"\s*\/>/,
-    `<meta name="twitter:image" content="${image}" />`,
-  );
-
-  // Replace existing JSON-LD with vehicle-specific one
-  html = html.replace(
-    /<script type="application\/ld\+json">[\s\S]*?<\/script>/,
-    `<script type="application/ld+json">\n${buildJsonLd(v)}\n</script>`,
-  );
-
-  // Visible text for readers that do not run JavaScript; React's createRoot replaces it on mount.
-  const facts: [string, unknown][] = [
-    ['VIN', v.vin], ['Color', v.color], ['Engine', v.engine_type], ['Transmission', v.transmission],
-    ['Drivetrain', v.drivetrain], ['Body', v.body_style],
-    ['Mileage', v.mileage ? `${Number(v.mileage).toLocaleString('en-US')} miles` : null],
-    ['Sold for', v.sale_price ? `$${Number(v.sale_price).toLocaleString('en-US')}` : null],
-    ['Location', v.city && v.state ? `${v.city}, ${v.state}` : null],
-  ];
-  const rows = facts.filter(([, x]) => x).map(([k, x]) => `<dt>${k}</dt><dd>${escapeHtml(String(x))}</dd>`).join('');
-  const blurb = typeof v.description === 'string' ? `<p>${escapeHtml(v.description.slice(0, 1200))}</p>` : '';
-  html = html.replace('<div id="root"></div>',
-    `<div id="root"><article><h1>${escapeHtml(vehicleTitle(v))}</h1><dl>${rows}</dl>${blurb}` +
-    `<p>Record last updated ${escapeHtml(day(typeof v.updated_at === 'string' ? v.updated_at : null))}. <a href="https://nuke.ag/api/v1/vehicle/${escapeHtml(String(v.id))}">JSON</a></p></article></div>`);
-
-  // Inject vehicle data JSON and API meta tag before </head>
+function injectVehicleData(html: string, v: Record<string, unknown>, sales: Record<string, unknown>[] | null, terminal: unknown): string {
+  const page = buildVehicleReport(v, sales, terminal);
+  if (!page) return html;
+  html = injectPage(html, page);
   const vehicleDataScript = `<script type="application/json" id="vehicle-data">${JSON.stringify(v)}</script>`;
   const apiMeta = `<meta name="nuke:api" content="https://nuke.ag/api/v1/vehicle/${v.id}" />`;
-  html = html.replace('</head>', `${apiMeta}\n${vehicleDataScript}\n</head>`);
-
-  return html;
+  return html.replace('</head>', `${apiMeta}\n${vehicleDataScript}\n</head>`);
 }
 
 // ── Main middleware ──────────────────────────────────────────────────────────
@@ -870,10 +773,19 @@ export default async function middleware(request: Request): Promise<Response | u
   }
 
   // ── HTML response with injected vehicle data ──
-  let html = await getBaseHtml(request.url);
-  html = injectVehicleData(html, vehicle);
+  const year = typeof vehicle.year === 'number' ? vehicle.year : Number(vehicle.year);
+  const make = typeof vehicle.make === 'string' ? vehicle.make : '';
+  const model = typeof vehicle.model === 'string' ? vehicle.model : '';
+  const [html, eventsRead, terminal] = await Promise.all([
+    getBaseHtml(request.url),
+    fetchVehicleEvents(String(vehicle.id)),
+    Number.isFinite(year) && make && model
+      ? anonRpc('get_make_model_terminal', { p_make: make, p_model: model, p_year: year, p_grain: 'year' })
+      : Promise.resolve(null),
+  ]);
+  const pageHtml = injectVehicleData(html, vehicle, eventsRead.ok ? eventsRead.value : null, terminal);
 
-  return new Response(html, {
+  return new Response(pageHtml, {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
