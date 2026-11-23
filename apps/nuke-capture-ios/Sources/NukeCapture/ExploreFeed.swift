@@ -128,6 +128,10 @@ struct ExploreFeedView: View {
     @State private var showTune = false
     /// The projected-hammer board, read once per feed load; each lot's reading is looked up in it.
     @State private var finish: FinishBoard?
+    /// The asks' fair ranges from close sales (ask_close_comps), read once per feed load after the asks.
+    @State private var fair: AskFairBoard?
+    /// The live board's bid curve, for a lot's heat line in the "why" stack.
+    @State private var curve: BidCurve?
     @State private var why: ExploreWhy?
     @State private var openCohort: CohortTarget?
 
@@ -191,6 +195,7 @@ struct ExploreFeedView: View {
                             ExplorePagerCard(item: item, position: idx, hasBidReading: lots[item.id] != nil,
                                              finish: item.lotId.flatMap { finish?.byId[$0] },
                                              finishFresh: finish?.fresh == true,
+                                             fair: item.kind == .classified ? fair?.range(for: item.vehicleId) : nil,
                                              onDrill: openDrill, onOpenProfile: openProfile, onChoice: choose,
                                              onWhy: openWhy)
                                 .onAppear { prefetch(after: idx) }
@@ -231,7 +236,9 @@ struct ExploreFeedView: View {
     private func openDrill(_ d: ExploreCardDrill) { drill = d }
 
     private func openWhy(_ item: ExploreFeedItem) {
-        why = ExploreWhy(item: item, estimate: item.lotId.flatMap { finish?.byId[$0] }, fresh: finish?.fresh == true)
+        let heat = lots[item.id]?.heat(curve: curve, at: Date()).map(ExploreWhyStack.heatLine)
+        why = ExploreWhy(item: item, estimate: item.lotId.flatMap { finish?.byId[$0] }, fresh: finish?.fresh == true,
+                         fair: item.kind == .classified ? fair?.range(for: item.vehicleId) : nil, heat: heat)
     }
 
     /// The stack's cohort row: close the sheet, then push the cohort page.
@@ -305,18 +312,22 @@ struct ExploreFeedView: View {
         finish = fb
         liveFailed = lr == nil
         askFailed = ar == nil
-        lots = Dictionary((lr ?? []).map { ($0.item.id, $0.lot) }, uniquingKeysWith: { first, _ in first })
-        live = tune.apply(lr?.map { $0.item } ?? [])
+        curve = lr?.curve
+        lots = Dictionary((lr?.rows ?? []).map { ($0.item.id, $0.lot) }, uniquingKeysWith: { first, _ in first })
+        live = tune.apply(lr?.rows.map { $0.item } ?? [])
         classified = tune.apply(ar ?? [])
         feed = ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
         loaded = true
+        // The fair ranges follow the asks; until they land (or when the reader is absent) asks read "No opinion yet".
+        fair = await AskFairBoard.fetch(vehicleIds: classified.compactMap(\.vehicleId))
     }
 
-    private static func readLive() async -> [(item: ExploreFeedItem, lot: LiveAuction)]? {
+    private static func readLive() async -> (rows: [(item: ExploreFeedItem, lot: LiveAuction)], curve: BidCurve?)? {
         guard let board = try? await LiveBoard.fetch() else { return nil }
-        return board.open(at: Date())
+        let rows = board.open(at: Date())
             .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
             .prefix(40).map { (ExploreFeedItem.from($0), $0) }
+        return (Array(rows), board.curve)
     }
 
     private static func readClassified(_ tune: ExploreTuning) async -> [ExploreFeedItem]? {

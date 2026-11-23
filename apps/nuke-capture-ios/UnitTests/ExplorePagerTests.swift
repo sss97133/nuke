@@ -134,39 +134,83 @@ final class ExplorePagerTests: XCTestCase {
         XCTAssertEqual(ExplorePriceRail.fraction(.nan, lo: 0, hi: 10), 0)
     }
 
-    func testAskRailPlacesTheMarkerInsideTheCohortBracket() {
-        let r = ExplorePriceRail.cohort(ask: 30_000, position: position())
-        XCTAssertEqual(r.basis, .cohort)
-        XCTAssertEqual(r.caption, ExplorePriceRail.cohortCaption)
-        XCTAssertEqual(r.low, 20_000)
-        XCTAssertEqual(r.high, 40_000)
-        XCTAssertTrue(r.bandStart < r.marker && r.marker < r.bandEnd)
-        XCTAssertTrue((0.0...1.0).contains(r.bandStart) && (0.0...1.0).contains(r.bandEnd) && (0.0...1.0).contains(r.marker))
+    /// The reader's row for the test case: a 1967 Chevelle SS 396 asking $16k against nine close SS 396 sales.
+    private func fairJSON(verdict: String = "range", reason: String? = nil, low: Double = 43_000, mid: Double = 54_000,
+                          high: Double = 60_900, n: Int = 9) -> String {
+        let r = reason.map { "\"" + $0 + "\"" } ?? "null"
+        return """
+        {"as_of":"2026-11-22T17:00:00Z","rows":[{"vehicle_id":"2A13D3BE-322A-420E-B974-7E82FF468318","verdict":"\(verdict)",
+         "reason":\(r),"match":{"year_from":1967,"year_to":1967,"make":"Chevrolet","family":"Chevelle","tokens":["SS","396"],
+         "window_from":"2024-12-12","window_to":"2026-01-06"},"n":\(n),"low":\(low),"mid":\(mid),"high":\(high),
+         "venues":{"Bring a Trailer":9},"condition_known":0,
+         "comps":[{"vehicle_id":"40ba4288-a634-438d-8aef-00af3a44ac2e","title":"1967 Chevrolet Chevelle SS 396 Sport Coupe 5-Speed",
+                   "sold_on":"2026-01-06","price":63500,"venue":"Bring a Trailer","url":"https://bringatrailer.com/listing/1967-chevrolet-chevelle-ss-396-28/"},
+                  {"vehicle_id":"a02816c3-db28-4f52-9d53-0040c41ef3a7","title":"1967 Chevrolet Chevelle SS 396 Sport Coupe",
+                   "sold_on":"2025-01-22","price":"39000","venue":"Bring a Trailer","url":"javascript:alert(1)"},
+                  {"title":"","url":null},
+                  "junk"]},
+         {"vehicle_id":"not-a-uuid","verdict":"range"}]}
+        """
     }
 
-    func testAskFarOutsideTheBracketStaysOnTheTrack() {
-        let below = ExplorePriceRail.cohort(ask: 1_000, position: position())
-        let above = ExplorePriceRail.cohort(ask: 900_000, position: position())
-        XCTAssertTrue(below.marker < below.bandStart)
-        XCTAssertTrue(above.marker > above.bandEnd)
-        XCTAssertTrue((0.0...1.0).contains(below.marker) && (0.0...1.0).contains(above.marker))
+    private func fair(_ json: String? = nil) -> AskFairRange? {
+        AskFairBoard.decode(Data((json ?? fairJSON()).utf8))?.byId["2a13d3be-322a-420e-b974-7e82ff468318"]
     }
 
-    func testThinOrShortCohortGivesNoRangeAndNoOpinionYet() {
-        for pos in [position(thin: true), position(sales: 4), position(basis: "asked"), nil] {
-            let r = ExplorePriceRail.cohort(ask: 30_000, position: pos)
+    func testFairBoardDecodesLossilyAndKeysByLowercasedId() throws {
+        let board = try XCTUnwrap(AskFairBoard.decode(Data(fairJSON().utf8)))
+        XCTAssertEqual(board.byId.count, 1, "a row without a real vehicle id is skipped")
+        let f = try XCTUnwrap(board.range(for: UUID(uuidString: "2a13d3be-322a-420e-b974-7e82ff468318")))
+        XCTAssertTrue(f.hasRange)
+        XCTAssertEqual(f.n, 9)
+        XCTAssertEqual(f.comps.count, 2, "an empty comp and a non-object are skipped")
+        XCTAssertEqual(f.comps[1].price, 39_000, "a numeric string reads as a number")
+        XCTAssertNil(f.comps[1].url, "only http(s) links open")
+        XCTAssertEqual(f.matchText, "1967 Chevrolet Chevelle · SS 396")
+        XCTAssertEqual(f.venues.first?.name, "Bring a Trailer")
+        XCTAssertNil(AskFairBoard.decode(Data("[]".utf8)))
+    }
+
+    func testChevelleAskSitsBelowItsCloseSalesRange() throws {
+        let r = ExplorePriceRail.fair(ask: 16_000, range: fair())
+        XCTAssertEqual(r.basis, .closeComps)
+        XCTAssertEqual(r.caption, "Fair range · 9 close sales")
+        XCTAssertEqual(r.low, 43_000)
+        XCTAssertEqual(r.high, 60_900)
+        XCTAssertTrue(r.marker < r.bandStart, "a $16k ask sits under the close-sale band")
+        XCTAssertTrue((0.0...1.0).contains(r.marker))
+        XCTAssertEqual(try XCTUnwrap(fair()).askPlacement(16_000), "Below all 2 close sales")
+    }
+
+    func testNoRangeVerdictMissingReaderOrBadNumbersReadNoOpinionYet() {
+        let cases: [AskFairRange?] = [
+            nil,
+            fair(fairJSON(verdict: "no_opinion", reason: "4 close sales in 3 years; 5 needed")),
+            fair(fairJSON(low: 0)),
+            fair(fairJSON(low: 70_000, high: 60_000)),
+        ]
+        for f in cases {
+            let r = ExplorePriceRail.fair(ask: 16_000, range: f)
             XCTAssertEqual(r.basis, .none)
             XCTAssertFalse(r.hasBand)
-            XCTAssertNil(r.low)
             XCTAssertEqual(r.caption, ExplorePriceRail.noOpinion)
         }
-        XCTAssertNil(ExplorePriceRail.cohort(ask: nil, position: position()).caption)
+        XCTAssertNil(ExplorePriceRail.fair(ask: nil, range: fair()).caption)
+    }
+
+    func testTheFamilyCohortIsNeverDrawnForAnAsk() {
+        let ask = item(position: position())
+        let r = ExplorePriceRail.make(item: ask, estimate: estimate(), fresh: true)
+        XCTAssertEqual(r.basis, .none, "a family cohort alone gives no band")
+        XCTAssertEqual(r.caption, ExplorePriceRail.noOpinion)
     }
 
     func testAuctionBandShowsOnlyFromAFreshBoardWithABidInsideIt() {
         let ok = ExplorePriceRail.projected(bid: 15_000, estimate: estimate(), fresh: true)
         XCTAssertEqual(ok.basis, .projected)
         XCTAssertEqual(ok.caption, "Projected hammer")
+        XCTAssertEqual(ok.landing, 18_000)
+        XCTAssertEqual(ok.landingText, "Lands near $18k")
         XCTAssertEqual(ok.low, 14_000)
         XCTAssertEqual(ok.high, 22_000)
         XCTAssertTrue(ok.bandStart < ok.marker && ok.marker < ok.bandEnd)
@@ -180,7 +224,7 @@ final class ExplorePagerTests: XCTestCase {
 
     func testRailChoosesBySourceKind() {
         let ask = item(position: position())
-        XCTAssertEqual(ExplorePriceRail.make(item: ask, estimate: estimate(), fresh: true).basis, .cohort)
+        XCTAssertEqual(ExplorePriceRail.make(item: ask, estimate: estimate(), fresh: true, fair: fair()).basis, .closeComps)
         let lot = item("live:abc", kind: .live, amount: 15_000)
         XCTAssertEqual(ExplorePriceRail.make(item: lot, estimate: estimate(), fresh: true).basis, .projected)
         XCTAssertEqual(lot.lotId, "abc")
@@ -196,20 +240,46 @@ final class ExplorePagerTests: XCTestCase {
 
     // MARK: Why this range
 
-    func testWhyStackServesTheCohortOnceAndLinksTheSource() {
-        let rows = ExploreWhyStack.rows(item: item(position: position()), estimate: nil, fresh: false)
+    func testWhyStackServesCloseSalesOnceAndLinksEachSource() throws {
+        let f = try XCTUnwrap(fair())
+        let rows = ExploreWhyStack.rows(item: item(amount: 16_000, position: position()), estimate: nil, fresh: false, fair: f)
         let labels = rows.map(\.label)
-        XCTAssertTrue(labels.contains("Sales"))
-        XCTAssertTrue(labels.contains("Basis"))
-        XCTAssertTrue(labels.contains("Source"))
+        XCTAssertEqual(rows.first?.label, "Match")
+        XCTAssertNotNil(rows.first?.cohort, "the match opens the existing cohort page")
+        XCTAssertTrue(rows.first?.value.contains("SS 396") == true)
+        XCTAssertEqual(rows.first { $0.label == "Close-sale median" }?.value, AskPlacement.dollars(54_000))
+        XCTAssertEqual(rows.first { $0.label == "Adjustments" }?.value, ExploreWhyStack.noAdjustments)
+        XCTAssertEqual(rows.first { $0.label == "Basis" }?.value, ExploreWhyStack.basis)
+        XCTAssertEqual(rows.first { $0.label == "Confidence" }?.value, "9 close sales · Bring a Trailer 9 · condition recorded on 0 of 9")
         XCTAssertEqual(rows.first { $0.label == "Source" }?.url, URL(string: "https://example.com/l"))
-        XCTAssertNotNil(rows.first { $0.label == "Cohort" }?.cohort, "year, make and model give the existing cohort page")
+        XCTAssertFalse(labels.contains("Sales") || labels.contains("Cohort median"), "no family cohort rows")
+        XCTAssertEqual(Set(labels).count, labels.count, "each fact once")
+        let comps = ExploreWhyStack.compRows(f)
+        XCTAssertEqual(comps.count, 2)
+        XCTAssertEqual(comps[0].url, URL(string: "https://bringatrailer.com/listing/1967-chevrolet-chevelle-ss-396-28/"))
+        XCTAssertTrue(comps[0].value.hasPrefix(AskPlacement.dollars(63_500)))
     }
 
-    func testWhyStackForAThinCohortSaysSoWithoutNumbers() {
-        let rows = ExploreWhyStack.rows(item: item(position: position(thin: true)), estimate: nil, fresh: false)
-        XCTAssertEqual(rows.first { $0.label == "Cohort" }?.value, ExploreAnalytics.notEnoughSales)
-        XCTAssertFalse(rows.map(\.label).contains("Sales"))
+    func testWhyStackWithoutARangeSaysWhy() throws {
+        let f = try XCTUnwrap(fair(fairJSON(verdict: "no_opinion", reason: "4 close sales in 3 years; 5 needed", n: 4)))
+        let rows = ExploreWhyStack.rows(item: item(position: position()), estimate: nil, fresh: false, fair: f)
+        XCTAssertEqual(rows.first { $0.label == "No opinion yet" }?.value, "4 close sales in 3 years; 5 needed")
+        XCTAssertNil(rows.first { $0.label == "Close-sale median" })
+        let none = ExploreWhyStack.rows(item: item(position: position()), estimate: nil, fresh: false, fair: nil)
+        XCTAssertEqual(none.first?.label, "No opinion yet")
+        XCTAssertNotNil(none.first { $0.label == "Model sales" }?.cohort)
+    }
+
+    func testHeatLineCarriesTheBoardsReading() {
+        let h = LiveAuction.Heat(ratio: 1.42, state: .hot, typicalNow: 31_000, share: 0.6, hoursLeft: 19.6)
+        XCTAssertEqual(ExploreWhyStack.heatLine(h),
+                       "Hot: the bid is 1.4× where comparable sold lots stood with 20 h left (\(AskPlacement.dollars(31_000)))")
+        let lot = item("live:abc", kind: .live, amount: 15_000)
+        let rows = ExploreWhyStack.rows(item: lot, estimate: estimate(), fresh: true, heat: "Hot: x")
+        XCTAssertEqual(rows.first?.label, "Heat")
+        XCTAssertNil(rows.first { $0.label == "Projection" }, "the rail carries the landing price")
+        let above = ExploreWhyStack.rows(item: item("live:abc", kind: .live, amount: 30_000), estimate: estimate(), fresh: true)
+        XCTAssertEqual(above.first { $0.label == "Projection" }?.value, AskPlacement.dollars(18_000), "said here when the rail cannot")
     }
 
     func testWhyStackForALotNeedsAFreshBoard() {
