@@ -135,6 +135,7 @@ INSERT INTO auction_comments (id, auction_event_id, vehicle_id, comment_type, co
 \ir ../migrations/20261123182000_data_set_membership_public_comps.sql
 \ir ../migrations/20261123183000_data_set_comps_speed.sql
 \ir ../migrations/20261123184000_data_set_comps_event_from_basis.sql
+\ir ../migrations/20261123185000_data_set_membership_restamp_revert_scope.sql
 
 -- Grants: tables closed to anon, readers open, producer closed.
 SELECT t_assert(NOT has_table_privilege('anon', 'public.data_set_members', 'SELECT')
@@ -256,6 +257,54 @@ SELECT t_assert((:'rv5'::jsonb->>'earlier_supersedes_restored')::int = 1
             AND (SELECT count(*) FROM fb_sets WHERE set_kind = 'trans_tail_casting' AND member_type = 'vehicle') = 1,
   'reverting the re-add brings the earlier row back');
 
+-- Reverting an unrelated run never revives a kept row that a later, still-applied run turned off.
+\set r7 '''77777777-7777-4777-8777-777777777777'''
+\set r8 '''88888888-8888-4888-8888-888888888888'''
+\set r9 '''99999999-9999-4999-8999-999999999999'''
+\set r10 '''aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'''
+UPDATE vehicle_observations SET is_superseded = true WHERE id = 'b0000000-0000-4000-8000-000000000004';
+SELECT data_set_membership_plan_v1(:r7, 'vehicle', :fb) AS p7 \gset
+SELECT data_set_membership_apply_v1(:r7, 50, 5, false) AS a7 \gset
+UPDATE vehicle_observations SET is_superseded = false WHERE id = 'b0000000-0000-4000-8000-000000000004';
+SELECT data_set_membership_plan_v1(:r8, 'vehicle', :fb) AS p8 \gset
+SELECT data_set_membership_apply_v1(:r8, 50, 5, false) AS a8 \gset
+SELECT data_set_membership_revert_v1(:r7) AS rv7 \gset
+UPDATE vehicle_observations SET is_superseded = true WHERE id = 'b0000000-0000-4000-8000-000000000004';
+SELECT data_set_membership_plan_v1(:r9, 'vehicle', :fb) AS p9 \gset
+SELECT data_set_membership_apply_v1(:r9, 50, 5, false) AS a9 \gset
+SELECT t_assert((SELECT count(*) FROM fb_sets WHERE set_kind = 'trans_tail_casting') = 0, 'tail casting off after run 9');
+SELECT data_set_membership_plan_v1(:r10, 'vehicle', :ta1) AS p10 \gset
+SELECT data_set_membership_apply_v1(:r10, 50, 5, false) AS a10 \gset
+SELECT data_set_membership_revert_v1(:r10) AS rv10 \gset
+SELECT t_assert((:'rv10'::jsonb->>'earlier_supersedes_restored')::int = 0
+            AND (SELECT count(*) FROM fb_sets WHERE set_kind = 'trans_tail_casting') = 0,
+  'an unrelated revert does not revive a kept row');
+SELECT data_set_membership_revert_v1(:r9) AS rv9 \gset
+SELECT data_set_membership_revert_v1(:r8) AS rv8 \gset
+SELECT t_assert((:'rv8'::jsonb->>'earlier_supersedes_restored')::int = 1
+            AND (SELECT count(*) FROM fb_sets WHERE set_kind = 'trans_tail_casting' AND member_type = 'vehicle') = 1,
+  'reverting the re-add restores exactly one earlier row');
+UPDATE vehicle_observations SET is_superseded = false WHERE id = 'b0000000-0000-4000-8000-000000000004';
+
+-- A comment moved to another auction: re-plan restamps it (supersede + add, no collision); comps follow the stamp.
+\set r11 '''bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'''
+CREATE TEMP VIEW sd_stamp AS
+  SELECT m.basis_detail->>'auction_event_id' AS ev FROM data_set_members m JOIN data_sets s ON s.id = m.set_id
+   WHERE s.set_kind = 'comment_theme' AND s.set_key = 'sd_authenticity' AND m.state = 'active'
+     AND m.member_id = 'd0000000-0000-4000-8000-000000000001';
+UPDATE auction_comments SET auction_event_id = 'c0000000-0000-4000-8000-000000000005' WHERE id = 'd0000000-0000-4000-8000-000000000001';
+SELECT data_set_membership_plan_v1(:r11, 'vehicle', :ta2) AS p11 \gset
+SELECT t_assert((:'p11'::jsonb->'by_kind'->>'supersede:comment_theme:auction_comment')::int >= 1
+            AND (:'p11'::jsonb->'by_kind'->>'add:comment_theme:auction_comment')::int >= 1, 'moved comment planned for restamp');
+SELECT data_set_membership_apply_v1(:r11, 1, 50, false) AS a11 \gset
+SELECT t_assert((SELECT count(*) FROM sd_stamp) = 1 AND (SELECT ev FROM sd_stamp) = 'c0000000-0000-4000-8000-000000000005', 'restamped to the new auction');
+SELECT t_assert((SELECT (e->'sold'->>'n')::int FROM jsonb_array_elements(data_set_comps((SELECT id FROM data_sets WHERE set_key = 'sd_authenticity'), NULL, 'gross_incl_premium')->'sets') e) = 0,
+  'comps follow the new stamp');
+SELECT data_set_membership_revert_v1(:r11) AS rv11 \gset
+SELECT t_assert((SELECT count(*) FROM sd_stamp) = 1 AND (SELECT ev FROM sd_stamp) = 'c0000000-0000-4000-8000-000000000003', 'revert puts the old stamp back');
+UPDATE auction_comments SET auction_event_id = 'c0000000-0000-4000-8000-000000000003' WHERE id = 'd0000000-0000-4000-8000-000000000001';
+DROP VIEW sd_stamp;
+
 -- A replica's VIN changes between plan and apply: its replica memberships are not applied.
 \set r6 '''66666666-6666-4666-8666-666666666666'''
 UPDATE vehicles SET is_replica = true, replica_quote = 'Trans Am SD-455 tribute' WHERE id = :ta2dup;
@@ -284,6 +333,7 @@ SELECT t_assert(true, 'a reverted run cannot be applied again');
 
 -- The file's own revert.
 DROP VIEW fb_sets;
+\ir revert_20261123185000_data_set_membership_restamp_revert_scope.sql
 \ir revert_20261123184000_data_set_comps_event_from_basis.sql
 \ir revert_20261123183000_data_set_comps_speed.sql
 \ir revert_20261123182000_data_set_membership_public_comps.sql
