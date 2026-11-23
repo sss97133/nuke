@@ -25,6 +25,7 @@ const DealRead = React.lazy(() => import('../pages/DealRead'));
 // R&D: white-label / "make this my app" showroom
 const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const Valuation = React.lazy(() => import('../pages/Valuation'));
+const McpAdvisor = React.lazy(() => import('../pages/McpAdvisor'));
 const SourcesBoard = React.lazy(() => import('../pages/market/SourcesBoard'));
 // Stacks: a page per stack, a path through the nine layers (case ledger §13.2)
 const StacksIndex = React.lazy(() => import('../pages/stacks/StacksIndex'));
@@ -213,6 +214,7 @@ export const DomainRoutes = () => {
         <Route path="/sources" element={<SourcesBoard />} />
         <Route path="/sources/:source" element={<SourcesBoard />} />
         <Route path="/valuation" element={<Valuation />} />
+        <Route path="/mcp-advisor" element={<McpAdvisor />} />
         <Route path="/stacks" element={<StacksIndex />} />
         <Route path="/stacks/order-book/:vehicleId" element={<OrderBookStack />} />
         {/* Public auction listings */}

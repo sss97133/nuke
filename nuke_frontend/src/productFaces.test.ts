@@ -5,10 +5,15 @@ import { describe, expect, it } from 'vitest';
 import { SITE } from './lib/discoveryFace';
 import { moneyAmounts } from './lib/cohortReport';
 import {
+  ADVISOR_CLIENT_DOCS,
+  ADVISOR_ENDPOINT,
+  ADVISOR_TOOLS,
+  CURSOR_MCP_JSON,
   DEVELOPERS_FAQS,
   DEVELOPERS_PUBLIC_LINKS,
   VALUATION_FAQS,
   developersFace,
+  mcpAdvisorFace,
   productFace,
   valuationFace,
 } from './lib/productFaces';
@@ -85,5 +90,47 @@ describe('product faces', () => {
     for (const link of DEVELOPERS_PUBLIC_LINKS) {
       expect(link.href.startsWith(SITE)).toBe(true);
     }
+  });
+
+  it('/mcp-advisor lists the advisor tools from tools.ts and cites official client docs', () => {
+    const page = mcpAdvisorFace();
+    expect(page.path).toBe('/mcp-advisor');
+    expect(page.title).toBe('Nuke Asset Advisor MCP | Nuke');
+    expect(page.body).toContain(ADVISOR_ENDPOINT);
+    expect(page.body).toContain('no write, admin, shop, SQL, or photo-analysis');
+    expect(page.body).toContain('cap confidence at 0.6');
+    expect(page.body).toContain(ADVISOR_CLIENT_DOCS.claude);
+    expect(page.body).toContain(ADVISOR_CLIENT_DOCS.cursor);
+    expect(page.body).toContain(ADVISOR_CLIENT_DOCS.chatgpt);
+    expect(page.body).toContain(ADVISOR_CLIENT_DOCS.chatgptConnect);
+    expect(page.body).toContain('https://nuke.ag/mcp/advisor');
+    expect(CURSOR_MCP_JSON).toContain('"url": "https://nuke.ag/mcp/advisor"');
+    expect(CURSOR_MCP_JSON).not.toContain('nk_live_');
+    expect(page.body).toContain('nuke-asset-advisor');
+    expect(page.body).toContain('&quot;url&quot;: &quot;https://nuke.ag/mcp/advisor&quot;');
+    expect(moneyAmounts(`${page.title}\n${page.description}\n${page.body}\n${page.head}`)).toEqual([]);
+    const graph = ld(page);
+    expect(graph['@graph'].map((n) => n['@type'])).toEqual(['WebApplication', 'FAQPage']);
+    expect(productFace('/mcp-advisor')).toEqual(page);
+    expect(page.body).toContain('MCP clients should call that URL, not /mcp-advisor');
+  });
+
+  it('advisor tool names and descriptions match tools.ts', () => {
+    const toolsSrc = readFileSync(path.join(root, 'supabase/functions/mcp-connector/advisor/tools.ts'), 'utf8');
+    for (const tool of ADVISOR_TOOLS) {
+      expect(toolsSrc).toContain(`name: "${tool.name}"`);
+      expect(toolsSrc).toContain(tool.description.slice(0, 80));
+      expect(mcpAdvisorFace().body).toContain(`<code>${tool.name}</code>`);
+      expect(mcpAdvisorFace().body).toContain(tool.description);
+    }
+    expect(ADVISOR_TOOLS.map((t) => t.name)).toEqual([
+      'find_asset', 'get_asset', 'get_comps', 'value_asset', 'evaluate_listing', 'budget_options',
+    ]);
+    const card = readFileSync(path.join(root, 'nuke_frontend/middleware.ts'), 'utf8');
+    expect(card).toContain("url: 'https://nuke.ag/mcp/advisor'");
+    expect(card).toContain("version: '1.1.0'");
+    expect(card).toContain("protocol: '2025-03-26'");
+    expect(card).toContain('required: false');
+    expect(toolsSrc).toContain('Confidence is capped at 0.6');
   });
 });
