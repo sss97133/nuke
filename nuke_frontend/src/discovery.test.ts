@@ -282,6 +282,7 @@ describe('discovery faces', () => {
     expect(out!.body).toContain('href="https://nuke.ag/methodology"');
     expect(out!.body).toContain('href="https://nuke.ag/sources"');
     expect(out!.body).toContain('href="https://nuke.ag/api/docs"');
+    expect(out!.body).toContain('href="https://nuke.ag/compare"');
   });
 
   it('/valuation and /developers prerender with self-canonicals and JSON-LD', async () => {
@@ -357,5 +358,26 @@ describe('discovery faces', () => {
     expect(sources!.body).toContain('254,485 lots held (counted 2026-10-16)');
     expect(sources!.body).toContain('source total unknown.');
     expect(sources!.res.headers.get('x-nuke-board')).toBe('ok');
+  });
+
+  it('/compare and vs-pages prerender with self-canonicals, citations, and no invented prices', async () => {
+    const index = await call('/compare', {});
+    expect(index!.body).toContain('<link rel="canonical" href="https://nuke.ag/compare" />');
+    expect(index!.body).toContain('<title>Compare Nuke | Nuke</title>');
+    expect(index!.body).toContain('href="https://nuke.ag/compare/nuke-vs-hagerty"');
+    expect(index!.body).toContain('"@type":"FAQPage"');
+
+    const hagerty = await call('/compare/nuke-vs-hagerty', {});
+    expect(hagerty!.body).toContain('<link rel="canonical" href="https://nuke.ag/compare/nuke-vs-hagerty" />');
+    expect(hagerty!.body).toContain('https://www.hagerty.com/media/market-trends/hagerty-insider/how-the-hagerty-price-guide-is-made/');
+    expect(hagerty!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
+
+    const bat = await call('/compare/nuke-vs-bat-results', {});
+    expect(bat!.body).toContain('View 275,777 Completed Auctions');
+    expect(bat!.body).toContain('https://bringatrailer.com/auctions/results/');
+
+    const alt = await call('/alternatives', {});
+    expect(alt!.body).toContain('<link rel="canonical" href="https://nuke.ag/alternatives" />');
+    expect(alt!.body).toContain('<title>Alternatives to Nuke | Nuke</title>');
   });
 });
