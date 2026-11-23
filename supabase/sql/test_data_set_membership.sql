@@ -133,6 +133,7 @@ INSERT INTO auction_comments (id, auction_event_id, vehicle_id, comment_type, co
 \ir ../migrations/20261123180000_data_set_membership.sql
 \ir ../migrations/20261123181000_data_set_membership_review_fixes.sql
 \ir ../migrations/20261123182000_data_set_membership_public_comps.sql
+\ir ../migrations/20261123183000_data_set_comps_speed.sql
 
 -- Grants: tables closed to anon, readers open, producer closed.
 SELECT t_assert(NOT has_table_privilege('anon', 'public.data_set_members', 'SELECT')
@@ -141,6 +142,10 @@ SELECT t_assert(has_function_privilege('anon', 'public.vehicle_data_sets(uuid)',
             AND has_function_privilege('anon', 'public.data_set_comps(uuid, uuid, price_basis_t)', 'EXECUTE'), 'readers open to anon');
 SELECT t_assert(NOT has_function_privilege('anon', 'public.data_set_membership_apply_v1(uuid, integer, integer, boolean)', 'EXECUTE')
             AND NOT has_function_privilege('anon', 'public.data_set_membership_plan_v1(uuid, text, uuid)', 'EXECUTE'), 'producer closed to anon');
+SELECT t_assert((SELECT l.lanname FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
+                  WHERE p.oid = 'public.data_set_comps_one(uuid, uuid, price_basis_t)'::regprocedure) = 'plpgsql'
+            AND NOT has_function_privilege('anon', 'public.data_set_comps_one(uuid, uuid, price_basis_t)', 'EXECUTE'),
+                'comps helper is plpgsql (planned per set) and closed to anon');
 SELECT t_assert(NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'data_set_members'
                              AND column_name ~ 'author|text'), 'no comment author or text column');
 
@@ -278,6 +283,7 @@ SELECT t_assert(true, 'a reverted run cannot be applied again');
 
 -- The file's own revert.
 DROP VIEW fb_sets;
+\ir revert_20261123183000_data_set_comps_speed.sql
 \ir revert_20261123182000_data_set_membership_public_comps.sql
 \ir revert_20261123181000_data_set_membership_review_fixes.sql
 \ir revert_20261123180000_data_set_membership.sql
