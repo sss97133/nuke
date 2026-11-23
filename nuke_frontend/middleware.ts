@@ -26,11 +26,13 @@ import {
 } from './src/lib/cohortHubs';
 import { productFace } from './src/lib/productFaces';
 import { buildUseCaseFace } from './src/lib/useCases';
+import { trustFace } from './src/lib/trustFaces';
+import { parseEvidence } from './src/pages/aboutEvidence';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
     '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
-    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor', '/use', '/use/:path*'],
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor', '/use', '/use/:path*', '/about', '/methodology', '/sources'],
 };
 
 const MCP_SERVER_CARD = {
@@ -236,6 +238,20 @@ async function fetchBoard(): Promise<Board> {
   }
 }
 
+
+async function fetchEvidence(origin: string) {
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 4000);
+    const resp = await fetch(new URL('/evidence.md', origin).toString(), { signal: ctl.signal });
+    clearTimeout(timer);
+    if (!resp.ok) return null;
+    return parseEvidence(await resp.text());
+  } catch {
+    return null;
+  }
+}
+
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : 'unknown');
 const fmt = (n: number | null) => (n == null ? 'unknown' : n.toLocaleString('en-US'));
 
@@ -289,7 +305,7 @@ function faceBody(page: FacePage, b: Board): string {
     '<li><a href="https://github.com/sss97133/nuke">The repository and its generated, dated numbers</a></li>' +
     '<li><a href="https://nuke.ag/llms.txt">llms.txt</a></li>' +
     '<li><a href="https://nuke.ag/mcp">MCP endpoint</a> · <a href="https://nuke.ag/developers">API and developers</a></li>' +
-    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/use">Use cases</a> · <a href="https://nuke.ag/developers">Developers</a></li></ul></main>';
+    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/use">Use cases</a> · <a href="https://nuke.ag/developers">Developers</a> · <a href="https://nuke.ag/about">About</a> · <a href="https://nuke.ag/methodology">Methodology</a> · <a href="https://nuke.ag/sources">Sources</a> · <a href="https://nuke.ag/api/docs">API docs</a></li></ul></main>';
 }
 
 function injectFace(html: string, page: FacePage, b: Board): string {
@@ -322,6 +338,10 @@ function llmsTxt(b: Board): string {
     '- [MCP full connector](https://nuke.ag/mcp)',
     '- [Vehicle API: GET /api/v1/vehicle/{id}](https://nuke.ag/api/v1/vehicle)',
     '- [Developers](https://nuke.ag/developers)',
+    '- [API docs](https://nuke.ag/api/docs)',
+    '- [Methodology](https://nuke.ag/methodology)',
+    '- [About](https://nuke.ag/about)',
+    '- [Sources](https://nuke.ag/sources)',
     '- [Sitemap](https://nuke.ag/sitemap.xml)',
     '', '## Nuke Asset Advisor',
     'Install in any MCP client as a Streamable HTTP server at `https://nuke.ag/mcp/advisor`.',
@@ -639,6 +659,28 @@ export default async function middleware(request: Request): Promise<Response | u
     if (!html) return undefined;
     return new Response(injectPage(html, product), {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
+    });
+  }
+
+  const trustPath = url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : url.pathname;
+  if (trustPath === '/methodology' || trustPath === '/about' || trustPath === '/sources') {
+    const accept = request.headers.get('Accept') || '';
+    if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return undefined;
+    const origin = new URL(request.url).origin;
+    const [html, evidence, board] = await Promise.all([
+      getBaseHtml(request.url),
+      trustPath === '/about' ? fetchEvidence(origin) : Promise.resolve(null),
+      trustPath === '/sources' ? fetchBoard() : Promise.resolve(null),
+    ]);
+    if (!html) return undefined;
+    const page = trustFace(trustPath, { evidence, board });
+    if (!page) return undefined;
+    return new Response(injectPage(html, page), {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': FACE_CACHE,
+        ...(trustPath === '/sources' ? { 'x-nuke-board': boardStatus } : {}),
+      },
     });
   }
 
