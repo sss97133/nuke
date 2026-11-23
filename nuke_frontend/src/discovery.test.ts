@@ -226,6 +226,44 @@ describe('discovery faces', () => {
     expect(out!.body).toContain(`<link rel="canonical" href="https://nuke.ag/vehicle/${VEH}" />`);
     expect(out!.body).toContain('<title>1983 GMC K2500 Sierra Classic | Nuke</title>');
     expect(out!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
+    // vehicles.sale_price alone is not a sold event (it can be an unsold high bid).
+    expect(out!.body).not.toContain('31,000');
+    expect(out!.body).toContain('No recorded sold event');
+    expect(out!.body).toContain('"@type":"FAQPage"');
+  });
+
+  it('/vehicle/:id lists a cited sold event and cohort median, and ignores vehicles.sale_price', async () => {
+    const out = await call(`/vehicle/${VEH}`, {
+      'rest:vehicles': [{
+        id: VEH, year: 1983, make: 'GMC', model: 'K2500', trim: 'Sierra Classic',
+        sale_price: 31000, nuke_estimate: 45000, updated_at: '2026-11-20T12:00:00Z',
+      }],
+      'rest:vehicle_events': [{
+        id: 'evt-1', event_status: 'sold', final_price: 27500, currency_code: 'USD',
+        sold_at: '2026-10-02T18:00:00Z', source_platform: 'Bring a Trailer',
+        source_url: 'https://bringatrailer.com/listing/1983-gmc-k2500/',
+        price_verification: 'verified', sale_truth_role: 'primary',
+      }],
+      get_make_model_terminal: {
+        resolved: true,
+        price_distribution: { populated: true, median: 57208, n: 105, observed_at: '2026-11-20T00:00:00Z' },
+        comps: {
+          populated: true,
+          rows: [{
+            vehicle_id: '11111111-1111-4111-8111-111111111111', year: 1983, make: 'GMC', model: 'K2500',
+            sale_price: 64000, sold_date: '2026-09-01', listing_url: 'https://bringatrailer.com/listing/other/',
+          }],
+        },
+      },
+    });
+    expect(out!.body).toContain('$27,500');
+    expect(out!.body).toContain('2026-10-02');
+    expect(out!.body).toContain('https://bringatrailer.com/listing/1983-gmc-k2500/');
+    expect(out!.body).toContain('Median sale $57,208');
+    expect(out!.body).toContain('$64,000');
+    expect(out!.body).toContain('href="https://nuke.ag/cohort/gmc/k2500/1983"');
+    expect(out!.body).not.toContain('31,000');
+    expect(out!.body).not.toContain('45,000');
   });
 
   it('/cohort/:make/:model/:year canonicalizes to the lowercase path and shows a median when recorded', async () => {
