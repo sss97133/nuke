@@ -29,7 +29,7 @@ import { productFace } from './src/lib/productFaces';
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
     '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
-    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers'],
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor'],
 };
 
 const MCP_SERVER_CARD = {
@@ -288,7 +288,7 @@ function faceBody(page: FacePage, b: Board): string {
     '<li><a href="https://github.com/sss97133/nuke">The repository and its generated, dated numbers</a></li>' +
     '<li><a href="https://nuke.ag/llms.txt">llms.txt</a></li>' +
     '<li><a href="https://nuke.ag/mcp">MCP endpoint</a> · <a href="https://nuke.ag/developers">API and developers</a></li>' +
-    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/developers">Developers</a></li></ul></main>';
+    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/developers">Developers</a></li></ul></main>';
 }
 
 function injectFace(html: string, page: FacePage, b: Board): string {
@@ -316,6 +316,7 @@ function llmsTxt(b: Board): string {
     '- [Evidence: graded predictions and the stack registry](https://nuke.ag/evidence.md)',
     '', '## Use it',
     '- [MCP Asset Advisor (read-only, cited)](https://nuke.ag/mcp/advisor)',
+    '- [How to connect the Asset Advisor in Claude, ChatGPT, or Cursor](https://nuke.ag/mcp-advisor)',
     '- [MCP server card](https://nuke.ag/.well-known/mcp.json)',
     '- [MCP full connector](https://nuke.ag/mcp)',
     '- [Vehicle API: GET /api/v1/vehicle/{id}](https://nuke.ag/api/v1/vehicle)',

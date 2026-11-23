@@ -276,6 +276,7 @@ describe('discovery faces', () => {
     expect(out!.body).toContain('href="https://nuke.ag/cohort"');
     expect(out!.body).toContain('href="https://nuke.ag/valuation"');
     expect(out!.body).toContain('href="https://nuke.ag/developers"');
+    expect(out!.body).toContain('href="https://nuke.ag/mcp-advisor"');
   });
 
   it('/valuation and /developers prerender with self-canonicals and JSON-LD', async () => {
@@ -294,5 +295,16 @@ describe('discovery faces', () => {
     expect(dev!.body).toContain('find_asset');
     expect(dev!.body).toContain('"@type":"FAQPage"');
     expect(dev!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
+  });
+
+  it('/mcp-advisor prerenders a how-to with a self-canonical and does not capture the protocol URL', async () => {
+    const page = await call('/mcp-advisor', {});
+    expect(page!.body).toContain('<link rel="canonical" href="https://nuke.ag/mcp-advisor" />');
+    expect(page!.body).toContain('<title>Nuke Asset Advisor MCP | Nuke</title>');
+    expect(page!.body).toContain('find_asset');
+    expect(page!.body).toContain('https://nuke.ag/mcp/advisor');
+    expect(page!.body).toContain('https://cursor.com/docs/mcp');
+    expect(page!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
+    expect(await call('/mcp/advisor', {})).toBeNull();
   });
 });

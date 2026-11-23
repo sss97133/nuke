@@ -28,6 +28,7 @@ export const STATIC_SITEMAP_URLS: SitemapUrl[] = [
   { loc: `${SITE}/jobs` },
   { loc: `${SITE}/cohort` },
   { loc: `${SITE}/valuation` },
+  { loc: `${SITE}/mcp-advisor` },
   { loc: `${SITE}/about` },
   { loc: `${SITE}/developers` },
   { loc: `${SITE}/privacy` },
