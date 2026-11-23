@@ -9,6 +9,7 @@ import {
   sitemapXml,
   type SitemapUrl,
 } from './discoveryFace';
+import { hubSitemapUrls, parseYearProfile, type YearProfile } from './cohortHubs';
 
 export const SITEMAP_CHUNK = 50_000;
 export const SITEMAP_PAGE = 1_000;
@@ -25,6 +26,7 @@ export const STATIC_SITEMAP_URLS: SitemapUrl[] = [
   { loc: `${SITE}/market` },
   { loc: `${SITE}/journal` },
   { loc: `${SITE}/jobs` },
+  { loc: `${SITE}/cohort` },
   { loc: `${SITE}/about` },
   { loc: `${SITE}/developers` },
   { loc: `${SITE}/privacy` },
@@ -159,6 +161,24 @@ export function yearCohortUrls(env: RestEnv, chunk: number): Promise<Read<Sitema
       lastmod: dayOf(typeof row.updated_at === 'string' ? row.updated_at : null),
     };
   });
+}
+
+export async function allYearProfiles(env: RestEnv): Promise<Read<YearProfile[]>> {
+  const rows: YearProfile[] = [];
+  for (let offset = 0; ; offset += SITEMAP_PAGE) {
+    const got = await restRange<CohortRow>(env, YEAR_COHORTS, offset, offset + SITEMAP_PAGE - 1);
+    if (!got.ok) return got;
+    for (const row of got.value) {
+      const parsed = parseYearProfile(row);
+      if (parsed) rows.push(parsed);
+    }
+    if (got.value.length < SITEMAP_PAGE) break;
+  }
+  return { ok: true, value: rows };
+}
+
+export function directorySitemapUrls(rows: YearProfile[]): SitemapUrl[] {
+  return hubSitemapUrls(rows);
 }
 
 export function indexLocs(vehicleTotal: number, cohortTotal: number, today: string): SitemapUrl[] {

@@ -1,7 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   acceptEncodingHeader,
+  allYearProfiles,
   buildUrlset,
+  directorySitemapUrls,
   encodeSitemap,
   parseChunkParam,
   restEnvFromProcess,
@@ -30,9 +32,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', SITEMAP_UNAVAILABLE);
     return res.status(503).json({ error: 'upstream unavailable', upstream_status: got.status });
   }
-  if (got.value.length === 0) return res.status(404).json({ error: 'not_found' });
+  let urls = got.value;
+  if (chunk === 0) {
+    const profiles = await allYearProfiles(env);
+    if (!profiles.ok) {
+      res.setHeader('Cache-Control', SITEMAP_UNAVAILABLE);
+      return res.status(503).json({ error: 'upstream unavailable', upstream_status: profiles.status });
+    }
+    urls = [...directorySitemapUrls(profiles.value), ...urls];
+  }
+  if (urls.length === 0) return res.status(404).json({ error: 'not_found' });
 
-  const encoded = encodeSitemap(buildUrlset(got.value), acceptEncodingHeader(req.headers['accept-encoding']));
+  const encoded = encodeSitemap(buildUrlset(urls), acceptEncodingHeader(req.headers['accept-encoding']));
   res.status(200);
   for (const [k, v] of Object.entries(encoded.headers)) res.setHeader(k, v);
   return res.send(encoded.body);
