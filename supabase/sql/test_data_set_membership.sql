@@ -134,6 +134,7 @@ INSERT INTO auction_comments (id, auction_event_id, vehicle_id, comment_type, co
 \ir ../migrations/20261123181000_data_set_membership_review_fixes.sql
 \ir ../migrations/20261123182000_data_set_membership_public_comps.sql
 \ir ../migrations/20261123183000_data_set_comps_speed.sql
+\ir ../migrations/20261123184000_data_set_comps_event_from_basis.sql
 
 -- Grants: tables closed to anon, readers open, producer closed.
 SELECT t_assert(NOT has_table_privilege('anon', 'public.data_set_members', 'SELECT')
@@ -283,6 +284,7 @@ SELECT t_assert(true, 'a reverted run cannot be applied again');
 
 -- The file's own revert.
 DROP VIEW fb_sets;
+\ir revert_20261123184000_data_set_comps_event_from_basis.sql
 \ir revert_20261123183000_data_set_comps_speed.sql
 \ir revert_20261123182000_data_set_membership_public_comps.sql
 \ir revert_20261123181000_data_set_membership_review_fixes.sql
