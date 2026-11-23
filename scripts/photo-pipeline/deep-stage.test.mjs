@@ -143,6 +143,35 @@ test('the admitted set is the database row; its fingerprint is part of the metho
   assert.ok(automaticMethod(ADMITS).length <= 200, 'inside the intake\'s text limit');
 });
 
+test('when the database admits rust none and paint aged, an agreed pair is posted; assembly stays unpublished on the thin parent', () => {
+  const wide = {
+    ...ADMITS,
+    rust_severity: ['none', 'surface', 'pitting', 'perforation'],
+    paint_state: ['bare_metal', 'primer', 'sealer', 'base', 'clear', 'aged'],
+  };
+  const first = verdict({ scene_type: 'body_exterior' }, { rust_severity: 'none', paint_state: 'aged', completeness: 'assembled' });
+  const second = verdict({ scene_type: 'body_exterior' }, { rust_severity: 'none', paint_state: 'aged', completeness: 'assembled' });
+  const r = thinVerdict(first, second, wide);
+  assert.equal(r.errors.length, 0);
+  assert.deepEqual(r.posted, { scene_type: 'body_exterior', rust_severity: 'none', paint_state: 'aged' });
+  assert.equal(r.verdict.state_observations.completeness, 'unknown', 'assembly state is still not posted on the thin parent');
+  assert.equal(thinViolation(r.verdict, wide), null);
+  const stored = {
+    id: '30000000-0000-4000-8000-000000000002', kind: 'condition', is_superseded: false, vehicle_id: r.verdict.vehicle_id,
+    confidence: 'medium', confidence_score: 0.6, agent_model: 'claude-sonnet-5-5', agent_tier: AUTOMATIC_TIER,
+    extraction_method: 'reviewed_image_analysis_v1', observed_at: '2026-11-20T18:05:00.000Z', ingested_at: '2026-11-20T18:05:03.123456+00:00',
+    structured_data: { ...r.verdict, analysis_kind: 'image_deep_byok', witness_image_id: r.verdict.image_id, is_inferred: true },
+  };
+  const image = { id: r.verdict.image_id, vehicle_id: r.verdict.vehicle_id, is_sensitive: false, is_superseded: false,
+    is_duplicate: false, is_document: false, vision_gate_status: 'approved', image_vehicle_match_status: 'match' };
+  const keyed = projectImageProperties(stored, image, { releaseIntentOnlyClarification: true });
+  assert.equal(keyed.deferred, null);
+  assert.deepEqual(keyed.claims.map((c) => [c.property_key, c.structured_data[c.property_key]]), [
+    ['image_visible_rust_severity', 'none'],
+    ['image_visible_paint_stage', 'aged'],
+  ]);
+});
+
 test('a thin reading keys: the row the intake stores for it projects exactly its posted rust value, through the one-photo route only', () => {
   // the stored row: the verdict plus what the intake adds, the confidence as the writer stores it (the verdict's own, capped at 0.6)
   const stored = (v, over = {}) => ({ id: '30000000-0000-4000-8000-000000000001', kind: 'condition', is_superseded: false, vehicle_id: v.vehicle_id,
