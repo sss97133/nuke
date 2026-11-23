@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { PublicDiscoveryLinks } from "../../components/PublicDiscoveryLinks";
 import { getGridImageUrl } from "../../lib/imageOptimizer";
 import { callTool } from "../../lib/mcp";
 import { readVehicleNames } from "./vehicleNames";
@@ -287,6 +288,7 @@ export default function JournalPage() {
 
       <div style={styles.footer}>
         PUBLIC VIEW · EACH ENTRY IS ATTRIBUTED TO THE PHOTO, RECEIPT OR PAYMENT IT CAME FROM
+        <PublicDiscoveryLinks />
       </div>
     </div>
   );

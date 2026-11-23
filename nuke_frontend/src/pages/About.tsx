@@ -93,8 +93,16 @@ const About: React.FC = () => {
           <dd><Text role="body"><Link to="/journal">What the ledger recorded</Link>, day by day.</Text></dd>
           <dt><Text role="label">Search</Text></dt>
           <dd><Text role="body"><Link to="/search">A vehicle, a VIN or a listing URL</Link>.</Text></dd>
+          <dt><Text role="label">Methodology</Text></dt>
+          <dd><Text role="body"><Link to="/methodology">How Nuke cites sources, clocks, and confidence</Link>.</Text></dd>
+          <dt><Text role="label">Sources</Text></dt>
+          <dd><Text role="body"><Link to="/sources">Every source, ranked by the lots Nuke holds</Link>.</Text></dd>
+          <dt><Text role="label">Compare</Text></dt>
+          <dd><Text role="body"><Link to="/compare">Nuke next to the Hagerty Price Guide, CLASSIC.COM, and Bring a Trailer results</Link>.</Text></dd>
+          <dt><Text role="label">Use cases</Text></dt>
+          <dd><Text role="body"><Link to="/use">How dealers, shops, and auction houses use the ledger</Link>.</Text></dd>
           <dt><Text role="label">The code</Text></dt>
-          <dd><Text role="body"><a href={REPO}>The public repository</a>, with a README measured daily from the same database, and <Link to="/api">the API</Link>.</Text></dd>
+          <dd><Text role="body"><a href={REPO}>The public repository</a>, with a README measured daily from the same database, and <Link to="/api/docs">the API docs</Link>.</Text></dd>
         </dl>
       </section>
 
