@@ -278,6 +278,10 @@ describe('discovery faces', () => {
     expect(out!.body).toContain('href="https://nuke.ag/developers"');
     expect(out!.body).toContain('href="https://nuke.ag/mcp-advisor"');
     expect(out!.body).toContain('href="https://nuke.ag/use"');
+    expect(out!.body).toContain('href="https://nuke.ag/about"');
+    expect(out!.body).toContain('href="https://nuke.ag/methodology"');
+    expect(out!.body).toContain('href="https://nuke.ag/sources"');
+    expect(out!.body).toContain('href="https://nuke.ag/api/docs"');
   });
 
   it('/valuation and /developers prerender with self-canonicals and JSON-LD', async () => {
@@ -321,5 +325,37 @@ describe('discovery faces', () => {
     expect(dealers!.body).toContain('"@type":"WebPage"');
     const auctions = await call('/use/auction-houses', {});
     expect(auctions!.body).toContain('Bring a Trailer listing URLs only');
+  });
+
+  it('/about, /methodology, and /sources prerender with self-canonicals and no invented prices', async () => {
+    const about = await call('/about', {});
+    expect(about!.body).toContain('<link rel="canonical" href="https://nuke.ag/about" />');
+    expect(about!.body).toContain('<title>About | Nuke</title>');
+    expect(about!.body).toContain('"@type":"FAQPage"');
+    expect(about!.body).toContain('does not fall back to a typed number');
+    expect(about!.body).not.toContain('<link rel="canonical" href="https://nuke.ag" />');
+
+    const method = await call('/methodology', {});
+    expect(method!.body).toContain('<link rel="canonical" href="https://nuke.ag/methodology" />');
+    expect(method!.body).toContain('<title>Methodology | Nuke</title>');
+    expect(method!.body).toContain('capped at 0.6');
+    expect(method!.body).toContain('"@type":"WebPage"');
+
+    const sources = await call('/sources', {
+      market_sources_read: {
+        as_of: '2026-10-16T04:47:00Z',
+        columns: ['source', 'name', 'category', 'held_lots', 'held_at', 'population', 'population_method', 'population_confidence', 'population_at'],
+        rows: [
+          ['mecum', 'Mecum Auctions', 'auction', 213935, '2026-10-16T00:30:07Z', 268979, 'enumerated', 0.85, '2026-10-15T01:00:00Z'],
+          ['bat', 'Bring a Trailer', 'auction', 254485, '2026-10-16T00:30:07Z', null, null, null, null],
+        ],
+      },
+    });
+    expect(sources!.body).toContain('<link rel="canonical" href="https://nuke.ag/sources" />');
+    expect(sources!.body).toContain('<title>Sources | Nuke</title>');
+    expect(sources!.body).toContain('market_sources_read');
+    expect(sources!.body).toContain('254,485 lots held (counted 2026-10-16)');
+    expect(sources!.body).toContain('source total unknown.');
+    expect(sources!.res.headers.get('x-nuke-board')).toBe('ok');
   });
 });

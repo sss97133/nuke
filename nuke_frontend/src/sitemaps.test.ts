@@ -59,6 +59,10 @@ describe('sitemap helpers', () => {
     expect(locs).toContain(`${SITE}/use/shops`);
     expect(locs).toContain(`${SITE}/use/auction-houses`);
     expect(locs).toContain(`${SITE}/developers`);
+    expect(locs).toContain(`${SITE}/about`);
+    expect(locs).toContain(`${SITE}/methodology`);
+    expect(locs).toContain(`${SITE}/sources`);
+    expect(locs).toContain(`${SITE}/api/docs`);
     expect(locs).not.toContain(`${SITE}/api`);
     expect(locs).not.toContain(`${SITE}/search`);
     expect(locs).not.toContain(`${SITE}/market/dashboard`);
