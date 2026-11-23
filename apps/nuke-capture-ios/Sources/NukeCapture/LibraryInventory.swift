@@ -42,6 +42,26 @@ struct InventoryRow: Codable, Equatable, Sendable {
     var gate_verdict: String
     var origin_device_id: String?
     var origin_scope: String
+    /// PHCloudIdentifier.stringValue: the id iCloud Photos shares with Mac Photos and iCloud.com, so the
+    /// server can join the same asset across devices. nil when the library cannot map it; never guessed.
+    var cloud_identifier: String? = nil
+}
+
+/// The run's census: the device's own count of every accessible image, by capture month. This is the
+/// denominator capture_library_coverage_v1 reports against. It is never derived from what reached the server.
+struct LibraryCensus: Codable, Equatable, Sendable {
+    var run_id: String
+    var origin_source = "ios_photokit"
+    var origin_device_id: String?
+    var origin_scope: String
+    var media_type = "image"
+    var total_count: Int
+    var month_counts: [String: Int]
+    var undated_count: Int
+    var month_tz: String
+    var started_at: Date
+    var finished_at: Date
+    var producer: String
 }
 
 /// What the device said about one asset, free of PhotoKit types.
@@ -68,6 +88,24 @@ enum LibraryInventoryPlan {
         guard !facts.isScreenshot else { return "screenshot" }
         guard let lat = facts.latitude, let lon = facts.longitude else { return "no_location" }
         return isAtSite(lat, lon) ? "at_site" : "off_site"
+    }
+
+    /// The server buckets capture months in this zone; the census must use the same one.
+    static let censusTimeZone = TimeZone(identifier: "America/Los_Angeles")!
+
+    /// Per-month counts by creation date ("YYYY-MM" in censusTimeZone) plus the undated count.
+    /// months + undated always equals dates.count, which the server checks.
+    static func censusCounts(_ dates: [Date?], timeZone: TimeZone = censusTimeZone) -> (months: [String: Int], undated: Int) {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        var months: [String: Int] = [:]
+        var undated = 0
+        for d in dates {
+            guard let d else { undated += 1; continue }
+            let c = cal.dateComponents([.year, .month], from: d)
+            months[String(format: "%04d-%02d", c.year ?? 0, c.month ?? 0), default: 0] += 1
+        }
+        return (months, undated)
     }
 
     static func row(from facts: InventoryAssetFacts, scope: String, deviceID: String?,
@@ -152,6 +190,8 @@ final class LibraryInventory {
         static let lastCompletedAt = "libraryInventoryLastCompletedAt"
         static let settledMarkedRun = "libraryInventorySettledMarkedRun"
         static let outbox = "libraryInventoryOutbox"           // JSON [InventoryOutcome] not yet reported
+        static let censusOutbox = "libraryInventoryCensusOutbox" // JSON LibraryCensus not yet reported
+        static let censusRunID = "libraryInventoryCensusRunID"   // run whose census was already taken
     }
     static let pageSize = 500
     private var running = false
@@ -177,6 +217,14 @@ final class LibraryInventory {
         let runID = UUID(uuidString: defaults.string(forKey: K.runID) ?? "") ?? UUID()
         let scope = status == .limited ? "limited" : "full"
         let device = UIDevice.current.identifierForVendor?.uuidString
+
+        // A full run starts with a census: one metadata-only pass counting every accessible image by month.
+        // It is queued before the rows so the denominator lands even if the row walk takes days.
+        if defaults.bool(forKey: K.runIsFull), defaults.data(forKey: K.censusOutbox) == nil,
+           defaults.string(forKey: K.censusRunID) != runID.uuidString {
+            queueCensus(runID: runID, scope: scope, device: device)
+        }
+        await flushCensus()
         let maxPages = background ? 40 : 6
 
         if !defaults.bool(forKey: K.nilDatesDone) {
@@ -203,6 +251,59 @@ final class LibraryInventory {
             await Task.yield()
         }
         // Budget spent: the cursor is checkpointed, the next call resumes here.
+    }
+
+    // MARK: Census
+
+    private func queueCensus(runID: UUID, scope: String, device: String?) {
+        let started = Date()
+        let o = PHFetchOptions()
+        o.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        let result = PHAsset.fetchAssets(with: o)
+        var dates: [Date?] = []
+        dates.reserveCapacity(result.count)
+        result.enumerateObjects { a, _, _ in dates.append(a.creationDate) }
+        let counts = LibraryInventoryPlan.censusCounts(dates)
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        let census = LibraryCensus(
+            run_id: runID.uuidString, origin_device_id: device, origin_scope: scope,
+            total_count: dates.count, month_counts: counts.months, undated_count: counts.undated,
+            month_tz: LibraryInventoryPlan.censusTimeZone.identifier, started_at: started, finished_at: Date(),
+            producer: "nuke-capture-ios LibraryInventory census build \(build)")
+        defaults.set(try? Self.censusEncoder.encode(census), forKey: K.censusOutbox)
+        defaults.set(runID.uuidString, forKey: K.censusRunID)
+    }
+
+    private static let censusEncoder: JSONEncoder = {
+        let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e
+    }()
+    private static let censusDecoder: JSONDecoder = {
+        let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d
+    }()
+
+    /// Report a queued census; kept until the server accepts it (the insert is idempotent per run).
+    func flushCensus() async {
+        guard let data = defaults.data(forKey: K.censusOutbox), SupabaseService.currentUserId != nil,
+              let census = try? Self.censusDecoder.decode(LibraryCensus.self, from: data) else { return }
+        struct P: Encodable { let p_census: LibraryCensus }
+        do {
+            try await SupabaseService.client.rpc("library_inventory_record_census", params: P(p_census: census)).execute()
+            defaults.removeObject(forKey: K.censusOutbox)
+        } catch {
+            NSLog("NukeCapture inventory census failed: %@", String(describing: error))
+        }
+    }
+
+    // MARK: Cloud identifiers
+
+    /// PHCloudIdentifier for each local id the library can map (iCloud Photos). Failures map to nil.
+    private func cloudIdentifiers(for ids: [String]) -> [String: String] {
+        guard !ids.isEmpty else { return [:] }
+        var out: [String: String] = [:]
+        for (local, result) in PHPhotoLibrary.shared().cloudIdentifierMappings(forLocalIdentifiers: ids) {
+            if case .success(let cloud) = result { out[local] = cloud.stringValue }
+        }
+        return out
     }
 
     private func begin(full: Bool, from: Date) {
@@ -256,9 +357,14 @@ final class LibraryInventory {
     /// next call retries the same page (the upsert is idempotent).
     private func upload(_ facts: [InventoryAssetFacts], runID: UUID, scope: String, device: String?) async -> Bool {
         let sites = SiteStore.shared
-        let rows = facts.map { LibraryInventoryPlan.row(from: $0, scope: scope, deviceID: device) {
-            sites.isAtSite(latitude: $0, longitude: $1)
-        } }
+        let cloud = cloudIdentifiers(for: facts.map(\.localIdentifier))
+        let rows = facts.map { f -> InventoryRow in
+            var r = LibraryInventoryPlan.row(from: f, scope: scope, deviceID: device) {
+                sites.isAtSite(latitude: $0, longitude: $1)
+            }
+            r.cloud_identifier = cloud[f.localIdentifier]
+            return r
+        }
         for start in stride(from: 0, to: rows.count, by: 500) {
             let chunk = Array(rows[start..<min(start + 500, rows.count)])
             do {

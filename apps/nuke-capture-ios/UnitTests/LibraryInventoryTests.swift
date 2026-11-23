@@ -126,3 +126,51 @@ final class LibraryInventoryTests: XCTestCase {
         XCTAssertNil(json?["latitude"])   // exact coordinates have no field to travel in
     }
 }
+
+// MARK: census (the denominator)
+
+final class LibraryCensusTests: XCTestCase {
+    func testCensusCountsByLosAngelesMonthAndAddsUp() {
+        let iso = ISO8601DateFormatter()
+        let dates: [Date?] = [
+            iso.date(from: "2017-03-10T18:00:00Z"),
+            iso.date(from: "2017-03-31T23:00:00Z"),   // still March in LA
+            iso.date(from: "2017-05-01T03:00:00Z"),   // April 30 in LA (server buckets the same way)
+            iso.date(from: "2023-01-15T12:00:00Z"),
+            nil,
+        ]
+        let c = LibraryInventoryPlan.censusCounts(dates)
+        XCTAssertEqual(c.months, ["2017-03": 2, "2017-04": 1, "2023-01": 1])
+        XCTAssertEqual(c.undated, 1)
+        XCTAssertEqual(c.months.values.reduce(0, +) + c.undated, dates.count)
+    }
+
+    func testEmptyLibraryCensusIsZeroNotMissing() {
+        let c = LibraryInventoryPlan.censusCounts([])
+        XCTAssertTrue(c.months.isEmpty)
+        XCTAssertEqual(c.undated, 0)
+    }
+
+    func testCensusEncodesTheServerFieldNames() throws {
+        let census = LibraryCensus(run_id: "R", origin_device_id: nil, origin_scope: "full", total_count: 3,
+                                   month_counts: ["2017-03": 2], undated_count: 1, month_tz: "America/Los_Angeles",
+                                   started_at: Date(timeIntervalSince1970: 0), finished_at: Date(timeIntervalSince1970: 60),
+                                   producer: "test")
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(census)) as? [String: Any]
+        for k in ["run_id", "origin_source", "origin_scope", "media_type", "total_count", "month_counts",
+                  "undated_count", "month_tz", "started_at", "finished_at", "producer"] {
+            XCTAssertNotNil(json?[k], k)
+        }
+        XCTAssertEqual(json?["origin_source"] as? String, "ios_photokit")
+    }
+
+    func testInventoryRowCarriesCloudIdentifierField() throws {
+        var r = LibraryInventoryPlan.row(from: InventoryAssetFacts(localIdentifier: "A/L0/001", creationDate: nil,
+            mediaSubtypesRaw: 0, sourceType: "user_library", isScreenshot: false, pixelWidth: 1, pixelHeight: 1,
+            latitude: nil, longitude: nil), scope: "full", deviceID: nil) { _, _ in false }
+        XCTAssertNil(r.cloud_identifier)
+        r.cloud_identifier = "CLOUD-1"
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(r)) as? [String: Any]
+        XCTAssertEqual(json?["cloud_identifier"] as? String, "CLOUD-1")
+    }
+}
