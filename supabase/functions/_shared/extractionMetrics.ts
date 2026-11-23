@@ -255,8 +255,7 @@ const intakeReasons = new Set(['paused', 'invocation_limit', 'source_limit', 'wo
 export const INTAKE_RUN_COUNT_KEYS = ['discovered_items', 'queue_rows_acknowledged', 'ingestion_requests',
   'landed_ledger_acknowledged', 'ledger_write_failures', 'known_or_matched', 'backing_off'] as const;
 
-export async function createIntakeRunReceipt(supabase: SupabaseClient, startedAt: number) {
-  const id = crypto.randomUUID();
+export async function createIntakeRunReceipt(supabase: SupabaseClient, startedAt: number, id: string = crypto.randomUUID()) {
   const targets: IntakeRunTarget[] = [];
   let selectionComplete: boolean | null = null;
   let limits: { max_feeds: number; max_ingests: number; limit_scope: string } | null = null;
