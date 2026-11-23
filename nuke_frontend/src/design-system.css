@@ -1200,6 +1200,9 @@ body {
   margin-top: auto;
 }
 
+.app-footer__discover { display: inline; }
+.app-footer__discover a { color: var(--text-secondary); text-decoration: none; }
+
 /* .app-header removed - using .header-content directly instead */
 
 /* Fix sticky header positioning when GlobalUploadStatus is present */

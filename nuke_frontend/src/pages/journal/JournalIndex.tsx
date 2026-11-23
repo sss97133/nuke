@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { PublicDiscoveryLinks } from "../../components/PublicDiscoveryLinks";
 import { readVehicleNames } from "./vehicleNames";
 
 // Discovery surface for /journal: the last 90 days that hold a public record, one row per day with its photos,
@@ -99,6 +100,7 @@ export default function JournalIndex() {
 
       <div style={styles.footer}>
         PUBLIC VIEW · DAYS WITH NO PUBLIC RECORD ARE NOT LISTED
+        <PublicDiscoveryLinks />
       </div>
     </div>
   );

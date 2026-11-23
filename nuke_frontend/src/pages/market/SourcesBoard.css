@@ -5,6 +5,8 @@
 .market-sources { padding: 10px 16px 12px; border-top: 2px solid var(--border); background: var(--bg); color: var(--text);
   font-family: Arial, sans-serif; }
 .market-sources__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 6px; }
+.market-sources__also { flex-basis: 100%; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: inherit; }
+.market-sources__also a { color: inherit; }
 .market-sources__title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .market-sources__collection-toggle { padding: 3px 7px; border: 1px solid var(--border); background: transparent;
   color: var(--text-secondary); font: 10px Arial, sans-serif; cursor: pointer; }

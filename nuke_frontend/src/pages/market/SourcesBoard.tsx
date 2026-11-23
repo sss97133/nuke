@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { PublicDiscoveryLinks } from '../../components/PublicDiscoveryLinks';
 import { supabase } from '../../lib/supabase';
 import { OrgLogo } from '../../components/common/OrgLogo';
 import { MakeIdentity } from '../../components/common/MakeIdentity';
@@ -2038,6 +2039,7 @@ export function SourcesBoardView({
       </svg>
       <div className="market-sources__head">
         <span className="market-sources__title">{scopedLabel}</span>
+        <PublicDiscoveryLinks className="market-sources__also" />
         <button type="button" className="market-sources__collection-toggle" aria-pressed={showCollection}
           onClick={() => setShowCollection(value => !value)}>Collection detail</button>
         {showCollection && <span className="market-sources__note">
