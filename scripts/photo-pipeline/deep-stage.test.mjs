@@ -12,7 +12,7 @@ import { childCarriesOnlyEnumAndPointers, projectImageProperties } from '../lib/
 import { stageSchema } from '../lib/byok-stage-schema.mjs';
 import {
   AUTOMATIC_METHOD, AUTOMATIC_NOTES, AUTOMATIC_TIER, DEFAULT_MODEL, OPEN_QUESTION_PATTERNS, STATE_STANDARD, admitsFingerprint, admitsFrom, automaticMethod, automaticProvenance, buildEnvelope, countReceipt, deepPrompt, deepReadFrame,
-  PRINT_WORDS, REFUSAL_STREAK_STOP, refusalStreak, saysPictureOfPicture, thinNarrative, thinVerdict, thinViolation,
+  PLACE_SCENES, PRINT_WORDS, REFUSAL_STREAK_STOP, refusalStreak, saysPictureOfPicture, sceneForAutomatic, thinNarrative, thinVerdict, thinViolation,
   cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput, QUESTION_TOKENS, standingReadingHold, standingReadingQuery,
   PROJECTION_WORDS, finishedLanding, ownReading, ownReadingQuery, projectionAnswer,
 } from './deep-stage.mjs';
@@ -110,6 +110,36 @@ test('a thin verdict: no admitted set posts nothing; a reading that cannot name 
     'a value a read left out is said as unknown: the intake refuses a question that names any word outside the closed values');
 });
 
+test('a place-named scene is posted as body_exterior, so agreed rust and paint are not dropped; a VIN plate is unchanged', () => {
+  const admits = { scene_type: ADMITS.scene_type, rust_severity: ['surface', 'none'], paint_state: ['aged', 'clear', 'primer', 'bare_metal'] };
+  const booth = (over = {}, state = {}) => verdict({ scene_type: 'paint_booth', ...over }, { rust_severity: 'surface', paint_state: 'aged', completeness: 'unknown', ...state });
+  const r = thinVerdict(booth(), booth({ confidence: 0.7, narrative_one_line: 'A Chevelle in a paint booth with surface rust on the quarter.' }), admits);
+  assert.deepEqual(r.posted, { scene_type: 'body_exterior', rust_severity: 'surface', paint_state: 'aged' });
+  assert.deepEqual(r.values.scene_type, { first: 'paint_booth', second: 'paint_booth' }, 'the receipt keeps the words each pass used');
+  assert.equal(r.agreed, true);
+  assert.deepEqual(r.verdict.open_questions, []);
+  assert.equal(r.verdict.narrative_one_line, 'Automatic read: scene body_exterior; rust surface; paint aged.');
+  assert.deepEqual(r.errors, []);
+  assert.equal(thinViolation(r.verdict, admits), null);
+  // one pass already used the vehicle region: they agree
+  const mixed = thinVerdict(booth(), verdict({ scene_type: 'body_exterior' }, { rust_severity: 'surface', paint_state: 'aged', completeness: 'unknown' }), admits);
+  assert.deepEqual(mixed.posted, { scene_type: 'body_exterior', rust_severity: 'surface', paint_state: 'aged' });
+  assert.equal(mixed.agreed, true);
+  // a VIN plate close-up is not a place scene: still posts nothing, including agreed rust and paint
+  const plate = thinVerdict(verdict({ scene_type: 'data_plate' }, { rust_severity: 'surface', paint_state: 'aged' }), verdict({ scene_type: 'data_plate' }, { rust_severity: 'surface', paint_state: 'aged' }), admits);
+  assert.deepEqual(plate.posted, { scene_type: 'unknown', rust_severity: 'unknown', paint_state: 'unknown' });
+  assert.ok(plate.verdict.open_questions.includes('Both reads say scene_type is data_plate; this reader may not post that value yet.'));
+  for (const place of PLACE_SCENES) {
+    assert.equal(sceneForAutomatic(place, admits), 'body_exterior', place);
+    const p = thinVerdict(verdict({ scene_type: place }, { rust_severity: 'unknown', paint_state: 'aged' }), verdict({ scene_type: place }, { rust_severity: 'unknown', paint_state: 'aged' }), admits);
+    assert.deepEqual(p.posted, { scene_type: 'body_exterior', rust_severity: 'unknown', paint_state: 'aged' }, place);
+  }
+  assert.equal(sceneForAutomatic('data_plate', admits), 'data_plate');
+  assert.equal(sceneForAutomatic('paint_booth', { scene_type: [] }), 'paint_booth', 'no admitted body_exterior: the token is unchanged');
+  assert.match(STATE_STANDARD, /SCENE TYPE: THE VEHICLE REGION, NOT THE ROOM/);
+  assert.match(STATE_STANDARD, /paint booth/);
+});
+
 test('the shared cases: the reader builds each accepted verdict, and its own rule refuses each refused one', () => {
   const ids = { image_id: FIXTURE.accepted[0].image_id, vehicle_id: FIXTURE.accepted[0].vehicle_id };
   const read = (scene, state, extra = {}) => verdict({ ...ids, scene_type: scene, ...extra }, state);
@@ -118,7 +148,7 @@ test('the shared cases: the reader builds each accepted verdict, and its own rul
     thinVerdict(read('undercarriage', { rust_severity: 'none', paint_state: 'unknown', completeness: 'unknown' }, { confidence: 0.55, presence: { person: true, dog: false, place_hint: null } }),
       read('data_plate', { rust_severity: 'none', paint_state: 'unknown', completeness: 'unknown' }, { confidence: 0.6, presence: { person: true, dog: false, place_hint: null } }), ADMITS),
     thinVerdict(read('body_exterior', { rust_severity: 'unknown', paint_state: 'clear', completeness: 'assembled' }, { confidence: 0.8 }), read('body_exterior', { rust_severity: 'unknown', paint_state: 'clear', completeness: 'assembled' }, { confidence: 0.8 }), ADMITS),
-    // a scene value of the grammar that the guard's first word list left out (off_property): the question must be storable
+    // a place-named scene of the grammar (off_property) is posted as body_exterior, the vehicle region this reader admits
     thinVerdict(read('off_property', { rust_severity: 'unknown', paint_state: 'unknown', completeness: 'partial' }, { confidence: 0.7 }), read('off_property', { rust_severity: 'unknown', paint_state: 'unknown', completeness: 'unknown' }, { confidence: 0.8 }), ADMITS),
   ];
   assert.equal(FIXTURE.accepted.length, built.length);
@@ -622,7 +652,8 @@ test('the words a question may name are the grammar\'s closed values, the list t
     assert.ok(words.every((w) => guard.includes(w)), q);
     assert.ok(OPEN_QUESTION_PATTERNS.some((p) => p.test(q)), q);
   }
-  assert.ok(odd.verdict.open_questions.includes('Both reads say scene_type is off_property; this reader may not post that value yet.'));
+  assert.equal(odd.posted.scene_type, 'body_exterior', 'a place-named scene is posted as the vehicle region, not left unknown');
+  assert.equal(odd.verdict.open_questions.includes('Both reads say scene_type is off_property; this reader may not post that value yet.'), false);
   assert.ok(odd.verdict.open_questions.includes('Two independent reads of this photo disagree on rust_severity: unknown vs surface; posted as unknown.'));
   assert.ok(odd.verdict.open_questions.length <= 8);
 });

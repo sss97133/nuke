@@ -326,14 +326,14 @@
    "observed_at": "2026-11-20T20:05:00.000Z",
    "source_id": null,
    "source_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000104.jpg",
-   "source_identifier": "reviewed_image_analysis_v1:30000000-0000-4000-8000-000000000104:13d328d90ccc6b311140cdd779ba5ea64e6a7be10f123d2830be3c609a71f4d3",
+   "source_identifier": "reviewed_image_analysis_v1:30000000-0000-4000-8000-000000000104:a95178398ffb83e90f4885eedd3e092a719ac704d6396ba32e7c60d4f142bbe7",
    "kind": "condition",
-   "content_text": "Automatic read: scene unknown; rust unknown; paint unknown.",
-   "content_hash": "35bb2772f0378bfbf716bcb0d5959f503a4db279ea8aa6227e96921e25df93f9",
+   "content_text": "Automatic read: scene body_exterior; rust unknown; paint unknown.",
+   "content_hash": "27f07520a47b0c192d69d0cc75c0fdbd0cff50553b9ef396c65b72a1baebc824",
    "structured_data": {
     "image_id": "30000000-0000-4000-8000-000000000104",
     "vehicle_id": "20000000-0000-4000-8000-000000000101",
-    "scene_type": "unknown",
+    "scene_type": "body_exterior",
     "build_phase_guess": "unknown",
     "intent": "unknown",
     "intent_confidence": 0,
@@ -365,11 +365,10 @@
      "distance_est": null,
      "exif_present": null
     },
-    "narrative_one_line": "Automatic read: scene unknown; rust unknown; paint unknown.",
+    "narrative_one_line": "Automatic read: scene body_exterior; rust unknown; paint unknown.",
     "confidence": 0.7,
     "context_complete": false,
     "open_questions": [
-     "Both reads say scene_type is off_property; this reader may not post that value yet.",
      "Two independent reads of this photo disagree on completeness: partial vs unknown; posted as unknown."
     ],
     "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier.",
@@ -386,7 +385,7 @@
    },
    "observer_raw": {
     "image_id": "30000000-0000-4000-8000-000000000104",
-    "review_hash": "13d328d90ccc6b311140cdd779ba5ea64e6a7be10f123d2830be3c609a71f4d3"
+    "review_hash": "a95178398ffb83e90f4885eedd3e092a719ac704d6396ba32e7c60d4f142bbe7"
    },
    "extraction_metadata": {
     "reviewed_image": {
@@ -405,7 +404,7 @@
      "agent_cost_cents": null,
      "cost_basis": "Owner subscription via the claude CLI; nothing is billed per photo. The CLI's notional cost and token counts are kept in the stage receipt, not here. agent_duration_ms is the photo's wall-clock (download, both reads, any retry)."
     },
-    "review_hash": "13d328d90ccc6b311140cdd779ba5ea64e6a7be10f123d2830be3c609a71f4d3"
+    "review_hash": "a95178398ffb83e90f4885eedd3e092a719ac704d6396ba32e7c60d4f142bbe7"
    },
    "analysis_deferred": true,
    "agent_tier": "subscription automatic",

@@ -195,7 +195,7 @@ CREATE FUNCTION tt_accepted() RETURNS jsonb LANGUAGE sql AS $j$ SELECT $json$[
  {
   "image_id": "11111111-1111-4111-8111-111111111111",
   "vehicle_id": "22222222-2222-4222-8222-222222222222",
-  "scene_type": "unknown",
+  "scene_type": "body_exterior",
   "build_phase_guess": "unknown",
   "intent": "unknown",
   "intent_confidence": 0,
@@ -227,11 +227,10 @@ CREATE FUNCTION tt_accepted() RETURNS jsonb LANGUAGE sql AS $j$ SELECT $json$[
    "distance_est": null,
    "exif_present": null
   },
-  "narrative_one_line": "Automatic read: scene unknown; rust unknown; paint unknown.",
+  "narrative_one_line": "Automatic read: scene body_exterior; rust unknown; paint unknown.",
   "confidence": 0.7,
   "context_complete": false,
   "open_questions": [
-   "Both reads say scene_type is off_property; this reader may not post that value yet.",
    "Two independent reads of this photo disagree on completeness: partial vs unknown; posted as unknown."
   ],
   "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
