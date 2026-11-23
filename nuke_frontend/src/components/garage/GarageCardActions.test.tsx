@@ -16,7 +16,7 @@ vi.mock('../../lib/supabase', () => {
 vi.mock('../../services/globalUploadQueue', () => ({ uploadQueue: { addFiles: vi.fn() } }));
 vi.mock('../PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 
-import { GarageSheetPanel, ProposalRow } from './GarageCardActions';
+import { GarageCardMenu, GarageDisclaimBar, GarageSheetPanel, ProposalRow } from './GarageCardActions';
 
 const vehicle = { id: '11111111-1111-4111-8111-111111111111', year: 1973, make: 'Fixture', model: 'Coupe', relationship_type: 'OWNER' } as GarageVehicle;
 const proposal = { id: 'p-1', writer: 'record_vehicle_statement', summary: 'Keep your words in the log book as a fact: “rear axle is posi”', token: 'signed.token' };
@@ -95,4 +95,59 @@ it('the log book lists the account’s own kept sessions beside its notes', asyn
   const list = host.querySelector('[aria-label="Your agent sessions"]');
   expect(list?.textContent).toContain('You: is it posi?');
   expect(list?.textContent).toContain('Agent: The photos show a 12-bolt.');
+});
+
+const viewer = '22222222-2222-4222-8222-222222222222';
+const tie = { table: 'vehicle_contributors', row_id: 'c-1', kind: 'contributor:photographer' };
+const perm = { table: 'vehicle_user_permissions', row_id: 'p-1', kind: 'permission:contributor' };
+
+it('the card menu offers Not my vehicle and hands the car to the confirm step', async () => {
+  const onDisclaim = vi.fn(); const onClose = vi.fn();
+  await act(async () => root.render(<GarageCardMenu vehicle={vehicle} x={10} y={10} onClose={onClose} onSheet={vi.fn()} onMerge={vi.fn()} onDisclaim={onDisclaim} />));
+  await act(async () => button('Not my vehicle…')!.click());
+  expect(onDisclaim).toHaveBeenCalledWith(vehicle); expect(onClose).toHaveBeenCalled();
+  expect(rpc).not.toHaveBeenCalled();
+});
+
+it('opening the step only previews (dry run); confirm ends the ties, the card leaves, Undo restores the run', async () => {
+  rpc.mockResolvedValueOnce({ data: { status: 'dry_run', would_end: [tie, perm], left: [], blocked_by: [], still_in_garage_by: [] }, error: null });
+  const onRemoved = vi.fn(); const onRestored = vi.fn();
+  await act(async () => root.render(<GarageDisclaimBar vehicle={vehicle} viewerId={viewer} onCancel={vi.fn()} onRemoved={onRemoved} onRestored={onRestored} />));
+  expect(rpc).toHaveBeenCalledTimes(1);
+  expect(rpc.mock.calls[0]).toEqual(['disclaim_vehicle_tie', expect.objectContaining({ p_vehicle_id: vehicle.id, p_actor: viewer, p_dry_run: true })]);
+  expect(host.textContent).toContain('a contributor credit an automatic job wrote; a permission no one granted');
+  expect(host.textContent).toContain('you can restore the ties afterwards');
+  expect(onRemoved).not.toHaveBeenCalled();
+
+  rpc.mockResolvedValueOnce({ data: { status: 'disclaimed', run_id: 'run-1', ended: [tie, perm], left: [], still_in_garage_by: [] }, error: null });
+  await act(async () => button('Not my vehicle')!.click());
+  expect(rpc.mock.calls[1][1]).not.toHaveProperty('p_dry_run');
+  expect(rpc.mock.calls[1][1]).not.toHaveProperty('p_force_reason');
+  expect(onRemoved).toHaveBeenCalledWith(vehicle.id);
+  expect(host.textContent).toContain('is out of your garage');
+
+  rpc.mockResolvedValueOnce({ data: { restored: [{}, {}], not_restored: [] }, error: null });
+  await act(async () => button('Undo')!.click());
+  expect(rpc.mock.calls[2]).toEqual(['restore_vehicle_tie', { p_journal_id: null, p_run_id: 'run-1', p_actor: viewer }]);
+  expect(onRestored).toHaveBeenCalledWith(vehicle.id);
+});
+
+it('first-hand evidence is named and removal needs the person to say why', async () => {
+  rpc.mockResolvedValueOnce({ data: { status: 'dry_run', would_end: [tie], left: [], blocked_by: [{ kind: 'own_photos', count: 12 }, { kind: 'work_order' }], still_in_garage_by: [] }, error: null });
+  await act(async () => root.render(<GarageDisclaimBar vehicle={vehicle} viewerId={viewer} onCancel={vi.fn()} onRemoved={vi.fn()} onRestored={vi.fn()} />));
+  expect(host.textContent).toContain('12 of your own photos; a work order in your name');
+  expect(button('Remove anyway')!.disabled).toBe(true);
+  await type('sold it in 2019');
+  rpc.mockResolvedValueOnce({ data: { status: 'disclaimed', run_id: 'run-2', ended: [tie], left: [], still_in_garage_by: [] }, error: null });
+  await act(async () => button('Remove anyway')!.click());
+  expect(rpc.mock.calls[1][1]).toMatchObject({ p_force_reason: 'sold it in 2019' });
+});
+
+it('when nothing an import made ties the car, there is nothing to confirm', async () => {
+  rpc.mockResolvedValueOnce({ data: { status: 'dry_run', would_end: [], left: [{ table: 'vehicle_contributors', kind: 'contributor:mechanic' }], blocked_by: [], still_in_garage_by: [] }, error: null });
+  await act(async () => root.render(<GarageDisclaimBar vehicle={vehicle} viewerId={viewer} onCancel={vi.fn()} onRemoved={vi.fn()} onRestored={vi.fn()} />));
+  expect(host.textContent).toContain('Nothing an import made ties');
+  expect(host.textContent).toContain('contributor as mechanic');
+  expect(button('Not my vehicle')).toBeUndefined();
+  expect(button('Cancel')).toBeDefined();
 });
