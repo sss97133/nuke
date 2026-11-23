@@ -28,6 +28,7 @@ const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const Valuation = React.lazy(() => import('../pages/Valuation'));
 const McpAdvisor = React.lazy(() => import('../pages/McpAdvisor'));
 const UseCase = React.lazy(() => import('../pages/UseCase'));
+const Compare = React.lazy(() => import('../pages/Compare'));
 const SourcesBoard = React.lazy(() => import('../pages/market/SourcesBoard'));
 // Stacks: a page per stack, a path through the nine layers (case ledger §13.2)
 const StacksIndex = React.lazy(() => import('../pages/stacks/StacksIndex'));
@@ -162,6 +163,9 @@ export const DomainRoutes = () => {
         {/* ── Static / legal ────────────────────────────────────────────── */}
         <Route path="/about" element={<About />} />
         <Route path="/methodology" element={<Methodology />} />
+        <Route path="/compare" element={<Compare />} />
+        <Route path="/compare/:slug" element={<Compare />} />
+        <Route path="/alternatives" element={<Compare />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/eula" element={<EULA />} />

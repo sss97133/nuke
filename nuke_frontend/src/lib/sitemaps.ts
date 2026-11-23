@@ -38,6 +38,11 @@ export const STATIC_SITEMAP_URLS: SitemapUrl[] = [
   { loc: `${SITE}/sources` },
   { loc: `${SITE}/developers` },
   { loc: `${SITE}/api/docs` },
+  { loc: `${SITE}/compare` },
+  { loc: `${SITE}/compare/nuke-vs-hagerty` },
+  { loc: `${SITE}/compare/nuke-vs-classic-com` },
+  { loc: `${SITE}/compare/nuke-vs-bat-results` },
+  { loc: `${SITE}/alternatives` },
   { loc: `${SITE}/privacy` },
   { loc: `${SITE}/terms` },
 ];

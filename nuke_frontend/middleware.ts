@@ -28,11 +28,12 @@ import { productFace } from './src/lib/productFaces';
 import { buildUseCaseFace } from './src/lib/useCases';
 import { trustFace } from './src/lib/trustFaces';
 import { parseEvidence } from './src/pages/aboutEvidence';
+import { buildCompareFace } from './src/lib/compareFaces';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
     '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup',
-    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor', '/use', '/use/:path*', '/about', '/methodology', '/sources'],
+    '/docs', '/docs/:path*', '/api', '/.well-known/mcp.json', '/cohort', '/cohort/:path*', '/valuation', '/developers', '/mcp-advisor', '/use', '/use/:path*', '/about', '/methodology', '/sources', '/compare', '/compare/:path*', '/alternatives'],
 };
 
 const MCP_SERVER_CARD = {
@@ -305,7 +306,7 @@ function faceBody(page: FacePage, b: Board): string {
     '<li><a href="https://github.com/sss97133/nuke">The repository and its generated, dated numbers</a></li>' +
     '<li><a href="https://nuke.ag/llms.txt">llms.txt</a></li>' +
     '<li><a href="https://nuke.ag/mcp">MCP endpoint</a> · <a href="https://nuke.ag/developers">API and developers</a></li>' +
-    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/use">Use cases</a> · <a href="https://nuke.ag/developers">Developers</a> · <a href="https://nuke.ag/about">About</a> · <a href="https://nuke.ag/methodology">Methodology</a> · <a href="https://nuke.ag/sources">Sources</a> · <a href="https://nuke.ag/api/docs">API docs</a></li></ul></main>';
+    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a> · <a href="https://nuke.ag/cohort">Cohorts</a> · <a href="https://nuke.ag/valuation">Recorded sale prices</a> · <a href="https://nuke.ag/mcp-advisor">Asset Advisor MCP</a> · <a href="https://nuke.ag/use">Use cases</a> · <a href="https://nuke.ag/developers">Developers</a> · <a href="https://nuke.ag/about">About</a> · <a href="https://nuke.ag/methodology">Methodology</a> · <a href="https://nuke.ag/sources">Sources</a> · <a href="https://nuke.ag/api/docs">API docs</a> · <a href="https://nuke.ag/compare">Compare</a></li></ul></main>';
 }
 
 function injectFace(html: string, page: FacePage, b: Board): string {
@@ -342,6 +343,7 @@ function llmsTxt(b: Board): string {
     '- [Methodology](https://nuke.ag/methodology)',
     '- [About](https://nuke.ag/about)',
     '- [Sources](https://nuke.ag/sources)',
+    '- [Compare](https://nuke.ag/compare)',
     '- [Sitemap](https://nuke.ag/sitemap.xml)',
     '', '## Nuke Asset Advisor',
     'Install in any MCP client as a Streamable HTTP server at `https://nuke.ag/mcp/advisor`.',
@@ -681,6 +683,17 @@ export default async function middleware(request: Request): Promise<Response | u
         'Cache-Control': FACE_CACHE,
         ...(trustPath === '/sources' ? { 'x-nuke-board': boardStatus } : {}),
       },
+    });
+  }
+
+  const compare = buildCompareFace(url.pathname);
+  if (compare) {
+    const accept = request.headers.get('Accept') || '';
+    if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return undefined;
+    const html = await getBaseHtml(request.url);
+    if (!html) return undefined;
+    return new Response(injectPage(html, compare), {
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
     });
   }
 

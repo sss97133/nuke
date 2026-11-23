@@ -63,6 +63,11 @@ describe('sitemap helpers', () => {
     expect(locs).toContain(`${SITE}/methodology`);
     expect(locs).toContain(`${SITE}/sources`);
     expect(locs).toContain(`${SITE}/api/docs`);
+    expect(locs).toContain(`${SITE}/compare`);
+    expect(locs).toContain(`${SITE}/compare/nuke-vs-hagerty`);
+    expect(locs).toContain(`${SITE}/compare/nuke-vs-classic-com`);
+    expect(locs).toContain(`${SITE}/compare/nuke-vs-bat-results`);
+    expect(locs).toContain(`${SITE}/alternatives`);
     expect(locs).not.toContain(`${SITE}/api`);
     expect(locs).not.toContain(`${SITE}/search`);
     expect(locs).not.toContain(`${SITE}/market/dashboard`);
