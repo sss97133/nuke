@@ -22,6 +22,8 @@ DROP FUNCTION IF EXISTS public.image_cohorts_read(uuid), private.image_cohorts_w
   public.image_cohort_drain(), public.vehicle_cohort_drain(),
   public.image_cohort_derive(uuid[], text), public.vehicle_cohort_derive(uuid[], text),
   public.image_cohort_backfill_enqueue(uuid, int), public.vehicle_cohort_backfill_enqueue(uuid, int);
+DROP FUNCTION IF EXISTS public.record_device_tags(jsonb), public.image_device_edges(uuid[]), public.paid_vision_question(uuid);
+DROP TABLE IF EXISTS public.image_device_tags, public.image_device_reads;
 DROP TABLE IF EXISTS public.image_cohort_queue, public.vehicle_cohort_queue, public.image_cohort_edges, public.vehicle_cohort_edges;
 DELETE FROM public.platform_config WHERE config_key = 'image_cohort_graph';
 commit;

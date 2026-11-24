@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS public.image_cohort_edges (
   id                    bigserial PRIMARY KEY,
   image_id              uuid NOT NULL,             -- vehicle_images.id (no FK: the deriver checks; keeps 76 GB table writes cheap)
   cohort_kind           text NOT NULL CHECK (cohort_kind IN
-                          ('place_cell','zcta','garage','garage_site','capture_session','work_order','data_set')),
+                          ('place_cell','zcta','garage','garage_site','capture_session','work_order','data_set',
+                           'photo_kind','person_present','burst')   -- the last three come from free device reads (05)),
   cohort_key            text NOT NULL CHECK (cohort_key <> ''),   -- '34.052:-118.244', '90012', uuid text, ...
   cohort_id             uuid,                      -- the row when the cohort is a row (garage, image_set, work order, data set)
   basis                 text NOT NULL,             -- 'vehicle_images.gps', 'geo_cell_zcta', 'image_set_members', ...

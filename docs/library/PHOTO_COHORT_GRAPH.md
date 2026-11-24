@@ -91,3 +91,35 @@ This is sized to the real data, not to 65M.
 3. Apply `03_triggers_and_cron.sql`, then enqueue the native backfill.
 4. Apply `04_reader.sql` and switch `PhotoCohorts.read` to `image_cohorts_read`.
 5. Enqueue the vehicle-fold backfill overnight.
+
+## Free-first: device reads before any paid pass (added 2026-11-23, draft `05_device_tags.sql`)
+
+The phone has already run Apple Vision on a photo before the photo leaves it. Those reads become per-image metadata at upload, and they produce the first cohort edges. A paid pass runs only for the question the free reads can't answer.
+
+### What exists today (Skylar, 30,399 rows, read-only, 2026-11-23)
+| Measure | Count |
+|---|---|
+| Any on-device label stored (`apple_ml_labels`) | 17,210 (56.6%): 7,559 from the phone's capture relay, 9,229 from the Mac Photos import (`iphoto`) |
+| Full phone verdict (`ai_scan_metadata.on_device_vision`) | 6,930 (22.8%), capture-relay rows only |
+| Phone says vehicle / not vehicle / personal | 4,018 / 2,912 / 193 |
+| Label vocabulary | 1,115 distinct strings, mixed casing ("Machine" 9,478 and "machine" 2,005) |
+| Label confidences stored | 0. The phone computes them and drops them |
+| `has_person` stored | 0. The phone computes it and the push doesn't send it |
+| PhotoKit facts stored (favorite, screenshot, burst, Live/HDR/depth) | 0 |
+| Device OCR or identity reads in `image_observations` (`device_privacy_v1`) | 0 |
+| `vehicle_score` set (the only free gate in the orchestrator) | 231. Never 0, so the free skip has never fired |
+| Paid classification ran | 18,556 OK + 473 failed. 12,943 also got the deep pass |
+| Phone said not a vehicle, paid classifier ran anyway | 2,460 (247 of them also deep) |
+
+The legacy push `sync_local_vision_tags` matches only `source in ('capture_relay_ios','capture_relay')`. 1,675 `iphoto` rows carry the phone uuid and are never reached.
+
+### Layer
+1. **Reads (`image_device_reads`, `image_device_tags`).** One row per image, with the model, revision and OS stamped. Labels are normalized to lower snake case. These are written by `record_device_tags`, which iOS #3747 calls behind a flag.
+2. **Free edges (`image_device_edges`)**, each with a rule version and a confidence:
+   - `photo_kind`: owner verdict, then screenshot, then document-like labels, then the device vehicle gate;
+   - `person_present`: always `private`, and feeds the Library privacy cover;
+   - `burst`.
+   - Place and capture session come from GPS and time, already in 02.
+3. **Paid gate (`paid_vision_question`).** It returns null when the free reads settle the photo: owner-hidden, personal, or the device says not a vehicle. Otherwise it returns `vehicle_detail` (filed, so only angle, parts and text remain) or `which_vehicle`. The orchestrator would call it before `classifyImageRouted`. That edge change isn't drafted as a deploy.
+
+Originator and place stay separate: every device edge's originator is the uploader, and place is a separate `place_cell`/`garage` edge.
