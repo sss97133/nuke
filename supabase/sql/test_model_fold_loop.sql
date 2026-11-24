@@ -143,6 +143,7 @@ INSERT INTO vehicles (id, make, model, year, vin, description) VALUES
 \ir ../migrations/20261124041000_analysis_queue_orphan_reaper.sql
 \ir ../migrations/20261124042000_model_fold_dead_letter_revive.sql
 \ir ../migrations/20261124043000_model_fold_revive_dirty_clock.sql
+\ir ../migrations/20261124044000_model_fold_review_fixes.sql
 
 UPDATE platform_config SET config_value = config_value || '{"settle_seconds":0,"max_delay_seconds":0,"sweep_scan":2,"budget_ms":20000,"min_pass_hours":0}'
  WHERE config_key = 'model_fold';
@@ -230,6 +231,9 @@ CALL model_fold_tick();
 SELECT t_assert(EXISTS (SELECT 1 FROM vehicle_code_readings WHERE vehicle_id = :fb3 AND code = '66' AND state = 'active'), 'observation text folded');
 -- Withdrawn origins: a superseded observation and a comment that became a question.
 UPDATE vehicle_observations SET is_superseded = true WHERE id = 'f0000000-0000-4000-8000-000000000001';
+SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE vehicle_id = :fb3 AND reason = 'vehicle_observations_update'), 'superseding an observation signals');
+UPDATE field_evidence SET status = 'rejected' WHERE id = 'f1000000-0000-4000-8000-000000000001';
+SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE vehicle_id = :fb3 AND reason = 'field_evidence_update'), 'rejecting evidence signals');
 UPDATE auction_comments SET has_question = true WHERE id = 'c0000000-0000-4000-8000-000000000001';
 SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE vehicle_id = :fb2 AND reason = 'auction_comments_update'), 'question flag change signals');
 UPDATE vehicles SET listing_title = '1979 Pontiac Trans Am 6.6' WHERE id = :fb2;
@@ -344,6 +348,12 @@ SELECT t_assert((assay_model_fold() ->> 'ok') = 'true', 'assay passes when healt
 SELECT t_assert(NOT has_function_privilege('anon', 'public.model_fold_revert_v1(uuid)', 'execute')
   AND NOT has_table_privilege('authenticated', 'public.model_fold_work', 'select'), 'not exposed to anon/authenticated');
 
+-- A pass that fits in one chunk verifies itself.
+UPDATE platform_config SET config_value = config_value || '{"sweep_scan":1000}' WHERE config_key = 'model_fold';
+UPDATE model_fold_cursor SET verified_key = NULL, cursor = NULL, pass_started_at = NULL;
+CALL model_fold_tick();
+SELECT t_assert((SELECT verified_key = model_fold_logic_key() AND pass_started_at IS NOT NULL FROM model_fold_cursor), 'single-chunk pass is verified');
+
 -- Reaper.
 INSERT INTO analysis_queue (vehicle_id, status, worker_id, claimed_at, lease_expires_at, lease_token, request_revision, completed_revision) VALUES
   (gen_random_uuid(), 'processing', 'w-old', '2026-04-01', NULL, NULL, 0, 0),
@@ -369,6 +379,7 @@ SELECT t_assert((SELECT count(*) FROM analysis_queue WHERE status = 'processing'
   'reaper revert restores');
 
 -- Revert files remove everything.
+\ir revert_20261124044000_model_fold_review_fixes.sql
 \ir revert_20261124043000_model_fold_revive_dirty_clock.sql
 \ir revert_20261124042000_model_fold_dead_letter_revive.sql
 \ir revert_20261124041000_analysis_queue_orphan_reaper.sql
