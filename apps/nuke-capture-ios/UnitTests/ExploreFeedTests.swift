@@ -37,4 +37,33 @@ final class ExploreFeedTests: XCTestCase {
     func testEmptyReadsGiveAnEmptyFeed() {
         XCTAssertTrue(ExploreFeedItem.interleave(live: [], classified: []).isEmpty)
     }
+    // MARK: Paging (the feed used to stop at 40 lots + 40 asks out of ~1,000 lots and ~1,600 asks)
+
+    func testNextPageStartsNearTheEnd() {
+        XCTAssertFalse(ExploreFeedPaging.shouldLoadMore(appeared: 0, count: 80))
+        XCTAssertFalse(ExploreFeedPaging.shouldLoadMore(appeared: 73, count: 80))
+        XCTAssertTrue(ExploreFeedPaging.shouldLoadMore(appeared: 74, count: 80))
+        XCTAssertTrue(ExploreFeedPaging.shouldLoadMore(appeared: 0, count: 3))
+        XCTAssertFalse(ExploreFeedPaging.shouldLoadMore(appeared: 0, count: 0))
+    }
+
+    func testAskBoardIsExhaustedOnlyWhenItReturnsLessThanAsked() {
+        XCTAssertFalse(ExploreFeedPaging.exhausted(read: 40, asked: 40))
+        XCTAssertTrue(ExploreFeedPaging.exhausted(read: 12, asked: 40))
+        XCTAssertTrue(ExploreFeedPaging.exhausted(read: 0, asked: 40))
+    }
+
+    func testNextPageNeverRepeatsACardAndKeepsHiddenOnesOut() {
+        var prefs = ExplorePreferences()
+        prefs.hide("c2")
+        let out = ExploreFeedPaging.nextCards(live: [item("l1", .live), item("l2", .live)],
+                                              classified: [item("c1", .classified), item("c2", .classified)],
+                                              existing: ["l1"], prefs: prefs)
+        XCTAssertEqual(out.map(\.id), ["c1", "l2"])
+    }
+
+    func testEndLineSaysWhatTheFeedCovered() {
+        XCTAssertTrue(ExploreFeedPaging.endLine(tuned: false).contains("last 72 hours"))
+        XCTAssertTrue(ExploreFeedPaging.endLine(tuned: true).contains("tuning"))
+    }
 }

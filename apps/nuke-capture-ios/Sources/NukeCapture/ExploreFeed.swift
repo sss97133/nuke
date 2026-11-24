@@ -5,6 +5,9 @@
 // Every card is facts the record carries: photo, identity, the recorded amount and what
 // kind of amount it is, the clock, the source. A read that fails or comes back empty
 // hides its cards; the feed only shows an error when both reads fail.
+// The feed pages (ExploreFeedPaging): every open lot is read at once and revealed 40 at a time, asks are read
+// 40 at a time by offset, and the next page starts six cards before the end. It ends with a plain line only
+// when both are exhausted. The projection board fills in the rails after the cards are up.
 
 import SwiftUI
 import UIKit
@@ -108,6 +111,35 @@ struct ExploreFeedItem: Identifiable, Equatable {
     }
 }
 
+/// How the feed pages. Pure, so the rules are unit-tested (ExploreFeedTests).
+enum ExploreFeedPaging {
+    static let livePage = 40
+    static let askPage = 40
+    static let tunedAskPage = 100
+    /// The next page starts loading when a card this close to the end appears.
+    static let lookahead = 6
+    /// Pages read in a row that add no card (all tuned out, hidden or already shown) before the feed waits.
+    static let maxEmptyPages = 5
+
+    static func shouldLoadMore(appeared index: Int, count: Int) -> Bool {
+        count > 0 && index >= count - lookahead
+    }
+
+    /// The ask board returned fewer rows than asked: it has no more.
+    static func exhausted(read: Int, asked: Int) -> Bool { read < asked }
+
+    static func nextCards(live: [ExploreFeedItem], classified: [ExploreFeedItem], existing: Set<String>,
+                          prefs: ExplorePreferences) -> [ExploreFeedItem] {
+        ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
+            .filter { !existing.contains($0.id) }
+    }
+
+    static func endLine(tuned: Bool) -> String {
+        tuned ? "That's every car with a photo that matches your tuning: open auction lots and asks from the last 72 hours. Pull down to refresh."
+              : "That's every car with a photo: every open auction lot and every ask from the last 72 hours. Pull down to refresh."
+    }
+}
+
 struct ExploreFeedView: View {
     @State private var live: [ExploreFeedItem] = []
     @State private var classified: [ExploreFeedItem] = []
@@ -130,6 +162,16 @@ struct ExploreFeedView: View {
     @State private var finish: FinishBoard?
     @State private var why: ExploreWhy?
     @State private var openCohort: CohortTarget?
+    /// Paging. The live board is one read of every open lot, so its cards are revealed a page at a time; asks are
+    /// read a page at a time with the board's offset. A new load (refresh, tuning) starts a new generation and
+    /// any page still in flight from the old one is dropped.
+    @State private var liveAll: [ExploreFeedItem] = []
+    @State private var liveShown = 0
+    @State private var askOffset = 0
+    @State private var askExhausted = true
+    @State private var loadingMore = false
+    @State private var moreFailed = false
+    @State private var generation = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -195,6 +237,7 @@ struct ExploreFeedView: View {
                                              onWhy: openWhy)
                                 .onAppear { prefetch(after: idx) }
                         }
+                        pagingFooter
                         if !footer.isEmpty {
                             Text(footer)
                                 .font(.caption).foregroundStyle(.tertiary)
@@ -219,6 +262,32 @@ struct ExploreFeedView: View {
             }
         }
         .task { if !loaded { await load() } }
+    }
+
+    private var hasMore: Bool { liveShown < liveAll.count || !askExhausted }
+
+    /// The end of the cards: loading the next page, a retry when it failed, or a plain end.
+    @ViewBuilder private var pagingFooter: some View {
+        if loadingMore {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, NukeSpace.lg)
+        } else if moreFailed {
+            Button {
+                moreFailed = false
+                Task { await loadMore() }
+            } label: {
+                Label("Couldn't load more cars. Try again", systemImage: "arrow.clockwise")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: NukeSize.minTap)
+            }
+            .buttonStyle(.bordered)
+            .padding(.horizontal, NukeSpace.lg)
+        } else if !hasMore {
+            Text(ExploreFeedPaging.endLine(tuned: tuning.isActive))
+                .font(.footnote).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, NukeSpace.xl).padding(.vertical, NukeSpace.lg)
+        }
     }
 
     private var footer: String {
@@ -288,6 +357,7 @@ struct ExploreFeedView: View {
 
     private func prefetch(after idx: Int) {
         let all = feed
+        if ExploreFeedPaging.shouldLoadMore(appeared: idx, count: all.count) { Task { await loadMore() } }
         guard idx + 1 < all.count else { return }
         for j in (idx + 1)..<min(idx + 4, all.count) {
             if let u = NukeImage.thumb(all[j].image, width: 1080) {
@@ -297,39 +367,92 @@ struct ExploreFeedView: View {
     }
 
     private func load() async {
+        generation += 1
+        let gen = generation
         let tune = tuning
         async let l = Self.readLive()
-        async let a = Self.readClassified(tune)
-        async let f = FinishBoard.fetch()
-        let (lr, ar, fb) = await (l, a, f)
-        finish = fb
+        async let a = Self.readClassified(tune, offset: 0)
+        let (lr, ar) = await (l, a)
+        guard gen == generation else { return }
         liveFailed = lr == nil
         askFailed = ar == nil
         lots = Dictionary((lr ?? []).map { ($0.item.id, $0.lot) }, uniquingKeysWith: { first, _ in first })
-        live = tune.apply(lr?.map { $0.item } ?? [])
-        classified = tune.apply(ar ?? [])
+        liveAll = tune.apply(lr?.map { $0.item } ?? [])
+        live = Array(liveAll.prefix(ExploreFeedPaging.livePage))
+        liveShown = live.count
+        classified = tune.apply(ar?.items ?? [])
+        askOffset = ar?.read ?? 0
+        askExhausted = ar.map { ExploreFeedPaging.exhausted(read: $0.read, asked: $0.asked) } ?? true
+        moreFailed = false
         feed = ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
         loaded = true
+        // The projection board only fills in the lots' rails (about 220 KB); the cards don't wait for it.
+        let board = await FinishBoard.fetch()
+        guard gen == generation else { return }
+        finish = board
     }
 
+    /// The next page: the next slice of open lots and the next page of asks, interleaved, with the saved choices
+    /// applied and no card already in the feed. A page the tuning or the choices empty out reads on, a few pages
+    /// at most, so the feed never stalls on a filtered-out page.
+    private func loadMore() async {
+        guard loaded, !loadingMore, !moreFailed, hasMore else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        let gen = generation
+        let tune = tuning
+        for _ in 0..<ExploreFeedPaging.maxEmptyPages {
+            let nextLive = Array(liveAll.dropFirst(liveShown).prefix(ExploreFeedPaging.livePage))
+            var nextAsks: [ExploreFeedItem] = []
+            var read = 0, asked = 0
+            if !askExhausted {
+                guard let page = await Self.readClassified(tune, offset: askOffset) else {
+                    if gen == generation { moreFailed = true }
+                    return
+                }
+                nextAsks = tune.apply(page.items)
+                read = page.read
+                asked = page.asked
+            }
+            guard gen == generation else { return }
+            liveShown += nextLive.count
+            if !askExhausted {
+                askOffset += read
+                askExhausted = ExploreFeedPaging.exhausted(read: read, asked: asked)
+            }
+            live += nextLive
+            classified += nextAsks
+            let fresh = ExploreFeedPaging.nextCards(live: nextLive, classified: nextAsks,
+                                                    existing: Set(feed.map(\.id)), prefs: prefs)
+            feed += fresh
+            if !fresh.isEmpty || !hasMore { return }
+        }
+    }
+
+    /// Every open lot, soonest to end first. The feed reveals them a page at a time (ExploreFeedPaging.livePage).
     private static func readLive() async -> [(item: ExploreFeedItem, lot: LiveAuction)]? {
         guard let board = try? await LiveBoard.fetch() else { return nil }
         return board.open(at: Date())
             .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
-            .prefix(40).map { (ExploreFeedItem.from($0), $0) }
+            .map { (ExploreFeedItem.from($0), $0) }
     }
 
-    private static func readClassified(_ tune: ExploreTuning) async -> [ExploreFeedItem]? {
+    /// One page of asks from `offset`: the cards, how many rows the board returned and how many were asked for
+    /// (fewer returned than asked means the board has no more).
+    private static func readClassified(_ tune: ExploreTuning, offset: Int) async
+        -> (items: [ExploreFeedItem], read: Int, asked: Int)? {
         let place = tune.place
         // A filter applied here to rows already read needs more rows to land on.
-        guard let board = try? await AskBoard.fetch(hours: 72, sort: .newest, limit: tune.hasLocalFilters ? 100 : 40,
+        let limit = tune.hasLocalFilters ? ExploreFeedPaging.tunedAskPage : ExploreFeedPaging.askPage
+        guard let board = try? await AskBoard.fetch(hours: 72, sort: .newest, limit: limit, offset: offset,
                                                     lat: place?.lat, lng: place?.lng, radiusMiles: place?.radius) else { return nil }
         let asOf = ProfileClock.date(board.as_of)
-        return board.rows.map { row -> ExploreFeedItem in
+        let items = board.rows.map { row -> ExploreFeedItem in
             var card = ExploreFeedItem.from(row)
             card.asOf = asOf
             return card
         }
+        return (items, board.rows.count, limit)
     }
 }
 
