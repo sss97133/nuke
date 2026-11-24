@@ -1,5 +1,5 @@
 -- Revert of 20261123190000_data_set_decoders.sql, 20261123191000_text_code_decode_window_fix.sql, 20261123192000_data_set_labels.sql,
--- 20261123193000_text_code_review_fixes.sql.
+-- 20261123193000_text_code_review_fixes.sql, 20261123194000_text_code_rescore_members.sql.
 -- Order: labels, membership runs, reading runs, then objects.
 --   select public.data_set_label_backfill_revert_v1('5d1a7c2e-0f3b-4c8e-9a61-20261123c001');
 --   select public.data_set_membership_revert_v1('5d1a7c2e-0f3b-4c8e-9a61-20261123a006');
