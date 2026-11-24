@@ -181,6 +181,7 @@ enum PhotoCohorts {
                 read.vehicle = .init(id: vid, year: v?.year, make: v?.make, model: v?.model)
                 let links: [OrgLink] = (try? await client.from("organization_vehicles")
                     .select("organization_id,relationship_type").eq("vehicle_id", value: vid)
+                    .not("user_rejected", operator: .is, value: true)   // a link the owner rejected is not membership
                     .limit(25).execute().value) ?? []
                 let ids = Array(Set(links.map(\.organization_id)))
                 if !ids.isEmpty {
