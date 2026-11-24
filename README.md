@@ -168,20 +168,20 @@ Install for Claude Code, Cursor and Claude Desktop: [`supabase/functions/mcp-con
 <summary>Daily measurements</summary>
 
 <!-- stats:start -->
-Measured 2026-11-23 06:45 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
+Measured 2026-11-24 06:35 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
 
 | | Rows | Coverage (sampled) |
 |---|---|---|
-| Auction comments (the auction log) | 25.2M | 95% author keyed to an identity · 8.3% sentiment-scored (n=50,219) |
+| Auction comments (the auction log) | 25.1M | 95% author keyed to an identity · 8.2% sentiment-scored (n=51,094) |
 | Bids | 4.99M |  |
 | Observations (the fact log) | 15.4M |  |
-| Images | 66.0M | 0.6% zone-classified · 0.4% vision-analyzed · 9.0% AI-processed (n=64,700) |
-| Vehicles | 1.48M | 51% active · 30% with a VIN · 78% public (n=30,013) |
+| Images | 66.2M | 0.6% zone-classified · 0.4% vision-analyzed · 8.9% AI-processed (n=65,676) |
+| Vehicles | 1.49M | 51% active · 31% with a VIN · 78% public (n=29,729) |
 | Listings (BaT) | 176K |  |
 | External identities | 1.01M |  |
 | Organizations | 5.76K |  |
 
-The database describing itself (`v_schema_atlas`, `v_job_health`): 1,739 tables (1,105 non-empty) · 6,439 of 41,629 columns described (15%) · 527 non-empty tables with no foreign key in or out · 5 tables with an undeclared writer in the last 30 days · 130 scheduled jobs active, 24 with a failure in the last 24 h · Postgres 17.6.
+The database describing itself (`v_schema_atlas`, `v_job_health`): 1,763 tables (1,121 non-empty) · 6,439 of 41,929 columns described (15%) · 537 non-empty tables with no foreign key in or out · 5 tables with an undeclared writer in the last 30 days · 137 scheduled jobs active, 23 with a failure in the last 24 h · Postgres 17.6.
 
 The stack registry (`v_stacks`): 66 stacks registered, 65 at status measured · 6 at coverage 0.9 or above · mean coverage 0.22. Coverage is the share of a stack's needs present in the live schema; partial needs do not count.
 
@@ -196,20 +196,20 @@ Owner-run views in `public` that anon or authenticated can write through, past r
 <summary>Intake and processing rates</summary>
 
 <!-- intake:start -->
-Measured 2026-11-23 06:46 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows landed per complete UTC day at each layer. Landed counts are exact; columns marked ≈ scale up a page sample whose n is in the header. Read-only. Nothing here is typed by hand.
+Measured 2026-11-24 06:36 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows landed per complete UTC day at each layer. Landed counts are exact; columns marked ≈ scale up a page sample whose n is in the header. Read-only. Nothing here is typed by hand.
 
-| Day (UTC) | Comments landed | Comments sentiment-scored ≈ (1% page sample, n=252,294) | Vehicles landed (BaT / Craigslist) | Images landed | Images vision-analyzed ≈ (0.1% page sample, n=66,466) | BaT lots read by the live pull (latest read per lot, so older days undercount) |
+| Day (UTC) | Comments landed | Comments sentiment-scored ≈ (1% page sample, n=252,212) | Vehicles landed (BaT / Craigslist) | Images landed | Images vision-analyzed ≈ (0.1% page sample, n=65,814) | BaT lots read by the live pull (latest read per lot, so older days undercount) |
 |---|---:|---:|---:|---:|---:|---:|
-| 2026-11-22 | 7,938 | 0 sampled | 4,320 (50 / 414) | 128,390 | 0 sampled | 1,248 |
+| 2026-11-23 | 6,779 | 0 sampled | 3,543 (128 / 417) | 111,428 | 0 sampled | 1,258 |
+| 2026-11-22 | 7,938 | 0 sampled | 4,320 (50 / 414) | 128,390 | 0 sampled | 14 |
 | 2026-11-21 | 10,815 | 0 sampled | 4,409 (158 / 411) | 153,540 | 0 sampled | 56 |
-| 2026-11-20 | 13,355 | 0 sampled | 4,405 (183 / 450) | 149,430 | 0 sampled | 79 |
-| 2026-11-19 | 13,903 | 0 sampled | 5,081 (213 / 423) | 180,764 | 0 sampled | 66 |
+| 2026-11-20 | 13,355 | 0 sampled | 4,405 (184 / 450) | 149,430 | 0 sampled | 79 |
+| 2026-11-19 | 13,903 | 0 sampled | 5,081 (214 / 423) | 180,764 | 0 sampled | 66 |
 | 2026-11-18 | 13,597 | 0 sampled | 5,096 (228 / 427) | 181,705 | 0 sampled | 85 |
 | 2026-11-17 | 11,844 | 0 sampled | 4,319 (238 / 416) | 160,150 | 0 sampled | 64 |
-| 2026-11-16 | 7,532 | 0 sampled | 4,341 (136 / 469) | 177,937 | 0 sampled | 6 |
 
-- **Live pull at measurement:** 0 of 1,222 live BaT lots are more than 2 h past their next scheduled read, and 0 live lots have never been read (`monitored_auctions.next_poll_at`, `last_synced_at`).
-- **Source coverage:** 156,967 of 973,682 known listing targets extracted (16%), across 18 sources (`source_target_coverage`).
+- **Live pull at measurement:** 0 of 1,132 live BaT lots are more than 2 h past their next scheduled read, and 0 live lots have never been read (`monitored_auctions.next_poll_at`, `last_synced_at`).
+- **Source coverage:** 156,970 of 973,687 known listing targets extracted (16%), across 18 sources (`source_target_coverage`).
 - **Clocks:** comments `auction_comments.created_at`, sentiment `auction_comments.analyzed_at`, vehicles `vehicles.created_at` split by `canonical_platform`, images `vehicle_images.created_at`, vision `vehicle_images.vision_analyzed_at`, live-pull reads `monitored_auctions.last_synced_at`, which keeps only each lot's latest read.
 - **Sampled zeros:** `tablesample system` keeps whole pages at random, so a day's rows reach the sample 95% of the time only when they span at least 299 comment pages or 2,995 image pages. "0 sampled" rules out steady processing, not a small run.
 <!-- intake:end -->
