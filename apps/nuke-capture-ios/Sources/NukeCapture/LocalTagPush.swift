@@ -74,6 +74,9 @@ enum LocalTagPush {
                 break
             }
             guard let matched = await SupabaseService.pushLocalVisionTags(rows) else { break } // offline → resume here next run
+            // Free-first metadata lane (flagged off until record_device_tags exists): the same rows,
+            // plus has_person, model/revision and the PhotoKit facts, as per-image metadata.
+            await DeviceTags.pushIfEnabled(rows)
             afterRowId = lastRowId
             defaults.set(Int(afterRowId), forKey: cursorKey) // advance only after a landed batch
             pushed += rows.count
