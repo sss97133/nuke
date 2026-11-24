@@ -241,11 +241,42 @@ struct LiveBoard: Decodable {
     static func fetch(maxAge: TimeInterval = 30) async throws -> LiveBoard {
         if let c = cached, Date().timeIntervalSince(c.at) < maxAge { return c.board }
         let res = try await SupabaseService.client.rpc("market_pulse_live").execute()
+        ServerClock.observe(dateHeader: res.response.value(forHTTPHeaderField: "Date"))
         try BoardContract.check(res.data)       // a renamed or moved slot stops the read (BoardContract.swift)
         let board = try JSONDecoder().decode(LiveBoard.self, from: res.data)
         cached = (board, Date())
         return board
     }
+}
+
+/// The server's clock as the phone sees it: the offset between the HTTP Date header of the board read and the
+/// phone's clock. Countdowns tick on the phone against this, so a phone whose clock is off still counts down to
+/// the recorded end. The header is whole seconds, so an offset under 2 s is treated as none.
+enum ServerClock {
+    private(set) static var offset: TimeInterval = 0
+
+    static func now(_ device: Date = Date()) -> Date { device.addingTimeInterval(offset) }
+
+    static func observe(dateHeader: String?, at device: Date = Date()) {
+        guard let header = dateHeader, let server = parse(header) else { return }
+        offset = measured(server: server, device: device)
+    }
+
+    static func measured(server: Date, device: Date) -> TimeInterval {
+        let o = server.timeIntervalSince(device)
+        return abs(o) < 2 ? 0 : o
+    }
+
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "GMT")
+        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return f
+    }()
+
+    /// RFC 7231 IMF-fixdate ("Mon, 23 Nov 2026 23:53:34 GMT").
+    static func parse(_ header: String) -> Date? { formatter.date(from: header) }
 }
 
 // MARK: - Model 32/33 Live Finish Estimates (useFinishEstimates.ts twin)

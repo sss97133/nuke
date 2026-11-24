@@ -160,6 +160,9 @@ struct GarageView: View {
 
     private func load() async {
         async let counted = GarageReaders.unorganizedPhotos()
+        // The cars saved from the last good read go up at once, with their saved time in the footer; the live
+        // read below replaces them (garage, cars, then the day squares and activity take several round trips).
+        if garage == nil { showSaved() }
         await loadGarage()
         if let vehicles = garage?.vehicles {
             async let read = GarageTimelineReader.read(ids: vehicles.map(\.vehicle_id))
@@ -194,15 +197,20 @@ struct GarageView: View {
         } catch {
             guard !Task.isCancelled, requests.isCurrent(request) else { return }
             NSLog("NukeCapture garage screen load failed: %@", String(describing: error))
-            if let cached = LocalStore.shared.cachedGarage(userId: userId), !cached.vehicles.isEmpty {
-                let unresolved = (try? LocalStore.shared.cachedUnresolvedGarageSources(userId: userId)) ?? []
-                garage = OwnGarage(vehicles: GarageVehicle.applying([], to: cached.vehicles.map(\.projection)), unresolved: unresolved)
-                cachedAt = cached.cachedAt
-                failure = nil
-            } else if garage == nil {
+            if garage == nil { showSaved() }
+            if garage == nil {
                 failure = JobReaders.refusal(GarageReaders.garageName, error)
             }
         }
+    }
+
+    /// The garage as the last good read saved it (owner corrections already applied), marked as saved.
+    private func showSaved() {
+        guard let cached = LocalStore.shared.cachedGarage(userId: userId), !cached.vehicles.isEmpty else { return }
+        let unresolved = (try? LocalStore.shared.cachedUnresolvedGarageSources(userId: userId)) ?? []
+        garage = OwnGarage(vehicles: GarageVehicle.applying([], to: cached.vehicles.map(\.projection)), unresolved: unresolved)
+        cachedAt = cached.cachedAt
+        failure = nil
     }
 }
 
