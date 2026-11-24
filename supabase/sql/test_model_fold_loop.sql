@@ -141,6 +141,7 @@ INSERT INTO vehicles (id, make, model, year, vin, description) VALUES
 
 \ir ../migrations/20261124040000_model_fold_loop.sql
 \ir ../migrations/20261124041000_analysis_queue_orphan_reaper.sql
+\ir ../migrations/20261124042000_model_fold_dead_letter_revive.sql
 
 UPDATE platform_config SET config_value = config_value || '{"settle_seconds":0,"max_delay_seconds":0,"sweep_scan":2,"budget_ms":20000,"min_pass_hours":0}'
  WHERE config_key = 'model_fold';
@@ -278,6 +279,13 @@ UPDATE model_fold_work SET next_attempt_at = now() WHERE vehicle_id = :boom;
 CALL model_fold_tick();
 SELECT t_assert((SELECT state FROM model_fold_work WHERE vehicle_id = :boom) = 'dead', 'dead-lettered after max_attempts');
 SELECT t_assert((SELECT status FROM model_fold_ticks ORDER BY started_at DESC LIMIT 1) = 'ok', 'a failing vehicle does not fail the tick');
+-- New input revives a dead letter; it fails again (still BOOM) and backs off with a fresh budget.
+SELECT model_fold_signal_ids(ARRAY[:boom]::uuid[], 'test');
+CALL model_fold_tick();
+SELECT t_assert((SELECT state = 'pending' AND attempts = 1 FROM model_fold_work WHERE vehicle_id = :boom), 'a new signal revives a dead letter');
+UPDATE model_fold_work SET next_attempt_at = now() WHERE vehicle_id = :boom;
+CALL model_fold_tick();
+SELECT t_assert((SELECT state FROM model_fold_work WHERE vehicle_id = :boom) = 'dead', 'still failing: dead again');
 
 -- A tick that died mid-fold: next tick marks it stale and backs its vehicle off.
 INSERT INTO model_fold_ticks (tick_id, status, pid, started_at) VALUES ('b0000000-0000-4000-8000-000000000001', 'running', 0, now() - interval '1 minute');
@@ -353,6 +361,7 @@ SELECT t_assert((SELECT count(*) FROM analysis_queue WHERE status = 'processing'
   'reaper revert restores');
 
 -- Revert files remove everything.
+\ir revert_20261124042000_model_fold_dead_letter_revive.sql
 \ir revert_20261124041000_analysis_queue_orphan_reaper.sql
 \ir revert_20261124040000_model_fold_loop.sql
 SELECT t_assert(to_regclass('public.model_fold_work') IS NULL AND to_regclass('public.analysis_queue_reap_backup') IS NULL
