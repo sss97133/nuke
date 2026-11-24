@@ -104,8 +104,8 @@ struct LibraryView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
-                            Picker("Personal photos", selection: $personalMode) {
-                                Label("Show", systemImage: "eye").tag(PersonalMode.show)
+                            Picker("Private photos", selection: $personalMode) {
+                                Label("Show all", systemImage: "eye").tag(PersonalMode.show)
                                 Label("Blur", systemImage: "drop.fill").tag(PersonalMode.blur)
                                 Label("Hide", systemImage: "eye.slash").tag(PersonalMode.black)
                             }
@@ -156,6 +156,8 @@ struct LibraryView: View {
             LibraryDetailView(startIndex: box.id)
                 .navigationTransition(.zoom(sourceID: box.id, in: zoomNS))
         }
+        // The server's privacy verdicts for this account's photos (cached on disk, refreshed here).
+        .task { await LibraryServerPrivacy.shared.refresh() }
         .sheet(isPresented: $showDays) { LibraryDaysView() }   // the local-first day receipt
         .sheet(isPresented: $showAlbums) { LibraryAlbumsView() }
     }
@@ -558,13 +560,22 @@ struct LibraryCell: View {
     var isSelected: Bool = false
     var localOnly: Bool = false
     @ObservedObject private var overlay = LibraryOverlayStore.shared
+    @ObservedObject private var serverPrivacy = LibraryServerPrivacy.shared
     @StateObject private var loader = LibraryThumbLoader()
     @State private var localID: String?
     @AppStorage("personalMode.v2") private var personalMode = PersonalMode.blur
     @AppStorage("showVisionTags") private var showVisionTags = false
 
-    /// Owner verdict wins, else the auto verdict (the Select tool's whole point).
-    private var shouldHide: Bool { localID.map { overlay.shouldHide($0) } ?? false }
+    /// The privacy gate's verdict for this cell (LibraryPrivacyGate): owner, server and device
+    /// signals, failing closed. No local id yet = unchecked.
+    private var pixelVerdict: LibraryPixelVerdict {
+        guard let localID else { return .unchecked }
+        return overlay.pixelVerdict(localID, server: serverPrivacy.reason(for: localID))
+    }
+    /// Pixels paint only when the owner chose Show, or the gate says the photo is clear.
+    private var coverVerdict: LibraryPixelVerdict? {
+        personalMode == .show || pixelVerdict.paintsPixels ? nil : pixelVerdict
+    }
     /// The on-device vision label for this cell, once the live classifier read it.
     private var visionTag: String? { localID.flatMap { overlay.label(for: $0) } }
     /// Unnecessary clutter (screenshot/doc/shopping) — the Vision gate softens it out
@@ -575,25 +586,24 @@ struct LibraryCell: View {
         Color(.secondarySystemFill)
             .aspectRatio(1, contentMode: .fill)
             .overlay {
-                if let image = loader.image {
+                if let cover = coverVerdict {
+                    // Fail closed: no pixels of a blocked or not-yet-checked photo, in either mode.
+                    // "Hide" = blacked out; "Blur" = a neutral frosted tile. Layout stays intact.
+                    LibraryPrivacyCover(verdict: cover, black: personalMode == .black)
+                } else if let image = loader.image {
                     Image(uiImage: image).resizable().scaledToFill()
-                        .blur(radius: (gatedJunk || (personalMode == .blur && shouldHide)) ? 14 : 0)
+                        .blur(radius: gatedJunk ? 14 : 0)
                 }
             }
             .overlay {
-                if personalMode == .black && shouldHide {
-                    Color.black   // "Hide" = blacked out; keeps the grid layout intact
-                }
-            }
-            .overlay {
-                if gatedJunk {
+                if gatedJunk && coverVerdict == nil {
                     // Clutter set aside by default: a faint scrim + a glyph so it reads as
                     // "filtered noise", still tappable to reveal, never fully removed.
                     Color.black.opacity(0.28)
                 }
             }
             .overlay(alignment: .center) {
-                if gatedJunk {
+                if gatedJunk && coverVerdict == nil {
                     Image(systemName: "rectangle.on.rectangle.slash")
                         .font(.body)
                         .foregroundStyle(.white.opacity(0.7))
@@ -638,10 +648,10 @@ struct LibraryCell: View {
             .onAppear {
                 let asset = LibraryStore.shared.asset(at: index)
                 localID = asset?.localIdentifier
-                if !localOnly {
-                    LibraryStore.shared.updateCache(around: index)
-                    if let lid = asset?.localIdentifier { overlay.note(lid) }
-                }
+                if !localOnly { LibraryStore.shared.updateCache(around: index) }
+                // Every surface asks for a verdict, or its cells would stay covered; a local-only
+                // surface reads on the device and never pulls from iCloud.
+                if let lid = asset?.localIdentifier { overlay.note(lid, allowNetwork: !localOnly) }
                 loader.load(index: index, allowNetwork: !localOnly)
             }
             .onDisappear {
