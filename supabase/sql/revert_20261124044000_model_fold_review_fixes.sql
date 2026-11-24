@@ -1,9 +1,6 @@
--- Revert 20261124044000_model_fold_review_fixes: drop the update triggers, restore the previous sweep and tick bodies.
+-- Revert 20261124044000_model_fold_review_fixes: restore the previous sweep and tick bodies.
 begin;
 set local lock_timeout = '3s';
-drop trigger if exists model_fold_signal_upd on public.vehicle_observations;
-drop trigger if exists model_fold_signal_upd on public.field_evidence;
-drop function if exists public.model_fold_origin_update_signal();
 
 create or replace function public.model_fold_sweep(p_key text, p_cfg jsonb) returns jsonb
 language plpgsql set search_path = public as $$

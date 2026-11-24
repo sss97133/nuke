@@ -231,9 +231,6 @@ CALL model_fold_tick();
 SELECT t_assert(EXISTS (SELECT 1 FROM vehicle_code_readings WHERE vehicle_id = :fb3 AND code = '66' AND state = 'active'), 'observation text folded');
 -- Withdrawn origins: a superseded observation and a comment that became a question.
 UPDATE vehicle_observations SET is_superseded = true WHERE id = 'f0000000-0000-4000-8000-000000000001';
-SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE vehicle_id = :fb3 AND reason = 'vehicle_observations_update'), 'superseding an observation signals');
-UPDATE field_evidence SET status = 'rejected' WHERE id = 'f1000000-0000-4000-8000-000000000001';
-SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE vehicle_id = :fb3 AND reason = 'field_evidence_update'), 'rejecting evidence signals');
 UPDATE auction_comments SET has_question = true WHERE id = 'c0000000-0000-4000-8000-000000000001';
 SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE vehicle_id = :fb2 AND reason = 'auction_comments_update'), 'question flag change signals');
 UPDATE vehicles SET listing_title = '1979 Pontiac Trans Am 6.6' WHERE id = :fb2;

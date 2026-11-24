@@ -1,7 +1,7 @@
 -- Model fold review fixes (20261124044000)
 --  1. A sweep pass that fits in one chunk now records itself verified (it re-ran every tick before).
 --  2. When a tick cancels a stuck tick, that tick's leased vehicle backs off immediately instead of waiting out its lease.
---  3. Observation and field-evidence updates that withdraw, edit or move an origin re-queue the vehicle (insert-only before).
+--  (Observation / field-evidence update signals ship separately: their tables are busy with spec landing right now.)
 -- Revert: supabase/sql/revert_20261124044000_model_fold_review_fixes.sql.
 
 begin;
@@ -212,29 +212,5 @@ begin
   perform pg_advisory_unlock(hashtext('public.model_fold_tick'));
 end $$;
 
--- Withdrawn or moved origins: an observation superseded/edited/moved or evidence rejected/moved re-queues its vehicle.
--- Row-level with column lists and WHEN, so only real changes to these columns fire.
-create or replace function public.model_fold_origin_update_signal() returns trigger
-language plpgsql security definer set search_path = public as $$
-begin
-  begin
-    perform public.model_fold_signal_ids(array_remove(array[old.vehicle_id, new.vehicle_id], null), tg_table_name || '_update');
-  exception when others then
-    raise warning 'model_fold signal skipped (%): %', tg_table_name, sqlerrm;
-  end;
-  return null;
-end $$;
-revoke all on function public.model_fold_origin_update_signal() from public, anon, authenticated;
-
-drop trigger if exists model_fold_signal_upd on public.vehicle_observations;
-create trigger model_fold_signal_upd after update of is_superseded, content_text, vehicle_id on public.vehicle_observations
-  for each row when (old.is_superseded is distinct from new.is_superseded or old.content_text is distinct from new.content_text
-                     or old.vehicle_id is distinct from new.vehicle_id)
-  execute function public.model_fold_origin_update_signal();
-drop trigger if exists model_fold_signal_upd on public.field_evidence;
-create trigger model_fold_signal_upd after update of status, proposed_value, vehicle_id on public.field_evidence
-  for each row when (old.status is distinct from new.status or old.proposed_value is distinct from new.proposed_value
-                     or old.vehicle_id is distinct from new.vehicle_id)
-  execute function public.model_fold_origin_update_signal();
 
 commit;
