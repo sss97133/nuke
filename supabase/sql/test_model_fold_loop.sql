@@ -229,10 +229,28 @@ SELECT t_assert(EXISTS (SELECT 1 FROM vehicle_code_readings WHERE vehicle_id = :
 -- Withdrawn origins: a superseded observation and a comment that became a question.
 UPDATE vehicle_observations SET is_superseded = true WHERE id = 'f0000000-0000-4000-8000-000000000001';
 UPDATE auction_comments SET has_question = true WHERE id = 'c0000000-0000-4000-8000-000000000001';
-SELECT model_fold_signal_ids(ARRAY[:fb2, :fb3]::uuid[], 'test');
+SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE vehicle_id = :fb2 AND reason = 'auction_comments_update'), 'question flag change signals');
+UPDATE vehicles SET listing_title = '1979 Pontiac Trans Am 6.6' WHERE id = :fb2;
+SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE vehicle_id = :fb2 AND reason = 'vehicle_update'), 'title change signals');
+SELECT model_fold_signal_ids(ARRAY[:fb3]::uuid[], 'test');
 CALL model_fold_tick();
 SELECT t_assert((SELECT state FROM vehicle_code_readings WHERE vehicle_id = :fb3 AND code = '66') = 'reverted'
   AND (SELECT state FROM vehicle_code_readings WHERE vehicle_id = :fb2 AND code = '55') = 'reverted', 'withdrawn origins invalidate');
+-- Comment readings keep no match text: an edit retires them and the re-decode brings back what the text still says.
+INSERT INTO auction_comments VALUES ('c0000000-0000-4000-8000-000000000004', NULL, :fb3, 'comment', 'Tag says paint code 44', NULL);
+CALL model_fold_tick();
+SELECT t_assert((SELECT count(*) FROM vehicle_code_readings WHERE origin_id = 'c0000000-0000-4000-8000-000000000004' AND state = 'active' AND match_text IS NULL) = 1,
+  'comment reading folded without match text');
+UPDATE auction_comments SET comment_text = 'Sorry, wrong car.' WHERE id = 'c0000000-0000-4000-8000-000000000004';
+SELECT t_assert(EXISTS (SELECT 1 FROM model_fold_signal WHERE reason = 'auction_comment_edit' AND origin_id = 'c0000000-0000-4000-8000-000000000004'), 'comment edit carries its id');
+CALL model_fold_tick();
+SELECT t_assert(NOT EXISTS (SELECT 1 FROM vehicle_code_readings WHERE origin_id = 'c0000000-0000-4000-8000-000000000004' AND state = 'active'),
+  'edited comment no longer supports the reading');
+SELECT t_assert((SELECT edited_origins = '{}' FROM model_fold_work WHERE vehicle_id = :fb3), 'edited ids cleared after the fold');
+UPDATE auction_comments SET comment_text = 'Checked again: paint code 44 it is.' WHERE id = 'c0000000-0000-4000-8000-000000000004';
+CALL model_fold_tick();
+SELECT t_assert((SELECT count(*) FROM vehicle_code_readings WHERE origin_id = 'c0000000-0000-4000-8000-000000000004' AND state = 'active') = 1,
+  'unchanged code comes back as a fresh reading after an edit');
 -- A reading from an origin this check does not know is left alone.
 INSERT INTO vehicle_code_readings (vehicle_id, kind, code, origin_table, origin_id, origin_column, match_text, rule_version, run_id)
 VALUES (:fb3, 'paint_code', '77', 'vehicles', :fb3, 'some_future_column', 'paint code 77', 'text_code_decode_v2', 'manual');
@@ -268,6 +286,13 @@ UPDATE model_fold_work SET state = 'leased', lease_tick = 'b0000000-0000-4000-80
 CALL model_fold_tick();
 SELECT t_assert((SELECT status FROM model_fold_ticks WHERE tick_id = 'b0000000-0000-4000-8000-000000000001') = 'stale'
   AND (SELECT state = 'pending' AND next_attempt_at > now() FROM model_fold_work WHERE vehicle_id = :fb3), 'stale tick releases its lease with backoff');
+
+-- A tick that died on this session left its lock and flag: the next tick clears them and ends holding nothing.
+SELECT pg_advisory_lock(hashtext('public.model_fold_tick')), pg_advisory_lock(hashtext('public.model_fold_tick')),
+       set_config('model_fold.in_tick', 'on', false);
+CALL model_fold_tick();
+SELECT t_assert(NOT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid())
+  AND coalesce(current_setting('model_fold.in_tick', true), '') = '', 'leftover session lock and flag are cleared');
 
 -- Logic change re-folds the whole scope through the sweep.
 CREATE OR REPLACE FUNCTION public.text_code_matches_v1(p_text text)

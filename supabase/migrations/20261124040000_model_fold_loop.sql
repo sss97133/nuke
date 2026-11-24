@@ -54,6 +54,7 @@ create table if not exists public.model_fold_signal (
   id bigint generated always as identity primary key,
   vehicle_id uuid not null,
   reason text not null,
+  origin_id uuid,
   at timestamptz not null default now());
 
 create table if not exists public.model_fold_work (
@@ -70,6 +71,7 @@ create table if not exists public.model_fold_work (
   last_error text,
   folded_at timestamptz,
   folded_key text,
+  edited_origins uuid[] not null default '{}',
   updated_at timestamptz not null default now());
 create index if not exists model_fold_work_pending_idx on public.model_fold_work (priority, dirty_at) where state = 'pending';
 create index if not exists model_fold_work_leased_idx on public.model_fold_work (leased_until) where state = 'leased';
@@ -218,7 +220,14 @@ begin
       select array_agg(distinct x) into v_ids from (
         select unnest(array[o.vehicle_id, n.vehicle_id]) x from old_rows o join new_rows n on n.id = o.id
          where o.vehicle_id is distinct from n.vehicle_id or o.comment_text is distinct from n.comment_text
-            or o.comment_type is distinct from n.comment_type) z where x is not null;
+            or o.comment_type is distinct from n.comment_type or o.has_question is distinct from n.has_question) z
+       where x is not null;
+      -- An edited comment's readings carry no match text, so the fold needs to know which comments changed.
+      insert into public.model_fold_signal (vehicle_id, reason, origin_id)
+      select n.vehicle_id, 'auction_comment_edit', n.id
+        from old_rows o join new_rows n on n.id = o.id join public.vehicles v on v.id = n.vehicle_id
+       where o.comment_text is distinct from n.comment_text
+         and public.model_fold_in_scope(v.make, v.model, v.vin, v.year, v.id);
     else
       select array_agg(distinct x) into v_ids from (
         select unnest(array[o.vehicle_id, n.vehicle_id]) x from old_rows o join new_rows n on n.id = o.id
@@ -265,12 +274,15 @@ declare n int;
 begin
   with s as (
     delete from public.model_fold_signal where id in (select id from public.model_fold_signal order by id limit p_limit)
-    returning vehicle_id, reason, at),
-  g as (select vehicle_id, array_agg(distinct reason) reasons, min(at) f, max(at) l from s group by vehicle_id)
-  insert into public.model_fold_work as w (vehicle_id, priority, reasons, first_dirty_at, dirty_at, next_attempt_at)
-  select vehicle_id, 1, reasons, f, l, now() from g
+    returning vehicle_id, reason, origin_id, at),
+  g as (select vehicle_id, array_agg(distinct reason) reasons, min(at) f, max(at) l,
+               coalesce(array_agg(distinct origin_id) filter (where origin_id is not null), '{}') edited
+          from s group by vehicle_id)
+  insert into public.model_fold_work as w (vehicle_id, priority, reasons, first_dirty_at, dirty_at, next_attempt_at, edited_origins)
+  select vehicle_id, 1, reasons, f, l, now(), edited from g
   on conflict (vehicle_id) do update set
     priority = 1,
+    edited_origins = (select coalesce(array_agg(distinct x), '{}') from unnest(w.edited_origins || excluded.edited_origins) x),
     reasons = case when w.state = 'done' then excluded.reasons
                    else (select array_agg(distinct x order by x) from unnest(w.reasons || excluded.reasons) x) end,
     first_dirty_at = case when w.state = 'done' then excluded.first_dirty_at else least(w.first_dirty_at, excluded.first_dirty_at) end,
@@ -364,13 +376,14 @@ end $$;
 -- A text reading stays active only while its origin row still exists on this vehicle and is still eligible (comment not a
 -- bid/sold/question, observation not superseded, evidence not rejected/superseded, vehicle not deleted/merged) and, when
 -- the reading kept its match text, that text is still in the origin column. v1 comment readings (no match text kept)
--- are re-checked through text_code_matches_v1, the matcher that produced them.
-create or replace function public.model_fold_invalidate_readings(p_vehicle uuid) returns uuid[]
+-- are re-checked through text_code_matches_v1, the matcher that produced them; other readings without match text are
+-- retired when their origin comment was edited (p_edited) and re-read by the decode that follows.
+create or replace function public.model_fold_invalidate_readings(p_vehicle uuid, p_edited uuid[] default '{}') returns uuid[]
 language plpgsql set search_path = public as $$
 declare v_ids uuid[];
 begin
   with o as (
-    select r.id, r.kind, r.code, r.rule_version, r.match_text, z.alive, z.txt
+    select r.id, r.kind, r.code, r.rule_version, r.match_text, r.origin_id, z.alive, z.txt
       from public.vehicle_code_readings r
      cross join lateral (
        select v.id = r.vehicle_id and v.deleted_at is null and v.merged_into_vehicle_id is null as alive,
@@ -399,20 +412,24 @@ begin
             or (r.origin_table = 'vehicle_observations' and r.origin_column = 'content_text')
             or (r.origin_table = 'field_evidence' and r.origin_column = 'proposed_value'))),
   -- the trailing (false, null) row only counts when no origin row was found
-  per as (select id, kind, code, rule_version, match_text, bool_or(alive) as alive, max(txt) as txt from o group by 1, 2, 3, 4, 5),
+  per as (select id, kind, code, rule_version, match_text, origin_id, bool_or(alive) as alive, max(txt) as txt
+            from o group by 1, 2, 3, 4, 5, 6),
   stale as (
     select p.id from per p
      where not coalesce(p.alive, false) or p.txt is null
         or (p.match_text is not null and strpos(p.txt, p.match_text) = 0)
         or (p.match_text is null and p.rule_version = 'text_code_decode_v1'
-            and not exists (select 1 from public.text_code_matches_v1(p.txt) m where m.kind = p.kind and m.code = p.code))),
+            and not exists (select 1 from public.text_code_matches_v1(p.txt) m where m.kind = p.kind and m.code = p.code))
+        -- no match text kept (comments) and the origin text was edited: retire it; the decode right after re-reads
+        -- the current text, so whatever it still says comes back as a fresh reading
+        or (p.match_text is null and p.origin_id = any (coalesce(p_edited, '{}')))),
   u as (update public.vehicle_code_readings r set state = 'reverted', reverted_at = now()
          from stale where r.id = stale.id returning r.id)
   select coalesce(array_agg(id), '{}') into v_ids from u;
   return v_ids;
 end $$;
 
-create or replace function public.model_fold_one(p_tick uuid, p_vehicle uuid, p_cfg jsonb) returns jsonb
+create or replace function public.model_fold_one(p_tick uuid, p_vehicle uuid, p_cfg jsonb, p_edited uuid[] default '{}') returns jsonb
 language plpgsql set search_path = public as $$
 declare
   t0 timestamptz := clock_timestamp(); v_inv uuid[]; v_dec uuid; v_mem uuid := gen_random_uuid();
@@ -421,7 +438,7 @@ begin
   if p_vehicle::text like '9cf5b7a4%' then return jsonb_build_object('skipped', 'excluded'); end if;
   select * into v from public.vehicles where id = p_vehicle;
   v_exists := found;
-  v_inv := public.model_fold_invalidate_readings(p_vehicle);
+  v_inv := public.model_fold_invalidate_readings(p_vehicle, p_edited);
   if v_exists and public.model_fold_scope_of(v.make, v.model, v.vin, v.year) in
        (select jsonb_array_elements_text(p_cfg -> 'decode_scopes')) then
     v_dec := gen_random_uuid();
@@ -489,9 +506,15 @@ declare
   v_maxatt int := coalesce((cfg ->> 'max_attempts')::int, 5);
   v_key text; v_reason text; v_sig int := 0; v_sweep jsonb; v_veh uuid; v_dirty timestamptz; v_att int; r jsonb; v_err text;
   n_claim int := 0; n_ok int := 0; n_fail int := 0; n_dead int := 0; n_add int := 0; n_inv int := 0; n_app int := 0; n_sup int := 0;
-  v_stuck record;
+  v_stuck record; v_edited uuid[];
 begin
   if not coalesce((cfg ->> 'enabled')::boolean, false) then return; end if;
+  -- A tick that died on this same session (error or timeout after COMMIT) left its session lock and in_tick flag behind;
+  -- drop them before trying again. Cron runs this CALL alone on its connection, so this session holds no other advisory lock.
+  if coalesce(current_setting('model_fold.in_tick', true), '') = 'on' then
+    perform pg_advisory_unlock_all();
+    perform set_config('model_fold.in_tick', '', false);
+  end if;
   if not pg_try_advisory_lock(hashtext('public.model_fold_tick')) then
     -- Another tick holds the lock. Cancel it only if it has overrun the stuck limit.
     for v_stuck in select t.tick_id, t.pid from public.model_fold_ticks t
@@ -544,7 +567,7 @@ begin
 
   loop
     exit when n_claim >= v_max or clock_timestamp() - t0 > v_budget;
-    select w.vehicle_id, w.dirty_at into v_veh, v_dirty from public.model_fold_work w
+    select w.vehicle_id, w.dirty_at, w.edited_origins into v_veh, v_dirty, v_edited from public.model_fold_work w
      where w.state = 'pending' and w.next_attempt_at <= now()
        and (w.dirty_at <= now() - v_settle or w.first_dirty_at <= now() - v_maxdelay)
      order by w.priority, w.dirty_at limit 1 for update skip locked;
@@ -554,9 +577,10 @@ begin
     commit;
     n_claim := n_claim + 1;
     begin
-      r := public.model_fold_one(v_tick, v_veh, cfg);
+      r := public.model_fold_one(v_tick, v_veh, cfg, v_edited);
       update public.model_fold_work set state = case when dirty_at > v_dirty then 'pending' else 'done' end,
              attempts = 0, leased_until = null, lease_tick = null, last_error = null, folded_at = now(), folded_key = v_key,
+             edited_origins = array(select unnest(edited_origins) except select unnest(v_edited)),
              priority = case when dirty_at > v_dirty then priority else 5 end, updated_at = now()
        where vehicle_id = v_veh;
       n_ok := n_ok + 1;
@@ -684,7 +708,7 @@ begin
   foreach f in array array['model_fold_config()','model_fold_scope_of(text,text,text,integer)','model_fold_scope_make(text)','model_fold_signals_on()',
     'model_fold_in_scope(text,text,text,integer,uuid)','model_fold_signal_ids(uuid[],text)','model_fold_vehicles_signal()',
     'model_fold_rows_signal()','model_fold_image_signal()','model_fold_logic_key()','model_fold_absorb_signals(integer)',
-    'model_fold_sweep(text,jsonb)','model_fold_invalidate_readings(uuid)','model_fold_one(uuid,uuid,jsonb)',
+    'model_fold_sweep(text,jsonb)','model_fold_invalidate_readings(uuid,uuid[])','model_fold_one(uuid,uuid,jsonb,uuid[])',
     'model_fold_backpressure(jsonb)','model_fold_revert_v1(uuid)','model_fold_revert_since(timestamptz)','assay_model_fold()'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
     execute format('grant execute on function public.%s to service_role', f);
@@ -699,12 +723,14 @@ create trigger model_fold_signal_ins after insert on public.vehicles
   for each row execute function public.model_fold_vehicles_signal();
 drop trigger if exists model_fold_signal_upd on public.vehicles;
 create trigger model_fold_signal_upd
-  after update of vin, year, make, model, description, highlights, equipment, modifications, numbers_quote, deleted_at,
-                  merged_into_vehicle_id on public.vehicles
+  after update of vin, year, make, model, description, highlights, equipment, modifications, numbers_quote, title,
+                  listing_title, bat_listing_title, deleted_at, merged_into_vehicle_id on public.vehicles
   for each row when (old.vin is distinct from new.vin or old.year is distinct from new.year or old.make is distinct from new.make
     or old.model is distinct from new.model or old.description is distinct from new.description
     or old.highlights is distinct from new.highlights or old.equipment is distinct from new.equipment
     or old.modifications is distinct from new.modifications or old.numbers_quote is distinct from new.numbers_quote
+    or old.title is distinct from new.title or old.listing_title is distinct from new.listing_title
+    or old.bat_listing_title is distinct from new.bat_listing_title
     or old.deleted_at is distinct from new.deleted_at or old.merged_into_vehicle_id is distinct from new.merged_into_vehicle_id)
   execute function public.model_fold_vehicles_signal();
 
