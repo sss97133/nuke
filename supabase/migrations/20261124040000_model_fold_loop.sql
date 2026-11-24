@@ -73,6 +73,11 @@ create table if not exists public.model_fold_work (
   folded_key text,
   edited_origins uuid[] not null default '{}',
   updated_at timestamptz not null default now());
+-- re-apply safe: columns added after the first draft of these tables
+alter table public.model_fold_signal add column if not exists origin_id uuid;
+alter table public.model_fold_work add column if not exists edited_origins uuid[] not null default '{}';
+drop function if exists public.model_fold_invalidate_readings(uuid);
+drop function if exists public.model_fold_one(uuid, uuid, jsonb);
 create index if not exists model_fold_work_pending_idx on public.model_fold_work (priority, dirty_at) where state = 'pending';
 create index if not exists model_fold_work_leased_idx on public.model_fold_work (leased_until) where state = 'leased';
 
