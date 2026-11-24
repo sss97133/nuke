@@ -142,6 +142,7 @@ INSERT INTO vehicles (id, make, model, year, vin, description) VALUES
 \ir ../migrations/20261124040000_model_fold_loop.sql
 \ir ../migrations/20261124041000_analysis_queue_orphan_reaper.sql
 \ir ../migrations/20261124042000_model_fold_dead_letter_revive.sql
+\ir ../migrations/20261124043000_model_fold_revive_dirty_clock.sql
 
 UPDATE platform_config SET config_value = config_value || '{"settle_seconds":0,"max_delay_seconds":0,"sweep_scan":2,"budget_ms":20000,"min_pass_hours":0}'
  WHERE config_key = 'model_fold';
@@ -286,6 +287,13 @@ SELECT t_assert((SELECT state = 'pending' AND attempts = 1 FROM model_fold_work 
 UPDATE model_fold_work SET next_attempt_at = now() WHERE vehicle_id = :boom;
 CALL model_fold_tick();
 SELECT t_assert((SELECT state FROM model_fold_work WHERE vehicle_id = :boom) = 'dead', 'still failing: dead again');
+UPDATE model_fold_work SET first_dirty_at = now() - interval '2 days' WHERE vehicle_id = :boom;
+SELECT model_fold_signal_ids(ARRAY[:boom]::uuid[], 'test2');
+SELECT model_fold_absorb_signals(100);
+SELECT t_assert((SELECT state = 'pending' AND first_dirty_at > now() - interval '1 minute' FROM model_fold_work WHERE vehicle_id = :boom),
+  'a revived dead letter starts a fresh dirty clock');
+UPDATE model_fold_work SET state = 'dead', attempts = 2 WHERE vehicle_id = :boom;
+
 
 -- A tick that died mid-fold: next tick marks it stale and backs its vehicle off.
 INSERT INTO model_fold_ticks (tick_id, status, pid, started_at) VALUES ('b0000000-0000-4000-8000-000000000001', 'running', 0, now() - interval '1 minute');
@@ -361,6 +369,7 @@ SELECT t_assert((SELECT count(*) FROM analysis_queue WHERE status = 'processing'
   'reaper revert restores');
 
 -- Revert files remove everything.
+\ir revert_20261124043000_model_fold_revive_dirty_clock.sql
 \ir revert_20261124042000_model_fold_dead_letter_revive.sql
 \ir revert_20261124041000_analysis_queue_orphan_reaper.sql
 \ir revert_20261124040000_model_fold_loop.sql
