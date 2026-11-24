@@ -1,4 +1,5 @@
--- Revert of 20261123190000_data_set_decoders.sql, 20261123191000_text_code_decode_window_fix.sql, 20261123192000_data_set_labels.sql.
+-- Revert of 20261123190000_data_set_decoders.sql, 20261123191000_text_code_decode_window_fix.sql, 20261123192000_data_set_labels.sql,
+-- 20261123193000_text_code_review_fixes.sql.
 -- Order: labels, membership runs, reading runs, then objects.
 --   select public.data_set_label_backfill_revert_v1('5d1a7c2e-0f3b-4c8e-9a61-20261123c001');
 --   select public.data_set_membership_revert_v1('5d1a7c2e-0f3b-4c8e-9a61-20261123a006');
@@ -12,6 +13,7 @@ DROP FUNCTION IF EXISTS public.data_set_key_label_v1(text, text);
 DROP FUNCTION IF EXISTS public.text_code_decode_v1(uuid, text, uuid, integer, integer, integer);
 DROP FUNCTION IF EXISTS public.text_code_decode_revert_v1(uuid);
 DROP FUNCTION IF EXISTS public.text_code_matches_v1(text);
+DROP FUNCTION IF EXISTS public.text_code_rescore_v1(uuid[]);
 -- vehicle_code_readings_backup is kept on purpose.
 DROP TABLE IF EXISTS public.vehicle_code_readings;
 DROP TABLE IF EXISTS public.vehicle_code_reading_runs;
