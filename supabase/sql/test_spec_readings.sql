@@ -1,4 +1,4 @@
--- Read-only checks for text_spec_matches_v2 (20261124020000). Each row must return ok = true.
+-- Read-only checks for text_spec_matches_v2 (20261124020000, 20261124022000). Each row must return ok = true.
 WITH t(name, txt, src, mk, model, kind, code, expect) AS (VALUES
   ('cid',            'powered by a 455ci V8',                          'listing', 'Pontiac',   'Firebird', 'engine_cid',        '455',           true),
   ('speeds',         'paired with a four-speed manual transmission',   'listing', 'Pontiac',   'Firebird', 'trans_speeds',      '4',             true),
@@ -25,6 +25,9 @@ WITH t(name, txt, src, mk, model, kind, code, expect) AS (VALUES
   ('style stripes',  'Z/28-style stripes',                             'title',   'Chevrolet', 'Camaro',   'trim_level',        'Z28',           false),
   ('gt 390',         '1967 Ford Mustang GT 390',                       'title',   'Ford',      'Mustang',  'trim_level',        'GT',            true),
   ('gt350 not gt',   '1966 Ford Mustang GT-350',                       'title',   'Ford',      'Mustang',  'trim_level',        'GT',            false),
+  ('kr is kr',       '1968 Shelby GT-500-KR',                          'title',   'Shelby',    'GT500',    'trim_level',        'SHELBY_GT500KR',true),
+  ('kr not gt500',   '1968 Shelby GT-500-KR',                          'title',   'Shelby',    'GT500',    'trim_level',        'SHELBY_GT500',  false),
+  ('gt500',          '1967 Shelby GT500 fastback',                     'title',   'Shelby',    'GT500',    'trim_level',        'SHELBY_GT500',  true),
   ('body',           '1969 Ford Mustang Fastback',                     'title',   'Ford',      'Mustang',  'body_style',        'FASTBACK',      true),
   ('dealer',         'It was sold new at Example Pontiac in Ohio',     'listing', 'Pontiac',   'Firebird', 'selling_dealer',    'STATED',        true))
 SELECT t.name, t.expect = EXISTS (SELECT 1 FROM public.text_spec_matches_v2(t.txt, t.src, t.mk, t.model) m
