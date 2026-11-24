@@ -1611,6 +1611,8 @@ final class LocalStore {
         let isVehicle: Bool?
         let isPersonal: Bool?
         let ownerVerdict: String?
+        /// Face/person read from the same classify pass; feeds the server's privacy edge.
+        var hasPerson: Bool? = nil
     }
 
     /// Classified appearance rows (T0 labels present), paged by rowid for a resumable push.
@@ -1621,7 +1623,7 @@ final class LocalStore {
             try dbQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
                     SELECT rowid AS rid, localIdentifier AS lid, appleMLLabelsJSON AS labels,
-                           isVehicle AS v, isPersonal AS p, ownerVerdict AS ov
+                           isVehicle AS v, isPersonal AS p, ownerVerdict AS ov, hasPerson AS hp
                     FROM appearance
                     WHERE appleMLLabelsJSON IS NOT NULL AND rowid > ?
                     ORDER BY rowid ASC LIMIT ?
@@ -1635,7 +1637,8 @@ final class LocalStore {
                                           labels: labels,
                                           isVehicle: r["v"],
                                           isPersonal: r["p"],
-                                          ownerVerdict: r["ov"]))
+                                          ownerVerdict: r["ov"],
+                                          hasPerson: r["hp"]))
                 }
             }
         } catch { NSLog("LocalStore.appearanceTagsForSync failed: %@", String(describing: error)) }
