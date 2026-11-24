@@ -2,7 +2,7 @@
 --   20261124020000_spec_readings, 20261124021000_spec_landing_drain, 20261124022000_spec_readings_review,
 --   20261124023000_spec_readings_public_sources, 20261124024000_spec_readings_financial_cleanup,
 --   20261124025000_data_set_public_counts, 20261124026000_spec_platform_scopes, 20261124027000_spec_fold_backpressure,
---   20261124028000_spec_bucket_bounds.
+--   20261124028000_spec_bucket_bounds, 20261124029000_spec_landing_autoqueue.
 -- Synthetic rows only; never production. Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_spec_readings
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_spec_readings -f supabase/sql/test_spec_readings.sql
@@ -450,6 +450,7 @@ CREATE FUNCTION public.observation_is_public(p_kind text, p_data jsonb) RETURNS 
 \i supabase/migrations/20261124026000_spec_platform_scopes.sql
 \i supabase/migrations/20261124027000_spec_fold_backpressure.sql
 \i supabase/migrations/20261124028000_spec_bucket_bounds.sql
+\i supabase/migrations/20261124029000_spec_landing_autoqueue.sql
 
 -- 1. matcher cases
 CREATE TEMP TABLE spec_cases AS
@@ -592,3 +593,41 @@ CREATE OR REPLACE FUNCTION public.model_fold_backpressure(p_cfg jsonb) RETURNS t
 SELECT public.spec_landing_drain_v1(5000);
 SELECT pg_temp.ok('platform jobs resume once the fold loop is clear', (SELECT status = 'done' FROM public.spec_landing_jobs WHERE job_id = 'p01'));
 DROP FUNCTION public.model_fold_backpressure(jsonb);
+
+-- 5. the platform feeds itself: next buckets queued below the low-water mark, existing buckets skipped, guards respected
+SELECT pg_temp.ok('autoqueue scheduled', EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'spec-landing-autoqueue'));
+SELECT public.spec_landing_autoqueue_v1();
+SELECT pg_temp.ok('autoqueue queues the next 16 buckets, skipping ones with jobs',
+  (SELECT count(*) = 48 AND count(DISTINCT scope) = 16 AND min(scope) = 'platform_hex_02' AND max(scope) = 'platform_hex_11'
+     FROM public.spec_landing_jobs WHERE job_id LIKE 'plat_%')
+  AND (SELECT count(DISTINCT run_id) = 32 FROM public.spec_landing_jobs WHERE job_id LIKE 'plat_%')
+  AND (SELECT depends_on = 'plat_02_decode' AND priority = 102 FROM public.spec_landing_jobs WHERE job_id = 'plat_02_plan'));
+SELECT public.spec_landing_autoqueue_v1();
+SELECT pg_temp.ok('autoqueue waits while enough jobs are open',
+  (SELECT count(*) = 48 FROM public.spec_landing_jobs WHERE job_id LIKE 'plat_%')
+  AND (SELECT last_autoqueue->>'skip' = 'enough queued' FROM public.spec_landing_control WHERE id = 1));
+UPDATE public.spec_landing_jobs SET status = 'done' WHERE job_id LIKE 'plat_%';
+UPDATE public.spec_landing_control SET paused = true WHERE id = 1;
+SELECT public.spec_landing_autoqueue_v1();
+SELECT pg_temp.ok('autoqueue respects the pause', (SELECT count(*) = 48 FROM public.spec_landing_jobs WHERE job_id LIKE 'plat_%'));
+UPDATE public.spec_landing_control SET paused = false, max_layer_bytes = 1 WHERE id = 1;
+SELECT public.spec_landing_autoqueue_v1();
+SELECT pg_temp.ok('autoqueue respects the size cap', (SELECT count(*) = 48 FROM public.spec_landing_jobs WHERE job_id LIKE 'plat_%'));
+UPDATE public.spec_landing_control SET max_layer_bytes = 15000000000 WHERE id = 1;
+CREATE OR REPLACE FUNCTION public.model_fold_backpressure(p_cfg jsonb) RETURNS text LANGUAGE sql AS $$ SELECT 'circuit open'::text $$;
+SELECT public.spec_landing_autoqueue_v1();
+SELECT pg_temp.ok('autoqueue respects fold backpressure', (SELECT count(*) = 48 FROM public.spec_landing_jobs WHERE job_id LIKE 'plat_%'));
+DROP FUNCTION public.model_fold_backpressure(jsonb);
+UPDATE public.spec_landing_jobs SET status = 'failed' WHERE job_id IN ('plat_02_decode','plat_03_decode','plat_04_decode');
+SELECT public.spec_landing_autoqueue_v1();
+SELECT pg_temp.ok('autoqueue stops after failed jobs', (SELECT last_autoqueue->>'skip' = 'failed jobs' FROM public.spec_landing_control WHERE id = 1));
+UPDATE public.spec_landing_jobs SET status = 'done' WHERE status = 'failed';
+UPDATE public.spec_landing_control SET autoqueue_batch = 300 WHERE id = 1;
+SELECT public.spec_landing_autoqueue_v1();
+SELECT public.spec_landing_autoqueue_v1();
+SELECT pg_temp.ok('autoqueue covers every bucket once, then stops',
+  (SELECT count(DISTINCT scope) = 256 FROM public.spec_landing_jobs WHERE scope LIKE 'platform_hex_%')
+  AND (SELECT count(*) = 1 FROM public.spec_landing_jobs WHERE scope = 'platform_hex_ff' AND step_kind = 'decode'));
+UPDATE public.spec_landing_jobs SET status = 'done' WHERE scope LIKE 'platform_hex_%';
+SELECT public.spec_landing_autoqueue_v1();
+SELECT pg_temp.ok('autoqueue reports completion', (SELECT last_autoqueue->>'skip' = 'all buckets queued' FROM public.spec_landing_control WHERE id = 1));
