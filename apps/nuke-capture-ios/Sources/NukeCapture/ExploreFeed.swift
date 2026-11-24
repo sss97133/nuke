@@ -44,6 +44,8 @@ struct ExploreFeedItem: Identifiable, Equatable {
     var position: AskPosition? = nil
     /// When the read that produced this classified card was made (the board's as_of), for the "why" stack.
     var asOf: Date? = nil
+    /// A live lot's last record write (the board's updated_at): the bid on the card is no newer than this.
+    var recordUpdatedAt: Date? = nil
 
     /// The vehicle id a live lot's finish estimate is keyed by (the card id without its "live:" prefix).
     var lotId: String? {
@@ -91,7 +93,10 @@ struct ExploreFeedItem: Identifiable, Equatable {
                         amount: lot.currentBid, amountLabel: "Current bid", endsAt: lot.endsAtDate,
                         source: "Bring a Trailer", location: nil, facts: lot.noReserve ? "No reserve" : nil,
                         seen: nil, vehicleId: lot.vehicleUUID, year: lot.year, make: lot.make, model: lot.model,
-                        link: lot.listingUrl.flatMap { URL(string: $0) }, listedAt: lot.listedAtDate)
+                        // No listedAt: the board's listed_at is vehicles.created_at (when Nuke first wrote the row), not
+                        // when bidding opened, so no "listed" date or auction length is derived from it.
+                        link: lot.listingUrl.flatMap { URL(string: $0) },
+                        recordUpdatedAt: ProfileClock.date(lot.updatedAt))
     }
 
     static func from(_ row: AskRow) -> ExploreFeedItem {
@@ -270,6 +275,25 @@ struct ExploreFeedView: View {
             }
         }
         .task { if !loaded { await load() } }
+        .task(id: generation) { await watchClosing() }
+    }
+
+    /// While a card's lot is in its last minutes or just past its recorded end, re-read the board every 20 s so a
+    /// soft-close extension (the house resets the clock when a late bid lands) or a new bid reaches the card. The
+    /// board itself is rebuilt every 2 minutes, so the card also says how old the bid on record is.
+    private func watchClosing() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            guard !Task.isCancelled, loaded else { continue }
+            guard ExploreClock.needsRefresh(feed, now: ServerClock.now()) else { continue }
+            guard let board = try? await LiveBoard.fetch(maxAge: 15), !Task.isCancelled else { continue }
+            let byId = Dictionary(board.auctions.map { ("live:" + $0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            feed = feed.map { item in
+                guard item.kind == .live, let lot = byId[item.id] else { return item }
+                return ExploreFeedItem.from(lot)
+            }
+            for (key, lot) in byId where lots[key] != nil { lots[key] = lot }
+        }
     }
 
     private var hasMore: Bool { liveShown < liveAll.count || !askExhausted }
@@ -477,53 +501,126 @@ struct ExploreCardOverlay: View {
     var body: some View {
         HStack(alignment: .bottom) {
             if let amt = item.amount {
-                if let onDrill, hasBidReading, item.kind == .live {
-                    ExploreDoor(kind: .bid, item: item, open: onDrill) { price(amt) }
-                } else {
-                    price(amt)
-                }
+                priceButton(amt)
             }
             Spacer(minLength: NukeSpace.sm)
-            if item.endsAt != nil {
-                TimelineView(.periodic(from: .now, by: 60)) { ctx in
-                    if let left = item.timeLeft(now: ctx.date) {
-                        if let onDrill {
-                            ExploreDoor(kind: .clock, item: item, alignment: .bottomTrailing, open: onDrill) { clock(left) }
-                        } else {
-                            clock(left)
-                        }
+            if let ends = item.endsAt {
+                // Ticks against the server's clock (ServerClock): every second in the last hour, where it reads m:ss,
+                // and every 30 s before that, where it shows hours and minutes.
+                TimelineView(.periodic(from: .now, by: ExploreClock.tick(ends: ends, now: ServerClock.now()))) { ctx in
+                    let now = ServerClock.now(ctx.date)
+                    let text = ExploreClock.text(ends: ends, now: now)
+                    if let onDrill {
+                        ExploreDoor(kind: .clock, item: item, alignment: .bottomTrailing, open: onDrill) { clock(text) }
+                    } else {
+                        clock(text)
                     }
                 }
             }
         }
     }
 
-    @ViewBuilder private func price(_ amt: Double) -> some View {
-        if let rail {
-            if let onWhy {
-                ExplorePriceRailView(item: item, rail: rail)
-                    .highPriorityGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onWhy() })
-            } else {
-                ExplorePriceRailView(item: item, rail: rail)
+    /// The price is a button: a tap opens the evidence behind it ("Why this range"; a live lot without that
+    /// stack opens its bid reading). It looks like one: a chip with a chevron, not a number painted on a photo.
+    @ViewBuilder private func priceButton(_ amt: Double) -> some View {
+        let action: (() -> Void)? = onWhy ?? {
+            guard let onDrill, hasBidReading, item.kind == .live else { return nil }
+            return { onDrill(ExploreCardDrill(kind: .bid, item: item)) }
+        }()
+        if let action {
+            Button {
+                Haptics.drill(depth: 1)
+                action()
+            } label: {
+                priceChip(amt, tappable: true)
             }
+            .buttonStyle(ExplorePriceButtonStyle())
+            .accessibilityHint(Text("Shows the evidence behind this price."))
         } else {
-            amount(amt)
+            priceChip(amt, tappable: false)
         }
     }
 
-    private func amount(_ amt: Double) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(item.amountLabel)
-                .font(.system(.caption, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white.opacity(0.85))
-            Text(LiveBoardView.bidNumber(amt))
-                .font(.nukeBigNumber)
-                .foregroundStyle(.white)
+    private func priceChip(_ amt: Double, tappable: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(priceLabel)
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                if tappable {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            if let rail {
+                ExplorePriceRailView(item: item, rail: rail, showsLabel: false)
+            } else {
+                Text(LiveBoardView.bidNumber(amt))
+                    .font(.nukeBigNumber)
+                    .foregroundStyle(.white)
+            }
         }
+        .padding(.horizontal, tappable ? 10 : 0)
+        .padding(.vertical, tappable ? 8 : 0)
+        .background {
+            if tappable {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.black.opacity(0.35))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.25), lineWidth: 0.5))
+            }
+        }
+        .frame(minHeight: NukeSize.minTap)
+        .contentShape(Rectangle())
     }
 
-    private func clock(_ left: String) -> some View {
-        NukePill(text: left, icon: "clock", onPhoto: true, textColor: Color.red)
+    /// In a lot's last hour the label says how old the bid on record is, since the board is rebuilt every
+    /// 2 minutes and the house's bid can move faster than that.
+    private var priceLabel: String {
+        guard item.kind == .live, let ends = item.endsAt else { return item.amountLabel }
+        let now = ServerClock.now()
+        guard ends.timeIntervalSince(now) < 3600, let at = item.recordUpdatedAt else { return item.amountLabel }
+        return "Bid on record · " + ExploreAnalytics.ago(at, now: now)
+    }
+
+    private func clock(_ text: String) -> some View {
+        NukePill(text: text, icon: "clock", onPhoto: true, textColor: Color.red)
+            .monospacedDigit()
+    }
+}
+
+/// A pressed price chip sinks a little; the tap lands as a button, not as decoration.
+struct ExplorePriceButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+/// The card's countdown. Pure, so it is unit-tested (ExploreFeedTests).
+enum ExploreClock {
+    /// "2d 4h", "3h 12m", then "12:07" in the last hour. At or past the recorded end it reads "Closing": the
+    /// house may have extended the close for a late bid, and the card waits for the board to say.
+    static func text(ends: Date, now: Date) -> String {
+        let s = Int(ends.timeIntervalSince(now).rounded(.down))
+        if s <= 0 { return "Closing" }
+        if s < 3600 { return String(format: "%d:%02d", s / 60, s % 60) }
+        if s < 86_400 { return "\(s / 3600)h \((s % 3600) / 60)m" }
+        return "\(s / 86_400)d \((s % 86_400) / 3600)h"
+    }
+
+    /// How often the card's clock redraws.
+    static func tick(ends: Date, now: Date) -> TimeInterval { ends.timeIntervalSince(now) < 3600 ? 1 : 30 }
+
+    /// A lot within 3 minutes of its recorded end, or up to 15 minutes past it, needs a fresh board read.
+    static func needsRefresh(_ items: [ExploreFeedItem], now: Date) -> Bool {
+        items.contains { item in
+            guard item.kind == .live, let ends = item.endsAt else { return false }
+            let left = ends.timeIntervalSince(now)
+            return left < 180 && left > -900
+        }
     }
 }
 

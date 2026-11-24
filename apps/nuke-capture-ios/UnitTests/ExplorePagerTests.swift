@@ -57,12 +57,13 @@ final class ExplorePagerTests: XCTestCase {
         XCTAssertTrue(ExplorePagePlan.hasCoordinates(item(lat: 35.23, lng: -80.84)))
     }
 
-    func testLiveLotHasAnAnalyticsPageOnlyWhenItHasSomethingNew() {
+    func testLiveLotHasNoListedOrLengthPage() {
+        // The board's listed_at is when Nuke first wrote the row, not when bidding opened: no page is built on it.
         let soon = Date().addingTimeInterval(3600)
         XCTAssertEqual(ExplorePagePlan.kinds(for: item(kind: .live, link: nil, endsAt: soon)), [.photos])
         let listed = Date().addingTimeInterval(-6 * 86_400)
         XCTAssertEqual(ExplorePagePlan.kinds(for: item(kind: .live, listedAt: listed, endsAt: soon)),
-                       [.photos, .analytics, .listing])
+                       [.photos, .listing])
     }
 
     // MARK: Buyer's reading
@@ -108,12 +109,12 @@ final class ExplorePagerTests: XCTestCase {
         XCTAssertEqual(ExploreAnalytics.ago(now.addingTimeInterval(-3 * 86_400), now: now), "3d ago")
     }
 
-    func testLiveLotReadingIsListedDateAndLengthOnly() {
+    func testLiveLotReadingShowsNoListedDateOrAuctionLength() {
         let now = Date()
         let listed = now.addingTimeInterval(-86_400)
         let r = ExploreAnalytics.reading(for: item(kind: .live, listedAt: listed, endsAt: listed.addingTimeInterval(7 * 86_400)), now: now)
-        XCTAssertNotNil(r.listed)
-        XCTAssertEqual(r.length, "7 days")
+        XCTAssertNil(r.listed)
+        XCTAssertNil(r.length)
         XCTAssertNil(r.placement)
         XCTAssertNil(r.placementNote)
     }

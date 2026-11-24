@@ -3,7 +3,7 @@
 //   photos   → every photo of the vehicle (cover first, read on the first swipe, at most 60), the price and
 //              the doors (clock, bid) stay on each photo; "n / N" shows once N is known
 //   location → a still map centred on the listing's rounded coordinates (classified rows that have them)
-//   analytics→ the listing's own clock (a classified's age; a lot's listed date and length). The cohort and
+//   analytics→ the listing's own clock (a classified's age). The cohort and
 //              projection evidence is on the price rail and its long-press stack, not repeated here
 //   listing  → the source's mark and "Opening <Source>…"; settling here opens the original listing and
 //              the pager returns to the page before it
@@ -183,6 +183,25 @@ struct ExplorePagerCard: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
+            // The price, clock and doors sit still on the card while only the photos page underneath. They show
+            // on the photo pages; the map and clock pages are their own content.
+            .overlay(alignment: .bottom) {
+                if selected.kind == .photos {
+                    LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if selected.kind == .photos {
+                    ExploreCardOverlay(item: item, hasBidReading: hasBidReading, onDrill: onDrill,
+                                       rail: ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh),
+                                       onWhy: whyAction)
+                        .padding(NukeSpace.lg)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: selected.kind)
             .overlay(alignment: .topTrailing) {
                 if case .photo(let i) = selected,
                    let text = ExplorePhotos.counter(index: i, total: photoURLs.count, reelKnown: reel != nil) {
@@ -219,16 +238,6 @@ struct ExplorePagerCard: View {
         let urls = photoURLs
         let url = i < urls.count ? urls[i] : item.image
         return NukePhoto(url: NukeImage.thumb(url, width: 1080), maxPixel: 1280)
-            .overlay(alignment: .bottom) {
-                LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
-                    .allowsHitTesting(false)
-            }
-            .overlay(alignment: .bottomLeading) {
-                ExploreCardOverlay(item: item, hasBidReading: hasBidReading, onDrill: onDrill,
-                                   rail: ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh),
-                                   onWhy: whyAction)
-                    .padding(NukeSpace.lg)
-            }
             .contentShape(Rectangle())
             .onTapGesture { openProfile() }
             .accessibilityLabel(Text(reel == nil ? "Photo" : "Photo \(i + 1) of \(urls.count)"))
@@ -279,8 +288,6 @@ struct ExplorePagerCard: View {
         let reading = ExploreAnalytics.reading(for: item, now: Date())
         var rows: [(symbol: String, text: String)] = []
         if let t = reading.age { rows.append(("clock", t)) }
-        if let t = reading.listed { rows.append(("calendar", t)) }
-        if let t = reading.length { rows.append(("hourglass", "Auction length \(t)")) }
         return VStack(alignment: .leading, spacing: NukeSpace.md) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 Label(row.text, systemImage: row.symbol).font(.nukeHeadline).lineLimit(2)
