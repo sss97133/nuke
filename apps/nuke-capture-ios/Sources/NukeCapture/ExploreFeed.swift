@@ -497,8 +497,9 @@ struct ExploreCardOverlay: View {
             }
             Spacer(minLength: NukeSpace.sm)
             if let ends = item.endsAt {
-                // Ticks every second against the server's clock (ServerClock); the last hour reads m:ss.
-                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                // Ticks against the server's clock (ServerClock): every second in the last hour, where it reads m:ss,
+                // and every 30 s before that, where it shows hours and minutes.
+                TimelineView(.periodic(from: .now, by: ExploreClock.tick(ends: ends, now: ServerClock.now()))) { ctx in
                     let now = ServerClock.now(ctx.date)
                     let text = ExploreClock.text(ends: ends, now: now)
                     if let onDrill {
@@ -601,6 +602,9 @@ enum ExploreClock {
         if s < 86_400 { return "\(s / 3600)h \((s % 3600) / 60)m" }
         return "\(s / 86_400)d \((s % 86_400) / 3600)h"
     }
+
+    /// How often the card's clock redraws.
+    static func tick(ends: Date, now: Date) -> TimeInterval { ends.timeIntervalSince(now) < 3600 ? 1 : 30 }
 
     /// A lot within 3 minutes of its recorded end, or up to 15 minutes past it, needs a fresh board read.
     static func needsRefresh(_ items: [ExploreFeedItem], now: Date) -> Bool {

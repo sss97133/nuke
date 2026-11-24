@@ -77,6 +77,8 @@ final class ExploreFeedTests: XCTestCase {
         XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(59), now: now), "0:59")
         XCTAssertEqual(ExploreClock.text(ends: now, now: now), "Closing")
         XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(-30), now: now), "Closing")
+        XCTAssertEqual(ExploreClock.tick(ends: now.addingTimeInterval(600), now: now), 1)
+        XCTAssertEqual(ExploreClock.tick(ends: now.addingTimeInterval(7200), now: now), 30)
     }
 
     func testBoardIsReReadOnlyAroundALotsEnd() {
