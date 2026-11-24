@@ -56,6 +56,15 @@ struct LibraryDetailView: View {
             }
             .padding()
         }
+        // Every group this photo belongs to (its vehicle, you, its organizations, make, model,
+        // cohort, place, session), each opening that group. Needs the network and a session, so the
+        // album drill's local-only mode leaves it out.
+        .overlay(alignment: .bottom) {
+            if !localOnly, SupabaseService.currentUserId != nil, let asset = LibraryStore.shared.asset(at: index) {
+                PhotoCohortStrip(localIdentifier: asset.localIdentifier, deviceLocation: asset.location?.coordinate)
+                    .id(asset.localIdentifier)
+            }
+        }
         .sheet(isPresented: $showInfo) {
             if let asset = LibraryStore.shared.asset(at: index) {
                 LibraryInfoView(asset: asset, localOnly: localOnly)
