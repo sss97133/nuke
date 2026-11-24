@@ -371,7 +371,11 @@ enum VisionEngine {
     /// coverage no longer means every scroll-triggered classify can freely hammer
     /// PhotoKit's network queue. Runs triage off the main actor. `isPersonal` = not
     /// a clean vehicle/work photo (not a vehicle OR a prominent face).
-    static func classifyAsset(localIdentifier: String) async -> (isVehicle: Bool, isPersonal: Bool, hasPerson: Bool, labels: [String])? {
+    ///
+    /// A failed face detector returns nil (no verdict), never "no face": the Library's privacy
+    /// gate treats a photo without a verdict as covered, so a failed read must not clear it.
+    /// `allowNetwork: false` keeps the read on the device (the album drill's local-only mode).
+    static func classifyAsset(localIdentifier: String, allowNetwork: Bool = true) async -> (isVehicle: Bool, isPersonal: Bool, hasPerson: Bool, labels: [String])? {
         // Local-only probe first — matches Blur's tagger for the common case (most
         // library photos ARE on-device) without touching the network gate at all.
         // With allowNetwork OFF here, an iCloud-only original returns nil FAST (a
@@ -379,7 +383,7 @@ enum VisionEngine {
         // original bug ("iCloud-only photos never classify") cheap to detect and
         // cheap to fall back from.
         var cg = await loadCGImage(assetID: localIdentifier, maxPixel: 256, allowNetwork: false)
-        if cg == nil {
+        if cg == nil, allowNetwork {
             // Not cached locally (Optimize Storage). Pulling the user's OWN iCloud
             // original DOWN to their device for on-device Vision is not "pixels
             // leaving to us" — it never touches our cloud, so the local-first/privacy
@@ -390,7 +394,7 @@ enum VisionEngine {
         guard let cg else { return nil }
         return await Task.detached(priority: .utility) {
             guard let cls = classify(cg) else { return nil }
-            let face = hasProminentFace(cg)
+            guard let face = try? detectProminentFace(cg) else { return nil }
             let labels = Array(cls.labels.prefix(12).map { $0.0 })
             // Auto-hide ONLY a person-centric, NON-vehicle photo (kids/family/selfies).
             // A work photo is NEVER auto-hidden — not a car-with-a-person (it's a vehicle),

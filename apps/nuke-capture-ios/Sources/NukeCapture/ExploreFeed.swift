@@ -314,6 +314,32 @@ struct ExploreFeedView: View {
         }
     }
 
+    private var hasMore: Bool { liveShown < liveAll.count || !askExhausted }
+
+    /// The end of the cards: loading the next page, a retry when it failed, or a plain end.
+    @ViewBuilder private var pagingFooter: some View {
+        if loadingMore {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, NukeSpace.lg)
+        } else if moreFailed {
+            Button {
+                moreFailed = false
+                Task { await loadMore() }
+            } label: {
+                Label("Couldn't load more cars. Try again", systemImage: "arrow.clockwise")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: NukeSize.minTap)
+            }
+            .buttonStyle(.bordered)
+            .padding(.horizontal, NukeSpace.lg)
+        } else if !hasMore {
+            Text(ExploreFeedPaging.endLine(tuned: tuning.isActive))
+                .font(.footnote).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, NukeSpace.xl).padding(.vertical, NukeSpace.lg)
+        }
+    }
+
     private var footer: String {
         var parts: [String] = []
         if !live.isEmpty { parts.append("Current bids are Bring a Trailer's, in US dollars — not sold prices.") }

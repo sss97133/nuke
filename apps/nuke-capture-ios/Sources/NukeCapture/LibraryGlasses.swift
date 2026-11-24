@@ -42,6 +42,9 @@ final class LibraryOverlayStore: ObservableObject {
     /// Owner's explicit verdicts (the Select tool) — these OVERRIDE the auto verdict.
     @Published private(set) var approved: Set<String> = []
     @Published private(set) var rejected: Set<String> = []
+    /// The on-device read for each photo the pass has resolved: the privacy gate's device input.
+    /// A photo absent here has no verdict yet, so the gate keeps it covered.
+    @Published private(set) var deviceRead: [String: LibraryDeviceRead] = [:]
 
     private var seen = Set<String>()        // resolved or in flight (dedup)
     private var queue: [String] = []
@@ -58,17 +61,29 @@ final class LibraryOverlayStore: ObservableObject {
     private var pendingApproved = Set<String>()
     private var pendingRejected = Set<String>()
     private var pendingDecorations: [String: LibraryDecoration] = [:]
+    private var pendingDeviceRead: [String: LibraryDeviceRead] = [:]
+    /// Ids queued from a local-only surface (the album drill): read on the device, never iCloud.
+    private var localOnlyIDs = Set<String>()
     private var flushScheduled = false
 
     /// A cell appeared — classify it cheap, on-device, cached, OFF the scroll path.
-    func note(_ localIdentifier: String) {
+    func note(_ localIdentifier: String, allowNetwork: Bool = true) {
         guard !seen.contains(localIdentifier) else { return }
+        if allowNetwork { localOnlyIDs.remove(localIdentifier) } else { localOnlyIDs.insert(localIdentifier) }
         // Bound the dedup set: a long scroll through a large library would otherwise grow it
         // forever. Clearing only re-allows a (cached, cheap) classify of an id seen again.
         if seen.count >= Self.seenCap { seen = Set(queue) }
         seen.insert(localIdentifier)
         queue.append(localIdentifier)
         if !running { running = true; Task { await run() } }
+    }
+
+    /// Read one photo again even if this session already tried it (a failed or iCloud-only read
+    /// leaves it covered; opening it fullscreen asks once more).
+    func recheck(_ localIdentifier: String, allowNetwork: Bool = true) {
+        guard deviceRead[localIdentifier] == nil, !queue.contains(localIdentifier) else { return }
+        seen.remove(localIdentifier)
+        note(localIdentifier, allowNetwork: allowNetwork)
     }
 
     /// A cell scrolled away before its turn: drop it from the queue so a fast flick does not leave
@@ -88,6 +103,13 @@ final class LibraryOverlayStore: ObservableObject {
         if rejected.contains(lid) { return true }
         if approved.contains(lid) { return false }
         return personal.contains(lid)
+    }
+
+    /// Whether the Library may paint this photo's pixels (LibraryPrivacyGate): fails closed, so a
+    /// photo with no verdict yet, a failed read, or any block signal (owner, server, device) stays covered.
+    func pixelVerdict(_ lid: String, server: String?) -> LibraryPixelVerdict {
+        let owner: Bool? = rejected.contains(lid) ? false : (approved.contains(lid) ? true : nil)
+        return LibraryPrivacyGate.verdict(ownerApproved: owner, serverBlockReason: server, device: deviceRead[lid])
     }
 
     /// Whether a cell is UNNECESSARY clutter (screenshot/doc/shopping) gated out by
@@ -120,9 +142,9 @@ final class LibraryOverlayStore: ObservableObject {
             // does not keep the Neural Engine saturated while the owner holds the device.
             for _ in 0..<Self.laneCount() {
                 group.addTask { [weak self] in
-                    while let lid = await self?.nextLID() {
-                        let info = await Self.resolve(lid)
-                        await self?.apply(lid, info)
+                    while let next = await self?.nextLID() {
+                        let info = await Self.resolve(next.lid, allowNetwork: next.allowNetwork)
+                        await self?.apply(next.lid, info)
                     }
                 }
             }
@@ -138,10 +160,14 @@ final class LibraryOverlayStore: ObservableObject {
     }
 
     /// Newest first: the cells on screen now, ahead of ones already scrolled past.
-    private func nextLID() -> String? { queue.popLast() }
+    private func nextLID() -> (lid: String, allowNetwork: Bool)? {
+        guard let lid = queue.popLast() else { return nil }
+        return (lid, !localOnlyIDs.contains(lid))
+    }
 
-    private func apply(_ lid: String, _ info: (isPersonal: Bool, isJunk: Bool, hasPerson: Bool, label: String?, ownerApproved: Bool?, glyph: String?)?) {
+    private func apply(_ lid: String, _ info: ResolvedRead?) {
         guard let info else { return }
+        if let read = info.device { pendingDeviceRead[lid] = read }
         if info.isPersonal { pendingPersonal.insert(lid) }
         if info.isJunk { pendingJunk.insert(lid) }
         if let l = info.label { pendingTopLabel[lid] = l }
@@ -175,26 +201,48 @@ final class LibraryOverlayStore: ObservableObject {
             decorations.merge(pendingDecorations) { _, new in new }
             pendingDecorations.removeAll()
         }
+        if !pendingDeviceRead.isEmpty {
+            deviceRead.merge(pendingDeviceRead) { _, new in new }
+            pendingDeviceRead.removeAll()
+        }
+    }
+
+    /// One resolved photo. `device` is nil when the photo could not be read: the gate keeps it covered.
+    struct ResolvedRead {
+        var isPersonal: Bool
+        var isJunk: Bool
+        var hasPerson: Bool
+        var label: String?
+        var ownerApproved: Bool?
+        var glyph: String?
+        var device: LibraryDeviceRead?
     }
 
     /// Heavy work, OFF the main actor: read the owner verdict + cached classification,
     /// else classify the photo on-device (Apple tags) and write it to the local store.
-    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, isJunk: Bool, hasPerson: Bool, label: String?, ownerApproved: Bool?, glyph: String?)? {
+    nonisolated private static func resolve(_ lid: String, allowNetwork: Bool = true) async -> ResolvedRead? {
         let owner = LocalStore.shared.ownerVerdicts(for: [lid])[lid]
+        let screenshot = VisionEngine.isScreenshot(localIdentifier: lid)
         if let c = LocalStore.shared.classification(for: [lid])[lid] {
             // Junk is DERIVED (not a stored column) from the cached T0 labels + the free
             // screenshot flag — so it needs no migration and re-tunes as the label set evolves.
-            let junk = VisionEngine.isUnnecessary(labels: c.labels, isScreenshot: VisionEngine.isScreenshot(localIdentifier: lid))
-            return (c.isPersonal, junk, c.hasPerson, humanize(c.labels.first), owner, c.isVehicle ? "car.fill" : nil)
+            let junk = VisionEngine.isUnnecessary(labels: c.labels, isScreenshot: screenshot)
+            return ResolvedRead(isPersonal: c.isPersonal, isJunk: junk, hasPerson: c.hasPerson, label: humanize(c.labels.first),
+                                ownerApproved: owner, glyph: c.isVehicle ? "car.fill" : nil,
+                                device: LibraryDeviceRead(isPersonal: c.isPersonal, hasPerson: c.hasPerson, labels: c.labels, isScreenshot: screenshot))
         }
-        guard let v = await VisionEngine.classifyAsset(localIdentifier: lid) else {
-            // iCloud-only / unclassifiable, but it may still carry an owner verdict.
-            return owner == nil ? nil : (false, false, false, nil, owner, nil)
+        guard let v = await VisionEngine.classifyAsset(localIdentifier: lid, allowNetwork: allowNetwork) else {
+            // iCloud-only / unclassifiable / a failed face read: no device verdict, so it stays
+            // covered, but it may still carry an owner verdict.
+            return owner == nil ? nil : ResolvedRead(isPersonal: false, isJunk: false, hasPerson: false, label: nil,
+                                                     ownerApproved: owner, glyph: nil, device: nil)
         }
         LocalStore.shared.classify(localIdentifier: lid, isVehicle: v.isVehicle, isPersonal: v.isPersonal,
                                    hasPerson: v.hasPerson, labels: v.labels)
-        let junk = VisionEngine.isUnnecessary(labels: v.labels, isScreenshot: VisionEngine.isScreenshot(localIdentifier: lid))
-        return (v.isPersonal, junk, v.hasPerson, humanize(v.labels.first), owner, v.isVehicle ? "car.fill" : nil)
+        let junk = VisionEngine.isUnnecessary(labels: v.labels, isScreenshot: screenshot)
+        return ResolvedRead(isPersonal: v.isPersonal, isJunk: junk, hasPerson: v.hasPerson, label: humanize(v.labels.first),
+                            ownerApproved: owner, glyph: v.isVehicle ? "car.fill" : nil,
+                            device: LibraryDeviceRead(isPersonal: v.isPersonal, hasPerson: v.hasPerson, labels: v.labels, isScreenshot: screenshot))
     }
 
     /// "sports_car" → "Sports Car" — the on-device label, made human for the chip.

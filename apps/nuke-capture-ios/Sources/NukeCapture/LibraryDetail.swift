@@ -69,10 +69,39 @@ private struct LibraryDetailPage: View {
     let localOnly: Bool
     @State private var image: UIImage?
     @State private var loaded = false
+    @State private var localID: String?
+    /// The owner tapped "Show this photo" on this page. Not stored: the next open is covered again.
+    @State private var revealed = false
+    @ObservedObject private var overlay = LibraryOverlayStore.shared
+    @ObservedObject private var serverPrivacy = LibraryServerPrivacy.shared
+    @AppStorage("personalMode.v2") private var personalMode = PersonalMode.blur
+
+    /// The same fail-closed gate as the grid: the fullscreen page never paints what the cell covers.
+    private var cover: LibraryPixelVerdict? {
+        guard !revealed, personalMode != .show else { return nil }
+        guard let localID else { return .unchecked }
+        let v = overlay.pixelVerdict(localID, server: serverPrivacy.reason(for: localID))
+        return v.paintsPixels ? nil : v
+    }
 
     var body: some View {
         ZStack {
-            if let image {
+            if let cover {
+                VStack(spacing: 14) {
+                    Image(systemName: cover == .unchecked ? "hourglass" : "eye.slash")
+                        .font(.largeTitle)
+                    Text(cover.coverText).font(.headline)
+                    Text(cover == .unchecked
+                         ? "Nuke hasn't finished checking this photo for private content."
+                         : "Covered so it doesn't show on screen.")
+                        .font(.footnote).multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.7))
+                    Button("Show this photo") { revealed = true }
+                        .buttonStyle(.bordered).tint(.white)
+                }
+                .foregroundStyle(.white)
+                .padding(32)
+            } else if let image {
                 ZoomableImage(image: image)
             } else if loaded {
                 Text("Original unavailable on this device")
@@ -82,8 +111,10 @@ private struct LibraryDetailPage: View {
             }
         }
         .task(id: index) {
-            image = nil; loaded = false
+            image = nil; loaded = false; revealed = false
             guard let asset = LibraryStore.shared.asset(at: index) else { loaded = true; return }
+            localID = asset.localIdentifier
+            overlay.recheck(asset.localIdentifier, allowNetwork: !localOnly)
             image = await LibraryStore.shared.fullImage(for: asset, allowNetwork: !localOnly, original: localOnly)
             loaded = true
         }
