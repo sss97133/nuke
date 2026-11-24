@@ -78,6 +78,10 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(profile.waitForExistence(timeout: 12)); profile.tap()
         let account = app.buttons["Account"].firstMatch
         XCTAssertTrue(account.waitForExistence(timeout: 5)); account.tap()
+        // On a slow simulator the first tap can land before the Profile tab settles and the sheet never opens.
+        let done = app.buttons["Done"].firstMatch
+        if !done.waitForExistence(timeout: 5) { account.tap() }
+        XCTAssertTrue(done.waitForExistence(timeout: 10), "the Account sheet must open")
         let grant = app.staticTexts["account.photos.status"]
         for _ in 0..<8 {
             if grant.exists && grant.isHittable { break }
