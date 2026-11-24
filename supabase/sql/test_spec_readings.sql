@@ -1,7 +1,8 @@
 -- Isolated PostgreSQL 17 contract for the spec readings layer:
 --   20261124020000_spec_readings, 20261124021000_spec_landing_drain, 20261124022000_spec_readings_review,
 --   20261124023000_spec_readings_public_sources, 20261124024000_spec_readings_financial_cleanup,
---   20261124025000_data_set_public_counts, 20261124026000_spec_platform_scopes, 20261124027000_spec_fold_backpressure.
+--   20261124025000_data_set_public_counts, 20261124026000_spec_platform_scopes, 20261124027000_spec_fold_backpressure,
+--   20261124028000_spec_bucket_bounds.
 -- Synthetic rows only; never production. Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_spec_readings
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_spec_readings -f supabase/sql/test_spec_readings.sql
@@ -448,6 +449,7 @@ CREATE FUNCTION public.observation_is_public(p_kind text, p_data jsonb) RETURNS 
 \i supabase/migrations/20261124025000_data_set_public_counts.sql
 \i supabase/migrations/20261124026000_spec_platform_scopes.sql
 \i supabase/migrations/20261124027000_spec_fold_backpressure.sql
+\i supabase/migrations/20261124028000_spec_bucket_bounds.sql
 
 -- 1. matcher cases
 CREATE TEMP TABLE spec_cases AS
@@ -558,7 +560,14 @@ SELECT pg_temp.ok('platform_hex_00 holds only non-cohort cars of that bucket',
   public.data_set_scope_vehicles('platform_hex_00', NULL) = ARRAY['00000000-0000-0000-0000-000000000004'::uuid]);
 SELECT pg_temp.ok('platform_hex_01 is the next bucket',
   public.data_set_scope_vehicles('platform_hex_01', NULL) = ARRAY['01000000-0000-0000-0000-000000000005'::uuid]);
-SELECT pg_temp.ok('platform_hex_ff has no upper bound', public.data_set_scope_vehicles('platform_hex_ff', NULL) IS NULL);
+SELECT pg_temp.ok('platform_hex_ff is empty before its cars exist', public.data_set_scope_vehicles('platform_hex_ff', NULL) IS NULL);
+INSERT INTO public.vehicles (id, make, model, year) VALUES
+  ('feffffff-ffff-ffff-ffff-ffffffffffff', 'Porsche', '912', 1966),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'Porsche', '914', 1972);
+SELECT pg_temp.ok('bucket bounds are inclusive at both ends',
+  public.data_set_scope_vehicles('platform_hex_fe', NULL) = ARRAY['feffffff-ffff-ffff-ffff-ffffffffffff'::uuid]
+  AND public.data_set_scope_vehicles('platform_hex_ff', NULL) = ARRAY['ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid]);
+DELETE FROM public.vehicles WHERE id IN ('feffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 UPDATE public.spec_landing_control SET paused = true WHERE id = 1;
 INSERT INTO public.spec_landing_jobs (job_id, step_kind, run_id, scope, step, batch) VALUES
   ('p00', 'decode', '11111111-1111-1111-1111-111111111113', 'platform_hex_00', 10, 10);
