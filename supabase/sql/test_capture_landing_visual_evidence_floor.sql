@@ -3,12 +3,12 @@
 -- is the only photo leg). Otherwise review with weak_visual or priors_only. The 2.5 / 1.0 bar
 -- is unchanged. The signed redecide moves still-unapplied awaiting_gate clears under that rule
 -- to review, does not file, and reverts by run.
--- Disposable DB only (dm_refinement_capture_visual_evidence%).
+-- Disposable DB only (dm_refinement_capture_landing_visual_evidence%).
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
 SET TIME ZONE 'UTC';
 DO $$ BEGIN
-  IF current_database() NOT LIKE 'dm_refinement_capture_visual_evidence%' THEN
+  IF current_database() NOT LIKE 'dm_refinement_capture_landing_visual_evidence%' THEN
     RAISE EXCEPTION 'refusing: not a disposable contract database';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
