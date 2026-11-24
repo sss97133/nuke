@@ -1,6 +1,7 @@
 -- Isolated PostgreSQL 17 contract for the spec readings layer:
 --   20261124020000_spec_readings, 20261124021000_spec_landing_drain, 20261124022000_spec_readings_review,
---   20261124023000_spec_readings_public_sources, 20261124024000_spec_readings_financial_cleanup.
+--   20261124023000_spec_readings_public_sources, 20261124024000_spec_readings_financial_cleanup,
+--   20261124025000_data_set_public_counts.
 -- Synthetic rows only; never production. Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_spec_readings
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_spec_readings -f supabase/sql/test_spec_readings.sql
@@ -435,6 +436,7 @@ END
 $function$
 ;
 
+ALTER TABLE public.vehicles ADD COLUMN user_id uuid, ADD COLUMN owner_id uuid, ADD COLUMN uploaded_by uuid;
 CREATE FUNCTION public.observation_is_public(p_kind text, p_data jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS
   $$ SELECT p_kind IN ('listing', 'sale_result', 'comment', 'bid', 'specification', 'condition', 'media', 'splice') $$;
 
@@ -443,6 +445,7 @@ CREATE FUNCTION public.observation_is_public(p_kind text, p_data jsonb) RETURNS 
 \i supabase/migrations/20261124022000_spec_readings_review.sql
 \i supabase/migrations/20261124023000_spec_readings_public_sources.sql
 \i supabase/migrations/20261124024000_spec_readings_financial_cleanup.sql
+\i supabase/migrations/20261124025000_data_set_public_counts.sql
 
 -- 1. matcher cases
 CREATE TEMP TABLE spec_cases AS
@@ -528,6 +531,12 @@ SELECT pg_temp.ok('before and after snapshots coexist', (SELECT count(DISTINCT p
   WHERE snapshot_id = 'contract'));
 SELECT pg_temp.ok('after snapshot shows the RPO codes keyed', (SELECT keyed = 1 FROM public.field_coverage_snapshots
   WHERE snapshot_id = 'contract' AND phase = 'after' AND field = 'rpo_option_codes'));
+SELECT public.data_set_public_counts_refresh_v1();
+SELECT pg_temp.ok('public counts cached and read', (SELECT pc.public_vehicles = 1 FROM public.data_set_public_counts pc
+  JOIN public.data_sets s ON s.id = pc.set_id WHERE s.set_kind = 'rpo_code' AND s.set_key = 'chevrolet:1969:l78')
+  AND (SELECT bool_and((e->>'public_vehicles_in_set')::int >= 1 AND e->>'public_vehicles_counted_at' IS NOT NULL)
+         FROM jsonb_array_elements(public.vehicle_data_sets('00000000-0000-0000-0000-000000000002')->'sets') e));
+SELECT pg_temp.ok('count refresh scheduled', EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'data-set-public-counts'));
 SELECT pg_temp.ok('drain jobs scheduled', (SELECT count(*) = 3 FROM cron.job WHERE jobname LIKE 'spec-landing-drain-%'));
 
 -- 3. revert by run
