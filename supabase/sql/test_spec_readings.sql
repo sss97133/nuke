@@ -1,7 +1,8 @@
 -- Isolated PostgreSQL 17 contract for the spec readings layer:
 --   20261124020000_spec_readings, 20261124021000_spec_landing_drain, 20261124022000_spec_readings_review,
 --   20261124023000_spec_readings_public_sources, 20261124024000_spec_readings_financial_cleanup,
---   20261124025000_data_set_public_counts.
+--   20261124025000_data_set_public_counts, 20261124026000_spec_platform_scopes, 20261124027000_spec_fold_backpressure,
+--   20261124028000_spec_bucket_bounds.
 -- Synthetic rows only; never production. Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_spec_readings
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_spec_readings -f supabase/sql/test_spec_readings.sql
@@ -446,6 +447,9 @@ CREATE FUNCTION public.observation_is_public(p_kind text, p_data jsonb) RETURNS 
 \i supabase/migrations/20261124023000_spec_readings_public_sources.sql
 \i supabase/migrations/20261124024000_spec_readings_financial_cleanup.sql
 \i supabase/migrations/20261124025000_data_set_public_counts.sql
+\i supabase/migrations/20261124026000_spec_platform_scopes.sql
+\i supabase/migrations/20261124027000_spec_fold_backpressure.sql
+\i supabase/migrations/20261124028000_spec_bucket_bounds.sql
 
 -- 1. matcher cases
 CREATE TEMP TABLE spec_cases AS
@@ -547,3 +551,44 @@ SELECT pg_temp.ok('reverts leave no active readings or members',
   AND NOT EXISTS (SELECT 1 FROM public.data_set_members WHERE state = 'active' AND run_id = '22222222-2222-2222-2222-222222222222'));
 SELECT pg_temp.ok('reverted readings are backed up', (SELECT count(*) > 0 FROM public.vehicle_code_readings_backup
   WHERE run_id = '11111111-1111-1111-1111-111111111112'));
+
+-- 4. platform buckets leave the landed cohorts out; the pause switch stops the drain
+INSERT INTO public.vehicles (id, make, model, year, listing_title) VALUES
+  ('00000000-0000-0000-0000-000000000004', 'Porsche', '911', 1973, '1973 Porsche 911 Targa 5-Speed'),
+  ('01000000-0000-0000-0000-000000000005', 'Porsche', '911', 1974, '1974 Porsche 911 Coupe');
+SELECT pg_temp.ok('platform_hex_00 holds only non-cohort cars of that bucket',
+  public.data_set_scope_vehicles('platform_hex_00', NULL) = ARRAY['00000000-0000-0000-0000-000000000004'::uuid]);
+SELECT pg_temp.ok('platform_hex_01 is the next bucket',
+  public.data_set_scope_vehicles('platform_hex_01', NULL) = ARRAY['01000000-0000-0000-0000-000000000005'::uuid]);
+SELECT pg_temp.ok('platform_hex_ff is empty before its cars exist', public.data_set_scope_vehicles('platform_hex_ff', NULL) IS NULL);
+INSERT INTO public.vehicles (id, make, model, year) VALUES
+  ('feffffff-ffff-ffff-ffff-ffffffffffff', 'Porsche', '912', 1966),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'Porsche', '914', 1972);
+SELECT pg_temp.ok('bucket bounds are inclusive at both ends',
+  public.data_set_scope_vehicles('platform_hex_fe', NULL) = ARRAY['feffffff-ffff-ffff-ffff-ffffffffffff'::uuid]
+  AND public.data_set_scope_vehicles('platform_hex_ff', NULL) = ARRAY['ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid]);
+DELETE FROM public.vehicles WHERE id IN ('feffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
+UPDATE public.spec_landing_control SET paused = true WHERE id = 1;
+INSERT INTO public.spec_landing_jobs (job_id, step_kind, run_id, scope, step, batch) VALUES
+  ('p00', 'decode', '11111111-1111-1111-1111-111111111113', 'platform_hex_00', 10, 10);
+SELECT public.spec_landing_drain_v1(5000);
+SELECT pg_temp.ok('paused drain takes no job', (SELECT ticks = 0 FROM public.spec_landing_jobs WHERE job_id = 'p00'));
+UPDATE public.spec_landing_control SET paused = false WHERE id = 1;
+SELECT public.spec_landing_drain_v1(5000);
+SELECT pg_temp.ok('platform bucket decoded', (SELECT status = 'done' FROM public.spec_landing_jobs WHERE job_id = 'p00')
+  AND EXISTS (SELECT 1 FROM public.vehicle_code_readings WHERE run_id = '11111111-1111-1111-1111-111111111113' AND kind = 'body_style' AND code = 'TARGA'));
+UPDATE public.spec_landing_control SET max_layer_bytes = 1 WHERE id = 1;
+INSERT INTO public.spec_landing_jobs (job_id, step_kind, run_id, scope, step, batch) VALUES
+  ('p01', 'decode', '11111111-1111-1111-1111-111111111114', 'platform_hex_01', 10, 10);
+SELECT public.spec_landing_drain_v1(5000);
+SELECT pg_temp.ok('size cap holds platform jobs', (SELECT ticks = 0 FROM public.spec_landing_jobs WHERE job_id = 'p01'));
+-- the model fold loop's backpressure also holds platform jobs, and clears when it clears
+UPDATE public.spec_landing_control SET max_layer_bytes = 15000000000 WHERE id = 1;
+CREATE OR REPLACE FUNCTION public.model_fold_backpressure(p_cfg jsonb) RETURNS text LANGUAGE sql AS $$ SELECT 'lock waiters 99'::text $$;
+SELECT public.spec_landing_drain_v1(5000);
+SELECT pg_temp.ok('fold backpressure holds platform jobs', (SELECT ticks = 0 FROM public.spec_landing_jobs WHERE job_id = 'p01')
+  AND (SELECT last_backpressure->>'model_fold' = 'lock waiters 99' FROM public.spec_landing_control WHERE id = 1));
+CREATE OR REPLACE FUNCTION public.model_fold_backpressure(p_cfg jsonb) RETURNS text LANGUAGE sql AS $$ SELECT NULL::text $$;
+SELECT public.spec_landing_drain_v1(5000);
+SELECT pg_temp.ok('platform jobs resume once the fold loop is clear', (SELECT status = 'done' FROM public.spec_landing_jobs WHERE job_id = 'p01'));
+DROP FUNCTION public.model_fold_backpressure(jsonb);
