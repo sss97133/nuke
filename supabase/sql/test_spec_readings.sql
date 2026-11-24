@@ -1,7 +1,7 @@
 -- Isolated PostgreSQL 17 contract for the spec readings layer:
 --   20261124020000_spec_readings, 20261124021000_spec_landing_drain, 20261124022000_spec_readings_review,
 --   20261124023000_spec_readings_public_sources, 20261124024000_spec_readings_financial_cleanup,
---   20261124025000_data_set_public_counts, 20261124026000_spec_platform_scopes.
+--   20261124025000_data_set_public_counts, 20261124026000_spec_platform_scopes, 20261124027000_spec_fold_backpressure.
 -- Synthetic rows only; never production. Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_spec_readings
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_spec_readings -f supabase/sql/test_spec_readings.sql
@@ -447,6 +447,7 @@ CREATE FUNCTION public.observation_is_public(p_kind text, p_data jsonb) RETURNS 
 \i supabase/migrations/20261124024000_spec_readings_financial_cleanup.sql
 \i supabase/migrations/20261124025000_data_set_public_counts.sql
 \i supabase/migrations/20261124026000_spec_platform_scopes.sql
+\i supabase/migrations/20261124027000_spec_fold_backpressure.sql
 
 -- 1. matcher cases
 CREATE TEMP TABLE spec_cases AS
@@ -572,3 +573,13 @@ INSERT INTO public.spec_landing_jobs (job_id, step_kind, run_id, scope, step, ba
   ('p01', 'decode', '11111111-1111-1111-1111-111111111114', 'platform_hex_01', 10, 10);
 SELECT public.spec_landing_drain_v1(5000);
 SELECT pg_temp.ok('size cap holds platform jobs', (SELECT ticks = 0 FROM public.spec_landing_jobs WHERE job_id = 'p01'));
+-- the model fold loop's backpressure also holds platform jobs, and clears when it clears
+UPDATE public.spec_landing_control SET max_layer_bytes = 15000000000 WHERE id = 1;
+CREATE OR REPLACE FUNCTION public.model_fold_backpressure(p_cfg jsonb) RETURNS text LANGUAGE sql AS $$ SELECT 'lock waiters 99'::text $$;
+SELECT public.spec_landing_drain_v1(5000);
+SELECT pg_temp.ok('fold backpressure holds platform jobs', (SELECT ticks = 0 FROM public.spec_landing_jobs WHERE job_id = 'p01')
+  AND (SELECT last_backpressure->>'model_fold' = 'lock waiters 99' FROM public.spec_landing_control WHERE id = 1));
+CREATE OR REPLACE FUNCTION public.model_fold_backpressure(p_cfg jsonb) RETURNS text LANGUAGE sql AS $$ SELECT NULL::text $$;
+SELECT public.spec_landing_drain_v1(5000);
+SELECT pg_temp.ok('platform jobs resume once the fold loop is clear', (SELECT status = 'done' FROM public.spec_landing_jobs WHERE job_id = 'p01'));
+DROP FUNCTION public.model_fold_backpressure(jsonb);
