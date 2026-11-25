@@ -3,6 +3,11 @@
 -- Fixture rows below live in a disposable test database only.
 \set ON_ERROR_STOP on
 \ir test_schema_proposal_key_gate.sql
+-- receipt_line_systems as production has it (a key table; three of its 18 live keys are enough here).
+CREATE TABLE IF NOT EXISTS public.receipt_line_systems (system_key text PRIMARY KEY, label text NOT NULL, note text,
+  created_at timestamptz DEFAULT now(), expects_operation boolean NOT NULL DEFAULT true);
+INSERT INTO public.receipt_line_systems (system_key, label, expects_operation) VALUES
+  ('engine', 'Engine', true), ('paint', 'Paint', true), ('hardware', 'Hardware', false) ON CONFLICT DO NOTHING;
 \ir ../migrations/20261125163000_reported_labor_statement_check.sql
 \ir ../migrations/20261125163000_reported_labor_statement_check.sql
 
@@ -32,10 +37,20 @@ DECLARE r jsonb;
   ac uuid := '33000000-0000-0000-0000-000000000001';
   q3 text := 'I had 2500 hours in my 1970 Pontiac GTO without the paint';
 BEGIN
-  PERFORM pg_temp.ok('31 values, each from its ratified key', (SELECT count(*) FROM public.labor_statement_values) = 31);
-  PERFORM pg_temp.ok('time_basis has unknown; system_key has tires and unplaced',
-    EXISTS (SELECT 1 FROM public.labor_statement_values WHERE property_key = 'labor_time_basis' AND value = 'unknown')
-    AND (SELECT count(*) FROM public.labor_statement_values WHERE property_key = 'labor_system_key' AND value IN ('tires', 'unplaced')) = 2);
+  PERFORM pg_temp.ok('13 prose values, each from its ratified key', (SELECT count(*) FROM public.labor_statement_values WHERE system_key IS NULL) = 13);
+  PERFORM pg_temp.ok('time_basis has unknown', EXISTS (SELECT 1 FROM public.labor_statement_values WHERE property_key = 'labor_time_basis' AND value = 'unknown'));
+  PERFORM pg_temp.ok('tires is a receipt system key now', EXISTS (SELECT 1 FROM public.receipt_line_systems WHERE system_key = 'tires'));
+  PERFORM pg_temp.ok('system values are exactly the receipt_line_systems keys, each by FK',
+    (SELECT array_agg(value ORDER BY value) FROM public.labor_statement_values WHERE property_key = 'labor_system_key')
+    = (SELECT array_agg(system_key ORDER BY system_key) FROM public.receipt_line_systems)
+    AND NOT EXISTS (SELECT 1 FROM public.labor_statement_values WHERE property_key = 'labor_system_key' AND system_key IS DISTINCT FROM value));
+  PERFORM pg_temp.ok('unplaced is not a system', NOT EXISTS (SELECT 1 FROM public.labor_statement_values WHERE value = 'unplaced'));
+  PERFORM pg_temp.ok('one open superseding proposal for the system key text', (
+    SELECT count(*) FROM public.schema_proposals p JOIN public.observation_properties o ON o.property_key = 'labor_system_key'
+     WHERE p.proposal_type = 'modify_property' AND p.status = 'open' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
+       AND p.payload ->> 'values_from' = 'receipt_line_systems.system_key') = 1);
+  PERFORM pg_temp.ok('the ratified system key text is untouched', (SELECT description FROM public.observation_properties
+     WHERE property_key = 'labor_system_key') LIKE '%unplaced%');
 
   -- accepts, one per source
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q);
@@ -75,6 +90,18 @@ BEGIN
   PERFORM pg_temp.ok('task without a system refused', r->'reasons' ? 'system_key_missing');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q || '{"labor_system_key":"paint"}');
   PERFORM pg_temp.ok('whole build with a system refused', r->'reasons' ? 'system_key_on_whole_build');
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key":"unplaced"}');
+  PERFORM pg_temp.ok('unplaced refused as a system', r->'reasons' ? 'qualifier_value_unknown:labor_system_key');
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key":"tires"}');
+  PERFORM pg_temp.ok('tires accepted as a system: ' || r::text, (r->>'ok')::boolean);
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key_null_reason":"names_no_one_system"}');
+  PERFORM pg_temp.ok('task with a null system and its reason accepted: ' || r::text, (r->>'ok')::boolean);
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, task_q || '{"labor_system_key_null_reason":"names_no_one_system"}');
+  PERFORM pg_temp.ok('a system and a null reason together refused', r->'reasons' ? 'system_key_and_null_reason');
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key_null_reason":"too_hard"}');
+  PERFORM pg_temp.ok('a null reason outside its table refused', r->'reasons' ? 'qualifier_value_unknown:labor_system_key_null_reason');
+  r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q || '{"labor_system_key_null_reason":"names_no_one_system"}');
+  PERFORM pg_temp.ok('whole build with a null reason refused', r->'reasons' ? 'system_key_on_whole_build');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q || '{"labor_time_basis":"billed"}');
   PERFORM pg_temp.ok('value outside the ratified list refused', r->'reasons' ? 'qualifier_value_unknown:labor_time_basis');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q || '{"labor_mood":"proud"}');
@@ -85,6 +112,101 @@ BEGIN
   PERFORM pg_temp.ok('stated subject not in the quote refused', r->'reasons' ? 'stated_subject_not_in_quote');
   r := public.reported_labor_statement_check('vehicles', v1, repeat('I put 1,200 hours into it. ', 12), 1200, NULL, ok_q);
   PERFORM pg_temp.ok('quote over 300 characters refused', r->'reasons' ? 'quote_too_long');
+END $$;
+
+-- Negative cases (lead ruling 2026-11-25): a statement lands as the writer will land it, vehicle_id NULL with the car
+-- in structured_data.source_vehicle_id, and never reaches the two public readers that read every work_record row on a
+-- car. Both readers are their production definitions (pg_get_viewdef / pg_get_functiondef, read 2026-11-25).
+ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS is_public boolean DEFAULT true, ADD COLUMN IF NOT EXISTS deleted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS user_id uuid, ADD COLUMN IF NOT EXISTS owner_id uuid, ADD COLUMN IF NOT EXISTS uploaded_by uuid;
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
+CREATE OR REPLACE FUNCTION public.public_text(p text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE WHEN p IS NULL OR btrim(p) = '' THEN NULL ELSE left(btrim(p), 300) END $$;
+-- guardrail-allow(center-key-fk): vehicle_observations.id: the table's own primary key, not a reference (fixture stub)
+CREATE TABLE IF NOT EXISTS public.vehicle_observations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  vehicle_id uuid REFERENCES public.vehicles(id), kind public.observation_kind NOT NULL, observed_at timestamptz DEFAULT now(),
+  is_superseded boolean DEFAULT false, structured_data jsonb);
+CREATE VIEW public.proj_disposition AS
+SELECT id AS vehicle_id,
+        CASE
+            WHEN (EXISTS ( SELECT 1
+               FROM vehicle_observations o
+              WHERE ((o.vehicle_id = v.id) AND (o.kind = 'sale_result'::observation_kind) AND (COALESCE(o.is_superseded, false) = false) AND (COALESCE((o.structured_data ->> 'outcome'::text), 'sold'::text) <> 'fell_through'::text)))) THEN 'sold'::text
+            WHEN (EXISTS ( SELECT 1
+               FROM vehicle_observations o
+              WHERE ((o.vehicle_id = v.id) AND (o.kind = 'sale_result'::observation_kind) AND ((o.structured_data ->> 'outcome'::text) = 'fell_through'::text)))) THEN 'deal_fell_through'::text
+            WHEN (EXISTS ( SELECT 1
+               FROM vehicle_observations o
+              WHERE ((o.vehicle_id = v.id) AND (o.kind = 'listing'::observation_kind) AND (NOT (EXISTS ( SELECT 1
+                       FROM vehicle_observations o2
+                      WHERE ((o2.vehicle_id = v.id) AND (o2.kind = 'sale_result'::observation_kind) AND (o2.observed_at >= o.observed_at)))))))) THEN 'listed'::text
+            WHEN (EXISTS ( SELECT 1
+               FROM vehicle_observations o
+              WHERE ((o.vehicle_id = v.id) AND (o.kind = 'provenance'::observation_kind) AND ((o.structured_data ->> 'kind'::text) = 'contract_build'::text)))) THEN 'contract_build'::text
+            WHEN (EXISTS ( SELECT 1
+               FROM vehicle_observations o
+              WHERE ((o.vehicle_id = v.id) AND (o.kind = 'work_record'::observation_kind)))) THEN 'in_progress'::text
+            WHEN (EXISTS ( SELECT 1
+               FROM vehicle_observations o
+              WHERE ((o.vehicle_id = v.id) AND (o.kind = 'ownership'::observation_kind)))) THEN 'acquired_idle'::text
+            ELSE 'unknown'::text
+        END AS disposition,
+    ( SELECT max(vehicle_observations.observed_at) AS max
+           FROM vehicle_observations
+          WHERE ((vehicle_observations.vehicle_id = v.id) AND (vehicle_observations.kind = ANY (ARRAY['sale_result'::observation_kind, 'listing'::observation_kind, 'ownership'::observation_kind, 'work_record'::observation_kind, 'provenance'::observation_kind])))) AS as_of
+   FROM vehicles v;
+CREATE OR REPLACE FUNCTION public.vehicle_build_log_public(p_vehicle_id uuid)
+ RETURNS TABLE(observation_id uuid, done_on date, item text, category text, supplier text, labor_minutes numeric, build_stage text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$;
+  SELECT o.id,
+         COALESCE(CASE WHEN o.structured_data->>'transaction_date' ~ '^\d{4}-\d{2}-\d{2}'
+                       THEN left(o.structured_data->>'transaction_date', 10)::date END,
+                  o.observed_at::date),
+         public.public_text(COALESCE(o.structured_data->>'item', o.structured_data->>'task',
+                                     o.structured_data->>'title', o.structured_data->>'work_performed')),
+         public.public_text(o.structured_data->>'category'),
+         public.public_text(o.structured_data->>'supplier'),
+         CASE WHEN o.structured_data->>'labor_minutes' ~ '^\d+(\.\d+)?$'
+              THEN (o.structured_data->>'labor_minutes')::numeric END,
+         public.public_text(COALESCE(o.structured_data->>'build_stage', o.structured_data->>'phase'))
+  FROM public.vehicle_observations o
+  JOIN public.vehicles v ON v.id = o.vehicle_id
+  WHERE o.vehicle_id = p_vehicle_id
+    AND o.kind = 'work_record'
+    AND o.is_superseded IS NOT TRUE
+    AND COALESCE(o.structured_data->>'contract','') <> 'visual_work_v1'
+    AND jsonb_typeof(o.structured_data) = 'object'
+    AND NOT (o.structured_data ?| ARRAY['receipt_id', 'invoice_number', 'file_url'])
+    AND COALESCE(o.structured_data->>'subject', '') <> 'client_invoice'
+    AND COALESCE(o.structured_data->>'item', o.structured_data->>'task', o.structured_data->>'title',
+                 o.structured_data->>'work_performed', o.structured_data->>'category') IS NOT NULL
+    AND v.deleted_at IS NULL
+    AND (v.is_public = true
+         OR v.user_id = (SELECT auth.uid())
+         OR v.owner_id = (SELECT auth.uid())
+         OR v.uploaded_by = (SELECT auth.uid()))
+  ORDER BY 2 DESC NULLS LAST, 1;
+$function$;
+-- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture database)
+INSERT INTO public.vehicle_observations (vehicle_id, kind, structured_data) VALUES
+  (NULL, 'work_record', jsonb_build_object('contract', 'reported_labor_hours_v1', 'source_vehicle_id', '30000000-0000-0000-0000-000000000001',
+    'source_table', 'vehicles', 'source_row_id', '30000000-0000-0000-0000-000000000001', 'labor_scope', 'whole_build', 'task', 'body and paint'));
+DO $$
+DECLARE v1 uuid := '30000000-0000-0000-0000-000000000001';
+BEGIN
+  PERFORM pg_temp.ok('statement row: proj_disposition unchanged',
+    (SELECT disposition FROM public.proj_disposition WHERE vehicle_id = v1) = 'unknown');
+  PERFORM pg_temp.ok('statement row: not on the public build log', NOT EXISTS (SELECT 1 FROM public.vehicle_build_log_public(v1)));
+  -- control: the same row with vehicle_id set reaches both, so the fixtures are sensitive to it
+  UPDATE public.vehicle_observations SET vehicle_id = v1 WHERE structured_data ->> 'contract' = 'reported_labor_hours_v1';
+  PERFORM pg_temp.ok('control: with vehicle_id set it would mark the car in_progress',
+    (SELECT disposition FROM public.proj_disposition WHERE vehicle_id = v1) = 'in_progress');
+  PERFORM pg_temp.ok('control: with vehicle_id set it would print on the build log', EXISTS (SELECT 1 FROM public.vehicle_build_log_public(v1)));
+  UPDATE public.vehicle_observations SET vehicle_id = NULL WHERE structured_data ->> 'contract' = 'reported_labor_hours_v1';
 END $$;
 
 DO $$ BEGIN

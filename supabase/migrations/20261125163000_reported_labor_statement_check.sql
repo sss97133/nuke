@@ -7,19 +7,30 @@
 -- reported_labor_statement_check and refuses on any reason, so the edge function holds no copy of the rules.
 --
 -- ROWS.
---   labor_statement_values (property_key FK observation_properties, value, proposal_id FK schema_proposals): the
---     allowed values of the 5 enum keys, each a whole token in its ratified key's own 'Allowed values:' text
---     (guarded below; 31 rows: labor_scope 2, labor_speaker_role 4, labor_statement_kind 3, labor_time_basis 4,
---     labor_system_key 18). labor_system_key's text names receipt_line_systems as its vocabulary, but live
---     receipt_line_systems (18 rows) has hardware and supplies and lacks tires and unplaced: the ratified text is
---     the authority here; 16 keys join receipt_line_systems, tires and unplaced do not.
+--   receipt_line_systems + ('tires', 'Tires', expects_operation true), the way 'paint' came in (20261125114500):
+--     receipt lines already name tires (5 receipt_items lines on 1 car whose description holds the word, none keyed
+--     to a system, read 2026-11-25); labor_operations has 0 tire operations, so a tire line is a book hole, said as
+--     one. No rule row: one goes through receipt_line_rule_propose / _promote when a line qualifies.
+--   schema_proposals + one modify_property row (agent claude-reported-labor-hours, status open) superseding the
+--     ratified labor_system_key text (proposal f1e80fb0): its values are receipt_line_systems.system_key, not a list
+--     in prose; 'unplaced' is not a system but a NULL system with a reason (labor_statement_null_reasons). Lead
+--     ruling 2026-11-25. It is filed, not ratified: it waits for its gate.
+--   labor_statement_values (property_key FK observation_properties, value, proposal_id FK schema_proposals,
+--     system_key FK receipt_line_systems): 13 values of the 4 prose enum keys, each a whole token of its ratified
+--     key's 'Allowed values:' text (labor_scope 2, labor_speaker_role 4, labor_statement_kind 3, labor_time_basis
+--     4), plus one row per receipt_line_systems key for labor_system_key with system_key = value (19 after tires),
+--     citing the superseding proposal. A system key added later is admitted to statements by its own row here.
+--   labor_statement_null_reasons (property_key FK observation_properties, reason, basis): why a key is absent. One
+--     row: labor_system_key / names_no_one_system (the ratified text's 'a job that names no one system: teardown,
+--     detailing, general').
 --   reported_labor_statement_check(source_table, source_row_id, quote, low, high, qualifiers) -> jsonb
 --     {ok, reasons[], quote_hash, text_md5, source_vehicle_id, contract}. Same source rules as gate A
 --     (schema_proposal_witness_sources: allowed table, row exists, not generated) and the same quote rule row
 --     (schema_proposal_quote_rules 'labor': min_quote_chars, term_pattern, figure_required, whole-token verbatim),
 --     plus: quote <= 300 chars; low > 0 and printed in the quote; high >= low and printed; qualifiers only the 6
---     labor keys; scope, speaker_role, statement_kind and time_basis required and in labor_statement_values;
---     system_key required for task, refused for whole_build; stated_subject <= 80 chars and inside the quote.
+--     labor keys and labor_system_key_null_reason; scope, speaker_role, statement_kind and time_basis required and
+--     in labor_statement_values; for task a system key (a labor_statement_values row, so a receipt_line_systems key)
+--     or a null reason, never both; neither for whole_build; stated_subject <= 80 chars and inside the quote.
 --     Thousands separators are read as printed ('1,000' is 1000).
 --     source_vehicle_id is the car the source row is about (auction_comments.vehicle_id; build_posts ->
 --     build_threads.vehicle_id; vehicles.id). The writer puts it in structured_data and lands the observation
@@ -31,17 +42,61 @@
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
+INSERT INTO public.receipt_line_systems (system_key, label, expects_operation)
+VALUES ('tires', 'Tires', true)
+ON CONFLICT (system_key) DO NOTHING;
+
+-- The superseding text for labor_system_key (filed open; the ratified row stays as it is until a gate decides).
+INSERT INTO public.schema_proposals (proposed_by_agent_key, proposal_type, status, supersedes_proposal_id, payload, evidence)
+SELECT 'claude-reported-labor-hours', 'modify_property', 'open', o.proposed_by_proposal_id,
+       jsonb_build_object(
+         'property_key', 'labor_system_key',
+         'field', 'description',
+         'values_from', 'receipt_line_systems.system_key',
+         'null_reasons_from', 'labor_statement_null_reasons',
+         'description', 'The car system the hours were spent on: a receipt_line_systems.system_key (the key table is the list; '
+           || 'no values are named here). Required for labor_scope=task unless the sentence names no one system (teardown, '
+           || 'detailing, general), in which case it is absent and the statement carries labor_system_key_null_reason = '
+           || 'names_no_one_system from labor_statement_null_reasons. Absent for whole_build. Written as the qualifier of one '
+           || 'work_record observation whose property_key is labor_hours_reported_low; never an observation of its own.'),
+       jsonb_build_array(jsonb_build_object('role', 'measurement', 'measured_on', '2026-11-25',
+         'what', 'ratified text lists 18 values; receipt_line_systems held 18 keys; 16 shared; text-only: tires, unplaced; table-only: hardware, supplies',
+         'basis', 'two sources of truth for one key; the key table wins (lead ruling 2026-11-25)'))
+  FROM public.observation_properties o
+ WHERE o.property_key = 'labor_system_key' AND o.proposed_by_proposal_id IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM public.schema_proposals p
+                    WHERE p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
+                      AND p.payload ->> 'values_from' = 'receipt_line_systems.system_key');
+
 CREATE TABLE IF NOT EXISTS public.labor_statement_values (
   property_key text NOT NULL REFERENCES public.observation_properties(property_key),
   value text NOT NULL CHECK (value ~ '^[a-z][a-z_]*$'),
   proposal_id uuid NOT NULL REFERENCES public.schema_proposals(id),
-  PRIMARY KEY (property_key, value)
+  system_key text REFERENCES public.receipt_line_systems(system_key),
+  PRIMARY KEY (property_key, value),
+  CHECK ((property_key = 'labor_system_key') = (system_key IS NOT NULL)),
+  CHECK (system_key IS NULL OR value = system_key)
 );
 COMMENT ON TABLE public.labor_statement_values IS
-  'reported_labor_hours_v1: allowed values of the ratified labor enum keys (grain: key x value). Each value is a whole token of its key''s ratified Allowed values text; proposal_id is the ratifying schema_proposals row.';
+  'reported_labor_hours_v1: allowed values of the labor statement qualifier keys (grain: key x value). Prose enums cite their ratifying proposal and are whole tokens of its Allowed values text; labor_system_key values are receipt_line_systems keys (system_key FK) citing the superseding proposal.';
 ALTER TABLE public.labor_statement_values ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.labor_statement_values FROM anon, authenticated;
 GRANT SELECT ON public.labor_statement_values TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.labor_statement_null_reasons (
+  property_key text NOT NULL REFERENCES public.observation_properties(property_key),
+  reason text NOT NULL CHECK (reason ~ '^[a-z][a-z_]*$'),
+  basis text NOT NULL,
+  PRIMARY KEY (property_key, reason)
+);
+ALTER TABLE public.labor_statement_null_reasons ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.labor_statement_null_reasons FROM anon, authenticated;
+GRANT SELECT ON public.labor_statement_null_reasons TO service_role;
+INSERT INTO public.labor_statement_null_reasons (property_key, reason, basis)
+SELECT 'labor_system_key', 'names_no_one_system',
+       'labor_system_key text (proposal f1e80fb0): ''unplaced for a job that names no one system (teardown, detailing, general)''; lead ruling 2026-11-25: not a system, a NULL system with a reason'
+ WHERE EXISTS (SELECT 1 FROM public.observation_properties WHERE property_key = 'labor_system_key')
+ON CONFLICT (property_key, reason) DO NOTHING;
 
 INSERT INTO public.labor_statement_values (property_key, value, proposal_id)
 SELECT o.property_key, v.value, o.proposed_by_proposal_id
@@ -51,30 +106,36 @@ SELECT o.property_key, v.value, o.proposed_by_proposal_id
     ('labor_speaker_role', 'commenter_other_car'), ('labor_speaker_role', 'third_party'),
     ('labor_statement_kind', 'actual'), ('labor_statement_kind', 'estimate'), ('labor_statement_kind', 'hearsay'),
     ('labor_time_basis', 'own'), ('labor_time_basis', 'paid_shop'), ('labor_time_basis', 'book_quote'),
-    ('labor_time_basis', 'unknown'),
-    ('labor_system_key', 'engine'), ('labor_system_key', 'machining'), ('labor_system_key', 'fuel'),
-    ('labor_system_key', 'cooling'), ('labor_system_key', 'exhaust'), ('labor_system_key', 'electrical'),
-    ('labor_system_key', 'brakes'), ('labor_system_key', 'steering'), ('labor_system_key', 'suspension'),
-    ('labor_system_key', 'axle'), ('labor_system_key', 'transmission'), ('labor_system_key', 'body'),
-    ('labor_system_key', 'paint'), ('labor_system_key', 'glass'), ('labor_system_key', 'interior'),
-    ('labor_system_key', 'trim'), ('labor_system_key', 'tires'), ('labor_system_key', 'unplaced')
+    ('labor_time_basis', 'unknown')
   ) v(property_key, value)
   JOIN public.observation_properties o ON o.property_key = v.property_key
  WHERE o.proposed_by_proposal_id IS NOT NULL AND o.data_type = 'enum'
 ON CONFLICT (property_key, value) DO NOTHING;
 
+INSERT INTO public.labor_statement_values (property_key, value, proposal_id, system_key)
+SELECT 'labor_system_key', s.system_key, p.id, s.system_key
+  FROM public.receipt_line_systems s
+  JOIN public.observation_properties o ON o.property_key = 'labor_system_key'
+  JOIN public.schema_proposals p ON p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
+                                AND p.payload ->> 'values_from' = 'receipt_line_systems.system_key'
+ON CONFLICT (property_key, value) DO NOTHING;
+
 DO $guard$
-DECLARE n int; bad text;
+DECLARE n_enum int; n_sys int; n_keys int; bad text;
 BEGIN
-  SELECT count(*) INTO n FROM public.labor_statement_values;
-  IF n <> 31 THEN
-    RAISE EXCEPTION 'reported_labor_hours_v1: expected 31 labor_statement_values rows, found % (are the 8 keys ratified?)', n;
+  SELECT count(*) FILTER (WHERE system_key IS NULL), count(*) FILTER (WHERE system_key IS NOT NULL)
+    INTO n_enum, n_sys FROM public.labor_statement_values;
+  SELECT count(*) INTO n_keys FROM public.receipt_line_systems;
+  IF n_enum <> 13 OR n_sys <> n_keys THEN
+    RAISE EXCEPTION 'reported_labor_hours_v1: expected 13 prose values and % system rows, found % and % (are the 8 keys ratified?)',
+      n_keys, n_enum, n_sys;
   END IF;
   SELECT string_agg(l.property_key || '.' || l.value, ', ') INTO bad
     FROM public.labor_statement_values l
     JOIN public.observation_properties o ON o.property_key = l.property_key
-   WHERE coalesce(substring(o.description FROM 'Allowed values:(.*)$'), '') !~ ('\m' || l.value || '\M')
-      OR o.proposed_by_proposal_id IS DISTINCT FROM l.proposal_id;
+   WHERE l.system_key IS NULL
+     AND (coalesce(substring(o.description FROM 'Allowed values:(.*)$'), '') !~ ('\m' || l.value || '\M')
+          OR o.proposed_by_proposal_id IS DISTINCT FROM l.proposal_id);
   IF bad IS NOT NULL THEN
     RAISE EXCEPTION 'reported_labor_hours_v1: values not in their ratified key''s Allowed values text: %', bad;
   END IF;
@@ -146,8 +207,13 @@ BEGIN
   END IF;
   FOR k IN SELECT jsonb_object_keys(q) LOOP
     IF k NOT IN ('labor_scope', 'labor_system_key', 'labor_speaker_role', 'labor_statement_kind', 'labor_time_basis',
-                 'labor_stated_subject') THEN
+                 'labor_stated_subject', 'labor_system_key_null_reason') THEN
       reasons := reasons || ('qualifier_unknown:' || k);
+    ELSIF k = 'labor_system_key_null_reason' THEN
+      IF jsonb_typeof(q -> k) <> 'string' OR NOT EXISTS (SELECT 1 FROM public.labor_statement_null_reasons r
+                                                          WHERE r.property_key = 'labor_system_key' AND r.reason = q ->> k) THEN
+        reasons := reasons || ('qualifier_value_unknown:' || k);
+      END IF;
     ELSIF k <> 'labor_stated_subject' AND (jsonb_typeof(q -> k) <> 'string' OR NOT EXISTS (
             SELECT 1 FROM public.labor_statement_values l WHERE l.property_key = k AND l.value = q ->> k)) THEN
       reasons := reasons || ('qualifier_value_unknown:' || k);
@@ -156,9 +222,11 @@ BEGIN
   FOREACH k IN ARRAY ARRAY['labor_scope', 'labor_speaker_role', 'labor_statement_kind', 'labor_time_basis'] LOOP
     IF NOT q ? k THEN reasons := reasons || ('qualifier_missing:' || k); END IF;
   END LOOP;
-  IF q ->> 'labor_scope' = 'task' AND NOT q ? 'labor_system_key' THEN
+  IF q ? 'labor_system_key' AND q ? 'labor_system_key_null_reason' THEN
+    reasons := reasons || 'system_key_and_null_reason'::text;
+  ELSIF q ->> 'labor_scope' = 'task' AND NOT q ? 'labor_system_key' AND NOT q ? 'labor_system_key_null_reason' THEN
     reasons := reasons || 'system_key_missing'::text;
-  ELSIF q ->> 'labor_scope' = 'whole_build' AND q ? 'labor_system_key' THEN
+  ELSIF q ->> 'labor_scope' = 'whole_build' AND (q ? 'labor_system_key' OR q ? 'labor_system_key_null_reason') THEN
     reasons := reasons || 'system_key_on_whole_build'::text;
   END IF;
   IF q ? 'labor_stated_subject' AND (jsonb_typeof(q -> 'labor_stated_subject') <> 'string'
