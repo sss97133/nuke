@@ -47,6 +47,8 @@
 --
 -- Guard: both bodies are 20261125200000's (md5 below) or already carry served_key_default_v1; anything else raises.
 --   image_scan_metadata_for_viewer(jsonb, uuid, uuid, image_scan_rule[])  c3ab8411de3cd842c8cafd823f90641e
+--     or 3d45767ad3218d2c53cb78879e975be1, the same body after 20261125234700 (#3978) widens the plate separator
+--     or 3d45767ad3218d2c53cb78879e975be1: the same body after 20261125234700 (#3978) widened the plate separator to \[nrt]
 --   image_scan_rules(text)                                                420fe0be7f009555945951f1876bb1dd
 -- Contract: supabase/sql/test_scan_reading_served_keys_end_user_guard.sql.
 -- Revert: supabase/sql/revert_20261126101900_scan_reading_served_keys_end_user_guard.sql.
@@ -63,7 +65,7 @@ BEGIN
   END IF;
   SELECT prosrc INTO v_w FROM pg_proc WHERE oid = 'public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[])'::regprocedure;
   SELECT prosrc INTO v_r FROM pg_proc WHERE oid = 'public.image_scan_rules(text)'::regprocedure;
-  IF md5(v_w) <> 'c3ab8411de3cd842c8cafd823f90641e' AND position('served_key_default_v1' IN v_w) = 0 THEN
+  IF md5(v_w) NOT IN ('c3ab8411de3cd842c8cafd823f90641e', '3d45767ad3218d2c53cb78879e975be1') AND position('served_key_default_v1' IN v_w) = 0 THEN
     RAISE EXCEPTION 'image_scan_metadata_for_viewer is not the 20261125200000 body (md5 %); review the drift', md5(v_w);
   END IF;
   IF md5(v_r) <> '420fe0be7f009555945951f1876bb1dd' AND position('served_key_default_v1' IN v_r) = 0 THEN

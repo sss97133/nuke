@@ -104,7 +104,7 @@ SELECT public.image_scan_rules_compile();
 DO $verify$
 BEGIN
   IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[])'::regprocedure)
-       <> 'c3ab8411de3cd842c8cafd823f90641e'
+       NOT IN ('c3ab8411de3cd842c8cafd823f90641e', '3d45767ad3218d2c53cb78879e975be1')
      OR (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.image_scan_rules(text)'::regprocedure) <> '420fe0be7f009555945951f1876bb1dd' THEN
     RAISE EXCEPTION 'revert: a body is not the 20261125200000 one';
   END IF;
