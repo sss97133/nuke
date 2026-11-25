@@ -421,4 +421,31 @@ END $$;
 COMMIT;
 GRANT SELECT (vin_source_image_id) ON public.vehicles TO anon;
 SELECT 'PASS 12 (b)' AS result;
+-- 13. The owner of a PRIVATE car reads its withheld column (owner_name) with its value; anon and a stranger get NULL.
+INSERT INTO public.vehicles (id, is_public, owner_id, owner_name, color)
+VALUES ('55555555-5555-5555-5555-555555555555', false, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'fixture private owner', 'blue');
+BEGIN;
+SELECT set_config('test.auth_role','authenticated',true), set_config('test.auth_uid','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',true);
+SET LOCAL ROLE authenticated;
+DO $$ DECLARE r jsonb := public.get_field_provenance('55555555-5555-5555-5555-555555555555','owner_name');
+BEGIN
+  ASSERT r->>'value' = 'fixture private owner', '13 owner of a private car reads owner_name';
+  ASSERT coalesce((r->>'withheld')::boolean, false) = false, '13 owner of a private car is not withheld';
+END $$;
+COMMIT;
+BEGIN;
+SELECT set_config('test.auth_role','authenticated',true), set_config('test.auth_uid','cccccccc-cccc-cccc-cccc-cccccccccccc',true);
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+  ASSERT public.get_field_provenance('55555555-5555-5555-5555-555555555555','owner_name') IS NULL, '13 stranger gets NULL for a private car';
+END $$;
+COMMIT;
+BEGIN;
+SELECT set_config('test.auth_role','anon',true), set_config('test.auth_uid','',true);
+SET LOCAL ROLE anon;
+DO $$ BEGIN
+  ASSERT public.get_field_provenance('55555555-5555-5555-5555-555555555555','owner_name') IS NULL, '13 anon gets NULL for a private car';
+END $$;
+COMMIT;
+SELECT 'PASS 13' AS result;
 SELECT 'PASS: get_field_provenance withholds columns the caller cannot select' AS result;
