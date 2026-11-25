@@ -61,10 +61,13 @@ Testimony is the rows that record what was observed, by whom, from what source a
   (`owner_delegated_sign_register`): no Sign an agent makes on his behalf records one, because `decide_evidence` reads
   the auth server's own session and factor records (an aal2 session stepped up with his verified second factor, enrolled
   at least 7 days earlier, within the last 15 minutes), which a delegated Sign does not satisfy.
-- Where that is enforced: by the writers migration (M1w, `20261021221000`, not live until it deploys), which grants
-  `decide_evidence` to authenticated only and refuses a job caller in its body. The tables' guard (`20261021220000`,
-  live) still lists `decide_evidence` among the writer names and would admit an `agent:` decision from a service-role
-  job through it; until the writers migration deploys, no writer exists at all.
+- Where that is enforced: in the tables' guard. Since `20261126074500` the insert guard refuses every `agent:`
+  decision, from every role and every writer, and `evidence_writer_names()` no longer lists `decide_evidence`, so no
+  function of that name can write the store (contract: `supabase/sql/test_image_evidence_tables.sql`). That closed the
+  latent path the `20261021220000` guard left: an `agent:` decision from a service-role caller whose outermost frame
+  was named `decide_evidence` (no such function existed live). The owner-confirmation loop that ships the real
+  `decide_evidence` lists the name again in its own reviewed migration; the agent refusal stays. No writer exists
+  live yet (M1w, `20261021221000`, is not deployed).
 - A data-only restore of these tables is a reviewed migration written for that restore, in one transaction: drop the 27
   guard triggers, load the rows, recreate the triggers `ENABLE ALWAYS` exactly as
   `20261021220000_image_evidence_tables.sql` does, and check that all 27 fire ALWAYS. Never `DISABLE TRIGGER`.
