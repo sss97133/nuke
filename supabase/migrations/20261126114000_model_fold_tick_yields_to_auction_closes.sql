@@ -40,6 +40,21 @@ BEGIN
 END
 $need$;
 
+-- The two bodies replaced below are the live ones read 2026-11-25 (prosrc md5), or this migration's own (re-apply).
+DO $anchor$
+DECLARE
+  b text := (SELECT prosrc FROM pg_proc WHERE oid = 'public.model_fold_backpressure(jsonb)'::regprocedure);
+  a text := (SELECT prosrc FROM pg_proc WHERE oid = 'public.assay_model_fold()'::regprocedure);
+BEGIN
+  IF md5(b) <> '27111d19a8b67bc0871066d7c476a8ed' AND b NOT LIKE '%yield_job%' THEN
+    RAISE EXCEPTION 'model_fold yield: model_fold_backpressure drifted from the live body read 2026-11-25 (md5 %)', md5(b);
+  END IF;
+  IF md5(a) <> '54509aafbd28dac64df49e0cfdb461b4' AND a NOT LIKE '%yielding_to_closes%' THEN
+    RAISE EXCEPTION 'model_fold yield: assay_model_fold drifted from the live body read 2026-11-25 (md5 %)', md5(a);
+  END IF;
+END
+$anchor$;
+
 UPDATE public.platform_config
    SET config_value = jsonb_set(config_value, '{jobs}', (config_value -> 'jobs') || '["model-fold-tick"]'::jsonb),
        updated_at = now()

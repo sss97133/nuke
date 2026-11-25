@@ -30,6 +30,8 @@ CREATE TABLE public.model_fold_ticks (tick_id uuid PRIMARY KEY, started_at times
   finished_at timestamptz, pid int, status text, skip_reason text, logic_key text, signals int DEFAULT 0, swept int DEFAULT 0,
   claimed int DEFAULT 0, folded int DEFAULT 0, failed int DEFAULT 0, dead int DEFAULT 0, readings_added int DEFAULT 0,
   readings_invalidated int DEFAULT 0, members_applied int DEFAULT 0, members_superseded int DEFAULT 0, ms int, error text);
+-- guardrail-allow(center-key-fk): model_fold_work.vehicle_id: fixture of the live table (live has the FK to vehicles; no vehicles table here)
+-- guardrail-allow(center-key-fk): model_fold_signal.vehicle_id: fixture of the live table (live has the FK to vehicles; no vehicles table here)
 CREATE TABLE public.model_fold_work (vehicle_id uuid PRIMARY KEY, state text NOT NULL DEFAULT 'pending',
   priority smallint NOT NULL DEFAULT 5, reasons text[] NOT NULL DEFAULT '{}', first_dirty_at timestamptz NOT NULL DEFAULT now(),
   dirty_at timestamptz NOT NULL DEFAULT now(), attempts int NOT NULL DEFAULT 0, next_attempt_at timestamptz NOT NULL DEFAULT now(),
@@ -455,8 +457,37 @@ DO $$ BEGIN
   IF public.assay_model_fold() ? 'yielding_to_closes' THEN RAISE EXCEPTION 'watch: yielding key on a normal reading'; END IF;
 END $$;
 
--- The logic key does not hash the backpressure, so the migration starts no pass (live definition, checked by name).
+-- Applied: the backpressure calls the reader, and the watch knows the yield.
 DO $$ BEGIN
   IF (SELECT prosrc FROM pg_proc WHERE proname = 'model_fold_backpressure') NOT LIKE '%auction_close_yield%' THEN RAISE EXCEPTION 'not applied'; END IF;
+  IF (SELECT prosrc FROM pg_proc WHERE proname = 'assay_model_fold') NOT LIKE '%yielding_to_closes%' THEN RAISE EXCEPTION 'watch not applied'; END IF;
+END $$;
+-- A drifted live body stops the migration (md5 anchors): change the watch body, re-run, expect no change.
+-- The ERROR lines psql prints for this step are expected.
+-- first the watch alone
+CREATE TEMP TABLE saved_watch AS SELECT pg_get_functiondef('public.assay_model_fold()'::regprocedure) AS d;
+CREATE OR REPLACE FUNCTION public.assay_model_fold() RETURNS jsonb LANGUAGE plpgsql SET search_path TO 'public'
+AS $function$ begin return '{}'::jsonb; end $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261126114000_model_fold_tick_yields_to_auction_closes.sql
+\set ON_ERROR_STOP on
+ROLLBACK;
+DO $$ BEGIN
+  IF (SELECT prosrc FROM pg_proc WHERE proname = 'assay_model_fold') <> ' begin return ''{}''::jsonb; end ' THEN
+    RAISE EXCEPTION 'drifted watch was replaced';
+  END IF;
+  EXECUTE (SELECT d FROM saved_watch);
+END $$;
+-- then the backpressure
+CREATE OR REPLACE FUNCTION public.model_fold_backpressure(p_cfg jsonb) RETURNS text LANGUAGE plpgsql SET search_path TO 'public'
+AS $function$ begin return null; end $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261126114000_model_fold_tick_yields_to_auction_closes.sql
+\set ON_ERROR_STOP on
+ROLLBACK;
+DO $$ BEGIN
+  IF (SELECT prosrc FROM pg_proc WHERE proname = 'model_fold_backpressure') <> ' begin return null; end ' THEN
+    RAISE EXCEPTION 'drifted backpressure was replaced';
+  END IF;
 END $$;
 \echo 'test_model_fold_yield_to_closes: ok'
