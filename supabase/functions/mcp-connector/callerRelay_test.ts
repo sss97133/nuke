@@ -95,3 +95,21 @@ Deno.test("the three write tools in index.ts go through these helpers", async ()
   assert(/scopedPhotoIngest\(.*, caller, args, resolvedVehicleId\)/.test(photos) && /resolvedVehicleId = scope\.vehicleId/.test(photos) &&
     /upsert: scope\.upsert/.test(photos) && !/args\.user_id/.test(photos), "ingest_photos bypasses scopedPhotoIngest");
 });
+
+Deno.test("submit_observation strips every structured_data key ingest-observation reads as a marker", async () => {
+  const { INGEST_CONTROL_MARKERS } = await import("./callerRelay.ts");
+  const src = await Deno.readTextFile(new URL("../ingest-observation/index.ts", import.meta.url));
+  // Keys ingest-observation reads from the incoming structured_data. owner_confirmed is judged separately (dropped unless
+  // the caller can edit the vehicle); is_inferred only narrows the anonymous share-page verdict.
+  const content = new Set(["owner_confirmed", "is_inferred"]);
+  const read = new Set([...src.matchAll(/input\.structured_data\?\.(\w+)/g)].map((m) => m[1]).filter((k) => !content.has(k)));
+  const listed = new Set<string>(INGEST_CONTROL_MARKERS);
+  const missing = [...read].filter((k) => !listed.has(k));
+  assert(missing.length === 0, `ingest-observation reads markers the connector does not strip: ${missing.join(", ")}`);
+  const sd: Record<string, unknown> = { a: 1 };
+  for (const k of INGEST_CONTROL_MARKERS) sd[k] = "x";
+  const stranger = await scopedObservation(rpc, strangerKey, { vehicle_id: CAR, source_slug: "s", kind: "k", structured_data: sd });
+  assert(JSON.stringify(stranger.body.structured_data) === JSON.stringify({ a: 1 }), "a marker reached ingest-observation");
+  const service = await scopedObservation(rpc, SERVICE, { vehicle_id: CAR, source_slug: "s", kind: "k", structured_data: sd });
+  assert((service.body.structured_data as Record<string, unknown>).source_profile === "x", "the service key lost a marker");
+});

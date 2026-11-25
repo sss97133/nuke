@@ -10,6 +10,12 @@
 // user_can_edit_vehicle before anything lands on a vehicle, and name the caller, never an argument, as the person.
 import type { CallerContext } from "./ownerStatements.ts";
 
+/** structured_data keys ingest-observation reads as control markers rather than content (2026-11-25). */
+export const INGEST_CONTROL_MARKERS = [
+  "ecr_capture_receipt", "source_profile", "listing_capture_receipt", "profile", "analysis_kind",
+  "vin_reference_receipt", "source_sale_receipt",
+] as const;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type Rpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
@@ -75,6 +81,11 @@ export async function scopedObservation(rpc: Rpc, caller: CallerContext | undefi
       delete structured.owner_confirmed;
     }
   }
+  // The connector reaches ingest-observation with the service key, and ingest-observation reads some structured_data
+  // keys as markers of its service-only and selector-bound paths (retained listings, capture receipts, historical asks,
+  // title facets, VIN and sale receipts). A caller that is not the service key never sends one (callerRelay_test.ts
+  // keeps this list equal to the keys ingest-observation reads).
+  for (const marker of INGEST_CONTROL_MARKERS) delete structured[marker];
   body.observer_raw = { via: "mcp-connector", user_id: callerUserId(caller) };
   return { body, ownerConfirmedDropped };
 }
