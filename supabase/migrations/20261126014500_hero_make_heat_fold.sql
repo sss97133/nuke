@@ -19,6 +19,13 @@
 -- 200 only and applies the visibility test (2,183 of 2,185 ranked cars passed it on 2026-11-25). Keys and element shapes
 -- of the answer are unchanged; each list is ordered explicitly (ties by id or make). search_path is pinned.
 --
+-- HEALTH. The refresh is the aggregate that can take 10 s cold (skeptic2, 2026-11-25: 57014 twice, then 0.84 s warm), so
+-- a cold run can fail under the job's 10 s statement_timeout; it then rolls back and the reader keeps the last fold.
+-- hero_make_heat_check() raises when the fold is empty or its newest computed_at is older than
+-- stale_after_intervals x interval_minutes (platform_config 'hero_make_heat'); job 'hero-make-heat-check' runs it, so a
+-- stale fold is a failing row in v_job_health with its reason, not only an old make_heat_as_of. Splitting the refresh
+-- into bounded statements, so a cold run cannot fail, is the follow-up.
+--
 -- GUARD. Refuses to replace a hero_heat whose definition is not the live one measured above (md5 3103e96f...) unless it
 -- is already this version.
 SET lock_timeout = '5s';
@@ -74,6 +81,35 @@ $f$;
 REVOKE ALL ON FUNCTION public.hero_make_heat_refresh() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.hero_make_heat_refresh() TO service_role;
 
+INSERT INTO public.platform_config (config_key, config_value, description)
+VALUES ('hero_make_heat',
+        jsonb_build_object('interval_minutes', 15, 'stale_after_intervals', 2,
+          'basis', 'refresh job hero-make-heat-refresh runs every 15 min; a fold older than 2 runs means at least two consecutive failed refreshes'),
+        'hero_make_heat_v1: the refresh interval and the staleness limit hero_make_heat_check() enforces')
+ON CONFLICT (config_key) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.hero_make_heat_check()
+RETURNS timestamptz
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $f$
+DECLARE newest timestamptz; lim interval;
+BEGIN
+  SELECT make_interval(mins => ((c.config_value ->> 'interval_minutes')::int * (c.config_value ->> 'stale_after_intervals')::int))
+    INTO lim FROM public.platform_config c WHERE c.config_key = 'hero_make_heat';
+  IF lim IS NULL THEN RAISE EXCEPTION 'hero_make_heat_check: platform_config hero_make_heat is missing its interval'; END IF;
+  SELECT max(computed_at) INTO newest FROM public.hero_make_heat;
+  IF newest IS NULL THEN RAISE EXCEPTION 'hero_make_heat_check: the fold is empty; hero_heat reads the live aggregate'; END IF;
+  IF newest < now() - lim THEN
+    RAISE EXCEPTION 'hero_make_heat_check: the fold was computed at %, older than % (hero-make-heat-refresh is failing)', newest, lim;
+  END IF;
+  RETURN newest;
+END
+$f$;
+REVOKE ALL ON FUNCTION public.hero_make_heat_check() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.hero_make_heat_check() TO service_role;
+
 SELECT public.hero_make_heat_refresh() AS makes_folded;
 
 DO $job$
@@ -82,6 +118,10 @@ BEGIN
   PERFORM cron.schedule('hero-make-heat-refresh', '*/15 * * * *',
     'SET client_min_messages = error; SET statement_timeout = ''10s''; SET lock_timeout = ''5s''; '
     'SELECT public.hero_make_heat_refresh();');
+  PERFORM cron.unschedule(jobid) FROM cron.job WHERE jobname = 'hero-make-heat-check';
+  PERFORM cron.schedule('hero-make-heat-check', '7,22,37,52 * * * *',
+    'SET client_min_messages = error; SET statement_timeout = ''10s''; SET lock_timeout = ''5s''; '
+    'SELECT public.hero_make_heat_check();');
 END
 $job$;
 

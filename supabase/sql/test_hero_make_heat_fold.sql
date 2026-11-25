@@ -32,6 +32,8 @@ CREATE TABLE public.vehicles (id uuid PRIMARY KEY, year integer, make text, mode
   deleted_at timestamptz, listing_kind text, heat_score numeric(5,2), sale_price integer, asking_price numeric,
   current_value numeric, primary_image_url text);
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+CREATE TABLE public.platform_config (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), config_key text UNIQUE, config_value jsonb,
+  description text, updated_at timestamptz DEFAULT now(), updated_by uuid);
 CREATE TABLE public.auction_comment_day_counts (
   vehicle_id uuid NOT NULL REFERENCES public.vehicles(id) ON DELETE CASCADE, posted_day date NOT NULL,
   n integer NOT NULL CHECK (n >= 0), folded_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (vehicle_id, posted_day));
@@ -151,7 +153,13 @@ UPDATE public.t_old SET j = :'old_j'::jsonb;
 DO $t$
 DECLARE o jsonb := (SELECT j FROM public.t_old); n jsonb; k text;
 BEGIN
-  IF (SELECT count(*) FROM cron.job WHERE jobname = 'hero-make-heat-refresh') <> 1 THEN RAISE EXCEPTION 'job count is not 1'; END IF;
+  IF (SELECT count(*) FROM cron.job WHERE jobname = 'hero-make-heat-refresh') <> 1
+     OR (SELECT count(*) FROM cron.job WHERE jobname = 'hero-make-heat-check') <> 1 THEN RAISE EXCEPTION 'job count is not 1'; END IF;
+  IF (SELECT (config_value ->> 'interval_minutes')::int * (config_value ->> 'stale_after_intervals')::int
+        FROM public.platform_config WHERE config_key = 'hero_make_heat') <> 30 THEN RAISE EXCEPTION 'staleness limit row missing'; END IF;
+  IF (SELECT command FROM cron.job WHERE jobname = 'hero-make-heat-refresh') NOT LIKE '%statement_timeout = ''10s''%' THEN
+    RAISE EXCEPTION 'refresh job does not run under the default 10 s'; END IF;
+  PERFORM public.hero_make_heat_check();  -- fresh fold passes
   -- the fold equals the live aggregate
   IF EXISTS (
       (SELECT make, total_heat, vehicle_count::bigint FROM public.hero_make_heat
@@ -220,4 +228,26 @@ BEGIN
   IF NOT has_function_privilege('anon', 'public.hero_heat()', 'execute') THEN RAISE EXCEPTION 'anon lost hero_heat'; END IF;
 END
 $t$;
+-- the refresh job's own command runs as written (refills the fold emptied above)
+SELECT command AS refresh_cmd FROM cron.job WHERE jobname = 'hero-make-heat-refresh' \gset
+:refresh_cmd
+RESET statement_timeout;
+RESET lock_timeout;
+
+-- the check: an aged fold and an empty fold are failures (a raise is a failing job row in v_job_health)
+UPDATE public.hero_make_heat SET computed_at = now() - interval '31 minutes';
+DO $t$ BEGIN
+  BEGIN PERFORM public.hero_make_heat_check(); RAISE EXCEPTION 'stale fold passed the check';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM = 'stale fold passed the check' THEN RAISE; END IF;
+    IF SQLERRM NOT LIKE '%older than%' THEN RAISE; END IF; END;
+END $t$;
+UPDATE public.hero_make_heat SET computed_at = now() - interval '29 minutes';
+SELECT public.hero_make_heat_check() IS NOT NULL AS within_two_intervals;
+DELETE FROM public.hero_make_heat;
+DO $t$ BEGIN
+  BEGIN PERFORM public.hero_make_heat_check(); RAISE EXCEPTION 'empty fold passed the check';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM = 'empty fold passed the check' THEN RAISE; END IF;
+    IF SQLERRM NOT LIKE '%empty%' THEN RAISE; END IF; END;
+  IF has_function_privilege('anon', 'public.hero_make_heat_check()', 'execute') THEN RAISE EXCEPTION 'anon runs the check'; END IF;
+END $t$;
 \echo hero_make_heat_fold: ok
