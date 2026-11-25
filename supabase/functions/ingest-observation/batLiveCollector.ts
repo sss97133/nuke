@@ -8,14 +8,26 @@ export { BAT_LIVE_COLLECT_MODE } from "../_shared/batLiveEvents.ts";
  * multiplexes EVERY eligible closing lot; p_lots never caps live subscriptions.
  * No HTML polling, model calls, private channels, cookies or source writes.
  */
+/** The closing window's lower bound, from the same row the minute puller reads (live_auction_sources bat,
+ * scraping_config.live_pull.stream_window.lookback_minutes; its basis is stored beside it). A lot that ended earlier
+ * than that is settled by HTML reads, not the stream. Absent or malformed: no lower bound, the rule before the row. */
+export function streamLookbackMinutes(scrapingConfig: any): number | null {
+  const raw = scrapingConfig?.live_pull?.stream_window?.lookback_minutes;
+  const text = typeof raw === "number" || typeof raw === "string" ? String(raw) : "";
+  return /^\d{1,5}$/.test(text) ? Number(text) : null;
+}
+
 export async function closingBatTargets(db: any): Promise<BatLiveTarget[]> {
-  const source = await db.from("live_auction_sources").select("id").eq("slug", "bat").single();
+  const source = await db.from("live_auction_sources").select("id,scraping_config").eq("slug", "bat").single();
   if (source.error) throw new Error("bat_source_unavailable");
-  const monitors = await db.from("monitored_auctions")
+  const lookback = streamLookbackMinutes(source.data.scraping_config);
+  let selection = db.from("monitored_auctions")
     .select("id,vehicle_id,external_auction_url,stream_state")
     .eq("source_id", source.data.id)
     .or(`is_live.eq.true,stream_state->>terminal_received_at.gte.${new Date(Date.now() - 120000).toISOString()}`)
-    .lte("auction_end_time", new Date(Date.now() + 15 * 60000).toISOString()).limit(201);
+    .lte("auction_end_time", new Date(Date.now() + 15 * 60000).toISOString());
+  if (lookback !== null) selection = selection.gte("auction_end_time", new Date(Date.now() - lookback * 60000).toISOString());
+  const monitors = await selection.limit(201);
   if (monitors.error || monitors.data.length > 200) throw new Error("bat_closing_coverage_unavailable_or_over_capacity");
   if (!monitors.data.length) return [];
   const parents = await db.from("vehicles").select("id,listing_url,origin_metadata")
