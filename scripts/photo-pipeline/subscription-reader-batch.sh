@@ -125,6 +125,11 @@ READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-frame-classifier "$
 #    readings; its own heartbeat row, so a silent loop is seen like a silent reader.
 FRAME_CLEAN="$LAST_CLEAN"
 READER_PATH_FIRST="$HOME/.local/bin" run_reader fact-doubt-cycle "$MAIN/scripts/doubts/fact-doubt-cycle.mjs" --vehicles "${DOUBT_VEHICLES:-3}" --answer-limit "${DOUBT_ANSWERS:-6}"
+# 5. receipt-to-work reconciliation (scripts/receipt-work/reconcile-receipt-work.mjs, no model): for every vehicle with
+#    linked receipts, re-derive receipt line x dated photo x work session rows and raise receipt_part_visible questions
+#    where a photographed zone after purchase needs a look; unchanged rows and identical questions are left alone. Until
+#    2026-11-24 nothing ran it after its hand runs of 11-09/10, so receipts and photos landed since raised no question.
+run_reader reconcile-receipt-work "$MAIN/scripts/receipt-work/reconcile-receipt-work.mjs" --user-id "$OWNER"
 LAST_CLEAN="$FRAME_CLEAN"
 # fast fires run only after a full fire whose first reads ended clean; a full fire that holds them says so
 if [ "$LAST_CLEAN" -eq 1 ]; then rm -f "$FAST_HOLD"; else
