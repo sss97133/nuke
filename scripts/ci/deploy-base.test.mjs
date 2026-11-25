@@ -126,3 +126,19 @@ test('main path: an unreadable API or missing environment fails', async () => {
   assert.match((await resolveBase(broken, ENV)).error, /403/);
   assert.match((await resolveBase(broken, { GITHUB_REPOSITORY: 'o/r' })).error, /missing/);
 });
+
+test('a run created in the same second is earlier only by its smaller id', async () => {
+  const same = '2026-11-25T10:30:00Z';
+  const runs = [run(8, 'c8', 'success', { created_at: same }), run(6, 'c6', 'success', { created_at: same })];
+  const out = await selectBase(runs, steps({ 8: applied(), 6: applied() }), { currentRunId: 7, currentCreatedAt: same });
+  assert.equal(out.sha, 'c6');
+});
+
+test('main path: an unreadable run fails even with DEPLOY_BASE_SHA set (a stale escape is never used on a 5xx)', async () => {
+  const esc = 'a'.repeat(40);
+  const base = fakeApi({ runs: [run(5, 'c5', 'success')], stepMap: { 5: applied() } });
+  const flaky = async (path) => { if (/\/runs\/5\/jobs/.test(path)) throw new Error('HTTP 502'); return base(path); };
+  const r = await resolveBase(flaky, { ...ENV, DEPLOY_BASE_SHA: esc });
+  assert.match(r.error, /steps of run 5 unreadable/);
+  assert.equal(r.sha, undefined);
+});

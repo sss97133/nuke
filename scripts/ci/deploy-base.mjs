@@ -27,6 +27,7 @@
 // when no safe base exists.
 
 export const APPLY_STEP = /^Apply migrations/;
+export const NO_APPLIED_RUN = 'no earlier push run reached its apply step';
 
 // runs: newest first (the API order). stepsByRun(id) -> the steps of that run's jobs, or null when unreadable.
 // Returns { sha, run, skipped: [{ id, sha, why }] } or { sha: null, why }.
@@ -34,7 +35,9 @@ export async function selectBase(runs, stepsByRun, { currentRunId, currentCreate
   const skipped = [];
   for (const r of runs) {
     if (String(r.id) === String(currentRunId)) continue;
-    if (currentCreatedAt && !(r.created_at < currentCreatedAt)) continue;
+    // created before this run; a run created in the same second is earlier only by its smaller id
+    if (currentCreatedAt && (r.created_at > currentCreatedAt
+        || (r.created_at === currentCreatedAt && !(Number(r.id) < Number(currentRunId))))) continue;
     if (r.event !== 'push' || r.head_branch !== branch) continue;
     const steps = await stepsByRun(r.id);
     if (steps == null) return { sha: null, why: `steps of run ${r.id} unreadable` };
@@ -47,7 +50,7 @@ export async function selectBase(runs, stepsByRun, { currentRunId, currentCreate
     const seen = applies.map((s) => s.conclusion || s.status).join('/') || 'absent';
     skipped.push({ id: r.id, sha: r.head_sha, why: `${r.conclusion}, apply step ${seen}` });
   }
-  return { sha: null, why: 'no earlier push run reached its apply step', skipped };
+  return { sha: null, why: NO_APPLIED_RUN, skipped };
 }
 
 // GitHub compare base...head: 'ahead' or 'identical' means base is an ancestor of head (or head itself).
@@ -66,7 +69,7 @@ export async function resolveBase(api, env, { maxPages = MAX_PAGES } = {}) {
     const { status } = await api(`/repos/${repo}/compare/${sha}...${head}`);
     return isAncestorStatus(status) ? null : status;
   };
-  let out = { sha: null, why: 'no earlier push run reached its apply step' };
+  let out = { sha: null, why: NO_APPLIED_RUN };
   try {
     const current = await api(`/repos/${repo}/actions/runs/${runId}`);
     const stepsByRun = async (id) => {
@@ -87,6 +90,8 @@ export async function resolveBase(api, env, { maxPages = MAX_PAGES } = {}) {
     return { error: e.message, notes };
   }
   if (!out.sha) {
+    // the escape answers only 'no run applied'; an unreadable run (a transient 5xx) fails, never falls to a stale sha
+    if (out.why !== NO_APPLIED_RUN) return { error: out.why, notes };
     if (!escape) {
       return { error: `${out.why} in the newest ${maxPages * 100} push runs. Nothing is applied. Dispatch the missing migrations by name, then set the repo variable DEPLOY_BASE_SHA to the commit production is applied through, re-run, and clear it`, notes };
     }
