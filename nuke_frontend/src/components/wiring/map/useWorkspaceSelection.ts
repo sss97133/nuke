@@ -81,7 +81,7 @@ export interface WsIndex {
 
 // a cavity as the page shows it: the cavity itself. A working note after it (" — pin order OPEN until …"), beside it
 // ("(AEM pin letter unknown until …)", "(ZGP p.11)") or a status clause (", candidate alternative to …") stays on the row.
-const cavOf = (c: string | null) => {
+export const cavOf = (c: string | null) => {
   if (!c) return c;
   const parts = c.split(' — ')[0].split(' (')[0].split(/\s*[,;]\s*/);
   return [parts[0], ...parts.slice(1).filter(x => !HIDE.test(x))].join(', ').trim();
