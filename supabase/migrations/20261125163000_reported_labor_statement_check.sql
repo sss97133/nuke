@@ -15,39 +15,45 @@
 --     ratified labor_system_key text (proposal f1e80fb0): its values are receipt_line_systems.system_key, not a list
 --     in prose; 'unplaced' is not a system but a NULL system with a reason (labor_statement_null_reasons). Lead
 --     ruling 2026-11-25. It is filed, not ratified: it waits for its gate.
---   schema_proposals + one modify_property row (open) superseding the ratified labor_speaker_role text: the role is
---     derived from the source row, never the reader, and 'unknown' is added for a speaker the source cannot establish
---     (lead ruling 2026-11-25).
---   schema_proposal_quote_rules (labor row) + figure_term_pattern, exclude_pattern, exclude_basis: the figure recorded
---     is the number directly before the hour term; time-left / time-since phrasing is refused (ta-skeptic2 2026-11-25).
+--   schema_proposal_quote_rules (labor row) + figure_term_pattern, exclude_pattern, exclude_basis,
+--     labor_context_pattern, labor_context_basis, stated_subject_basis (lead ruling and ta-skeptic2, 2026-11-25): the
+--     figure recorded is the number directly before the hour term; time-left, time-since, travel and meter phrasing is
+--     refused; a statement counts only when the figure's sentence holds a work word. Each pattern carries its measured
+--     basis on the row (n sampled, n matched, n labor on ta-labor's read; a skeptic's read replaces the counts).
 --   labor_statement_values (property_key FK observation_properties, value, proposal_id FK schema_proposals,
 --     system_key FK receipt_line_systems): 13 values of the 4 prose enum keys, each a whole token of its ratified
 --     key's 'Allowed values:' text (labor_scope 2, labor_speaker_role 4, labor_statement_kind 3, labor_time_basis
---     4), speaker_role 'unknown' citing its open superseding proposal, and one row per receipt_line_systems key for
---     labor_system_key with system_key = value: a key the ratified text names cites the ratified proposal, any
---     other (hardware, supplies) cites the open superseding one.
---   labor_statement_value_admitted(key, value): a value admits a statement only while its proposal is approved, or
---     was and is superseded by an approved one. A ruling is not a ratification (ta-skeptic2 must-fix 4): hardware,
---     supplies and speaker 'unknown' are listed and wait.
---   labor_statement_null_reasons (property_key FK observation_properties, reason, basis): why a key is absent. One
---     row: labor_system_key / names_no_one_system (the ratified text's 'a job that names no one system: teardown,
---     detailing, general').
+--     4), and one row per receipt_line_systems key for labor_system_key with system_key = value: a key the ratified
+--     text names cites the ratified proposal, any other (hardware, supplies) cites the open superseding one.
+--   labor_statement_value_admitted(key, value): a value admits a statement only while the key's current approved
+--     proposal covers it (the newest approved supersession, else the ratified proposal; its Allowed values text, its
+--     values_from key table, or a whole token of its description). A ruling is not a ratification (ta-skeptic2
+--     must-fix 4): hardware and supplies are listed and wait; a value an approved successor drops stops admitting.
+--   labor_statement_null_reasons (property_key FK observation_properties, reason, basis): why a key is absent.
+--     labor_system_key / names_no_one_system (the ratified text's 'a job that names no one system: teardown,
+--     detailing, general'); labor_speaker_role / source_does_not_establish_speaker (the role is derived from the source
+--     row; a speaker it cannot establish is NULL with this reason, the weakest weight, never a value: lead ruling).
+--   labor_stated_subject_key(subject) -> {kind, key, token} | NULL: the make or model key the subject names
+--     (canonical_makes, make_alias_ref, canonical_models), written with a capital or a digit.
 --   reported_labor_statement_check(source_table, source_row_id, quote, low, high, qualifiers) -> jsonb
---     {ok, reasons[], contract, quote_hash, text_md5, page_vehicle_id, speaker_role, speaker_role_basis,
---     speaker_role_read}. Same source rules as gate A (schema_proposal_witness_sources: allowed table, row exists,
---     not generated) and the same quote rule row (schema_proposal_quote_rules 'labor': min_quote_chars, term_pattern,
---     figure_required, whole-token verbatim), plus: quote <= 300 chars; no exclude_pattern match; low is the first
---     figure of a figure_term_pattern match and high, when given, the same match's second (never any number in the
---     sentence); qualifiers only the 6 labor keys and labor_system_key_null_reason; scope, statement_kind and
---     time_basis required, listed and admitted; for task a system key or a null reason, never both; neither for
---     whole_build; stated_subject <= 80 chars, a whole-token run of the quote, 2+ words, one a name (capital or digit).
---     Figures and time phrases are read on the row text at the quote's span (a trimmed quote cannot cut a figure or a
---     time phrase). Thousands separators are read as printed.
+--     {ok, disposition, reasons[], held_reasons[], contract, quote_hash, text_md5, page_vehicle_id, speaker_role,
+--     speaker_role_null_reason, speaker_role_basis, speaker_role_read, stated_subject_key}.
+--     disposition refused (any reason; nothing lands), held (well formed, but no work word in the figure's sentence:
+--     held_reasons no_labor_context; it lands, admits nothing and reaches no baseline) or admitted (ok true).
+--     Same source rules as gate A (schema_proposal_witness_sources: allowed table, row exists, not generated) and the
+--     same quote rule row (min_quote_chars, term_pattern, figure_required, whole-token verbatim), plus: quote <= 300
+--     chars; no exclude_pattern match touching the quote; low is the first figure of a figure_term_pattern match and
+--     high, when given, the same match's second (never any number in the sentence); qualifiers only the 6 labor keys
+--     and labor_system_key_null_reason; scope, statement_kind and time_basis required, listed and admitted; for task a
+--     system key or a null reason, never both; neither for whole_build; stated_subject <= 80 chars, a whole-token run
+--     of the quote holding no hour figure that resolves through labor_stated_subject_key, else
+--     stated_subject_unresolved. Figures, time phrases and the work word are read on the row text at the quote's span
+--     (a trimmed quote cannot cut a figure or a time phrase). Thousands separators are read as printed.
 --     speaker_role is derived from the source row: auction_comments.is_seller and build_posts author = build_threads
 --     author give owner_seller; vehicles.description names no author (description_source: null or source_imported),
---     so it gives nothing; a quote naming another car (labor_stated_subject) gives commenter_other_car; anything else
---     is 'unknown'. The reader's role is returned
---     as speaker_role_read and decides nothing.
+--     so it gives nothing; a resolved stated subject with the reader's commenter_other_car gives commenter_other_car;
+--     anything else is NULL with speaker_role_null_reason. The reader's role is returned as speaker_role_read and
+--     decides nothing.
 --     page_vehicle_id is the car of the page the statement appeared on (auction_comments.vehicle_id; build_posts ->
 --     build_threads.vehicle_id; vehicles.id). It is never the subject: hours reach a vehicle only through a subject
 --     edge with its own evidence. The writer lands the observation with vehicle_id NULL: proj_disposition marks a
@@ -63,11 +69,19 @@ SET statement_timeout = '60s';
 ALTER TABLE public.schema_proposal_quote_rules
   ADD COLUMN IF NOT EXISTS figure_term_pattern text,
   ADD COLUMN IF NOT EXISTS exclude_pattern text,
-  ADD COLUMN IF NOT EXISTS exclude_basis text;
+  ADD COLUMN IF NOT EXISTS exclude_basis text,
+  ADD COLUMN IF NOT EXISTS labor_context_pattern text,
+  ADD COLUMN IF NOT EXISTS labor_context_basis text,
+  ADD COLUMN IF NOT EXISTS stated_subject_basis text;
 UPDATE public.schema_proposal_quote_rules
    SET figure_term_pattern = '\m([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)\+?\s*(?:(?:-|to)\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)\+?\s*)?(?:man[- ]?)?(?:hours?|hrs?)\M',
-       exclude_pattern = '\m(?:ends?|ending|closes?|closing|over|starts?|starting)\s+in\s+(?:about\s+|around\s+|less than\s+|under\s+)?[0-9][0-9.,]*\s*(?:hours?|hrs?)\M|\m[0-9][0-9.,]*\s*(?:more\s+)?(?:hours?|hrs?)\s+(?:left|remaining|to\s+go|ago|from\s+now)\M',
-       exclude_basis = 'auction_comments TABLESAMPLE SYSTEM (0.2) REPEATABLE (7), read 2026-11-25: 138 comments hold a figure directly before an hour term; 48 of them match this pattern (auction time left or time since: ends in N hours, N hours left / ago); 0 of the 4 with labor phrasing (man hours, hours of work, hours in it) match it. Case found by ta-skeptic2: Bidding ends in 2 hours, good luck.'
+       exclude_pattern = '\m(?:ends?|ending|closes?|closing|over|starts?|starting)\s+in\s+(?:about\s+|around\s+|less than\s+|under\s+)?[0-9][0-9.,]*\s*(?:hours?|hrs?)\M|\m[0-9][0-9.,]*\s*(?:more\s+)?(?:hours?|hrs?)\s+(?:left|remaining|remain|to\s+go|ago|from\s+now|until|till|before|away|drive|driving|trip|flight|between|of\s+(?:use|sleep|idling|driving)|on\s+the\s+(?:engine|clock|meter))\M',
+       exclude_basis = 'auction_comments TABLESAMPLE SYSTEM (0.2) REPEATABLE (7), sentences split on .!?; read 2026-11-25: 142 hold a figure directly before an hour term; 70 match this pattern (time left or since in an auction, distance or travel time, run interval, hours on a meter), 0 of them labor on ta-labor''s read. Cases: Bidding ends in 2 hours (ta-skeptic2), N hours until / remain (ta-skeptic2), N hours between rebuilds.',
+       labor_context_pattern = '\m(labou?r\w*|man[- ]?hours?|(re)?build\w*|(re)?built|restor\w*|resto|fabricat\w*|weld\w*|paint(ed|ing|work)?|bodywork|sand(ed|ing)|install\w*|swap\w*|conver(sion|ted|ting)|replac\w*|repair\w*|(dis)?assembl\w*|tear(ing)?\s+down|tore\s+down|detail(ed|ing)|polish\w*|machin\w*|fix\w*|rewir\w*|wir(ed|ing)|upholster\w*|chang(ed|ing)\s+out|servic\w*|test(ed|ing)|overhaul\w*|refinish\w*)\M',
+       labor_context_basis = 'same sample: of the 72 sentences the exclude pattern leaves, 12 hold a work word in the sentence of the figure (10 labor on ta-labor''s read; 2 not: a test mode, a pressure test) and 60 hold none (2 labor on ta-labor''s read: N hours with one person, a shop N hours to do; 1 unclear). A statement with no work word lands held (no_labor_context) and admits nothing (lead ruling 2026-11-25). A skeptic''s read of the same 142 replaces these counts.'
+ WHERE category = 'labor';
+UPDATE public.schema_proposal_quote_rules
+   SET stated_subject_basis = 'labor_stated_subject_key: a word run of the subject equal to a make or model key (canonical_makes names and aliases, make_alias_ref aliases not retired, canonical_models names and aliases; 13,664 distinct keys holding a letter, read 2026-11-25), written as the subject writes it starting with a capital or a digit. Sample: possessive phrases (my/our/his/her and up to four words) in auction_comments TABLESAMPLE SYSTEM (0.5) REPEATABLE (11) holding an hour figure, 256 distinct; 46 resolve, of which 33 name a car on ta-labor''s read and 13 do not (a place, a site, a collection, a dealer); of 60 unresolved sampled, 6 name a car (a digits-only model, or a model written in lower case). Without the capital test, car, motor, engine, truck, project and one resolve as canonical_models names. One call reads the key tables in 98 ms (EXPLAIN ANALYZE). A skeptic''s read of the same 256 replaces these counts.'
  WHERE category = 'labor';
 
 INSERT INTO public.receipt_line_systems (system_key, label, expects_operation)
@@ -95,29 +109,6 @@ SELECT 'claude-reported-labor-hours', 'modify_property', 'open', o.proposed_by_p
    AND NOT EXISTS (SELECT 1 FROM public.schema_proposals p
                     WHERE p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
                       AND p.payload ->> 'values_from' = 'receipt_line_systems.system_key');
-
--- labor_speaker_role comes from the source row, not the reader (lead ruling 2026-11-25); a role the source cannot support
--- is 'unknown', the weakest. Filed open beside the ratified text, as for the system key.
-INSERT INTO public.schema_proposals (proposed_by_agent_key, proposal_type, status, supersedes_proposal_id, payload, evidence)
-SELECT 'claude-reported-labor-hours', 'modify_property', 'open', o.proposed_by_proposal_id,
-       jsonb_build_object(
-         'property_key', 'labor_speaker_role',
-         'field', 'description',
-         'adds_values', jsonb_build_array('unknown'),
-         'derived_from', 'the source row: auction_comments.is_seller; build_posts author = build_threads author; vehicles.description has no author column, so its speaker is unknown',
-         'description', 'Who made the statement, derived from the source row, never from the reader. owner_seller: the seller of the lot '
-           || '(auction_comments.is_seller) or the author of the build thread (build_posts.author_handle = build_threads.author_handle). '
-           || 'commenter_other_car: anyone else whose quote names the other car '
-           || '(labor_stated_subject, verbatim in the quote). unknown: any other speaker; the weakest role, counted by no baseline that '
-           || 'needs the speaker. shop_builder and third_party stay in the list for a source that can establish them.'),
-       jsonb_build_array(jsonb_build_object('role', 'measurement', 'measured_on', '2026-11-25',
-         'what', 'auction_comments.is_seller is populated: a 0.2% sample held 50,843 rows, 7,184 true, 0 null (ta-skeptic2); build_posts 1% sample: 250 of 629 posts by the thread author (author_handle)',
-         'basis', 'a reader-asserted role passed the check as owner_seller for a commenter (ta-skeptic2 2026-11-25)'))
-  FROM public.observation_properties o
- WHERE o.property_key = 'labor_speaker_role' AND o.proposed_by_proposal_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM public.schema_proposals p
-                    WHERE p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
-                      AND p.payload -> 'adds_values' ? 'unknown');
 
 CREATE TABLE IF NOT EXISTS public.labor_statement_values (
   property_key text NOT NULL REFERENCES public.observation_properties(property_key),
@@ -148,6 +139,13 @@ SELECT 'labor_system_key', 'names_no_one_system',
        'labor_system_key text (proposal f1e80fb0): ''unplaced for a job that names no one system (teardown, detailing, general)''; lead ruling 2026-11-25: not a system, a NULL system with a reason'
  WHERE EXISTS (SELECT 1 FROM public.observation_properties WHERE property_key = 'labor_system_key')
 ON CONFLICT (property_key, reason) DO NOTHING;
+-- labor_speaker_role is derived from the source row (lead ruling 2026-11-25); a speaker the source cannot establish is
+-- NULL with this reason, the weakest weight, never a vocabulary value (lead ruling 2026-11-25, ta-skeptic2 must-fix 4).
+INSERT INTO public.labor_statement_null_reasons (property_key, reason, basis)
+SELECT 'labor_speaker_role', 'source_does_not_establish_speaker',
+       'lead rulings 2026-11-25: the role comes from the source row (auction_comments.is_seller; build_posts author = build_threads author); vehicles.description names no author (description_source null or source_imported on 9,417 of 9,418 sampled); any other speaker is NULL with this reason'
+ WHERE EXISTS (SELECT 1 FROM public.observation_properties WHERE property_key = 'labor_speaker_role')
+ON CONFLICT (property_key, reason) DO NOTHING;
 
 INSERT INTO public.labor_statement_values (property_key, value, proposal_id)
 SELECT o.property_key, v.value, o.proposed_by_proposal_id
@@ -161,14 +159,6 @@ SELECT o.property_key, v.value, o.proposed_by_proposal_id
   ) v(property_key, value)
   JOIN public.observation_properties o ON o.property_key = v.property_key
  WHERE o.proposed_by_proposal_id IS NOT NULL AND o.data_type = 'enum'
-ON CONFLICT (property_key, value) DO NOTHING;
-
-INSERT INTO public.labor_statement_values (property_key, value, proposal_id)
-SELECT 'labor_speaker_role', 'unknown', p.id
-  FROM public.observation_properties o
-  JOIN public.schema_proposals p ON p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
-                                AND p.payload -> 'adds_values' ? 'unknown'
- WHERE o.property_key = 'labor_speaker_role'
 ON CONFLICT (property_key, value) DO NOTHING;
 
 -- A key the ratified text names cites the ratified proposal; any other key cites the open superseding proposal and
@@ -190,8 +180,8 @@ BEGIN
   SELECT count(*) FILTER (WHERE system_key IS NULL), count(*) FILTER (WHERE system_key IS NOT NULL)
     INTO n_enum, n_sys FROM public.labor_statement_values;
   SELECT count(*) INTO n_keys FROM public.receipt_line_systems;
-  IF n_enum <> 14 OR n_sys <> n_keys THEN
-    RAISE EXCEPTION 'reported_labor_hours_v1: expected 14 prose values and % system rows, found % and % (are the 8 keys ratified?)',
+  IF n_enum <> 13 OR n_sys <> n_keys THEN
+    RAISE EXCEPTION 'reported_labor_hours_v1: expected 13 prose values and % system rows, found % and % (are the 8 keys ratified?)',
       n_keys, n_enum, n_sys;
   END IF;
   SELECT string_agg(l.property_key || '.' || l.value, ', ') INTO bad
@@ -208,19 +198,58 @@ BEGIN
   END IF;
 END $guard$;
 
--- A value admits a statement only while its proposal is ratified (approved), or was ratified and then superseded by a
--- ratified proposal. Values citing an open proposal are listed and wait.
+-- A value admits a statement only while the key's CURRENT approved proposal covers it: the newest approved supersession
+-- of the ratified proposal if there is one, else the ratified proposal itself. Coverage: the ratified 'Allowed values:'
+-- text (whole token), a successor's values_from key table, or a whole token of the successor's own description. A value an approved successor drops stops admitting
+-- (ta-skeptic2 should-fix 2026-11-25). Values citing an open proposal are listed and wait.
 CREATE OR REPLACE FUNCTION public.labor_statement_value_admitted(p_property_key text, p_value text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
-  SELECT EXISTS (
-    SELECT 1 FROM public.labor_statement_values l JOIN public.schema_proposals p ON p.id = l.proposal_id
-     WHERE l.property_key = p_property_key AND l.value = p_value
-       AND (p.status = 'approved'
-            OR (p.status = 'superseded' AND EXISTS (SELECT 1 FROM public.schema_proposals n
-                                                     WHERE n.supersedes_proposal_id = p.id AND n.status = 'approved'))))
+  WITH o AS (SELECT op.proposed_by_proposal_id AS pid, op.description FROM public.observation_properties op
+              WHERE op.property_key = p_property_key),
+  cur AS (SELECT p.id, p.payload, (p.id = o.pid) AS is_original
+            FROM public.schema_proposals p, o
+           WHERE p.status = 'approved' AND (p.id = o.pid OR p.supersedes_proposal_id = o.pid)
+           ORDER BY (p.id = o.pid), p.proposed_at DESC
+           LIMIT 1)
+  SELECT p_value ~ '^[a-z][a-z_]*$'
+     AND EXISTS (SELECT 1 FROM public.labor_statement_values l WHERE l.property_key = p_property_key AND l.value = p_value)
+     AND EXISTS (SELECT 1 FROM cur, o WHERE CASE
+           WHEN cur.is_original THEN coalesce(substring(o.description FROM 'Allowed values:(.*)$'), '') ~ ('\m' || p_value || '\M')
+           WHEN cur.payload ->> 'values_from' = 'receipt_line_systems.system_key'
+             THEN EXISTS (SELECT 1 FROM public.receipt_line_systems r WHERE r.system_key = p_value)
+           ELSE coalesce(substring(cur.payload ->> 'description' FROM 'Allowed values:(.*)$'), cur.payload ->> 'description', '')
+                  ~ ('\m' || p_value || '\M') END)
 $fn$;
 REVOKE ALL ON FUNCTION public.labor_statement_value_admitted(text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.labor_statement_value_admitted(text, text) TO service_role;
+
+-- labor_stated_subject must name a car by a key (ta-skeptic2 must-fix 5, 2026-11-25): a run of whole words of the
+-- subject (punctuation folded to spaces) equal to a key of canonical_makes (canonical_name, display_name, short_name,
+-- aliases), make_alias_ref (alias_text, not retired) or canonical_models (canonical_model, aliases), holding a letter,
+-- and written in the subject starting with a capital or a digit. Basis: schema_proposal_quote_rules.stated_subject_basis.
+-- Returns {kind, key, token} for the longest key, or NULL.
+CREATE OR REPLACE FUNCTION public.labor_stated_subject_key(p_subject text)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
+  WITH s AS (SELECT ' ' || btrim(regexp_replace(p_subject, '[^A-Za-z0-9]+', ' ', 'g')) || ' ' AS cs),
+  c(kind, key, token) AS (
+    SELECT 'canonical_makes', m.id::text, t FROM public.canonical_makes m,
+           unnest(array_remove(ARRAY[m.canonical_name, m.display_name, m.short_name] || coalesce(m.aliases, '{}'::text[]), NULL)) t
+    UNION ALL
+    SELECT 'make_alias_ref', a.id::text, a.alias_text FROM public.make_alias_ref a WHERE a.retired_at IS NULL
+    UNION ALL
+    SELECT 'canonical_models', cm.id::text, t FROM public.canonical_models cm,
+           unnest(array_remove(ARRAY[cm.canonical_model] || coalesce(cm.aliases, '{}'::text[]), NULL)) t),
+  k AS MATERIALIZED (SELECT kind, key, btrim(regexp_replace(lower(token), '[^a-z0-9]+', ' ', 'g')) AS token
+                       FROM c WHERE token ~ '[A-Za-z]')
+  SELECT jsonb_build_object('kind', k.kind, 'key', k.key, 'token', k.token)
+    FROM k, s
+   WHERE length(k.token) >= 2 AND strpos(lower(s.cs), ' ' || k.token || ' ') > 0
+     AND substr(s.cs, strpos(lower(s.cs), ' ' || k.token || ' ') + 1, 1) ~ '[A-Z0-9]'
+   ORDER BY length(k.token) DESC, k.kind, k.key
+   LIMIT 1
+$fn$;
+REVOKE ALL ON FUNCTION public.labor_stated_subject_key(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.labor_stated_subject_key(text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.reported_labor_statement_check(
   p_source_table text, p_source_row_id uuid, p_quote text, p_low numeric, p_high numeric, p_qualifiers jsonb)
@@ -247,7 +276,15 @@ DECLARE
   at_high boolean := false;
   cut boolean := false;
   timed boolean := false;
+  ctx boolean := false;
+  sent_start int;
+  sent_end int;
+  e int;
   subj text;
+  subj_key jsonb;
+  role_null_reason text;
+  disposition text;
+  held text[] := '{}';
 BEGIN
   SELECT * INTO qr FROM public.schema_proposal_quote_rules WHERE category = 'labor';
   IF NOT FOUND THEN reasons := reasons || 'no_quote_rule'::text; END IF;
@@ -315,6 +352,15 @@ BEGIN
             IF f1 = p_low THEN
               at_low := true;
               IF f2 = p_high THEN at_high := true; END IF;
+              -- the sentence of this figure (split on .!?; followed by space or end) holds a work word
+              e := regexp_instr(reverse(substr(txt, 1, ms - 1)), '\s[.!?;]');
+              sent_start := CASE WHEN e = 0 THEN 1 ELSE ms - e + 1 END;
+              e := regexp_instr(substr(txt, me), '[.!?;](\s|$)');
+              sent_end := CASE WHEN e = 0 THEN length(txt) + 1 ELSE me + e END;
+              IF qr.labor_context_pattern IS NOT NULL
+                 AND substr(txt, sent_start, sent_end - sent_start) ~* qr.labor_context_pattern THEN
+                ctx := true;
+              END IF;
             END IF;
           END IF;
         END IF;
@@ -366,16 +412,20 @@ BEGIN
   ELSIF q ->> 'labor_scope' = 'whole_build' AND (q ? 'labor_system_key' OR q ? 'labor_system_key_null_reason') THEN
     reasons := reasons || 'system_key_on_whole_build'::text;
   END IF;
-  -- labor_stated_subject names the other car: a whole-token run of the quote, at least two words, one of them a name
-  -- (a capital or a digit: '1970 Pontiac GTO', 'my GTO'; not 'I', 'my car'). The floor is ta-labor's judgment, not a
-  -- measured rule; it is what lets commenter_other_car be derived, so a skeptic attacks it.
+  -- labor_stated_subject names the other car: a whole-token run of the quote that resolves to a make or model key
+  -- (labor_stated_subject_key) and holds no hour figure. 'I had' and '2500 hours' resolve to nothing.
   IF q ? 'labor_stated_subject' THEN
     subj := CASE WHEN jsonb_typeof(q -> 'labor_stated_subject') = 'string' THEN q ->> 'labor_stated_subject' END;
     pos := CASE WHEN subj IS NULL OR p_quote IS NULL THEN 0 ELSE position(subj IN p_quote) END;
-    IF subj IS NULL OR length(subj) > 80 OR subj <> btrim(subj) OR array_length(regexp_split_to_array(subj, '\s+'), 1) < 2
-       OR subj !~ '\m[A-Z0-9]' OR pos = 0
+    IF subj IS NULL OR length(subj) > 80 OR subj <> btrim(subj) OR pos = 0
        OR substr(p_quote, pos - 1, 1) ~ '[[:alnum:]]' OR substr(p_quote, pos + length(subj), 1) ~ '[[:alnum:]]' THEN
       reasons := reasons || 'stated_subject_not_in_quote'::text;
+    ELSE
+      subj_key := public.labor_stated_subject_key(subj);
+      IF subj_key IS NULL OR (qr.figure_term_pattern IS NOT NULL AND subj ~* qr.figure_term_pattern) THEN
+        reasons := reasons || 'stated_subject_unresolved'::text;
+        subj_key := NULL;
+      END IF;
     END IF;
   END IF;
 
@@ -398,23 +448,35 @@ BEGIN
       NULL;
     END IF;
   END IF;
-  IF role IS NULL AND q ->> 'labor_speaker_role' = 'commenter_other_car' AND q ? 'labor_stated_subject'
-     AND NOT ('stated_subject_not_in_quote' = ANY (reasons)) THEN
+  IF role IS NULL AND q ->> 'labor_speaker_role' = 'commenter_other_car' AND subj_key IS NOT NULL THEN
     role := 'commenter_other_car';
     role_basis := 'labor_stated_subject: the quote names another car';
   END IF;
-  role := coalesce(role, 'unknown');
-  role_basis := coalesce(role_basis, 'the source row does not establish the speaker');
-  IF NOT public.labor_statement_value_admitted('labor_speaker_role', role) THEN
+  IF role IS NULL THEN
+    role_null_reason := 'source_does_not_establish_speaker';
+    role_basis := 'the source row does not establish the speaker';
+  ELSIF NOT public.labor_statement_value_admitted('labor_speaker_role', role) THEN
     reasons := reasons || 'speaker_role_unratified'::text;
   END IF;
 
-  RETURN jsonb_build_object('ok', cardinality(reasons) = 0, 'reasons', to_jsonb(reasons),
+  -- refused: the statement is malformed or not labor (nothing lands). held: well-formed and verbatim but no work word in
+  -- the figure's sentence; it lands, admits nothing and reaches no baseline (lead ruling 2026-11-25). admitted: counts.
+  IF cardinality(reasons) > 0 THEN
+    disposition := 'refused';
+  ELSIF NOT ctx THEN
+    disposition := 'held';
+    held := held || 'no_labor_context'::text;
+  ELSE
+    disposition := 'admitted';
+  END IF;
+
+  RETURN jsonb_build_object('ok', disposition = 'admitted', 'disposition', disposition, 'reasons', to_jsonb(reasons),
+    'held_reasons', to_jsonb(held),
     'contract', 'reported_labor_hours_v1', 'quote_hash', md5(coalesce(p_quote, '')), 'text_md5', md5(txt),
-    'page_vehicle_id', page_veh, 'speaker_role', role, 'speaker_role_basis', role_basis,
-    'speaker_role_read', q -> 'labor_speaker_role');
+    'page_vehicle_id', page_veh, 'speaker_role', role, 'speaker_role_null_reason', role_null_reason,
+    'speaker_role_basis', role_basis, 'speaker_role_read', q -> 'labor_speaker_role', 'stated_subject_key', subj_key);
 END $fn$;
 COMMENT ON FUNCTION public.reported_labor_statement_check(text, uuid, text, numeric, numeric, jsonb) IS
-  'reported_labor_hours_v1: the one check a reported labor statement passes before ingest-observation lands it. Reads schema_proposal_witness_sources, schema_proposal_quote_rules (labor) and labor_statement_values; ok false with reasons otherwise.';
+  'reported_labor_hours_v1: the one check a reported labor statement passes before ingest-observation lands it. Reads schema_proposal_witness_sources, schema_proposal_quote_rules (labor) and labor_statement_values. disposition admitted (counts), held (lands, admits nothing: held_reasons) or refused (nothing lands: reasons).';
 REVOKE ALL ON FUNCTION public.reported_labor_statement_check(text, uuid, text, numeric, numeric, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.reported_labor_statement_check(text, uuid, text, numeric, numeric, jsonb) TO service_role;
