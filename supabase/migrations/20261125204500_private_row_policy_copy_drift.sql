@@ -28,6 +28,9 @@
 --   get_image_deep_analysis(uuid)     vehicle_images        SELECT/ALL    5 policies  (20261125160500's shown test)
 --   intake_live_state(integer,integer) vehicle_images       SELECT/ALL    5 policies
 --   intake_live_state(integer,integer) work_sessions        SELECT/ALL    3 policies
+--   get_vehicle_profile_data(uuid)     timeline_events      SELECT/ALL    6 policies  (ta-provenance, 20261125220000)
+--   vehicle_plates_read(uuid[])        vehicles             SELECT/ALL    2 policies  (ta-provenance, 20261125224500)
+-- A copy row may name a reader that is not deployed yet; until it is, the watch reads it missing, not exposed.
 --
 -- REVERT. supabase/sql/revert_20261125204500_private_row_policy_copy_drift.sql
 -- TEST. supabase/sql/test_private_row_reader_policy_copy.sql
@@ -35,7 +38,7 @@ SET lock_timeout = '5s';
 SET statement_timeout = '30s';
 
 CREATE TABLE IF NOT EXISTS public.private_row_policy_copies (
-  reader        text NOT NULL CHECK (reader ~ '^[a-z_][a-z0-9_]*\([a-z0-9_, ]*\)$'),
+  reader        text NOT NULL CHECK (reader ~ '^[a-z_][a-z0-9_]*\(([a-z_][a-z0-9_ ]*(\[\])?(, *[a-z_][a-z0-9_ ]*(\[\])?)*)?\)$'),
   relation      text NOT NULL CHECK (relation ~ '^[a-z_][a-z0-9_]*$'),
   policy_filter text NOT NULL CHECK (policy_filter <> '' AND position(';' IN policy_filter) = 0),
   recorded_hash text NOT NULL CHECK (recorded_hash ~ '^[0-9a-f]{32}$'),
@@ -77,7 +80,11 @@ INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, r
   ('intake_live_state(integer,integer)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')', '3af9ebbc1bebf423e3bd1e0b7c45a194',
    'ta-pipeline', '20261125160500 restates the vehicle_images read policy for the feed'),
   ('intake_live_state(integer,integer)', 'work_sessions', 'p.cmd IN (''SELECT'', ''ALL'')', '942389cb05d6ec9f220bd0c8bfbada50',
-   'ta-pipeline', '20261125160500 restates the work_sessions read policies (author or tied) for sessions_today')
+   'ta-pipeline', '20261125160500 restates the work_sessions read policies (author or tied) for sessions_today'),
+  ('get_vehicle_profile_data(uuid)', 'timeline_events', 'p.cmd IN (''SELECT'', ''ALL'')', '59207833e1b8f9ab3f0dfd6663388f71',
+   'ta-provenance', '20261125220000 restates timeline_events_private_source_read (RESTRICTIVE) in the timeline list and stats'),
+  ('vehicle_plates_read(uuid[])', 'vehicles', 'p.cmd IN (''SELECT'', ''ALL'')', '7773d11e280e80abad0422000a1ff9cc',
+   'ta-provenance', '20261125224500 restates the insider half of vehicles_private_select (plus created_by_user_id, as vehicle_row_read)')
 ON CONFLICT (reader, relation, policy_filter) DO NOTHING;
 
 DO $g$ DECLARE c record; h text; n int; bad text := '';

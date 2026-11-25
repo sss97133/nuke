@@ -19,7 +19,7 @@ BEGIN
   d := pg_get_functiondef('public.assay_private_row_exposure()'::regprocedure);
   IF (length(d) - length(replace(d, 'private_row_policy_copy_drift_v1', ''))) / length('private_row_policy_copy_drift_v1') <> 1 THEN
     RAISE EXCEPTION 'assay patched more or less than once'; END IF;
-  IF (SELECT count(*) FROM public.private_row_policy_copies) <> 7 THEN RAISE EXCEPTION 'expected 7 copy rows'; END IF;
+  IF (SELECT count(*) FROM public.private_row_policy_copies) <> 9 THEN RAISE EXCEPTION 'expected 9 copy rows'; END IF;
 
   -- record the fixture's own state, as a re-read would
   UPDATE public.private_row_policy_copies c
