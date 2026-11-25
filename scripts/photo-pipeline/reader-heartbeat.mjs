@@ -111,10 +111,35 @@ export async function postHeartbeat({ url, key, body, fetchImpl = fetch, timeout
   return res.status;
 }
 
+// --start: record that the batch is starting this reader (record_reader_start, 20261125003000). A start newer than the
+// reader's last heartbeat for 30 minutes makes subscription-reader-watch say "stuck" instead of "silent".
+export const START_READERS = [...READERS, 'reconcile-receipt-work'];
+export async function postStart({ url, key, name, fetchImpl = fetch, timeoutMs = 10000 }) {
+  const res = await fetchImpl(`${url.replace(/\/+$/, '')}/rest/v1/rpc/record_reader_start`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_jobname: name }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  return res.status;
+}
+
 async function main() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) { console.log('heartbeat: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required'); return 2; }
+  if (process.argv.includes('--start')) {
+    const name = process.env.READER_NAME;
+    if (!START_READERS.includes(name)) { console.log('reader start: unknown reader'); return 2; }
+    try {
+      const status = await postStart({ url, key, name });
+      console.log(`reader start ${name} HTTP ${status}`);
+      return status === 200 ? 0 : 1;
+    } catch (e) {
+      console.log(`reader start ${name} not sent: ${e.name === 'TimeoutError' ? 'timeout' : 'request failed'}`);
+      return 1;
+    }
+  }
   const name = READERS.includes(process.env.READER_NAME) ? process.env.READER_NAME : 'unknown-reader';
   let body;
   try {
