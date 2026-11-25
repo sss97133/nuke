@@ -66,6 +66,22 @@ DO $$ BEGIN
   PERFORM set_config('request.jwt.claims', '', false);
 END $$;
 
+-- 5. An organisation member who is not an insider (the org's link to the car is not owner or consigner, so
+--    vehicle_user_has_access does not tie them) reads no listing columns either: v_org_member is not v_insider.
+INSERT INTO auth.users (id) VALUES ('abababab-abab-4bab-8bab-abababababab');
+INSERT INTO public.organization_vehicles (id, organization_id, vehicle_id, relationship_type, status) VALUES
+  (gen_random_uuid(), 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', '11111111-1111-4111-8111-111111111111', 'service_provider', 'active');
+INSERT INTO public.organization_contributors (id, organization_id, user_id, role, status) VALUES
+  (gen_random_uuid(), 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'abababab-abab-4bab-8bab-abababababab', 'employee', 'active');
+DO $$ BEGIN
+  PERFORM public.t_claims('abababab-abab-4bab-8bab-abababababab');
+  ASSERT NOT public.vehicle_user_has_access('11111111-1111-4111-8111-111111111111', 'abababab-abab-4bab-8bab-abababababab'),
+    '5 the org member is not tied';
+  ASSERT public.get_vehicle_profile_data('11111111-1111-4111-8111-111111111111')::jsonb -> 'external_listings' = '[]'::jsonb,
+    '5 an org member who is not an insider reads no listing columns';
+  PERFORM set_config('request.jwt.claims', '', false);
+END $$;
+
 -- 4. Grants are read at call time: granting anon two columns and reserve_price shows anon those two and never the
 --    reserve; a signed-in stranger (no grant) still reads nothing; the function body does not change.
 CREATE TEMP TABLE el_body AS SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') AS sha FROM pg_proc
