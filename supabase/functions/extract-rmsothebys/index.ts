@@ -24,7 +24,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveExistingVehicleId } from '../_shared/resolveVehicleForListing.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { getKnownAuctions } from './knownAuctions.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { rmLotLinkMatchesUrl, rmLotUrl } from './lotUrl.ts';
@@ -239,6 +239,9 @@ if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

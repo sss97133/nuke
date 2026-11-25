@@ -11,13 +11,16 @@
  * Service/admin callers only (requireWriteAuth).
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatLocation } from "./parse.ts";
 
 type Row = { id: string; listing_url: string; html_storage_path: string | null; fetched_at?: string };
 
 Deno.serve(async (req) => {
   const denied = await requireWriteAuth(req); if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   // writeGuard passes OPTIONS through unjudged; answer the preflight here so it never runs a batch.
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
   const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};

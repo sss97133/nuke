@@ -20,7 +20,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { CHRISTIES_LOT_METHOD, decodePosition, EARLIEST, encodePosition, monthAt, type ChristiesLotRecord } from "./christiesLot.ts";
 import { artSales, LOT_PAGE_GAP_MS, LOT_PAGE_MAX, Reader, saleLots, withLotPages } from "./christiesRead.ts";
@@ -38,6 +38,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
 
   const body = await req.json().catch(() => ({})) as { mode?: string; dry_run?: boolean; lot_pages?: boolean };
   const mode = body.mode ?? "art_land";

@@ -38,7 +38,7 @@ import { fetchMecumFeedUrls } from "../_shared/mecumSearch.ts";
 import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { captureLedgerFields } from "./captureLedger.ts";
 import { createIntakeRunReceipt } from "../_shared/extractionMetrics.ts";
 import {
@@ -1245,6 +1245,9 @@ Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
