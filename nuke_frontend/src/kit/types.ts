@@ -97,8 +97,10 @@ export type FacetItem = {
   status: FacetItemStatus; sources: FacetItemSource[]; rule: Record<string, unknown> | null;
   equation: Record<string, unknown> | null; needed: string | null; normalized?: string | null; stated?: string | null;
   lead?: boolean; sides?: Array<{ value: unknown; normalized?: string | null; sources: FacetItemSource[]; witnesses?: number | null }>;
-  /** What the reader's readings of a disputed slot rest on: readings, distinct photos, reader families. */
-  agreement?: { readings?: number | null; photos?: number | null; families?: number | null } | null;
+  /** What the reader's readings of a disputed slot rest on: readings, distinct photos, reader families; and, for every
+   *  stated item, its independent sources and their source families (a claim keeps how many sources agree). */
+  agreement?: { readings?: number | null; photos?: number | null; families?: number | null;
+    sources?: number | null; source_families?: number | null } | null;
   candidates?: Array<Record<string, unknown>>; examined?: Array<Record<string, unknown>>;
   /** Cited factory availability rows (model_availability) for the car's decoded series and engine; every source kept. */
   availability?: Array<Record<string, unknown>>;
