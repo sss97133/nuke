@@ -15,6 +15,7 @@ import { VisualWorkCards } from './VisualWorkCards';
 import { useBuildReconstruction, usePartEvidence } from './hooks/useBuildReconstruction';
 import { BuildRecord, SeenContext } from './BuildRecord';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
+import { useDocumentMode } from './documentMode';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
 function amountText(amount: number | null, currency: string | null): string {
@@ -155,7 +156,9 @@ export function CorrectionReceipt({ vehicleId, citation }: {
 function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: VehicleReceiptRecord }) {
   const { user, loading } = useAuthContext();
   const element = useRef<HTMLElement>(null);
-  const [near, setNear] = useState(false);
+  const documentMode = useDocumentMode();
+  const [nearOnScreen, setNear] = useState(false);
+  const near = nearOnScreen || documentMode;
   useEffect(() => {
     if (!element.current || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(entries => {
@@ -199,7 +202,7 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
       </tr>)}</tbody></table>}
     {lines.length > 4 && <button type="button" className="vp-receipt-expand" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Show fewer lines' : `Show all ${lines.length} lines`}</button>}
     {!receipt.date && !receipt.dateConflict && <p className="vp-receipt-note">Open the original for its line items.</p>}
-    {receipt.date && !page && <p className="vp-receipt-note" role="status">{read.isError ? 'Line items could not load.' : read.isFetching || !near ? 'Reading receipt…' : 'Line items are not available in this view.'}
+    {receipt.date && !page && <p className="vp-receipt-note" role="status" data-reading={read.isError ? undefined : 'receipt'}>{read.isError ? 'Line items could not load.' : read.isFetching || !near ? 'Reading receipt…' : 'Line items are not available in this view.'}
       {(!near || read.isError) && <button type="button" onClick={() => { setNear(true); if (read.isError) void read.refetch(); }}>{read.isError ? 'Retry' : 'Read lines'}</button>}</p>}
     <footer>
       {moneyVisible && page && <dl>{([['Subtotal', page.subtotal], ['Shipping', page.shipping], ['Discount', page.discount], ['Tax', page.tax]] as const)
@@ -221,12 +224,16 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   const partEvidence = usePartEvidence(vehicleId, !!build.data);
   const seenParts = React.useMemo(() => partEvidence.data ? new Map(partEvidence.data.lines.map(line => [line.item_id, line])) : null, [partEvidence.data]);
   const [vendor, setVendor] = useState('');
-  const [showAll, setShowAll] = useState(false);
+  const documentMode = useDocumentMode();
+  const [showAllOnScreen, setShowAll] = useState(false);
+  const showAll = showAllOnScreen || documentMode;
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = read;
+  useEffect(() => { if (documentMode && hasNextPage && !isFetchingNextPage) void fetchNextPage(); }, [documentMode, hasNextPage, isFetchingNextPage, fetchNextPage]);
   const rows = (loading || read.isError ? [] : read.rows)
     .map(receipt => ({ ...receipt, vendor: receiptSupplierLabel(receipt.vendor) }))
     .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.id.localeCompare(b.id));
   const vendors = [...new Set(rows.map(receipt => receipt.vendor).filter((name): name is string => !!name))].sort();
-  const selectedVendor = vendors.includes(vendor) ? vendor : '';
+  const selectedVendor = !documentMode && vendors.includes(vendor) ? vendor : '';
   const matching = selectedVendor ? rows.filter(receipt => receipt.vendor === selectedVendor) : rows;
   const visible = showAll || selectedVendor ? matching : matching.slice(0, 6);
   return <section id="build-receipts" aria-label="Work and parts receipts" className="vp-receipt-section">

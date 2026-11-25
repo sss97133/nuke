@@ -1,0 +1,31 @@
+/* The vehicle profile printed as its document (documentMode.tsx). Print shows the page's own sections whole and leaves
+   out only what a sheet of paper cannot use: site navigation, controls and the location. Content is never added here. */
+.vp-print-record { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 8px 12px 0; }
+.vp-print-record button { min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.vp-print-record button:disabled { cursor: progress; opacity: .7; }
+.vp-print-record p { margin: 0; color: var(--text-secondary); }
+.vp-labor { padding: 0 12px; }
+.vp-labor-status { padding: 0 12px; color: var(--text-secondary); }
+
+@media print {
+  @page { size: letter; margin: 14mm 12mm; }
+  html, body { background: #fff !important; }
+  .header-wrapper, .app-footer, .mobile-bottom-nav, .vehicle-tab-bar, .vp-print-record, .vp-col-divider,
+  .vp-receipt-jump, .vp-receipt-filter, .vp-receipt-browse, .vp-receipt-expand, .vp-financial-action, .vp-financial-original,
+  [aria-label^="Explore ZIP"] { display: none !important; }
+  /* The replacement-cost scenario and the per-system cost-basis cards were never approved as part of the car's record
+     (owner, 2026-11-19); they stay on screen for now and stay off the printed document. */
+  #build-estimates, .vp-component-evidence { display: none !important; }
+  /* On screen the two columns are viewport-high scrolling panes; on paper they are one column of the whole page. */
+  .vp-columns { display: block !important; position: static !important; height: auto !important; }
+  .vp-col-left, .vp-col-right { width: auto !important; height: auto !important; overflow: visible !important; }
+  .vp-header-sticky { position: static !important; }
+  .k-section, .vp-build-system, .k-rows, .vp-receipt-page { break-inside: avoid-page; }
+  #labor-appraisal, #build-record { break-before: page; }
+  img { max-width: 100%; }
+  /* Receipts on paper: three to a row, without the supplier's current catalog listing beside each line (a live store
+     quote, not part of this car's record; it stays on screen). */
+  .vp-receipt-section .vp-receipt-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .vp-receipt-section .vp-receipt-page { padding: 10px !important; font-size: 11px !important; }
+  .vp-catalog-product { display: none !important; }
+}

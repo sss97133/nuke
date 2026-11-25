@@ -11,6 +11,8 @@ vi.mock('../../components/vehicle/VehicleCommentsCard', () => ({
 }));
 vi.mock('./FinancialReceiptRecords', () => ({ ProfileReceiptRecords: () => <section data-testid="receipt-pages">Work &amp; parts</section> }));
 vi.mock('./WorkMemorySection', () => ({ default: () => null }));
+vi.mock('./LaborAppraisal', () => ({ LaborAppraisal: () => null }));
+vi.mock('./documentMode', () => ({ PrintRecordButton: () => null, useDocumentMode: () => false }));
 vi.mock('./VehicleDossierPanel', () => ({ default: () => <div data-testid="specifications">Retained specifications</div> }));
 vi.mock('../../components/vehicle/VehicleLedgerDocumentsCard', () => ({ VehicleLedgerDocumentsCard: () => null }));
 vi.mock('../../components/PartsQuoteGenerator', () => ({ PartsQuoteGenerator: () => null }));

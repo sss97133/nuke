@@ -4,9 +4,11 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import type { GalleryReadCount } from '../../components/images/ImageGallery';
 import type { GalleryAnalysisRead } from '../../components/images/ImageGallery';
 import { useAuthContext } from '../../contexts/AuthContext';
+import { PrintRecordButton } from './documentMode';
 
 // Lazy-load heavy components
 const ProfileReceiptRecords = React.lazy(() => import('./FinancialReceiptRecords').then(module => ({ default: module.ProfileReceiptRecords })));
+const LaborAppraisal = React.lazy(() => import('./LaborAppraisal').then(module => ({ default: module.LaborAppraisal })));
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
 const VehicleDossierPanel = React.lazy(() => import('./VehicleDossierPanel'));
 const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
@@ -205,6 +207,8 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   // with ~9000px of content overflowing a ~550px pane (fixed 2026-06-11).
   return (
     <div>
+      <PrintRecordButton />
+      <React.Suspense fallback={null}><LaborAppraisal vehicleId={vehicle.id} /></React.Suspense>
       <React.Suspense fallback={null}><ProfileReceiptRecords vehicleId={vehicle.id} /></React.Suspense>
       <div className="vp-columns">
         {/* LEFT COLUMN */}
