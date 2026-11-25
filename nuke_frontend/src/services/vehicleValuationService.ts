@@ -115,9 +115,12 @@ export class VehicleValuationService {
         .rpc('get_vehicle_total_invested', { p_vehicle_id: vehicleId })
         .abortSignal(readSignal);
       readSignal.throwIfAborted();
-      if (investedError || !totalInvestedData ||
+      // An untied viewer is answered with presence only (amounts_visible false, total_invested null): that is an
+      // answered read with no amount to use, not a failure.
+      const amountsHidden = !investedError && totalInvestedData?.amounts_visible === false && totalInvestedData.total_invested === null;
+      if (investedError || !totalInvestedData || (!amountsHidden && (
           typeof totalInvestedData.total_invested !== 'number' ||
-          !Number.isFinite(totalInvestedData.total_invested) || totalInvestedData.total_invested < 0) {
+          !Number.isFinite(totalInvestedData.total_invested) || totalInvestedData.total_invested < 0))) {
         throw new Error('Investment evidence unavailable');
       }
 
@@ -618,8 +621,8 @@ export class VehicleValuationService {
       }
 
       // 4. Include ALL documented work from work orders (parts, labor, materials, overhead)
-      const totalInvested = totalInvestedData.total_invested;
-      const breakdown = totalInvestedData.breakdown || {};
+      const totalInvested = amountsHidden ? 0 : totalInvestedData.total_invested;
+      const breakdown = amountsHidden ? {} : totalInvestedData.breakdown || {};
 
       if (totalInvested > 0) {
         // Add to total invested
