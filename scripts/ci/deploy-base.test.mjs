@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { selectBase } from './deploy-base.mjs';
 
-const run = (id, sha, conclusion, extra = {}) => ({ id, head_sha: sha, conclusion, status: 'completed', event: 'push', head_branch: 'main', ...extra });
+const run = (id, sha, conclusion, extra = {}) => ({ id, head_sha: sha, conclusion, status: 'completed', event: 'push', head_branch: 'main',
+  created_at: `2026-11-25T10:${String(id).padStart(2, '0')}:00Z`, ...extra });
 const applied = (conclusion = 'success') => [{ name: 'Checkout (with previous commit for diff)', status: 'completed', conclusion: 'success', started_at: 't' },
   { name: 'Apply migrations (psql, in filename order)', status: 'completed', conclusion, started_at: 't' }];
 const steps = (map) => async (id) => (id in map ? map[id] : []);
@@ -45,4 +46,18 @@ test('a run the API still lists in progress, with its apply step started, is the
 test('unreadable steps or no qualifying run give no base (the caller falls back to HEAD^ with a warning)', async () => {
   assert.equal((await selectBase([run(2, 'c2', 'success')], async () => null, { currentRunId: 3 })).sha, null);
   assert.equal((await selectBase([run(2, 'c2', 'cancelled')], steps({}), { currentRunId: 3 })).sha, null);
+});
+
+test('a re-run of an old commit diffs from the run created before it, not from newer runs', async () => {
+  const runs = [run(9, 'c9', 'success'), run(5, 'c5', 'failure', { run_attempt: 2 }), run(3, 'c3', 'success')];
+  const out = await selectBase(runs, steps({ 9: applied(), 5: applied('failure'), 3: applied() }),
+    { currentRunId: 5, currentCreatedAt: run(5).created_at });
+  assert.equal(out.sha, 'c3');
+});
+
+test('a run whose first attempt applied and whose re-run is queued still counts as applied (steps of all attempts)', async () => {
+  const attempts = [...applied('failure'), { name: 'Apply migrations (psql, in filename order)', status: 'queued', conclusion: null, started_at: null }];
+  const out = await selectBase([run(5, 'c5', null, { status: 'queued', run_attempt: 2 }), run(3, 'c3', 'success')],
+    steps({ 5: attempts, 3: applied() }), { currentRunId: 6, currentCreatedAt: run(6).created_at });
+  assert.equal(out.sha, 'c5');
 });

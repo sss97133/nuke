@@ -12,6 +12,9 @@
 // A run that never reached that step (replaced while pending, or failed before it) applied nothing, so its commit's
 // files ride the next run. A run that failed while
 // applying keeps today's behaviour: its own files are not re-applied (re-dispatch them by name).
+// Re-runs: a run keeps its id and created_at when re-run, so only runs created before this one are candidates (a re-run
+// of an old commit diffs from the run before it, not from newer runs), and a run's steps are read across all its
+// attempts (jobs?filter=all): a run whose first attempt applied and whose re-run is still queued has applied.
 // Fallback: HEAD^ with a ::warning:: when the API cannot be read or no such run is found in the newest page.
 //
 // Usage (in the workflow): BASE=$(node scripts/ci/deploy-base.mjs) ; prints one sha on stdout, notes on stderr.
@@ -20,17 +23,19 @@ export const APPLY_STEP = /^Apply migrations/;
 
 // runs: newest first (the API order). stepsByRun(id) -> the steps of that run's jobs, or null when unreadable.
 // Returns { sha, run, skipped: [{ id, sha, why }] } or { sha: null, why }.
-export async function selectBase(runs, stepsByRun, { currentRunId, branch = 'main' } = {}) {
+export async function selectBase(runs, stepsByRun, { currentRunId, currentCreatedAt, branch = 'main' } = {}) {
   const skipped = [];
   for (const r of runs) {
     if (String(r.id) === String(currentRunId)) continue;
+    if (currentCreatedAt && !(r.created_at < currentCreatedAt)) continue;
     if (r.event !== 'push' || r.head_branch !== branch) continue;
     const steps = await stepsByRun(r.id);
     if (steps == null) return { sha: null, why: `steps of run ${r.id} unreadable` };
-    const apply = steps.find((s) => APPLY_STEP.test(s.name || ''));
-    const started = Boolean(apply && apply.started_at && apply.conclusion !== 'skipped' && apply.status !== 'queued');
+    const applies = steps.filter((s) => APPLY_STEP.test(s.name || ''));
+    const started = applies.some((s) => s.started_at && s.conclusion !== 'skipped' && s.status !== 'queued');
     if (started) return { sha: r.head_sha, run: r.id, skipped };
-    skipped.push({ id: r.id, sha: r.head_sha, why: `${r.conclusion}, apply step ${apply ? apply.conclusion || apply.status : 'absent'}` });
+    const seen = applies.map((s) => s.conclusion || s.status).join('/') || 'absent';
+    skipped.push({ id: r.id, sha: r.head_sha, why: `${r.conclusion}, apply step ${seen}` });
   }
   return { sha: null, why: 'no earlier push run reached its apply step in the newest page', skipped };
 }
@@ -55,11 +60,12 @@ async function main() {
       `/repos/${repo}/actions/workflows/supabase-deploy.yml/runs?branch=main&event=push&per_page=30`, token);
     const stepsByRun = async (id) => {
       try {
-        const { jobs } = await api(`/repos/${repo}/actions/runs/${id}/jobs?per_page=20`, token);
+        const { jobs } = await api(`/repos/${repo}/actions/runs/${id}/jobs?filter=all&per_page=50`, token);
         return jobs.flatMap((j) => j.steps || []);
       } catch { return null; }
     };
-    const out = await selectBase(runs, stepsByRun, { currentRunId: runId });
+    const current = runId ? await api(`/repos/${repo}/actions/runs/${runId}`, token) : null;
+    const out = await selectBase(runs, stepsByRun, { currentRunId: runId, currentCreatedAt: current?.created_at });
     for (const s of out.skipped || []) console.error(`deploy-base: run ${s.id} (${s.sha.slice(0, 9)}) applied nothing (${s.why}); its files ride this run`);
     if (!out.sha) return fallback(out.why);
     console.error(`deploy-base: run ${out.run} applied through ${out.sha.slice(0, 9)}`);
