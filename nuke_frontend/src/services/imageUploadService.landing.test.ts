@@ -25,7 +25,7 @@ vi.mock('../lib/supabase', () => {
       },
       from: (_table: string) => ({
         select: (cols?: string) => chain(String(cols).includes('image_url') ? { data: calls.existing, error: null } : { data: null, error: null, count: 0 }),
-        insert: (row: any) => { calls.rows.push(row); return chain(calls.insertError ? { data: null, error: calls.insertError } : { data: { id: 'row-1' }, error: null }); },
+        insert: (row: any) => { calls.rows.push(row); const err = typeof calls.insertError === 'function' ? calls.insertError(row) : calls.insertError; return chain(err ? { data: null, error: err } : { data: { id: 'row-1' }, error: null }); },
       }),
       functions: { invoke: async () => ({ error: null }) },
     },
@@ -100,6 +100,22 @@ describe('web upload lands where iOS lands', () => {
     calls.insertError = { code: '23505', message: 'duplicate key value violates unique constraint "idx_unique_vehicle_file_hash"' };
     const result = await ImageUploadService.uploadImage('vehicle-1', photo(), 'general');
     expect(result).toMatchObject({ success: true, outcome: 'duplicate' });
+  });
+
+  it('lands the photo unfiled when the database refuses the picked car (42501), keeping the pick on the row', async () => {
+    calls.insertError = (row: any) => (row.vehicle_id ? { code: '42501', message: 'new row violates row-level security policy for table "vehicle_images"' } : null);
+    const result = await ImageUploadService.uploadImage('vehicle-1', photo(), 'general');
+    expect(result).toMatchObject({ success: true, outcome: 'landed', message: 'Landed in your unfiled photos: you cannot add photos to that vehicle' });
+    expect(calls.rows).toHaveLength(2);
+    expect(calls.rows[1]).toMatchObject({ vehicle_id: null, is_primary: false });
+    expect(calls.rows[1].exif_data).toEqual(calls.rows[0].exif_data);
+  });
+
+  it('refuses, and says so, when the database refuses an unfiled row too', async () => {
+    calls.insertError = { code: '42501', message: 'new row violates row-level security policy for table "vehicle_images"' };
+    const result = await ImageUploadService.uploadImage(undefined, photo(), 'general');
+    expect(result).toMatchObject({ success: false, outcome: 'refused' });
+    expect(calls.rows).toHaveLength(1);
   });
 
   it('says why storage refused, and lands no row', async () => {

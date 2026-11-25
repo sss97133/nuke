@@ -525,11 +525,24 @@ export class ImageUploadService {
         nowIso: new Date().toISOString(),
       });
 
-      const { data: dbResult, error: dbError } = await supabase
+      let { data: dbResult, error: dbError } = await supabase
         .from('vehicle_images')
         .insert(row)
         .select('id')
         .single();
+
+      let refusedPick: string | null = null;
+      if (dbError?.code === '42501' && row.vehicle_id) {
+        // The database admits a photo onto a car only when the uploader may edit that car. Land it unfiled instead:
+        // the pick stays recorded in exif_data.filing, and the photo waits in the uploader's own library.
+        refusedPick = row.vehicle_id;
+        ({ data: dbResult, error: dbError } = await supabase
+          .from('vehicle_images')
+          .insert({ ...row, vehicle_id: null, is_primary: false })
+          .select('id')
+          .single());
+        if (!dbError) vehicleId = undefined;
+      }
 
       if (dbError?.code === '23505') {
         // The picked car already holds these bytes (one row per car and hash): nothing new, nothing moved.
@@ -626,7 +639,8 @@ export class ImageUploadService {
         success: true,
         outcome: 'landed',
         imageId: dbResult.id,
-        imageUrl: await readBack()
+        imageUrl: await readBack(),
+        ...(refusedPick ? { message: 'Landed in your unfiled photos: you cannot add photos to that vehicle' } : {}),
       };
 
     } catch (error: any) {
