@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS public.retained_projection_backfill_cars (
   public_readable boolean NOT NULL,
   censused_at     timestamptz NOT NULL,
   graded_at       timestamptz,
-  attempts        integer NOT NULL DEFAULT 0   -- consecutive picks whose select did not finish; at max_car_attempts the car is skipped
+  attempts        integer NOT NULL DEFAULT 0   -- consecutive picks killed before a chunk committed; at max_car_attempts the car is skipped
 );
 CREATE INDEX IF NOT EXISTS retained_projection_backfill_cars_next
   ON public.retained_projection_backfill_cars (public_readable DESC, projections DESC, vehicle_id) WHERE graded_at IS NULL;
@@ -488,8 +488,9 @@ BEGIN
       COMMIT;
       EXIT;
     END IF;
-    -- The pick is counted before the select and committed: a select or grade the 10 s timeout kills leaves it counted,
-    -- so a car that cannot finish is skipped after max_car_attempts instead of being picked every tick.
+    -- The pick is counted before the select and committed. It is cleared only when a chunk commits or the step ends
+    -- normally, so a run the 10 s timeout kills before either leaves it counted, and a car that cannot finish is skipped
+    -- after max_car_attempts instead of being picked every tick.
     UPDATE public.retained_projection_backfill_cars SET attempts = attempts + 1 WHERE vehicle_id = car;
     COMMIT;
     -- one select per pick (2,000-projection car: 1.3 s cold, 13 ms warm), then chunks inside the budget
@@ -498,7 +499,6 @@ BEGIN
        WHERE o.vehicle_id = car AND o.extraction_method = 'retained_listing_property_projection_v1'
          AND NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts d WHERE d.projection_id = o.id)
        LIMIT chunk * 40) x;
-    UPDATE public.retained_projection_backfill_cars SET attempts = 0 WHERE vehicle_id = car;   -- the select finished
     IF ids IS NULL THEN
       UPDATE public.retained_projection_backfill_cars SET graded_at = clock_timestamp() WHERE vehicle_id = car;
       n_cars := n_cars + 1;
@@ -506,11 +506,13 @@ BEGIN
       i := 1;
       WHILE i <= cardinality(ids) AND clock_timestamp() < until LOOP
         n_backfill := n_backfill + public.retained_projection_grade_ids(ids[i:i + chunk - 1], key);
+        UPDATE public.retained_projection_backfill_cars SET attempts = 0 WHERE vehicle_id = car;   -- a chunk committed
         UPDATE public.retained_projection_grading_state SET backfill_progress_at = clock_timestamp() WHERE id;
         COMMIT;
         i := i + chunk;
       END LOOP;
     END IF;
+    UPDATE public.retained_projection_backfill_cars SET attempts = 0 WHERE vehicle_id = car;   -- the step ended normally
     UPDATE public.retained_projection_grading_state SET backfill_progress_at = clock_timestamp() WHERE id;
     COMMIT;
     car := NULL;

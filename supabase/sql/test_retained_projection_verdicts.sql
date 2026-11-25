@@ -703,7 +703,7 @@ DO $$ BEGIN
     RAISE EXCEPTION 'FAIL skipped car: %', (SELECT to_jsonb(b) FROM public.v_retained_projection_backfill b); END IF;
   RAISE NOTICE 'PASS a car at max_car_attempts is skipped, reads cars_skipped (1) and failed in the job''s assay row';
 END $$;
--- A pick whose select finishes resets the count; the car is graded.
+-- A pick whose step ends normally resets the count; the car is graded.
 UPDATE public.retained_projection_backfill_cars SET attempts = 2 WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1';
 UPDATE public.retained_projection_grading_state SET backfill_done = false WHERE id;
 CALL public.retained_projection_grade_tick();
@@ -712,8 +712,51 @@ DO $$ BEGIN
      OR (SELECT attempts FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1') <> 0
      OR (SELECT status FROM public.v_retained_projection_backfill) <> 'done' THEN
     RAISE EXCEPTION 'FAIL retry under max_car_attempts: %', (SELECT to_jsonb(b) FROM public.v_retained_projection_backfill b); END IF;
-  RAISE NOTICE 'PASS under max_car_attempts the car is picked, its count resets when the select finishes, and it is graded';
+  RAISE NOTICE 'PASS under max_car_attempts the car is picked, its count resets when its step ends normally, and it is graded';
 END $$;
+
+-- A run the timeout kills while a car is picked leaves the pick counted (the COMMIT after attempts + 1); three such
+-- runs skip the car and read red. grade_ids is replaced by one that outlasts a 1 s statement_timeout.
+CREATE TABLE pg_temp.saved_grade AS
+  SELECT pg_get_functiondef('public.retained_projection_grade_ids(uuid[],text)'::regprocedure) AS d;
+CREATE OR REPLACE FUNCTION public.retained_projection_grade_ids(p_ids uuid[], p_key text) RETURNS integer
+LANGUAGE plpgsql AS $f$ BEGIN   -- only the picked car's grade outlasts the timeout; the tail and sweep grade nothing meanwhile
+  IF '00000000-0000-0000-0000-00000000e010'::uuid = ANY (p_ids) THEN PERFORM pg_sleep(3); END IF; RETURN 0; END $f$;
+DELETE FROM public.retained_projection_verdicts WHERE projection_id = '00000000-0000-0000-0000-00000000e010';
+UPDATE public.retained_projection_backfill_cars SET graded_at = NULL, attempts = 0 WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1';
+UPDATE public.retained_projection_grading_state SET backfill_done = false WHERE id;
+\set ON_ERROR_STOP off
+SET statement_timeout = '1s';
+CALL public.retained_projection_grade_tick();
+RESET statement_timeout;
+\set ON_ERROR_STOP on
+SELECT pg_advisory_unlock_all();
+DO $$ BEGIN
+  IF (SELECT attempts FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1') <> 1 THEN
+    RAISE EXCEPTION 'FAIL a killed run did not leave its pick counted: attempts %',
+      (SELECT attempts FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1'); END IF;
+  RAISE NOTICE 'PASS a run killed by the timeout leaves the pick counted (attempts 1)';
+END $$;
+\set ON_ERROR_STOP off
+SET statement_timeout = '1s';
+CALL public.retained_projection_grade_tick();
+CALL public.retained_projection_grade_tick();
+RESET statement_timeout;
+\set ON_ERROR_STOP on
+SELECT pg_advisory_unlock_all();
+CALL public.retained_projection_grade_tick();   -- a fourth run does not pick the car
+DO $$ BEGIN
+  IF (SELECT attempts FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1') <> 3
+     OR (SELECT skipped_cars FROM public.v_retained_projection_backfill) <> 1
+     OR (SELECT status FROM public.v_retained_projection_backfill) <> 'cars_skipped' THEN
+    RAISE EXCEPTION 'FAIL three killed runs: %', (SELECT to_jsonb(b) FROM public.v_retained_projection_backfill b); END IF;
+  RAISE NOTICE 'PASS three killed runs skip the car (attempts 3, not picked again) and read cars_skipped';
+END $$;
+DO $$ BEGIN EXECUTE (SELECT d FROM pg_temp.saved_grade); END $$;
+UPDATE public.retained_projection_backfill_cars SET attempts = 0 WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1';
+UPDATE public.retained_projection_grading_state SET backfill_done = false WHERE id;
+CALL public.retained_projection_grade_tick();
+SELECT pg_temp.check_e('after the killed runs', 8);
 
 \ir revert_20261126063500_retained_projection_verdicts.sql
 DO $$ BEGIN
