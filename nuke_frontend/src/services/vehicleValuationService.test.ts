@@ -60,6 +60,19 @@ describe('required investment reader failure', () => {
     expect(fixture.calls.filter(c => c.name === 'get_vehicle_total_invested')).toHaveLength(2);
   });
 
+  it('reads an untied answer (presence only, no amount) as answered, adding no spend', async () => {
+    fixture.read.mockImplementation(({ name }) => ({
+      data: name === 'get_vehicle_total_invested'
+        ? { amounts_visible: false, documented_spend: 'present', total_invested: null, breakdown: null, components_count: { receipts: 3 } } :
+        name === 'vehicles' ? { make: 'Offline', year: 2000, current_value: 20000 } :
+        ['vehicle_valuations', 'vehicle_builds', 'profile_image_insights'].includes(name) ? null : [],
+      error: null,
+    }));
+    const value = await VehicleValuationService.getValuation('offline-a');
+    expect(value.totalInvested).toBe(0);
+    expect(value.estimatedValue).toBe(20000);
+  });
+
   it('preserves a successfully answered zero as distinct from a failed read', async () => {
     const value = await VehicleValuationService.getValuation('offline-a');
     expect(value.totalInvested).toBe(0);
