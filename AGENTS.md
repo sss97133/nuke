@@ -228,7 +228,11 @@ machine-layer delivery does not close the unfinished renderer or estimate work.
   - Verify it live after the run.
 - **Edge functions.** Same path; CI deploys the function folders the commit changed. A function that
   writes calls `requireWriteAuth` (`supabase/functions/_shared/writeGuard.ts`), and
-  `scripts/guardrails/check-write-guard.mjs` fails the deploy otherwise.
+  `scripts/guardrails/check-write-guard.mjs` fails the deploy otherwise. Signed in is anyone (sign-up is open), so a
+  function that then writes with the service client also has one row in `scripts/guardrails/edge-caller-classes.json`
+  saying who may call it (service, self, row_owner, by_mode, public); a service row needs `requireAdminOrService`,
+  `requireOwnerOrService` or `isServiceCaller` as the handler's first statement after `requireWriteAuth`, and a
+  function that hands the service key to another function says in `relay` how it checks the caller first.
 - **Row writes.** Only through the sanctioned writers: `ingest-observation`,
   `correct_vehicle_sale_provenance_batch`, `correct_vehicle_event_attribution` (a BaT event's organization,
   seller identity and metadata, by merge, with the before-image kept on the row), and the supersession functions.

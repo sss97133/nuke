@@ -56,11 +56,18 @@ const ALLOWLIST = {
 //   row_owner  an end user calls it on ids it names (vehicle_id, image_id, organization_id ...); the row names the id
 //              (owns). Until it calls a requireCallerCan* ownership helper the row stays status "open", and the
 //              number of open rows may only shrink (open_ceiling).
+//   by_mode    an end user calls some modes (each checked as self or row_owner) and the rest are service-only; the
+//              row lists service_modes and the function calls requireAdminOrService / requireOwnerOrService /
+//              isServiceCaller on them.
 //   public     deliberately callable by anyone signed in, with bounded writes; the row says why.
+// A function of any class but service that holds the service key and calls another function (a relay: the callee
+// trusts the key, not the caller) must say in `relay` how the caller's right to each target is checked; while that
+// check is not built the row is status "open". Open rows of every class count against open_ceiling.
 // CHECK_WRITE_GUARD_MANIFEST points at a fixture manifest (check-write-guard.test.mjs); production never sets it.
 const MANIFEST_PATH = process.env.CHECK_WRITE_GUARD_MANIFEST || path.join(REPO, "scripts/guardrails/edge-caller-classes.json");
 const MANIFEST = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
-const CLASSES = new Set(["service", "self", "row_owner", "public"]);
+const CLASSES = new Set(["service", "self", "row_owner", "by_mode", "public"]);
+const ANY_GATE = /\brequireAdminOrService\(|\brequireOwnerOrService\(|\bisServiceCaller\(/;
 const OWNER_HELPER = /\brequireCallerCan[A-Z]\w*\(/;
 const SERVICE_CLIENT = /projectSecretKey\(|SERVICE_ROLE_KEY/;
 function fnSources(fn) {
@@ -69,13 +76,17 @@ function fnSources(fn) {
 }
 // The gate: a statement of its own that returns its refusal (requireOwnerOrService / requireAdminOrService into a
 // const, then `if (x) return`; or `if (!(await isServiceCaller(req))) return`). Group 1 is its indent.
-const STRONG_GATE = /^( *)(?:(?:const|let) (\w+) = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b[^;]*;\s*if \(\2\) return\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b[^\n]*\)\)\s*(?:return\b|\{\s*return\b))/gm;
+const STRONG_GATE = /^( *)(?:(?:const|let) (\w+) = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b[^;]*;\s*if \(\2\) return\b|(?:const|let) (\w+) = \(await requireWriteAuth\(\s*(?:req|request)\b[^;]*?\)\) \?\?\s*\(await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b[^;]*;\s*if \(\3\) return\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b[^\n]*\)\)\s*(?:return\b|\{\s*return\b))/gm;
 const BODY_READ = /\b(req|request)\.(json|formData|text|arrayBuffer|blob|body)\b|new URL\(\s*(req|request)\.url/;
 // What may run before the gate: requireWriteAuth and its refusal, and the OPTIONS preflight return.
+// A refusal of a wrong method may run too, and the handler's top-level `try {` may open first (the gate is then the
+// first statement inside it).
 const PRE_GATE_OK = [
-  /^\s*(?:const|let) (\w+) = await requireWriteAuth\([^;]*;\s*if \(\1\) return \1;?/,
-  /^\s*if \((?:req|request)\.method === ["']OPTIONS["']\)\s*(?:\{\s*return [^;]*;\s*\}|return [^;]*;)/,
+  /^\s*(?:const|let) (\w+) = \(?await requireWriteAuth\([^;]*?\)\)?;?\s*if \(\1\) return \1\b[^;\n]*;?/,
+  /^\s*if \((?:req|request)\.method === ["']OPTIONS["']\)\s*(?:\{\s*return [^;\n]*;?\s*\}|return [^;\n]*;?)/,
+  /^\s*if \((?:req|request)\.method !== ["'][A-Z]+["']\)\s*(?:\{\s*return [^;\n]*;?\s*\}|return [^;\n]*;?)/,
 ];
+const TRY_OPEN = /^\s*try\s*\{/;
 // Comments and string contents do not gate anything and must not move braces: blank them, keeping offsets.
 function blank(src, strings = true) {
   const sp = (m) => m.replace(/[^\n]/g, " ");
@@ -105,7 +116,9 @@ function handlerSpan(src) {
     if (src[j] === "{") depth++;
     else if (src[j] === "}" && --depth === 0) return [open, j];
   }
-  return null;
+  // Unbalanced (a quote inside a regex literal can fool the blanking): the gate test below needs only the opening,
+  // since everything between it and the gate must be requireWriteAuth, OPTIONS, a method refusal or `try {`.
+  return [open, src.length];
 }
 // The gate must be a statement at the top level of the handler (the indent of its first statement), inside the
 // handler's own span in index.ts, with nothing before it but requireWriteAuth and the OPTIONS return, and before
@@ -125,16 +138,20 @@ function gatedBeforeBody(fn) {
   const firstAt = open + 1 + first.index;
   const indent = firstAt - (src.lastIndexOf("\n", firstAt) + 1);
   for (const g of text.matchAll(STRONG_GATE)) {
-    if (g.index < open || g.index > close || g[1].length !== indent) continue;
-    let pre = text.slice(open + 1, g.index);
+    if (g.index < open || g.index > close) continue;
+    let pre = text.slice(open + 1, g.index), inTry = false;
     for (let changed = true; changed; ) {
       changed = false;
       for (const ok of PRE_GATE_OK) {
         const m = ok.exec(pre);
         if (m) { pre = pre.slice(m[0].length); changed = true; }
       }
+      const t = !inTry && TRY_OPEN.exec(pre);
+      if (t) { pre = pre.slice(t[0].length); inTry = changed = true; }
     }
-    return pre.trim() === "" && !BODY_READ.test(text.slice(open, g.index));
+    // Top level: at the handler's first-statement indent, or one block deeper inside its leading try.
+    const depthOk = inTry ? g[1].length > indent : g[1].length === indent;
+    if (depthOk && pre.trim() === "" && !BODY_READ.test(text.slice(open, g.index))) return true;
   }
   return false;
 }
@@ -229,6 +246,15 @@ for (const fn of serviceWriters) {
   if (row.class === "service" && !gatedBeforeBody(fn)) {
     classProblems.push(`${fn}: class service, but no requireAdminOrService / requireOwnerOrService / isServiceCaller before the body is read`);
   }
+  if (row.class === "by_mode") {
+    if (!Array.isArray(row.service_modes) || !row.service_modes.length) classProblems.push(`${fn}: class by_mode must list service_modes`);
+    if (!fnSources(fn).some((src) => ANY_GATE.test(src))) classProblems.push(`${fn}: class by_mode, but no service gate on any mode`);
+  }
+  if (row.status === "open" && row.class === "service") classProblems.push(`${fn}: a service row cannot be open`);
+  const callees = [...(info.get(fn)?.callees ?? [])];
+  if (row.class !== "service" && callees.length && fnSources(fn).some((src) => SERVICE_CLIENT.test(src)) && !String(row.relay ?? "").trim()) {
+    classProblems.push(`${fn}: class ${row.class} calls ${callees.join(", ")} holding the service key; say in relay how the caller's right to each target is checked`);
+  }
   if (row.class === "row_owner") {
     if (!String(row.owns ?? "").trim()) classProblems.push(`${fn}: class row_owner must name the id it owns (owns)`);
     if (row.status !== "open" && !fnSources(fn).some((src) => OWNER_HELPER.test(src))) {
@@ -236,9 +262,9 @@ for (const fn of serviceWriters) {
     }
   }
 }
-const openRows = Object.entries(rows).filter(([, r]) => r.class === "row_owner" && r.status === "open").map(([fn]) => fn);
+const openRows = Object.entries(rows).filter(([, r]) => r.status === "open").map(([fn]) => fn);
 if (openRows.length > (MANIFEST.open_ceiling ?? 0)) {
-  classProblems.push(`${openRows.length} open row_owner rows exceed open_ceiling ${MANIFEST.open_ceiling ?? 0}: the open list may only shrink`);
+  classProblems.push(`${openRows.length} open rows exceed open_ceiling ${MANIFEST.open_ceiling ?? 0}: the open list may only shrink`);
 }
 // A rename would otherwise drop a function out of the check without anyone noticing.
 const scopedStale = Object.keys(rows).filter((fn) => !info.has(fn));
@@ -279,4 +305,4 @@ if (unguarded.length) {
   console.error("\nAdd `const denied = await requireWriteAuth(req); if (denied) return denied;` as the first statement of the handler\n(import from ../_shared/writeGuard.ts), or allowlist it in scripts/guardrails/check-write-guard.mjs with the auth that refuses anonymous callers.");
 }
 if (unguarded.length || preflightRuns.length || classProblems.length || scopedStale.length) process.exit(1);
-console.log(`✓ every writing function refuses anonymous callers; ${serviceWriters.length} service-client writers classed (${openRows.length} row_owner open)`);
+console.log(`✓ every writing function refuses anonymous callers; ${serviceWriters.length} service-client writers classed (${openRows.length} open)`);

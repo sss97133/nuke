@@ -1,0 +1,763 @@
+{
+  "_doc": "Caller class per edge function that passes requireWriteAuth and writes with the service client. Checked by scripts/guardrails/check-write-guard.mjs; classes and rules are in its header.",
+  "open_ceiling": 26,
+  "functions": {
+    "acquire-vehicle": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "admin-update-vehicle-field": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "agent-chat": {
+      "class": "self",
+      "reason": "writes keyed to the caller's JWT user id (derivation_queue rows for the caller's own approved title documents)",
+      "relay": "answer_confirmation posts to ingest-observation with the service key only after get_vehicle_build_ledger, called with the caller's JWT client (SECURITY DEFINER, auth.uid() ownership check), returns that draft on that vehicle; a non-owner gets zero rows and stops"
+    },
+    "analysis-engine-coordinator": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "analyze-comments-fast": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "analyze-vehicle-documents": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "analyze-with-claude": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "api-keys-manage": {
+      "class": "self",
+      "reason": "manages the caller's own API keys, keyed to the JWT user id"
+    },
+    "api-v1-vision": {
+      "class": "by_mode",
+      "service_modes": [
+        "the listing route"
+      ],
+      "status": "open",
+      "reason": "the listing route is admin-or-service; classify, analyze and batch admit any signed-in caller or API key through authenticateRequest",
+      "relay": "open: forwards readings to ingest-observation and calls api-v1-comps with the service key; listed for the relay item of the row-owner PR"
+    },
+    "auto-analyze-upload": {
+      "class": "row_owner",
+      "owns": "image_id / vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row-owner PR",
+      "relay": "open: calls yono-analyze with the service key on caller-named ids; the row-owner PR checks the caller's right first and forwards the caller's identity"
+    },
+    "auto-create-bundle-events": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row-owner PR",
+      "relay": "open: calls suggest-bundle-label with the service key on caller-named ids; the row-owner PR checks the caller's right first and forwards the caller's identity"
+    },
+    "auto-fix-vehicle-profile": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "auto-sort-photos": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "backfill-comments": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "backfill-images": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row-owner PR",
+      "relay": "open: calls yono-analyze with the service key on caller-named ids; the row-owner PR checks the caller's right first and forwards the caller's identity"
+    },
+    "bat-closed-lots-sync": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "bat-price-propagation": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "bat-queue-worker": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "bat-snapshot-parser": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "bat-url-discovery": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "bat-year-crawler": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "batch-comment-discovery": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "batch-extract-snapshots": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "batch-vin-decode": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "batch-ymm-propagate": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "calculate-market-indexes": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "calculate-market-trends": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "calculate-vehicle-scores": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "check-image-vehicle-match": {
+      "class": "by_mode",
+      "service_modes": [
+        "check",
+        "build_signatures",
+        "disambiguate"
+      ],
+      "reason": "the subject modes (resolve_subjects, read_subjects, read_subject_reinspections, record_device_reading, create_capture_profile) are scoped to the caller's own account by subjectOwnerId; the legacy modes write on caller-named vehicle_id, user_id and images and answer the service key or an admin"
+    },
+    "check-vendor-balances": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "classify-organization-type": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "collecting-cars-discovery": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "complete-bat-import": {
+      "class": "row_owner",
+      "owns": "organization_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "compute-data-quality-snapshot": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "compute-vehicle-valuation": {
+      "class": "by_mode",
+      "service_modes": [
+        "every computation and write"
+      ],
+      "reason": "the assessment branch only reads sources the viewer can already see; every legacy computation or write is isServiceCaller-only"
+    },
+    "compute-wiring-overlay": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "connect-claude": {
+      "class": "self",
+      "reason": "stores the caller's own connection, keyed to the JWT user id"
+    },
+    "continuous-queue-processor": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "contributor-intake": {
+      "class": "by_mode",
+      "service_modes": [
+        "/review"
+      ],
+      "reason": "the intake path admits a contributor token or the signed-in owner (owner-recorded mode) through requireWriteAuth allowAnonymous: carriesToken; /review answers the service key only"
+    },
+    "create-org-from-url": {
+      "class": "row_owner",
+      "owns": "the organization matched from the url",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "create-work-session-from-evidence": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "daily-report": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "deal-jacket-pipeline": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "decode-vin-and-update": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "dedup-vehicle-images": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "derive-dispatch": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "derive-image-exif": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "derive-title-ownership": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "detect-sensitive-document": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "device-ping": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "discover-cl-squarebodies": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "discover-description-data": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "discover-from-observations": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "discover-organization-full": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "document-ocr-worker": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "enrich-bulk": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "enrich-factory-specs": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "enrich-msrp": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "enrich-vehicle-profile-ai": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "enrich-vehicles-cron": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-all-orgs-inventory": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-auction-comments": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-barn-finds-listing": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-barrett-jackson": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-bat-core": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-bat-parts-brands": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-bat-profile-vehicles": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-bat-seller-location": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-bh-auction": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-bonhams": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-bonhams-typesense": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-broad-arrow": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-cab-bids": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-cars-and-bids-comments": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-cars-and-bids-core": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-christies-art": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-collecting-cars": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-craigslist": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-ebay-motors": {
+      "class": "by_mode",
+      "service_modes": [
+        "every action but parts"
+      ],
+      "reason": "action parts (partsFinder) writes nothing and has its own capped quota; every other action writes vehicles, images and observations from a caller URL or query"
+    },
+    "extract-facebook-marketplace": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-gaa-classics": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-gooding": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-hagerty-listing": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-jamesedition": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-ksl": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-mecum": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-premium-auction": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-rmsothebys": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-specialty-builder": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-vehicle-data-ai": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "extract-vin-from-vehicle": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "extraction-watchdog": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "fb-marketplace-orchestrator": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "fb-photo-upload": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "firecrawl-balance-log": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "forensic-deal-jacket": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "generate-harness-spec": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "generate-org-due-diligence": {
+      "class": "row_owner",
+      "owns": "organizationId",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "generate-vehicle-description": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "generate-vehicle-diagram": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "generate-wiring-diagram": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "generate-wiring-quote": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "generate-work-logs": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "geo-cross-check": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "gmail-alert-poller": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "haiku-extraction-worker": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "identify-vehicle-from-image": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "image-ai-chat": {
+      "class": "row_owner",
+      "owns": "image_id (plus a column allow-list)",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "image-intake": {
+      "class": "row_owner",
+      "owns": "the vehicle chosen by findVehicle",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "imessage-router": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "import-classic-auction": {
+      "class": "row_owner",
+      "owns": "organizationId",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row-owner PR",
+      "relay": "open: calls backfill-images and extract-organization-from-seller with the service key on caller-named ids; the row-owner PR checks the caller's right first and forwards the caller's identity"
+    },
+    "import-classiccars-listing": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "import-fb-marketplace": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "import-pcarmarket-listing": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "index-reference-document": {
+      "class": "by_mode",
+      "service_modes": [
+        "supplied_reference",
+        "receipt_products",
+        "structure and extract_parts when user_id is not the caller"
+      ],
+      "status": "open",
+      "reason": "a signed-in caller may run structure / extract_parts only naming themself as user_id (whose provider key pays); the caller's right to document_id is checked in the row-owner PR (KnowledgeLibrary uploads call it for the caller's own document)",
+      "relay": "ingest-observation only inside supplied_reference, after its writer authorizes isServiceCaller"
+    },
+    "ingest": {
+      "class": "public",
+      "status": "open",
+      "reason": "open intake by design: lands observations as claims of the caller, never promoted without witnesses",
+      "relay": "open: delegates a BaT URL to extract-bat-core and comments to extract-auction-comments with the service key, so any signed-in caller reaches those admin-only writers on a URL it chooses; listed for the relay item of the row-owner PR"
+    },
+    "ingest-artifact": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "ingest-external-profile": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "ingest-observation": {
+      "class": "public",
+      "reason": "the sanctioned observation writer, open intake by design; owner_confirmed trust is checked in its own small PR"
+    },
+    "ingest-observation-batch": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "ingest-receipts-as-observations": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "ingest-video-frame": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "link-document-entities": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "live-admin": {
+      "class": "self",
+      "reason": "every write is keyed to the caller's JWT user id; for another user's id it returns only the playback URL and refuses the owner actions 403"
+    },
+    "mcp-connector": {
+      "class": "by_mode",
+      "service_modes": [
+        "the admin-or-service branch"
+      ],
+      "reason": "the connector authenticates its own OAuth callers; its admin branch calls requireAdminOrService",
+      "status": "open",
+      "relay": "open: callEdgeFn sends the service key to extract-vehicle-data-ai and identify-vehicle-from-image on caller-supplied values; the first item of the row-owner PR checks the caller's right to the target and forwards the caller's identity"
+    },
+    "migrate-to-observations": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "monitor-fb-marketplace": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "onboard-source": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "paperwork-intake": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "parse-reference-document": {
+      "class": "row_owner",
+      "owns": "document / vehicle_id",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row-owner PR"
+    },
+    "photo-pipeline-orchestrator": {
+      "class": "by_mode",
+      "service_modes": [
+        "process_pending",
+        "classifier_assay",
+        "one image when the caller is not its uploader"
+      ],
+      "reason": "the web upload path calls it with the uploader's session for the image just uploaded; classification_only and record_reviewed_analysis authorize the service role in their own writers; classifier_prompt reads a manifest",
+      "relay": "ingest-observation only inside classification_only and record_reviewed_analysis, after their writers authorize the service role"
+    },
+    "pipeline-dashboard": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "poll-listing-feeds": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "process-account-deletions": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "process-alert-email": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "process-all-images-cron": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "process-bat-extraction-queue": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "process-cl-queue": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "process-classic-seller-queue": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "process-file-upload": {
+      "class": "self",
+      "reason": "the import row and storage path are keyed to the caller's verified id; a vehicle_id on the form must pass user_can_edit_vehicle(vehicle_id, caller) or the call is refused 403"
+    },
+    "process-import-queue": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "process-profile-queue": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "query-wiring-needs": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "quickbooks-connect": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "re-extract-pending-vehicles": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "receipt-photo-ocr": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "recommend-parts-for-vehicle": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "refine-fb-listing": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "report-marketplace-sale": {
+      "class": "self",
+      "reason": "the owner path updates the listing only when contributed_by = the caller; otherwise it records the caller's report with reported_by = the caller's JWT id"
+    },
+    "review-agent-submissions": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "score-live-auctions": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "scrape-vehicle": {
+      "class": "public",
+      "reason": "AddVehicle.tsx scrapes a listing URL for any signed-in user; it writes only extraction-health telemetry (spends Firecrawl on the caller's URL)"
+    },
+    "send-invoice-email": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "set-ai-provider": {
+      "class": "self",
+      "reason": "writes the caller's own user_ai_providers row (JWT user id); the _migrate branch refuses any user JWT and re-encrypts rows, returning counts only"
+    },
+    "setup-payment-method": {
+      "class": "self",
+      "reason": "the caller's own payment setup, keyed to the JWT user id"
+    },
+    "sonnet-supervisor": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "sync-live-auction": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "sync-live-auctions": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "transfer-advance": {
+      "class": "row_owner",
+      "owns": "transfer_id (a party to the transfer)",
+      "status": "open",
+      "reason": "an end user calls it on ids it names; ownership helper lands in the row_owner PR"
+    },
+    "transfer-automator": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "trickle-backfill-images": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "update-live-sentiment": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "update-org-from-website": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "upload-fb-image": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "vehicle-agent": {
+      "class": "row_owner",
+      "owns": "vehicle_id",
+      "status": "open",
+      "reason": "checks user_can_edit_vehicle / the image tie inline (its loosest branch admits any uploader of an image on the car, which #3972 makes acceptable); moves to the shared helper in the row-owner PR",
+      "relay": "open: posts the agent's finding to ingest-observation with the service key on behalf of the caller after its inline user_can_edit_vehicle / image-tie check; moves to the shared helper with the forwarded identity in the row-owner PR"
+    },
+    "work-session": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    },
+    "yono-analyze": {
+      "class": "service",
+      "reason": "no end-user caller; 7-day gateway log 2026-11-18..25: 0 non-service calls"
+    }
+  }
+}
