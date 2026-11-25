@@ -17,8 +17,8 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { mkdtempSync, readFileSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inputFingerprint, receiptForResult, recordStageReceipt } from './stage-queue.mjs';
 import { DEFAULT_MODEL, claudePrint, deepChildEnv, leanClaudeArgs } from './deep-stage.mjs';
@@ -41,6 +41,17 @@ const rereadLimit = args.rereads && args.rereads !== true ? Number(args.rereads)
 // blocks in open() on a privacy prompt until someone answers it, which stopped the whole batch on 2026-11-25. Run it from a
 // terminal that has the access; the scheduled batch reads stored papers only.
 const localRereads = args['local-rereads'] === true;
+// Deadlines (2026-11-25 stall: one blocked read held the whole batch for over an hour). A local paper is read by a child
+// process that is killed after LOCAL_READ_MS, so a privacy prompt or a hung disk costs one item, never the event loop.
+// Each re-read item has a wall-clock limit (--item-seconds, default 360); --deadline-at <unix seconds>, passed by
+// subscription-reader-batch.sh, ends the whole run with its summary (stopped: "deadline") and exit 4.
+const LOCAL_READ_MS = 30_000;
+const itemMs = (args['item-seconds'] && args['item-seconds'] !== true ? Number(args['item-seconds']) : 360) * 1000;
+const deadlineAt = args['deadline-at'] && args['deadline-at'] !== true ? Number(args['deadline-at']) : null;
+// Folders macOS gates behind a privacy prompt. A process without a terminal (launchd) never opens them: it would wait on a
+// dialog nobody may be there to answer.
+const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const GATED = new RegExp(`^${escapeRe(homedir())}/(Downloads|Documents|Desktop|Library/Mobile Documents)(/|$)`);
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 
 const TYPES = ['receipt', 'invoice', 'work_order', 'packing_slip', 'order_confirmation', 'estimate', 'statement', 'alignment_report', 'title', 'registration', 'sale_sheet', 'manual', 'shipping_bill', 'other'];
@@ -107,7 +118,7 @@ async function readFrame(f, dir) {
 }
 
 // Read one stored page (image or PDF) already in its own directory.
-async function readFile(id, raw, ext, dir) {
+async function readFile(id, raw, ext, dir, signal) {
   let img = raw;
   if (ext === 'heic' || ext === 'heif') {
     img = join(dir, `${id}.jpg`);
@@ -118,7 +129,7 @@ async function readFile(id, raw, ext, dir) {
   // transcript under ~/.claude/projects. The child runs in that directory with the subscription login and no service key
   // or other credential in its environment (deepChildEnv): the page is not trusted (a photographed page can carry
   // instructions). The prompt goes on stdin (execFile's `input` is ignored for async calls).
-  const stdout = await claudePrint(leanClaudeArgs({ model, readDir: dir }), prompt(img), { env: deepChildEnv(), cwd: dir });
+  const stdout = await claudePrint(leanClaudeArgs({ model, readDir: dir }), prompt(img), { env: deepChildEnv(), cwd: dir, signal });
   let outer; try { outer = JSON.parse(stdout); } catch { throw Object.assign(new Error('no JSON in the reader output'), { invalidOutput: true }); }
   if (outer.is_error) throw Object.assign(new Error(`reader error: ${String(outer.result ?? '').slice(0, 200)}`), { apiStatus: outer.api_error_status ?? null });
   const extraction = parseResult(outer.result);
@@ -140,17 +151,29 @@ async function rereadList() {
   try { return await rest(`receipt_reread_worklist?select=receipt_id,source_kind,source,file_name,reason&user_id=eq.${OWNER}${localRereads ? '' : '&source_kind=eq.storage'}&order=receipt_id&limit=${rereadLimit}`); }
   catch (e) { console.error(`reread work list unavailable: ${String(e.message || e).slice(0, 120)}`); return []; }
 }
-async function rereadBytes(w) {
+async function rereadBytes(w, signal) {
   if (w.source_kind === 'storage') {
-    const r = await fetch(w.source, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }, signal: AbortSignal.timeout(60_000) });
+    const r = await fetch(w.source, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }, signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]) });
     if (!r.ok) throw Object.assign(new Error(`download ${r.status}`), { cls: 'storage_download_failed' });
     return Buffer.from(await r.arrayBuffer());
   }
-  try { return readFileSync(w.source); }
-  catch (e) {
-    const cls = e.code === 'EPERM' || e.code === 'EACCES' ? 'local_file_denied' : e.code === 'ENOENT' ? 'local_file_missing' : 'local_file_error';
-    throw Object.assign(new Error(`${cls} ${e.code || ''}`.trim()), { cls });
+  const path = String(w.source || '');
+  if (GATED.test(path) && !process.stdin.isTTY) throw Object.assign(new Error('privacy_gated_folder'), { cls: 'privacy_gated_folder' });
+  try {
+    const { stdout } = await run('/bin/cat', [path], { encoding: 'buffer', timeout: LOCAL_READ_MS, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024, signal });
+    return stdout;
+  } catch (e) {
+    const msg = String(e.stderr || e.message || '');
+    const cls = e.killed || e.signal ? 'local_file_timeout' : /Operation not permitted|Permission denied/.test(msg) ? 'local_file_denied'
+      : /No such file/.test(msg) ? 'local_file_missing' : 'local_file_error';
+    throw Object.assign(new Error(cls), { cls });
   }
+}
+// The item's work under a wall-clock limit: on expiry the signal aborts its download or read and the item fails as item_deadline.
+async function withDeadline(work, ms) {
+  const ctl = new AbortController(); let timer;
+  const expired = new Promise((_, reject) => { timer = setTimeout(() => { ctl.abort(); reject(Object.assign(new Error('item_deadline'), { cls: 'item_deadline' })); }, ms); });
+  try { return await Promise.race([work(ctl.signal), expired]); } finally { clearTimeout(timer); }
 }
 
 const frames = await worklist();
@@ -159,6 +182,14 @@ console.error(`${frames.length} document frames to read for ${OWNER} (model ${mo
 // says what is wrong without anyone opening the log on the Mac.
 const out = []; const summary = { frames: frames.length, read: 0, page: 0, landed: 0, waiting_no_vehicle: 0, vehicle_document: 0, errors: 0, error_classes: {}, receipts: 0, receipt_errors: 0, stopped: null, by_type: {}, read_seconds: 0 };
 let stop = false;
+if (Number.isFinite(deadlineAt) && deadlineAt > 0) {
+  setTimeout(() => {
+    summary.stopped = 'deadline';
+    try { if (args.out && args.out !== true) writeFileSync(args.out, JSON.stringify({ run: 'subscription-document-reader', at: new Date().toISOString(), owner: OWNER, model, summary, results: out }, null, 1)); } catch {}
+    console.log(JSON.stringify(summary));
+    process.exit(4);
+  }, Math.max(0, deadlineAt * 1000 - Date.now())).unref();
+}
 const resultOf = (e) => {
   const msg = String(e?.message || e);
   const dl = msg.match(/^download (\d+)/);
@@ -223,8 +254,7 @@ if (!dry) {
     try {
       const ext = String(w.source || w.file_name || '').toLowerCase().match(/\.(heic|heif|png|webp|jpe?g|pdf)(?:$|\?)/)?.[1] || 'jpg';
       const raw = join(own, `${w.receipt_id}.${ext}`);
-      writeFileSync(raw, await rereadBytes(w));
-      const { extraction } = await readFile(w.receipt_id, raw, ext, own);
+      const { extraction } = await withDeadline(async (signal) => { writeFileSync(raw, await rereadBytes(w, signal)); return readFile(w.receipt_id, raw, ext, own, signal); }, itemMs);
       const res = await rpc('receipt_record_reread', { p_receipt: w.receipt_id, p_extraction: extraction, p_reader: `claude-cli ${model} subscription`, p_source: w.source_kind });
       if (res?.stored) summary.reread_stored++; else summary.reread_refused++;
       out.push({ receipt_id: w.receipt_id, reread: true, source_kind: w.source_kind, stored: !!res?.stored, reason: res?.reason, lines: res?.lines });

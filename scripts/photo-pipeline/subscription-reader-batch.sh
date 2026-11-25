@@ -40,7 +40,25 @@ FULL_STAMP="$LOGDIR/.subscription-reader-last-full"; FAST_HOLD="$LOGDIR/.subscri
 last_full="$(cat "$FULL_STAMP" 2>/dev/null)"; case "$last_full" in ''|*[!0-9]*) last_full=0;; esac
 if [ $(( $(date +%s) - last_full )) -ge "$FULL_EVERY" ]; then MODE=full; else MODE=fast; fi
 [ "$MODE" = fast ] && [ -e "$FAST_HOLD" ] && exit 0
+# Wall clock (2026-11-25: the document reader blocked in open() on a macOS privacy prompt from 02:28Z and, because every
+# fire skips while a reader lives, held all four readers for over an hour). Each reader is started with --deadline-at
+# (now + READER_WALL_S) and ends itself there; a reader still alive a minute past its own deadline is ended here.
+# A process started without --deadline-at (before this rule) is left alone and reported.
+READER_WALL_S="${NUKE_READER_WALL_S:-1500}"
+READER_KILL="${NUKE_READER_KILL:-/bin/kill}"
 if pgrep -f "subscription-document-reader.mjs|subscription-frame-classifier.mjs" >/dev/null; then
+  now_s=$(date +%s); overdue=""
+  while read -r pid cmd; do
+    dl="$(printf '%s' "$cmd" | sed -n 's/.*--deadline-at \([0-9][0-9]*\).*/\1/p')"
+    if [ -n "$dl" ] && [ "$now_s" -gt $(( dl + 60 )) ]; then overdue="$overdue $pid"; fi
+  done < <(pgrep -lf "subscription-document-reader.mjs|subscription-frame-classifier.mjs")
+  if [ -n "$overdue" ]; then
+    for pid in $overdue; do "$READER_KILL" -TERM "$pid" 2>/dev/null; done
+    sleep 5
+    for pid in $overdue; do "$READER_KILL" -KILL "$pid" 2>/dev/null; done
+    echo "$STAMP ended reader process(es)$overdue: alive more than 60 s past their --deadline-at"
+    exit 0
+  fi
   # a full fire that is due stays due (the stamp is not written), so it runs on the first minute the reader is free
   [ "$MODE" = full ] && echo "$STAMP a reader is already running; skipping this fire"
   exit 0
@@ -60,11 +78,13 @@ run_reader() { # name script args...
   local out="$LOGDIR/$name-$STAMP${OUT_TAG:-}.json"   # OUT_TAG: a fast fire's batch number, so two batches in one second keep their own files
   local started_s; started_s=$(date +%s)
   local summary
+  # the start, so the watch can tell a stuck reader (started, no report) from a silent one; a failed start never stops the fire
+  (cd "$HOME/nuke" && READER_NAME="$name" dotenvx run -q -f "$ENV_FILE" -- node "$MAIN/scripts/photo-pipeline/reader-heartbeat.mjs" --start >/dev/null 2>>"$LOGDIR/subscription-reader.log") || true
   # the reader's own exit status, not tail's: a reader that crashed must not look like one that reported
   # READER_PATH_FIRST: a directory searched ahead of the rest of PATH for this reader only. On 2026-11-20 /usr/local/bin/claude
   # (2.1.20, no --safe-mode) shadowed ~/.local/bin/claude (2.1.329); the frame reader's lean calls need the newer one, and the
   # reader falls back to its old call when the CLI it finds cannot take them.
-  summary="$(cd "$HOME/nuke" && PATH="${READER_PATH_FIRST:+$READER_PATH_FIRST:}$PATH" dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
+  summary="$(cd "$HOME/nuke" && PATH="${READER_PATH_FIRST:+$READER_PATH_FIRST:}$PATH" dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" ${READER_DEADLINE:+--deadline-at "$(( started_s + READER_WALL_S ))"} 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
   local rc=$?
   echo "$STAMP $name exit=$rc ${summary:-no summary}"
   # How the fire ended, for the fast fires: the photos it claimed, and whether it ended clean (exit 0, first reads not
@@ -118,7 +138,7 @@ fi
 
 # 2. documents, then 3. frames (failed first, then pending). Both readers name the model in full (claude-sonnet-5-5) and
 #    need the newer CLI for it, so both search ~/.local/bin first.
-READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-document-reader "$MAIN/scripts/photo-pipeline/subscription-document-reader.mjs" --limit "$DOCS_LIMIT" --concurrency 2
+READER_DEADLINE=1 READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-document-reader "$MAIN/scripts/photo-pipeline/subscription-document-reader.mjs" --limit "$DOCS_LIMIT" --concurrency 2
 READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-frame-classifier "$FRAME_READER" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending --deep-limit "$DEEP_LIMIT" --keyed-limit "$KEYED_LIMIT"
 # 4. the fact-doubt loop (scripts/doubts/fact-doubt-cycle.mjs): raise doubts for the owner's vehicles (newest landings
 #    first, no model) and answer pending ones blind on the subscription. After the frame reader so it sees this fire's

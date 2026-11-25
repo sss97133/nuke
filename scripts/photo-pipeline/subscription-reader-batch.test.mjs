@@ -54,9 +54,14 @@ esac
 const FAKE_GIT = `#!/bin/bash
 printf '%s\\n' "$*" >> "$HOME/git-calls.log"
 `;
+// pgrep -lf lists FAKE_PGREP_LIST (pid command lines) when a reader is said to be running
 const FAKE_PGREP = `#!/bin/bash
-[ -n "\${FAKE_READER_RUNNING:-}" ] && exit 0
-exit 1
+[ -n "\${FAKE_READER_RUNNING:-}" ] || exit 1
+[ "$1" = "-lf" ] && [ -n "\${FAKE_PGREP_LIST:-}" ] && printf '%s\\n' "$FAKE_PGREP_LIST"
+exit 0
+`;
+const FAKE_KILL = `#!/bin/bash
+printf '%s\\n' "$*" >> "$HOME/kill-calls.log"
 `;
 const FULL = ['subscription-document-reader.mjs', 'reader-heartbeat.mjs', 'subscription-frame-classifier.mjs', 'reader-heartbeat.mjs',
   'fact-doubt-cycle.mjs', 'reader-heartbeat.mjs', 'reconcile-receipt-work.mjs', 'reader-heartbeat.mjs'];
@@ -76,8 +81,11 @@ async function withHome(fn) {
     for (const f of ['node-calls.log', 'git-calls.log', 'probe-count']) rmSync(join(home, f), { force: true });
     const r = await run('/bin/bash', [WRAPPER, '20', '20'], { env: { HOME: home, PATH: '/usr/bin:/bin', NUKE_READER_BIN: bin, ...env } })
       .then((x) => ({ code: 0, ...x }), (e) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));
-    const calls = lines('node-calls.log').map((l) => { const [script, args, pathFirst] = l.split('|'); return { script, args, pathFirst, probe: args.includes('--probe') }; });
-    return { ...r, calls, scripts: calls.map((c) => (c.probe ? 'probe' : c.script)), git: lines('git-calls.log'),
+    const all = lines('node-calls.log').map((l) => { const [script, args, pathFirst] = l.split('|'); return { script, args, pathFirst, probe: args.includes('--probe'), start: args === '--start' }; });
+    // the reader starts (reader-heartbeat.mjs --start) are kept apart, so the call sequences below read as before
+    const calls = all.filter((c) => !c.start);
+    const starts = all.filter((c) => c.start).length;
+    return { ...r, calls, starts, order: all.map((c) => (c.start ? 'start' : c.probe ? 'probe' : c.script)), scripts: calls.map((c) => (c.probe ? 'probe' : c.script)), git: lines('git-calls.log'),
       receipts: readdirSync(logs).filter((f) => f.endsWith('.json')), stamp: existsSync(join(logs, '.subscription-reader-last-full')), hold: existsSync(join(logs, '.subscription-reader-fast-hold')) };
   };
   const fullFire = (env = {}) => fire({ NUKE_READER_FULL_EVERY: '0', ...env });
@@ -90,6 +98,10 @@ test('the first fire is a full one: checkout refreshed, documents then frames wi
     assert.equal(r.code, 0);
     assert.equal(r.git.some((g) => g.includes('fetch -q origin main')), true, 'a full fire refreshes the checkout');
     assert.deepEqual(r.scripts, FULL);
+    assert.deepEqual(r.order.slice(0, 3), ['start', 'subscription-document-reader.mjs', 'reader-heartbeat.mjs'], 'each reader is started on record first');
+    assert.equal(r.starts, 4);
+    assert.match(r.calls[0].args, /--deadline-at \d+/, 'the document reader carries its deadline');
+    assert.doesNotMatch(r.calls[2].args, /--deadline-at/, 'the frame reader does not end itself, so it carries none');
     assert.match(r.calls[2].args, /--limit 20 --concurrency 2 --status failed,pending --deep-limit 20 --keyed-limit 60 /);
     assert.deepEqual([r.calls[0].pathFirst, r.calls[2].pathFirst], [join(home, '.local', 'bin'), join(home, '.local', 'bin')], 'both readers search ~/.local/bin first for the CLI');
     assert.deepEqual([r.stamp, r.hold], [true, false], 'the full fire is stamped; its clean ending leaves the fast fires on');
@@ -184,6 +196,24 @@ test('while a reader is running a fast fire is silent, and a full fire that is d
     await fire();
     const fast = await fire({ FAKE_READER_RUNNING: '1', FAKE_START: '5' });
     assert.deepEqual([fast.code, fast.calls.length, fast.stdout], [0, 0, '']);
+  });
+});
+
+test('a reader alive a minute past its own --deadline-at is ended; one started without a deadline is left alone', async () => {
+  await withHome(async ({ fire, home, bin }) => {
+    writeFileSync(join(bin, 'kill'), FAKE_KILL); chmodSync(join(bin, 'kill'), 0o755);
+    const env = { FAKE_READER_RUNNING: '1', NUKE_READER_KILL: join(bin, 'kill') };
+    const kills = () => (existsSync(join(home, 'kill-calls.log')) ? readFileSync(join(home, 'kill-calls.log'), 'utf8').trim().split('\n') : []);
+    const old = await fire({ ...env, FAKE_PGREP_LIST: '41 node /x/subscription-document-reader.mjs --limit 20 --owner o --out f' });
+    assert.deepEqual([old.code, kills()], [0, []], 'no deadline on the command line: not ended');
+    assert.match(old.stdout, /a reader is already running; skipping this fire/);
+    const late = await fire({ ...env, FAKE_PGREP_LIST: '42 node /x/subscription-document-reader.mjs --out f --deadline-at 1000' });
+    assert.deepEqual(kills(), ['-TERM 42', '-KILL 42']);
+    assert.match(late.stdout, /ended reader process\(es\) 42: alive more than 60 s past their --deadline-at/);
+    rmSync(join(home, 'kill-calls.log'));
+    const soon = Math.floor(Date.now() / 1000) + 600;
+    await fire({ ...env, FAKE_PGREP_LIST: `43 node /x/subscription-document-reader.mjs --deadline-at ${soon}` });
+    assert.deepEqual(kills(), [], 'within its deadline: not ended');
   });
 });
 

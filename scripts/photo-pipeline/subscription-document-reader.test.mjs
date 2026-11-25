@@ -46,8 +46,9 @@ async function withStandIns(frameNames, fn, { blocked = [], ledger = true, extra
     req.on('end', () => {
       const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body)); };
       const path = decodeURIComponent(req.url);
+      if (path.startsWith('/img/') && path.includes('hang')) return; // never answers
       if (path.startsWith('/img/')) return path.includes('gone') ? res.writeHead(404).end() : res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
-      if (path.startsWith('/rest/v1/receipt_reread_worklist')) { calls.queries.push(path); return rereads ? json(200, rereads(url)) : json(404, { code: 'PGRST205' }); }
+      if (path.startsWith('/rest/v1/receipt_reread_worklist')) { calls.queries.push(path); return rereads ? json(200, rereads(url, bin)) : json(404, { code: 'PGRST205' }); }
       if (path === '/rest/v1/rpc/receipt_record_reread') { const b = JSON.parse(data); calls.rereads.push(b); return json(200, { stored: true, lines: 0 }); }
       if (path.startsWith('/rest/v1/capture_document_pages_to_land')) return json(200, []);
       if (path.startsWith('/rest/v1/capture_document_pages')) return json(200, [{ image_id: 'z-already-read.jpg' }]);
@@ -68,6 +69,7 @@ async function withStandIns(frameNames, fn, { blocked = [], ledger = true, extra
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   port = server.address().port;
+  // bin is also the reader's HOME, so a test can name a path inside the folders macOS gates (bin/Downloads/...)
   const bin = mkdtempSync(join(tmpdir(), 'doc-reader-bin-'));
   writeFileSync(join(bin, 'claude'), FAKE_CLAUDE); chmodSync(join(bin, 'claude'), 0o755);
   try {
@@ -79,7 +81,7 @@ async function withStandIns(frameNames, fn, { blocked = [], ledger = true, extra
     const lines = (f) => (existsSync(join(bin, f)) ? readFileSync(join(bin, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
     await fn({ calls, summary, url, result, claudeArgs: lines('claude-args.jsonl'), claudeRuns: lines('claude-runs.jsonl') });
   } finally {
-    server.close();
+    server.closeAllConnections(); server.close();
     rmSync(bin, { recursive: true, force: true });
   }
 }
@@ -166,6 +168,28 @@ test('held receipts: storage papers, and local papers with --local-rereads, are 
       assert.ok(calls.queries.some((q) => q.includes('source_kind=eq.storage')), 'the work list is asked for stored papers only');
     }, { rereads: rows });
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a local paper in a gated folder is never opened without a terminal; a hung download costs one item, not the run', async () => {
+  const rows = (url, home) => [
+    { receipt_id: 'r-gated', source_kind: 'local', source: join(home, 'Downloads', 'RECEIPTS', 'IMG_9.jpeg'), file_name: 'IMG_9.json', reason: 'no_lines_held' },
+    { receipt_id: 'r-hang', source_kind: 'storage', source: url('hang.jpeg'), file_name: 'hang.jpeg', reason: 'no_lines_held' },
+    { receipt_id: 'r-storage', source_kind: 'storage', source: url('IMG_2.jpeg'), file_name: 'IMG_2.jpeg', reason: 'no_lines_held' },
+  ];
+  await withStandIns([], ({ calls, summary }) => {
+    assert.equal(summary.error_classes.privacy_gated_folder, 1);
+    assert.equal(summary.error_classes.item_deadline, 1);
+    assert.equal(summary.reread_stored, 1, 'the item after the hung one still runs');
+    assert.deepEqual(calls.rereads.map((c) => c.p_receipt), ['r-storage']);
+  }, { rereads: rows, extraArgs: ['--local-rereads', '--item-seconds', '1'] });
+});
+
+test('--deadline-at ends the run with its summary and exit 4', async () => {
+  const rows = (url) => [{ receipt_id: 'r-hang', source_kind: 'storage', source: url('hang.jpeg'), file_name: 'hang.jpeg', reason: 'no_lines_held' }];
+  await withStandIns([], ({ result, summary }) => {
+    assert.equal(result.code, 4);
+    assert.equal(summary.stopped, 'deadline');
+  }, { rereads: rows, extraArgs: ['--deadline-at', String(Math.floor(Date.now() / 1000) + 2)] });
 });
 
 test('without the work list (view not deployed) the reader runs as before', async () => {
