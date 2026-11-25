@@ -5,10 +5,12 @@
 
 import { supabase } from '../lib/supabase';
 import { extractImageMetadata } from '../utils/imageMetadata';
-import { imageOptimizationService } from './imageOptimizationService';
 import { TimelineEventService } from './timelineEventService';
 import { DocumentTypeDetector } from './documentTypeDetector';
 import { ImageDuplicateLinker } from './imageDuplicateLinker';
+import { webImageRow } from '../lib/webImageRow';
+import { signPrivateStorageUrl } from '../lib/privateStorage';
+import { PHOTO_BUCKET, PAPER_BUCKET, objectName, photoObjectPath, paperObjectPath, uploadOwnObject, bucketForStoragePath } from '../lib/ownStorage';
 
 export interface ImageUploadResult {
   success: boolean;
@@ -16,12 +18,13 @@ export interface ImageUploadResult {
   imageUrl?: string;
   duplicateOf?: string;
   duplicateType?: 'exact' | 'perceptual';
+  /** The end state: the row landed, the same bytes already have a row (nothing written or re-filed), or refused. */
+  outcome?: 'landed' | 'duplicate' | 'refused';
   message?: string;
   error?: string;
 }
 
 export class ImageUploadService {
-  private static readonly STORAGE_BUCKET = 'vehicle-data';
   private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private static readonly COMPRESS_THRESHOLD = 5 * 1024 * 1024; // Compress files larger than 5MB
 
@@ -232,11 +235,15 @@ export class ImageUploadService {
 
       // Compute hashes up front for dedupe (use original file for stability)
       let fileHash: string | null = null;
+      let originalHash: string | null = null;
       let perceptualHash: string | null = null;
       let differenceHash: string | null = null;
 
       try {
-        fileHash = await this.computeFileHash(file);
+        // The stored bytes' hash, as iOS computes it: it names the object and is the row's file_hash.
+        fileHash = await this.computeFileHash(fileToUpload);
+        // Web uploads before #3951 hashed the original file; a compressed upload is checked under both hashes.
+        if (fileToUpload !== file) originalHash = await this.computeFileHash(file);
       } catch (err) {
         console.warn('Failed to compute file hash (non-blocking):', err);
       }
@@ -255,38 +262,30 @@ export class ImageUploadService {
       let duplicateOf: string | null = null;
       let duplicateType: 'exact' | 'perceptual' | null = null;
 
-      // Exact duplicates per vehicle (or personal library)
+      // The same bytes already have a row: the uploader's own (on any car, or unfiled) or one on the picked car. That row
+      // keeps its filing; the web writes nothing and does not re-file it, and says so.
       if (fileHash) {
-        try {
-          const exactQuery = supabase
-            .from('vehicle_images')
-            .select('id, image_url, vehicle_id')
-            .eq('file_hash', fileHash)
-            .limit(1);
-
-          if (vehicleId) {
-            exactQuery.eq('vehicle_id', vehicleId);
-          } else {
-            exactQuery.is('vehicle_id', null).eq('user_id', user.id);
-          }
-
-          const { data: exactDup, error: exactErr } = await exactQuery.maybeSingle();
-          if (exactErr && exactErr.code !== 'PGRST116') {
-            console.warn('Exact duplicate check failed (non-blocking):', exactErr);
-          } else if (exactDup) {
-            duplicateOf = exactDup.id;
-            duplicateType = 'exact';
-            return {
-              success: true,
-              imageId: exactDup.id,
-              imageUrl: exactDup.image_url,
-              duplicateOf: exactDup.id,
-              duplicateType: 'exact',
-              message: 'Exact duplicate detected; reusing existing image'
-            };
-          }
-        } catch (err) {
-          console.warn('Exact duplicate check failed (non-blocking):', err);
+        const holders = [`user_id.eq.${user.id}`];
+        if (vehicleId && vehicleId !== 'title-scan-temp') holders.push(`vehicle_id.eq.${vehicleId}`);
+        const { data: exactDup, error: exactErr } = await supabase
+          .from('vehicle_images')
+          .select('id, image_url, vehicle_id')
+          .in('file_hash', originalHash && originalHash !== fileHash ? [fileHash, originalHash] : [fileHash])
+          .or(holders.join(','))
+          .limit(1)
+          .maybeSingle();
+        if (exactErr && exactErr.code !== 'PGRST116') {
+          console.warn('Exact duplicate check failed (the insert still refuses a same-car twin):', exactErr);
+        } else if (exactDup) {
+          return {
+            success: true,
+            outcome: 'duplicate',
+            imageId: exactDup.id,
+            imageUrl: exactDup.image_url || undefined,
+            duplicateOf: exactDup.id,
+            duplicateType: 'exact',
+            message: exactDup.vehicle_id ? 'Already uploaded: these bytes are on a vehicle; left where they are' : 'Already uploaded: these bytes are in your unfiled photos; left there',
+          };
         }
       }
 
@@ -314,7 +313,6 @@ export class ImageUploadService {
 
       // Extract EXIF metadata for images only (use original file for EXIF, not compressed)
       let metadata: any = {};
-      let optimizationResult: any = { success: false };
 
       const rawListingContext: any = (file as any)?.listingContext;
       let listingCapturedAt: Date | undefined;
@@ -347,27 +345,12 @@ export class ImageUploadService {
         if (listingSource) {
           metadata.listingSource = listingSource;
         }
-
-        // Generate optimized variants for images (use compressed file)
-        console.log('Generating image variants...');
-        optimizationResult = await imageOptimizationService.generateVariantBlobs(fileToUpload);
-
-        if (!optimizationResult.success) {
-          console.warn('Variant generation failed, uploading original only:', optimizationResult.error);
-        }
       } else {
         console.log('Skipping EXIF extraction for non-image file:', file.name);
       }
 
-      // Generate simple filename: vehicleId/uniqueId.ext OR userId/unorganized/uniqueId.ext
-      const fileExt = file.name.split('.').pop() || (isImage ? 'jpg' : 'pdf');
       const uniqueId = crypto.randomUUID();
-      const fileName = `${uniqueId}.${fileExt}`;
-      const safeCategory = String(category || 'general')
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9_-]+/g, '_')
-        .replace(/^_+|_+$/g, '') || 'general';
+      const fileName = objectName(file.name);
 
       // Detect document type early since storage routing depends on it.
       // IMPORTANT: If the caller explicitly uploads as a document, force document classification.
@@ -382,13 +365,6 @@ export class ImageUploadService {
         : DocumentTypeDetector.detectFromFile(file);
       const isDocument = docDetection.type !== 'vehicle_photo';
       const documentCategory = isDocument ? this.mapDocumentTypeToCategory(docDetection.type) : null;
-      const storageFolder = isDocument ? 'documents' : 'images';
-
-      const storagePath = vehicleId === 'title-scan-temp'
-        ? `temp/title-scan/${user.id}/${fileName}`
-        : vehicleId
-          ? `vehicles/${vehicleId}/${storageFolder}/${safeCategory}/${fileName}`
-          : `users/${user.id}/unorganized/${fileName}`; // Personal library
 
       // Capture date is real testimony — only assert it from a real capture signal.
       // EXIF DateTimeOriginal / a source listing's capture time / the file's own
@@ -401,63 +377,32 @@ export class ImageUploadService {
         || (file.lastModified ? new Date(file.lastModified) : null);
       console.log('Using date for timeline:', photoDate ? photoDate.toISOString() : '(none — taken_at left null)');
 
-      // Upload original to storage (use compressed version if available)
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(this.STORAGE_BUCKET)
-        .upload(storagePath, fileToUpload, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        return { success: false, error: `Upload failed: ${uploadError.message}` };
+      // One landing rule with iOS (lib/ownStorage): a photo to vehicle-photos users/<uid>/capture-relay/<sha256>/<name>,
+      // a paper to the private user-documents bucket. Only the original goes up; the image renderer makes the sizes.
+      if (!fileHash) {
+        return { success: false, outcome: 'refused', error: 'Upload refused: the file could not be hashed, so it has no storage name' };
+      }
+      const isPaper = isDocument || vehicleId === 'title-scan-temp';
+      const bucket = isPaper ? PAPER_BUCKET : PHOTO_BUCKET;
+      const storagePath = isPaper ? paperObjectPath(user.id, fileHash, file.name) : photoObjectPath(user.id, fileHash, file.name);
+      const refused = await uploadOwnObject(bucket, storagePath, fileToUpload, fileToUpload.type || undefined);
+      if (refused) {
+        return { success: false, outcome: 'refused', error: `Upload refused by storage: ${refused}` };
       }
 
-      // Get public URL for original
-      const { data: urlData } = supabase.storage
-        .from(this.STORAGE_BUCKET)
-        .getPublicUrl(storagePath);
-
-      // Upload variants and collect URLs
-      const variants: any = { full: urlData.publicUrl };
-
-      if (optimizationResult.success && optimizationResult.variantBlobs) {
-        console.log('Uploading image variants...');
-
-        for (const [sizeName, blob] of Object.entries(optimizationResult.variantBlobs)) {
-          const variantPath = vehicleId === 'title-scan-temp'
-            ? `temp/title-scan/${user.id}/${uniqueId}_${sizeName}.jpg`
-            : vehicleId
-              ? `vehicles/${vehicleId}/${storageFolder}/${safeCategory}/${uniqueId}_${sizeName}.jpg`
-              : `users/${user.id}/unorganized/${uniqueId}_${sizeName}.jpg`;
-
-          const { data: variantUpload, error: variantError } = await supabase.storage
-            .from(this.STORAGE_BUCKET)
-            .upload(variantPath, blob as Blob, {
-              cacheControl: '3600',
-              upsert: false
-            });
-
-          if (!variantError && variantUpload) {
-            const { data: variantUrl } = supabase.storage
-              .from(this.STORAGE_BUCKET)
-              .getPublicUrl(variantPath);
-
-            variants[sizeName] = variantUrl.publicUrl;
-            console.log(`Uploaded ${sizeName} variant:`, variantUrl.publicUrl);
-          } else {
-            console.warn(`Failed to upload ${sizeName} variant:`, variantError?.message);
-          }
-        }
-      }
+      // A paper is private: its row carries the object's storage URL in the private bucket, which opens for nobody until
+      // a reader signs it (lib/privateStorage signPrivateStorageUrl, the rule every private-document reader uses).
+      const urlData = { publicUrl: supabase.storage.from(bucket).getPublicUrl(storagePath).data.publicUrl };
+      const readBack = async () => (isPaper ? await signPrivateStorageUrl(urlData.publicUrl, 600) : urlData.publicUrl) || undefined;
 
       // Skip database insert for title scanning temp uploads
       if (vehicleId === 'title-scan-temp') {
         console.log('Skipping database insert for title scan temp upload');
         return {
           success: true,
+          outcome: 'landed',
           imageId: 'temp-' + uniqueId,
-          imageUrl: urlData.publicUrl
+          imageUrl: await readBack()
         };
       }
 
@@ -540,65 +485,72 @@ export class ImageUploadService {
       const latitude = locationWithAddress?.latitude || metadata.location?.latitude;
       const longitude = locationWithAddress?.longitude || metadata.location?.longitude;
 
-      const { data: dbResult, error: dbError } = await supabase
-        .from('vehicle_images')
-        .insert({
-          vehicle_id: vehicleId || null, // Nullable for personal library
-          user_id: user.id,
-          image_url: urlData.publicUrl,
-          file_name: fileName,
-          filename: file.name, // Store original filename for duplicate detection
-          storage_path: storagePath,
-          category: category,
-          file_size: fileToUpload.size, // Use compressed file size
-          mime_type: fileToUpload.type,
-          file_hash: fileHash,
-          perceptual_hash: perceptualHash,
+      // The iOS row (lib/webImageRow, checked against the Swift struct) plus the web form's columns. A picked car is
+      // kept: the pick at submit is the uploader's Sign, recorded in exif_data.filing with the uploader's id.
+      const row = webImageRow({
+        userId: user.id,
+        vehicleId: vehicleId || null,
+        publicUrl: urlData.publicUrl,
+        storagePath,
+        fileName,
+        originalFilename: file.name,
+        fileSize: fileToUpload.size,
+        mimeType: fileToUpload.type,
+        fileHash,
+        latitude: latitude || null,
+        longitude: longitude || null,
+        takenAt: photoDate ? photoDate.toISOString() : null, // Real capture signal only; null when unknown
+        exif: exifPayload,
+        cameraMake: metadata.camera?.make ?? null,
+        cameraModel: metadata.camera?.model ?? null,
+        isPaper,
+        // A paper has no public URL for the photo pipeline to fetch: it is held ('skipped'), as iOS holds a
+        // metadata-only row, until a reader signs its URL.
+        aiProcessingStatus: duplicateOf ? 'duplicate_skipped' : isPaper ? 'skipped' : 'pending',
+        web: {
+          category,
+          perceptualHash,
           dhash: differenceHash,
-          duplicate_of: duplicateOf,
-          is_duplicate: Boolean(duplicateOf),
-          is_primary: count === 0 && !isDocument, // First image becomes primary (not documents)
-          is_sensitive: false, // Required field
-          taken_at: photoDate ? photoDate.toISOString() : null, // Real capture signal only; null when unknown
-          latitude: latitude || null, // Store at top level for easier querying
-          longitude: longitude || null, // Store at top level for easier querying
-          variants: variants, // Store all variant URLs
-          exif_data: exifPayload,
-          is_document: isDocument,
-          document_category: documentCategory,
-          document_classification: isDocument ? JSON.stringify({
+          duplicateOf,
+          isPrimary: count === 0 && !isDocument, // First image becomes primary (not documents)
+          isDocument,
+          documentCategory,
+          documentClassification: isDocument ? JSON.stringify({
             type: docDetection.type,
             confidence: docDetection.confidence,
             reasoning: docDetection.reasoning,
             detected_at: new Date().toISOString()
           }) : null,
-          ai_processing_status: duplicateOf ? 'duplicate_skipped' : 'pending', // Queue for AI analysis unless duplicate
-          organization_status: vehicleId ? 'organized' : 'unorganized' // Auto-organized if linked to vehicle
-        })
+        },
+        nowIso: new Date().toISOString(),
+      });
+
+      let { data: dbResult, error: dbError } = await supabase
+        .from('vehicle_images')
+        .insert(row)
         .select('id')
         .single();
 
+      let refusedPick: string | null = null;
+      if (dbError?.code === '42501' && row.vehicle_id) {
+        // The database admits a photo onto a car only when the uploader may edit that car. Land it unfiled instead:
+        // the pick stays recorded in exif_data.filing, and the photo waits in the uploader's own library.
+        refusedPick = row.vehicle_id;
+        ({ data: dbResult, error: dbError } = await supabase
+          .from('vehicle_images')
+          .insert({ ...row, vehicle_id: null, is_primary: false })
+          .select('id')
+          .single());
+        if (!dbError) vehicleId = undefined;
+      }
+
+      if (dbError?.code === '23505') {
+        // The picked car already holds these bytes (one row per car and hash): nothing new, nothing moved.
+        return { success: true, outcome: 'duplicate', message: 'Already on this vehicle: the same bytes have a row there' };
+      }
       if (dbError) {
-        // Clean up uploaded files if database insert fails
-        const pathsToClean = [storagePath];
-
-        // Add variant paths to cleanup list
-        if (optimizationResult.success && optimizationResult.variantBlobs) {
-          for (const sizeName of Object.keys(optimizationResult.variantBlobs)) {
-            const variantPath = vehicleId === 'title-scan-temp'
-              ? `temp/title-scan/${user.id}/${uniqueId}_${sizeName}.jpg`
-              : vehicleId
-                ? `vehicles/${vehicleId}/${isDocument ? 'documents' : 'images'}/${safeCategory}/${uniqueId}_${sizeName}.jpg`
-                : `users/${user.id}/unorganized/${uniqueId}_${sizeName}.jpg`;
-            pathsToClean.push(variantPath);
-          }
-        }
-
-        await supabase.storage
-          .from(this.STORAGE_BUCKET)
-          .remove(pathsToClean);
-
-        return { success: false, error: `Database error: ${dbError.message}` };
+        // The object stays: its path is its bytes, so a retry lands the row on the same object (iOS does the same).
+        return { success: false, outcome: 'refused', error: `Database error: ${dbError.message}` };
       }
 
       // ✅ PHOTOS ARE NOT EVENTS
@@ -647,7 +599,7 @@ export class ImageUploadService {
       // Trigger photo-pipeline-orchestrator directly (non-blocking, retried).
       // Backstops: pg_net INSERT trigger + photo-pipeline-drain cron requeue
       // anything that slips through, so a lost invoke is recoverable.
-      if (isImage && dbResult?.id && !duplicateOf) {
+      if (isImage && !isPaper && dbResult?.id && !duplicateOf) {
         console.log('📸 Triggering photo pipeline for:', dbResult.id);
         const pipelineBody = {
           image_id: dbResult.id,
@@ -685,8 +637,10 @@ export class ImageUploadService {
 
       return {
         success: true,
+        outcome: 'landed',
         imageId: dbResult.id,
-        imageUrl: urlData.publicUrl
+        imageUrl: await readBack(),
+        ...(refusedPick ? { message: 'Landed in your unfiled photos: you cannot add photos to that vehicle' } : {}),
       };
 
     } catch (error: any) {
@@ -729,9 +683,10 @@ export class ImageUploadService {
 
       // Delete from storage
       if (imageRecord.storage_path) {
-        const { error: storageError } = await supabase.storage
-          .from(this.STORAGE_BUCKET)
-          .remove([imageRecord.storage_path]);
+        const bucket = bucketForStoragePath(imageRecord.storage_path);
+        const { error: storageError } = bucket
+          ? await supabase.storage.from(bucket).remove([imageRecord.storage_path])
+          : { error: { message: 'unknown storage path shape' } };
 
         if (storageError) {
           console.warn('Storage deletion failed:', storageError.message);
