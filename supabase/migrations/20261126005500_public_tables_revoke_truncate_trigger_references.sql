@@ -21,7 +21,10 @@
 --
 -- Locks (measured on PG17): a REVOKE takes no lock on the table. It updates the relation's pg_class row (relacl) and
 -- sends a relcache invalidation. Concurrent reads and writes on the tables continue. DDL or GRANTs on the same
--- relations wait until this transaction commits, and every backend rebuilds its relcache entries afterwards. Install
+-- relations wait until this transaction commits, and so does ANALYZE on a touched table (ta-skeptic2 measured an
+-- autovacuum-style ANALYZE waiting 2.95 s behind a REVOKE held open), and every backend rebuilds its relcache entries
+-- afterwards (one cache reset per backend for the 2,208 pg_class rows). Measured runtime on PG17 at live scale: 0.06 to
+-- 0.20 s. Install
 -- in a quiet window: no index build, and v_job_health showing the fewest lots near close.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
