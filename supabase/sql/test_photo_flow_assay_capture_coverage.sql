@@ -1,4 +1,4 @@
--- Contract for 20261125132000_photo_flow_assay_capture_coverage.sql, on a fresh disposable database.
+-- Contract for 20261126054500_photo_flow_assay_capture_coverage.sql, on a fresh disposable database.
 -- assay_photo_reading_flow v5 counts the landing owner's recent photos that are in no capture set, by why, and fails
 -- while a scorable photo is stranded (not_chunked, read_after_plan, scorable_no_candidate past one drain cycle):
 --   one photo per bucket: no_pixels, duplicate, image_type_blocked, awaiting_read, awaiting_plan, not_chunked,
@@ -66,8 +66,8 @@ SELECT pg_temp.cchunk(13, interval '1 hour');
 SELECT assay_photo_reading_flow(false) AS v4 \gset
 
 -- ===== apply
-\ir ../migrations/20261125132000_photo_flow_assay_capture_coverage.sql
-SELECT pg_temp.ok(pg_temp.md5_of('public.assay_photo_reading_flow(boolean)') = '7e538364bb81721ab810b816ace059a1', 'migration lands v5 (md5)');
+\ir ../migrations/20261126054500_photo_flow_assay_capture_coverage.sql
+SELECT pg_temp.ok(pg_temp.md5_of('public.assay_photo_reading_flow(boolean)') = '3d4148c2a23a4c1014ce713f26632664', 'migration lands v5 (md5)');
 SELECT assay_photo_reading_flow(false) AS v5 \gset
 SELECT pg_temp.ok((:'v5')::jsonb #> '{capture_sets,by_reason}' = '{"no_pixels":1,"duplicate":1,"image_type_blocked":1,"awaiting_read":1,
     "awaiting_plan":1,"not_chunked":1,"read_after_plan":1,"scorable_no_candidate":2}'::jsonb
@@ -93,9 +93,9 @@ SELECT pg_temp.ok(((:'v5b')::jsonb #>> '{capture_sets,stuck}')::int = 0
   'nothing stranded: the reasons and status are v4''s');
 
 -- ===== replay and revert
-\ir ../migrations/20261125132000_photo_flow_assay_capture_coverage.sql
-SELECT pg_temp.ok(pg_temp.md5_of('public.assay_photo_reading_flow(boolean)') = '7e538364bb81721ab810b816ace059a1', 'replay: same body');
-\ir revert_20261125132000_photo_flow_assay_capture_coverage.sql
+\ir ../migrations/20261126054500_photo_flow_assay_capture_coverage.sql
+SELECT pg_temp.ok(pg_temp.md5_of('public.assay_photo_reading_flow(boolean)') = '3d4148c2a23a4c1014ce713f26632664', 'replay: same body');
+\ir revert_20261126054500_photo_flow_assay_capture_coverage.sql
 SELECT pg_temp.ok(pg_temp.md5_of('public.assay_photo_reading_flow(boolean)') = '9451a1281ddaa876dc0ba980aeeaba6d'
   AND NOT (assay_photo_reading_flow(false) ? 'capture_sets'), 'revert: v4 body by md5, no capture_sets section');
 \echo 'photo flow assay capture coverage contract passed'

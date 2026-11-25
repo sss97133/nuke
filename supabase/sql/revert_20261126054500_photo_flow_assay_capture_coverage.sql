@@ -1,32 +1,8 @@
--- assay_photo_reading_flow v5: a capture-set coverage section, red while a scorable photo is stranded.
---
--- Why. On 2026-11-24 the skeptic found 554 of the owner's recent photos in no capture set, and nothing showed it: the
--- landing tick, the drain and the review sweep all passed in v_job_health. Measured 2026-11-25: of 540 such photos
--- (since 11-10), 498 are excluded by the scorer's rules (no pixels, duplicate, image type), 41 were classified after
--- their day's plan and never re-armed (20261125131000 re-arms them), and 2 were planned after their read but formed no set.
---
--- What. The existing hourly watch (cron photo-reading-flow-watch, SELECT assay_photo_reading_flow()) gains 'capture_sets':
--- the landing owner's photos uploaded in the last 30 days, unfiled or on the holding car, admitted, in no non-dry
--- capture_landing_sets row, counted by why: no_taken_at, no_pixels, duplicate, image_type_blocked, awaiting_read,
--- awaiting_plan, not_chunked, read_after_plan, scorable_no_candidate. The last three are photos no job will plan
--- again; while any exist (older than one drain cycle, 15 min) the assay fails with a reason, so the raising watch fails
--- and v_job_health shows it with the counts as last_error. No new job, no table, no row written.
--- Cost: 5 s on the owner's 30-day uploads (idx_vehicle_images_user_created), within the watch's 20 s.
--- Guard: the body must be 20261125070000's (md5 9451a128...) or this migration's own (replay).
--- Contract: supabase/sql/test_photo_flow_assay_capture_coverage.sql
--- Revert: supabase/sql/revert_20261125132000_photo_flow_assay_capture_coverage.sql
-
+-- Revert of 20261126054500_photo_flow_assay_capture_coverage.sql: assay_photo_reading_flow back to 20261125070000's
+-- body (md5 9451a1281ddaa876dc0ba980aeeaba6d), with no capture_sets section.
 begin;
 set local statement_timeout = '45s';
 set local lock_timeout = '3s';
-
-do $guard$
-declare v text := coalesce((select md5(prosrc) from pg_proc where oid = to_regprocedure('public.assay_photo_reading_flow(boolean)')), 'missing');
-begin
-  if v not in ('9451a1281ddaa876dc0ba980aeeaba6d', '7e538364bb81721ab810b816ace059a1') then
-    raise exception 'assay_photo_reading_flow is not the body this migration replaces (md5 %); review before applying', v;
-  end if;
-end $guard$;
 
 CREATE OR REPLACE FUNCTION public.assay_photo_reading_flow(p_raise boolean DEFAULT true)
  RETURNS jsonb
@@ -53,7 +29,6 @@ DECLARE
   v_scope_on boolean := false; v_rs record; v_stages jsonb := '{}'::jsonb; v_rs_reasons text[] := '{}';
   v_rs_due bigint; v_rs_oldest timestamptz; v_rs_claimed bigint; v_rs_receipts_6h bigint; v_rs_closed_6h bigint; v_rs_last timestamptz;
   v_rs_carried bigint; v_rs_skipped_6h bigint; v_rs_live_used integer;
-  v_cap jsonb := '{}'::jsonb; v_cap_stuck bigint := 0;   -- (20261125132000) capture-set coverage
 BEGIN
   IF coalesce(auth.role(), 'postgres') NOT IN ('service_role', 'postgres') THEN
     RAISE EXCEPTION 'assay_photo_reading_flow: service admission required' USING ERRCODE = '42501';
@@ -270,62 +245,11 @@ BEGIN
   END IF;
   v_reasons := v_reasons || v_rs_reasons;
 
-  -- (20261125132000) Capture-set coverage. The landing owner's photos uploaded in the last 30 days that are unfiled (or
-  -- on the holding car), admitted, and in no non-dry capture_landing_sets row, each counted once by why
-  -- (idx_vehicle_images_user_created bounds the scan; 5 s live on 2026-11-25):
-  --   no_taken_at, no_pixels, duplicate (duplicate / superseded / sensitive), image_type_blocked (document, gate-rejected,
-  --   image_type other or receipt_document, a landed document page): capture_sets_score excludes these by rule;
-  --   awaiting_read: not classified yet (this assay's queue section watches that);
-  --   awaiting_plan: scorable, read or chunked within one drain cycle (15 min: 10 min settle + 5 min cron), or its chunk
-  --     is still planning;
-  --   not_chunked: scorable, read over 15 min ago, and no non-dry chunk covers its taken_at;
-  --   read_after_plan: scorable, and every chunk covering it was created before its classification;
-  --   scorable_no_candidate: scorable, planned after its read over 15 min ago, still in no set.
-  -- The last three are photos no job will plan again: the assay fails while any exist.
-  SELECT coalesce(jsonb_object_agg(g.why, g.n), '{}'::jsonb) INTO v_cap
-    FROM (WITH cfg AS (SELECT c.user_id FROM capture_landing_config c WHERE c.id = 1),
-          p AS (SELECT vi.id, vi.taken_at, vi.ai_processing_completed_at AS rd,
-                       CASE WHEN vi.taken_at IS NULL THEN 'no_taken_at'
-                            WHEN nullif(vi.image_url, '') IS NULL THEN 'no_pixels'
-                            WHEN coalesce(vi.is_duplicate, false) OR coalesce(vi.is_superseded, false) OR coalesce(vi.is_sensitive, false) THEN 'duplicate'
-                            WHEN coalesce(vi.is_document, false) OR coalesce(vi.doc_flag, false)
-                              OR coalesce(vi.vision_gate_status::text, '') IN ('rejected_personal', 'rejected_misattributed')
-                              OR coalesce(vi.ai_scan_metadata #>> '{classification,image_type}', '') IN ('other', 'receipt_document')
-                              OR EXISTS (SELECT 1 FROM capture_document_pages dp WHERE dp.image_id = vi.id AND dp.revoked_at IS NULL) THEN 'image_type_blocked'
-                            WHEN coalesce(vi.ai_scan_metadata #>> '{classification,image_type}', '') = '' THEN 'awaiting_read' END AS blocked
-                  FROM cfg JOIN vehicle_images vi ON vi.user_id = cfg.user_id
-                 WHERE vi.created_at >= now() - interval '30 days'
-                   AND public.capture_set_photo_admits(vi.source, vi.vehicle_id, vi.exif_data)
-                   AND (vi.vehicle_id IS NULL OR vi.vehicle_id = '14447ecd-293e-4203-9045-90102559c904'::uuid)
-                   AND NOT EXISTS (SELECT 1 FROM capture_landing_sets s JOIN capture_landing_chunks c ON c.id = s.chunk_id
-                                    WHERE NOT c.dry AND vi.id = ANY (s.image_ids))),
-          k AS (SELECT p.*,
-                       (SELECT max(c.created_at) FROM capture_landing_chunks c WHERE NOT c.dry AND c.state <> 'superseded'
-                         AND p.taken_at >= c.t_from AND p.taken_at < c.t_to) AS last_chunk,
-                       EXISTS (SELECT 1 FROM capture_landing_chunks c WHERE NOT c.dry AND c.state = 'planning'
-                                AND p.taken_at >= c.t_from AND p.taken_at < c.t_to) AS planning
-                  FROM p WHERE p.blocked IS NULL)
-          SELECT p.blocked AS why, count(*) AS n FROM p WHERE p.blocked IS NOT NULL GROUP BY 1
-          UNION ALL
-          SELECT CASE WHEN k.planning OR coalesce(k.rd, '-infinity') > now() - interval '15 minutes' THEN 'awaiting_plan'
-                      WHEN k.last_chunk IS NULL THEN 'not_chunked'
-                      WHEN k.last_chunk <= coalesce(k.rd, '-infinity') THEN 'read_after_plan'
-                      WHEN k.last_chunk > now() - interval '15 minutes' THEN 'awaiting_plan'
-                      ELSE 'scorable_no_candidate' END, count(*)
-            FROM k GROUP BY 1) g;
-  v_cap_stuck := coalesce((v_cap ->> 'not_chunked')::bigint, 0) + coalesce((v_cap ->> 'read_after_plan')::bigint, 0)
-               + coalesce((v_cap ->> 'scorable_no_candidate')::bigint, 0);
-  IF v_cap_stuck > 0 THEN
-    v_reasons := v_reasons || format('%s scorable photos uploaded in 30 days are in no capture set and no job will plan them again (not_chunked %s, read_after_plan %s, scorable_no_candidate %s)',
-                                     v_cap_stuck, coalesce(v_cap ->> 'not_chunked', '0'), coalesce(v_cap ->> 'read_after_plan', '0'),
-                                     coalesce(v_cap ->> 'scorable_no_candidate', '0'));
-  END IF;
-
   v_out := jsonb_build_object(
     'status', CASE WHEN cardinality(v_reasons) = 0 THEN 'passed' ELSE 'failed' END,
     'reasons', to_jsonb(v_reasons),
     'checked_at', now(),
-    'method', 'assay_photo_reading_flow v5',
+    'method', 'assay_photo_reading_flow v4',
     'population', 'vehicle_images rows with a user_id, every status (user_image_counts.n_all); listing photos are outside this assay',
     'classifier', jsonb_build_object(
       'image_rows_total', v_total,
@@ -359,23 +283,14 @@ BEGIN
       'successes_6h', v_ok_6h,
       'note', 'HTTP 200 is logged before the answer is validated; it is telemetry, not a reading'),
     'readers', v_readers,
-    'stage_queue', v_stage,
-    'capture_sets', jsonb_build_object(
-      'population', 'landing owner''s photos uploaded in the last 30 days, unfiled or on the holding car, admitted, in no non-dry capture_landing_sets row',
-      'by_reason', v_cap,
-      'stuck', v_cap_stuck));
+    'stage_queue', v_stage);
 
   IF p_raise AND cardinality(v_reasons) > 0 THEN
     RAISE EXCEPTION 'photo reading stalled: %', array_to_string(v_reasons, '; ');
   END IF;
   RETURN v_out;
-END $function$;
+END $function$
 
-do $after$
-begin
-  if (select md5(prosrc) from pg_proc where oid = to_regprocedure('public.assay_photo_reading_flow(boolean)')) <> '7e538364bb81721ab810b816ace059a1' then
-    raise exception 'assay_photo_reading_flow did not land as written';
-  end if;
-end $after$;
+;
 
 commit;
