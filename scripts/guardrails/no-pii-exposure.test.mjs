@@ -90,3 +90,51 @@ test('a public reader counting memberships with no grade is warned; graded, revo
   assert.deepEqual(ungradedCounts(ungraded.replace('SECURITY DEFINER', '')), []);
   assert.deepEqual(ungradedCounts(`CREATE FUNCTION public.n() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT count(*)::int FROM vehicles $$;`), []);
 });
+
+test('subject keys: a USING (true) read policy or disabled RLS on a table with a photo, user or document key is an exposure', async () => {
+  const { SUBJECT_COLUMN, SUBJECT_TABLE } = await import('./no-pii-exposure.mjs');
+  const keys = { image_descriptions: ['image_id'], user_presence: ['user_id'], paint_codes: [] };
+  const k = (sql) => findExposures(sql, pii, keys).map((h) => `${h.table}:${h.audience}:${h.columns.join(',')}`);
+  // the 2026-11-25 shapes: model descriptions of unfiled photos and a who-was-where log, readable logged out
+  assert.deepEqual(k('CREATE POLICY image_descriptions_select ON public.image_descriptions FOR SELECT USING (true);'),
+    ['image_descriptions:anon:image_id', 'image_descriptions:authenticated:image_id']);
+  assert.deepEqual(k('CREATE POLICY p ON user_presence FOR SELECT TO anon, authenticated USING (true);'),
+    ['user_presence:anon:user_id', 'user_presence:authenticated:user_id']);
+  assert.deepEqual(k('CREATE POLICY p ON image_descriptions FOR SELECT TO authenticated USING (true);'), ['image_descriptions:authenticated:image_id']);
+  assert.deepEqual(k('ALTER TABLE user_presence DISABLE ROW LEVEL SECURITY;'), ['user_presence:anon:user_id', 'user_presence:authenticated:user_id']);
+  // keys added in the same migration and tables named for photos count
+  assert.deepEqual(k('CREATE TABLE public.photo_readings (id uuid, vehicle_image_id uuid, body text);\nCREATE POLICY r ON public.photo_readings FOR SELECT USING (true);'),
+    ['photo_readings:anon:vehicle_image_id', 'photo_readings:authenticated:vehicle_image_id']);
+  assert.deepEqual(k('ALTER TABLE paint_codes ADD COLUMN source_document_id uuid; CREATE POLICY r ON paint_codes FOR SELECT USING (true);'),
+    ['paint_codes:anon:source_document_id', 'paint_codes:authenticated:source_document_id']);
+  assert.deepEqual(k('CREATE TABLE public.shop_photos (id uuid, taken_at timestamptz);\nCREATE POLICY r ON public.shop_photos FOR SELECT USING (true);'),
+    ['shop_photos:anon:id', 'shop_photos:authenticated:id']);
+  // rule tables named after receipts carry no key (20261124163000, 20261125013000, 20261125014500 replay)
+  assert.deepEqual(k('CREATE TABLE public.receipt_line_systems (id text, label text);\nCREATE POLICY r ON public.receipt_line_systems FOR SELECT USING (true);'), []);
+  // the idempotent DO-block shape (20251101000009 organization_images) counts; an EXECUTE string does not
+  assert.deepEqual(k(`DO $$\nBEGIN\nDROP POLICY IF EXISTS "a" ON user_presence;\nCREATE POLICY "a" ON user_presence\n  FOR SELECT\n  USING (true);\nEND $$;`),
+    ['user_presence:anon:user_id', 'user_presence:authenticated:user_id']);
+  assert.deepEqual(k(`DO $do$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'a') THEN CREATE POLICY a ON image_descriptions FOR SELECT TO authenticated USING (true); END IF; END $do$;`),
+    ['image_descriptions:authenticated:image_id']);
+  assert.deepEqual(k(`DO $$ BEGIN EXECUTE 'CREATE POLICY a ON user_presence FOR SELECT USING (true)'; END $$;`), []);
+  // predicates, service_role, writes and reference tables without keys pass
+  assert.deepEqual(k(`CREATE POLICY p ON image_descriptions FOR SELECT USING (EXISTS (SELECT 1 FROM vehicle_images vi WHERE vi.id = image_id AND vi.user_id = auth.uid()));`), []);
+  assert.deepEqual(k('CREATE POLICY p ON image_descriptions FOR SELECT TO service_role USING (true);'), []);
+  assert.deepEqual(k('CREATE POLICY p ON image_descriptions FOR INSERT WITH CHECK (true);'), []);
+  assert.deepEqual(k('CREATE POLICY p ON paint_codes FOR SELECT USING (true);'), []);
+  // a select grant alone is not a subject exposure (RLS still filters); without the keys map nothing changes
+  assert.deepEqual(k('GRANT SELECT ON image_descriptions TO anon;'), []);
+  assert.deepEqual(findExposures('CREATE POLICY p ON image_descriptions FOR SELECT USING (true);', pii), []);
+  for (const c of ['image_id', 'vehicle_image_id', 'image_ids', 'source_document_id', 'receipt_id', 'user_id', 'author_bat_user_id', 'uploaded_by', 'owner_id', 'capture_set_id'])
+    assert.ok(SUBJECT_COLUMN.test(c), c);
+  for (const c of ['id', 'vehicle_id', 'created_by', 'image_count', 'user_agent', 'document_type'])
+    assert.ok(!SUBJECT_COLUMN.test(c), c);
+  for (const t of ['vehicle_images', 'shop_photos', 'organization_images', 'receipts', 'library_documents']) assert.ok(SUBJECT_TABLE.test(t), t);
+  for (const t of ['paint_codes', 'vehicles', 'imagery_sources', 'receipt_line_systems', 'image_tags']) assert.ok(!SUBJECT_TABLE.test(t), t);
+});
+
+test('subject keys: the allowlist exempts named keys with a reason', () => {
+  const hits = findExposures('CREATE POLICY p ON image_descriptions FOR SELECT USING (true);', pii, { image_descriptions: ['image_id'] });
+  assert.deepEqual(unallowed(hits, [{ table: 'image_descriptions', columns: ['image_id'], why: 'test' }]), []);
+  assert.equal(unallowed(hits, []).length, 2);
+});

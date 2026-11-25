@@ -38,6 +38,17 @@
  * --counts --live asks production (has_function_privilege('anon', ...)) for the exact list. Never fails: a hit prints
  * WARN; make it blocking once the false-positive rate is known.
  *
+ * Subject keys (added 2026-11-25, blocking): a migration the change adds (or, with no base, one at or after SUBJECT_FLOOR)
+ * that opens a table carrying a photo, user or document key (SUBJECT_COLUMN: image_id, vehicle_image_id, image_ids,
+ * photo_id, capture_id, document_id, receipt_id, user_id, *_user_id, uploaded_by, owner_id ...; or, when it has none, the
+ * id of a table whose name ends in images, photos, captures, documents or receipts) to anon/authenticated/PUBLIC by a permissive USING (true) SELECT/ALL
+ * policy or by disabling row level security. Its rows are someone's photo readings, documents or activity: a reader
+ * opens them through a predicate (photo gallery-eligible on a public vehicle, or uploader / tied user), never true.
+ * Measured 2026-11-25: image_descriptions (209,530 rows; 9,581 on unfiled photos), image_vehicle_mismatches (1,667 of
+ * 1,750 on unfiled photos), image_condition_observations and user_presence (50,417 rows of user + vehicle + time) read
+ * logged out; image_angle_observations (18,770 rows on non-public cars) and three more by any signed-in user. The reasoned
+ * exemption is an allowlist entry naming the key columns with a why. Tables' keys from subject-columns.json (--refresh).
+ *
  * Exit: 0 clean, 1 exposure, 2 setup error. Flags: --live [--content], --refresh, --json, --counts [--live].
  */
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
@@ -55,6 +66,9 @@ export const PII_COLUMN = new RegExp('(^|_)(e?mail|email_address|phone|phone_num
   + 'last_name|full_name|legal_name|full_legal_name|ip_address|user_agent|latitude|longitude|lat|lng|lon|camera_serial|'
   + 'device_fingerprint|raw_exif|exif_data|owner_contact|owner_name|contact_email|contact_phone|contact_name|'
   + 'customer_email|customer_phone|customer_name|guest_email|guest_phone|guest_name|card_last4|payment_token)$', 'i');
+export const SUBJECT_FLOOR = '20261125080000';
+export const SUBJECT_COLUMN = /^(?:(?:\w+_)?(?:image|photo|capture|capture_set|document|receipt|user)_ids?|uploaded_by|owner_id|owner_user_id)$/i;
+export const SUBJECT_TABLE = /(?:^|_)(?:images|photos|captures|documents|receipts)$/i;   // rows that are photos, documents, receipts
 const API_ROLES = ['anon', 'authenticated'];
 export const CONTACT_EMAIL = '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}';
 export const CONTACT_PHONE = '(^|[^0-9])\\(?[2-9]\\d{2}\\)?[-. ][2-9]\\d{2}[-. ]\\d{4}([^0-9]|$)';
@@ -98,32 +112,60 @@ function audiences(roleText) {
   return API_ROLES.filter((r) => roles.includes(r));
 }
 
-/** Columns the statements add (CREATE TABLE / ALTER TABLE ADD COLUMN) whose names look personal, by table. */
-function addedColumns(statements) {
+/** Columns the statements add (CREATE TABLE / ALTER TABLE ADD COLUMN) whose names match re (personal by default), by table. */
+function addedColumns(statements, PII = PII_COLUMN) {
   const added = {};
   for (const s of statements) {
     let m = s.match(/^\s*CREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w."]+)\s*\(([\s\S]*)\)\s*$/i);
     if (m) {
       const cols = m[2].split(/,(?![^()]*\))/).map((c) => c.trim().split(/\s+/)[0]).filter(Boolean).map(bare);
-      added[bare(m[1])] = [...(added[bare(m[1])] || []), ...cols.filter((c) => PII_COLUMN.test(c))];
+      added[bare(m[1])] = [...(added[bare(m[1])] || []), ...cols.filter((c) => PII.test(c))];
     }
     m = s.match(/^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?([\w."]+)\s+([\s\S]*)$/i);
     if (m) {
       for (const a of m[2].matchAll(/ADD\s+(?:COLUMN\s+)?(?:IF\s+NOT\s+EXISTS\s+)?([\w"]+)/gi)) {
         const c = bare(a[1]);
-        if (PII_COLUMN.test(c)) added[bare(m[1])] = [...(added[bare(m[1])] || []), c];
+        if (PII.test(c)) added[bare(m[1])] = [...(added[bare(m[1])] || []), c];
       }
     }
   }
   return added;
 }
 
-/** Each statement in one migration that opens personal columns: { table, audience, columns, statement }. */
-export function findExposures(sql, piiColumns) {
+const DDL_START = /\b(?:CREATE\s+POLICY|ALTER\s+POLICY|ALTER\s+TABLE|CREATE\s+(?:UNLOGGED\s+)?TABLE)\b/i;
+/** Policy and table statements written inside top-level DO blocks (the repo's idempotent shape: DO $$ BEGIN DROP POLICY IF
+ * EXISTS ...; CREATE POLICY ...; END $$), each cut to start at its DDL keyword; strings inside the body stay blanked, so
+ * EXECUTE 'CREATE POLICY ...' text is still not seen. */
+export function doBlockStatements(sql) {
+  const out = [];
+  const masked = maskSql(sql);
+  for (const m of masked.matchAll(/(?:^|;)\s*DO\s+(?:LANGUAGE\s+\w+\s+)?(\$[A-Za-z_]*\$)/gi)) {
+    const start = m.index + m[0].length;
+    const end = masked.indexOf(m[1], start);
+    if (end < 0) continue;
+    for (const piece of maskSql(sql.slice(start, end)).split(';')) {
+      const d = piece.search(DDL_START);
+      if (d >= 0) out.push(piece.slice(d).trim());
+    }
+  }
+  return out;
+}
+
+/** Each statement in one migration that opens personal columns: { table, audience, columns, statement }. With
+ * subjectColumns (a table -> key columns map), a USING (true) policy or disabled RLS also opens the table's photo, user
+ * and document keys (SUBJECT_COLUMN, or 'id' of a table SUBJECT_TABLE names). */
+export function findExposures(sql, piiColumns, subjectColumns = null) {
   const masked = maskSql(sql);
   const statements = masked.split(';').map((s) => s.trim()).filter(Boolean);
+  if (subjectColumns) statements.push(...doBlockStatements(sql));
   const added = addedColumns(statements);
   const columnsOf = (t) => [...new Set([...(piiColumns[t] || []), ...(added[t] || [])])];
+  const addedKeys = subjectColumns ? addedColumns(statements, SUBJECT_COLUMN) : {};
+  const keysOf = (t) => {
+    const k = [...(subjectColumns[t] || []), ...(addedKeys[t] || [])];
+    return k.length || !SUBJECT_TABLE.test(t) ? k : ['id'];   // a table named for photos/documents: its own id is the key
+  };
+  const rowsOf = (t) => (subjectColumns ? [...new Set([...columnsOf(t), ...keysOf(t)])] : columnsOf(t));
   const hits = [];
   const hit = (table, auds, columns, statement) => {
     for (const audience of auds) if (columns.length) hits.push({ table, audience, columns: [...columns].sort(), statement: statement.replace(/\s+/g, ' ').slice(0, 160) });
@@ -154,12 +196,12 @@ export function findExposures(sql, piiColumns) {
       const roles = (rest.match(/\bTO\s+([\w",\s]+?)(?=\s+(USING|WITH\s+CHECK)\b|$)/i) || [null, 'public'])[1];
       const openUsing = /\bUSING\s*\(\s*\(?\s*true\s*\)?\s*\)/i.test(rest);
       if (!restrictive && (cmd === 'ALL' || cmd === 'SELECT') && openUsing) {
-        hit(bare(m[2]), audiences(roles), columnsOf(bare(m[2])), s);
+        hit(bare(m[2]), audiences(roles), rowsOf(bare(m[2])), s);
       }
       continue;
     }
     m = s.match(/^ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?([\w."]+)\s+DISABLE\s+ROW\s+LEVEL\s+SECURITY$/i);
-    if (m) { hit(bare(m[1]), API_ROLES, columnsOf(bare(m[1])), s); continue; }
+    if (m) { hit(bare(m[1]), API_ROLES, rowsOf(bare(m[1])), s); continue; }
     m = s.match(/^CREATE\s+(?:OR\s+REPLACE\s+)?(MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w."]+)\s*([\s\S]*?)\bAS\b([\s\S]*)$/i);
     if (m) {
       const invoker = !m[1] && /security_invoker\s*=?\s*(true|on|1)\b/i.test(m[3]);
@@ -326,6 +368,12 @@ function main() {
     const snap = Object.fromEntries(rows.map((r) => [r.t, r.cols]));
     writeFileSync(join(HERE, 'pii-columns.json'), JSON.stringify(snap, null, 1) + '\n');
     console.log(`pii-columns.json: ${rows.length} relations`);
+    const keys = q(`SELECT c.relname AS t, array_agg(a.attname::text ORDER BY a.attname) AS cols FROM pg_class c
+      JOIN pg_attribute a ON a.attrelid = c.oid WHERE c.relnamespace = 'public'::regnamespace
+      AND c.relkind IN ('r', 'p', 'f') AND a.attnum > 0 AND NOT a.attisdropped GROUP BY 1 ORDER BY 1`)
+      .map((r) => [r.t, r.cols.filter((c) => SUBJECT_COLUMN.test(c))]).filter(([, cols]) => cols.length);
+    writeFileSync(join(HERE, 'subject-columns.json'), JSON.stringify(Object.fromEntries(keys), null, 1) + '\n');
+    console.log(`subject-columns.json: ${keys.length} tables`);
     return 0;
   }
   const allowlist = loadJson('pii-exposure-allowlist.json').entries;
@@ -338,14 +386,19 @@ function main() {
     const pii = loadJson('pii-columns.json');
     for (const [t, cols] of Object.entries(freeformColumns(loadJson('pii-freeform-columns.json')))) pii[t] = [...new Set([...(pii[t] || []), ...cols])];
     const dir = join(ROOT, 'supabase/migrations');
-    hits = readdirSync(dir).filter((f) => f.endsWith('.sql') && f.split('_')[0] >= FLOOR).sort()
-      .flatMap((f) => findExposures(readFileSync(join(dir, f), 'utf8'), pii).map((h) => ({ ...h, file: f })));
+    const keys = loadJson('subject-columns.json');
+    const added = addedMigrations(process.argv.slice(2));
+    const keyed = new Set(added ? added.map((f) => f.split('/').pop())
+      : readdirSync(dir).filter((f) => f.endsWith('.sql') && f.split('_')[0] >= SUBJECT_FLOOR));
+    hits = readdirSync(dir).filter((f) => f.endsWith('.sql') && (f.split('_')[0] >= FLOOR || keyed.has(f))).sort()
+      .flatMap((f) => findExposures(readFileSync(join(dir, f), 'utf8'), pii, keyed.has(f) ? keys : null).map((h) => ({ ...h, file: f })));
   }
   const bad = args.has('--content') ? hits : unallowed(hits, allowlist);
   if (args.has('--json')) console.log(JSON.stringify(bad, null, 1));
   else for (const b of bad) console.log(`EXPOSURE ${b.file}: ${b.table} -> ${b.audience}: ${b.columns.join(',')} (${b.statement})`);
   if (bad.length) {
-    console.error(`no-pii-exposure: ${bad.length} exposure(s). Close the path, or add the columns to scripts/guardrails/pii-exposure-allowlist.json with the reason they are public.`);
+    console.error(`no-pii-exposure: ${bad.length} exposure(s). Close the path, or add the columns to scripts/guardrails/pii-exposure-allowlist.json with the reason they are public.
+A photo, user or document key (SUBJECT_COLUMN) is opened by a predicate, never USING (true): gallery-eligible photo on a public vehicle, or the uploader / a tied user.`);
     return 1;
   }
   if (!args.has('--json')) console.log(`no-pii-exposure: clean (${args.has('--content') ? 'production content' : args.has('--live') ? 'production' : `migrations >= ${FLOOR}`})`);
