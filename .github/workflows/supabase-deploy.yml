@@ -10,7 +10,9 @@
 #
 # Behavior:
 #   - On push to main touching supabase/: applies ONLY the migration files
-#     added in that push (psql, one by one — sidesteps the repo's known
+#     added since the last push run that reached its apply step
+#     (scripts/ci/deploy-base.mjs; a run GitHub replaced while pending applied
+#     nothing, so its commit rides this run) (psql, one by one — sidesteps the repo's known
 #     migration-history drift that breaks `supabase db push`), then deploys
 #     the edge functions whose directories changed plus every function that
 #     imports a changed file (scripts/ci/functions-to-deploy.mjs).
@@ -45,6 +47,11 @@ concurrency:
   group: supabase-deploy
   cancel-in-progress: false
 
+# actions: read lets scripts/ci/deploy-base.mjs list earlier runs of this workflow and their steps.
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -78,6 +85,7 @@ jobs:
         id: plan
         env:
           REQUESTED_MIGRATION_FILE: ${{ github.event.inputs.migration_file }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SINCE="${{ github.event.inputs.migrations_since }}"
@@ -90,11 +98,21 @@ jobs:
             fi
             echo "${{ github.event.inputs.functions }}" | tr ',' '\n' | sed '/^$/d' > /tmp/functions.txt
           else
-            git diff --name-only --diff-filter=A HEAD^ HEAD -- 'supabase/migrations/*.sql' > /tmp/migrations.txt || true
+            # GitHub keeps one pending run per concurrency group: a newer push replaces the pending run, and HEAD^..HEAD
+            # then drops the replaced commit's files (2026-11-25: #3918's run 45592124859 was replaced by #3914's and its
+            # migration never applied). Diff from the last push run that reached its apply step instead.
+            BASE=$(node scripts/ci/deploy-base.mjs)
+            if [ "$BASE" != "HEAD^" ] && ! git cat-file -e "$BASE^{commit}" 2>/dev/null \
+               && ! git fetch --no-tags --depth=1 origin "$BASE"; then
+              echo "::warning::deploy-base: could not fetch $BASE; diffing from HEAD^"
+              BASE='HEAD^'
+            fi
+            echo "── diff base: $BASE"
+            git diff --name-only --diff-filter=A "$BASE" HEAD -- 'supabase/migrations/*.sql' > /tmp/migrations.txt
             # A function bundles every file it imports, so a changed _shared/ file redeploys each function that imports
             # it, directly or through other files (scripts/ci/functions-to-deploy.mjs). Listing only changed folders left
             # api-v1-vin-lookup and ingest on the old vin-decoder after 657e90226. A resolver failure fails the run.
-            git diff --name-only HEAD^ HEAD -- 'supabase/functions/' > /tmp/changed-functions-paths.txt || true
+            git diff --name-only "$BASE" HEAD -- 'supabase/functions/' > /tmp/changed-functions-paths.txt
             node scripts/ci/functions-to-deploy.mjs --explain < /tmp/changed-functions-paths.txt > /tmp/functions-explained.txt
             cut -f1 /tmp/functions-explained.txt > /tmp/functions.txt
           fi
