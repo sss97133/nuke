@@ -227,7 +227,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
           </Suspense>
         )}
         {view === 'face' && <ConnectorFace cw={cw} ix={ix} site={site} code={faceCode} sel={sel} rel={rel} onSelect={pick} />}
-        {view === 'sch' && <SchematicBlock cw={cw} map={map} ix={ix} section={sys} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} />}
+        {view === 'sch' && <SchematicBlock cw={cw} vehicleId={vehicleId} section={sys} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} />}
         {view === 'lib' && <PartLibrary cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} />}
       </div>
     </div>

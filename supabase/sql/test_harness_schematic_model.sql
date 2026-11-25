@@ -14,9 +14,11 @@ ALTER TABLE public.wire_termination_specs ADD COLUMN cavity text,
   ADD COLUMN terminal_contact_catalog_id uuid, ADD COLUMN terminal_contact_pn text,
   ADD COLUMN pin_seal_catalog_id uuid, ADD COLUMN pin_seal_pn text,
   ADD COLUMN crimp_tool_catalog_id uuid, ADD COLUMN crimp_tool_pn text;
+CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY);
+INSERT INTO public.vehicle_observations VALUES ('00000000-0000-0000-0000-00000000ee01');
 CREATE TABLE public.harness_evidence (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL,
-  observation_id uuid NOT NULL, row_kind text NOT NULL, row_id uuid NOT NULL,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL REFERENCES public.vehicles(id),
+  observation_id uuid NOT NULL REFERENCES public.vehicle_observations(id), row_kind text NOT NULL, row_id uuid NOT NULL,
   field text, relation text NOT NULL, created_at timestamptz DEFAULT now());
 
 -- Actual failure shape: circuit says18, catalog key says18, segment scalar retained20.
