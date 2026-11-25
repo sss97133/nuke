@@ -3,7 +3,7 @@
 -- first answer image that is a current photo of that vehicle as the witness; it skips other outcomes, other statuses, a
 -- reader pair, a blank value, an unnamed model and an answer with no usable photo; a request is landed by its request id,
 -- and a re-ask that read the same value with the same model is landed too, while another model's read is not;
--- fact_doubt_evidence_state ignores the loop's own landed rows and still changes on any other keyed reading; only the
+-- a class-scope property is neither landed nor raised; fact_doubt_evidence_state ignores the loop's own landed rows and still changes on any other keyed reading; only the
 -- service role can list what to land.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -15,7 +15,7 @@ END $$;
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY);
 CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid, taken_at timestamptz, is_superseded boolean DEFAULT false,
   is_duplicate boolean DEFAULT false);
-CREATE TABLE public.observation_properties (id uuid PRIMARY KEY, property_key text);
+CREATE TABLE public.observation_properties (id uuid PRIMARY KEY, property_key text, verification_scope text DEFAULT 'instance');
 CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, property_id uuid,
   extraction_method text, agent_model text, structured_data jsonb, is_superseded boolean DEFAULT false);
 CREATE TABLE public.evidence_judgment_requests (id uuid PRIMARY KEY, vehicle_id uuid, question_kind text, status text,
@@ -30,6 +30,7 @@ INSERT INTO public.vehicles VALUES ('10000000-0000-0000-0000-000000000001'), ('1
 INSERT INTO public.observation_properties VALUES
  ('40000000-0000-0000-0000-000000000001', 'transmission_case_casting'),
  ('40000000-0000-0000-0000-000000000002', 'engine_block_casting');
+INSERT INTO public.observation_properties VALUES ('40000000-0000-0000-0000-000000000003', 'engine_configuration', 'class');
 INSERT INTO public.vehicle_images (id, vehicle_id, taken_at, is_superseded) VALUES
  ('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '2026-10-28T17:00Z', true),
  ('50000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '2026-10-28T17:05Z', false),
@@ -62,7 +63,10 @@ FROM (VALUES
   ('a0000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001', 'answered', 'property', 'engine_block_casting', '40000000-0000-0000-0000-000000000002',
    '{"outcome":"value","value":"9799140","image_ids":["50000000-0000-0000-0000-000000000002"]}', NULL, '2026-11-22T05:15Z'),
   ('a0000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001', 'answered', 'property', 'engine_block_casting', '40000000-0000-0000-0000-000000000002',
-   '{"outcome":"value","value":"9799140","image_ids":["50000000-0000-0000-0000-000000000003"]}', 'model-c', '2026-11-22T05:16Z')
+   '{"outcome":"value","value":"9799140","image_ids":["50000000-0000-0000-0000-000000000003"]}', 'model-c', '2026-11-22T05:16Z'),
+  -- raised before the scope rule: a class-scope property is not landed
+  ('a0000000-0000-0000-0000-00000000000b', '10000000-0000-0000-0000-000000000001', 'answered', 'property', 'engine_configuration', '40000000-0000-0000-0000-000000000003',
+   '{"outcome":"value","value":"400","image_ids":["50000000-0000-0000-0000-000000000002"]}', 'model-c', '2026-11-22T05:17Z')
 ) x(id, vid, status, form, pk, prop, answer, model, at);
 
 \ir ../migrations/20261124193100_fact_doubt_reread_landing.sql
@@ -110,6 +114,19 @@ BEGIN
   UPDATE public.evidence_judgment_requests SET answer_observation_id = gen_random_uuid() WHERE id = 'a0000000-0000-0000-0000-00000000000a';
   ASSERT NOT EXISTS (SELECT 1 FROM public.fact_doubt_readings_to_land(50) WHERE request_id = 'a0000000-0000-0000-0000-00000000000a'),
     'a linked request is landed';
+  ASSERT NOT EXISTS (SELECT 1 FROM public.fact_doubt_readings_to_land(50) WHERE request_id = 'a0000000-0000-0000-0000-00000000000b'),
+    'a class-scope property is not landed';
+  -- the registry row refuses a new fact doubt on a class-scope property, and admits one on an instance-scope property
+  BEGIN
+    INSERT INTO public.evidence_judgment_requests (id, vehicle_id, question_kind, status, subject_table, subject_id, params)
+    VALUES ('a0000000-0000-0000-0000-00000000000c', '10000000-0000-0000-0000-000000000001', 'fact_doubt', 'pending', 'observation_properties',
+            '40000000-0000-0000-0000-000000000003', '{"doubt_form":"property","property_key":"engine_configuration"}');
+    RAISE EXCEPTION 'FAIL: a class-scope fact doubt was raised';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+  INSERT INTO public.evidence_judgment_requests (id, vehicle_id, question_kind, status, subject_table, subject_id, params)
+  VALUES ('a0000000-0000-0000-0000-00000000000d', '10000000-0000-0000-0000-000000000001', 'fact_doubt', 'pending', 'observation_properties',
+          '40000000-0000-0000-0000-000000000002', '{"doubt_form":"property","property_key":"engine_block_casting"}');
 END $$;
 
 SET ROLE anon;
