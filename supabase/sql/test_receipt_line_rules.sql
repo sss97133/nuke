@@ -533,7 +533,6 @@ INSERT INTO public.receipt_items (id, receipt_id, description) VALUES
 SELECT public.assert((SELECT operation_code IS NOT NULL AND gap IS NULL FROM public.receipt_line_gaps
                        WHERE item_id = '00000000-0000-0000-0000-000000000e02'), 'a landed line reaches the fold through its edge');
 
-\echo 'test_receipt_line_rules: PASS'
 
 -- build reconstruction reads edges (migration 20261124234700): the two classifier expressions are edited in place in
 -- the live body. A stub body holding both anchors stands in for the reader here.
@@ -583,3 +582,25 @@ DO $$ BEGIN
     IF SQLERRM NOT LIKE 'build reconstruction anchor drifted%' THEN RAISE; END IF;
   END;
 END $$;
+
+-- 20261125111700: a scoped or part_number system / labor_operation rule cannot be active.
+\i supabase/migrations/20261125111700_receipt_line_rules_active_unscoped.sql
+\i supabase/migrations/20261125111700_receipt_line_rules_active_unscoped.sql
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, system_key, scope_make, status, source,
+                                           proposed_by_agent_key, promoted_at)
+    VALUES ('sys.991.scoped-active', 'system', 991, '\yzzscope\y', 'body', 'Pontiac', 'active', 'test fixture', 'test', now());
+    RAISE EXCEPTION 'FAIL: an active scoped rule was accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  BEGIN
+    UPDATE public.receipt_line_rules SET status = 'active', retired_at = NULL, promoted_at = now() WHERE rule_id = 'sys.990.scoped-test';
+    RAISE EXCEPTION 'FAIL: a scoped rule was re-activated';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END $$;
+-- Proposed scoped rules still land.
+INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, system_key, scope_make, status, source, proposed_by_agent_key)
+VALUES ('sys.992.scoped-proposed', 'system', 992, '\yzzscope\y', 'body', 'Pontiac', 'proposed', 'test fixture', 'test');
+\echo 'test_receipt_line_rules: PASS'
