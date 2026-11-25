@@ -12,7 +12,7 @@
   html, body { background: #fff !important; }
   .header-wrapper, .app-footer, .mobile-bottom-nav, .vehicle-tab-bar, .vp-print-record, .vp-labor-status button, .vp-col-divider,
   .vp-receipt-jump, .vp-receipt-filter, .vp-receipt-browse, .vp-receipt-expand, .vp-financial-action, .vp-financial-original,
-  [aria-label^="Explore ZIP"] { display: none !important; }
+  [aria-label^="Explore ZIP"], .vp-photo-fit, .vp-reader-version { display: none !important; }
   /* The replacement-cost scenario and the per-system cost-basis cards were never approved as part of the car's record
      (owner, 2026-11-19); they stay on screen for now and stay off the printed document. */
   #build-estimates, .vp-component-evidence { display: none !important; }
@@ -24,8 +24,12 @@
   .vp-columns { display: block !important; position: static !important; height: auto !important; }
   .vp-col-left, .vp-col-right { width: auto !important; height: auto !important; overflow: visible !important; }
   .vp-header-sticky { position: static !important; }
-  .k-section, .vp-build-system, .k-rows, .vp-receipt-page { break-inside: avoid-page; }
-  #labor-appraisal, #build-record { break-before: page; }
+  /* Sections flow on from the photo and break between their items, never inside one; a heading always travels with
+     what follows it, so no page ends on a header (lead, 2026-11-24: page 1 half empty, a stranded header). */
+  .k-item, .vp-build-system, .k-rows, .vp-receipt-page, .k-row { break-inside: avoid-page; }
+  h1, h2, h3, h4, .k-section__head, .k-section__head + p, .k-rows__head { break-after: avoid-page; }
+  article > header { break-inside: avoid-page; break-after: avoid-page; }
+  #build-record { break-before: page; }
   img { max-width: 100%; }
   /* Receipts on paper: three to a row, without the supplier's current catalog listing beside each line (a live store
      quote, not part of this car's record; it stays on screen). */

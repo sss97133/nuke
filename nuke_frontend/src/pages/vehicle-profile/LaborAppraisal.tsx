@@ -19,7 +19,7 @@ export function rangeText(r: LaborRange | null | undefined): string | null {
 
 const stepText = (s: LaborStageStep) => [
   [s.from_stage, s.to_stage].filter(Boolean).map(v => codeText(String(v))).join(' to '),
-  s.zone && s.zone !== '*' ? codeText(s.zone) : null,
+  s.zone && !s.zone.includes('*') ? codeText(s.zone) : null,
   s.status ? codeText(s.status) : null,
   s.photo_phase ? `photographed as ${codeText(s.photo_phase)}` : null,
   s.images != null ? `${s.images} ${s.images === 1 ? 'photo' : 'photos'}` : null,
@@ -30,16 +30,14 @@ const stepText = (s: LaborStageStep) => [
 /** A part line as the reader names it: the catalog part's name, else the reader's own words. Without them it is counted. */
 const partWords = (p: LaborPart) => p.part?.name || p.name || p.description || null;
 
-/** The reassembly parts: named in the reader's words, the rest counted. When the reader keys pieces to the catalog, an
- *  unnamed piece is one with no catalog row. */
+/** The reassembly parts: each named part with its hours, the rest counted. Operation codes are the book's keys, not
+ *  words, so they are not printed; a part the reader does not name is counted, never flagged. */
 function PartsLine({ title, parts }: { title: string; parts: LaborPart[] }) {
   const named = parts.filter(p => partWords(p));
-  const said = parts.filter(p => partWords(p) || p.operation_code).map(p => [partWords(p), p.operation_code, h(p.hours), p.reason].filter(Boolean).join(' '));
-  const unnamed = parts.length - named.length;
-  const keyed = parts.some(p => p.part !== undefined);
+  const said = named.map(p => [partWords(p), h(p.hours)].filter(Boolean).join(', '));
+  const others = parts.length - named.length;
   return <Text role="caption" as="p" className="k-item__line">
-    {title}: {parts.length}{said.length ? `. ${said.join('; ')}` : ''}
-    {unnamed ? (keyed ? ` (${unnamed} of ${parts.length} part not in catalog)` : ` (${unnamed} of ${parts.length} not named by the reader)`) : ''}
+    {title}: {parts.length}{said.length ? `. ${said.join('; ')}` : ''}{said.length && others ? `; ${others} more` : ''}
   </Text>;
 }
 
@@ -109,7 +107,7 @@ export function SegmentRows({ segment }: { segment: LaborSegment }) {
   ].filter(Boolean).join(' · ');
   const witnessed = witnessText(segment);
   const witnessedHours = witnessedHoursText(segment);
-  return <div className="k-item" data-key={segment.segment} data-status={segment.evidence_grade ?? 'ungraded'}>
+  return <div className="k-item" data-key={segment.segment} data-status={segment.evidence_grade ?? 'ungraded'} title={segment.citation ?? undefined}>
     <div className="k-row">
       <Text role="label">{codeText(segment.segment)}</Text>
       <Text role="measure">{rangeText(segment) ?? 'No hours'}</Text>
@@ -121,7 +119,6 @@ export function SegmentRows({ segment }: { segment: LaborSegment }) {
     {!!segment.stage_steps?.length && <Text role="caption" as="p" className="k-item__line">Stages: {segment.stage_steps.map(stepText).join('; ')}</Text>}
     {!!r?.matched?.length && <PartsLine title="Fitted parts with a book operation" parts={r.matched} />}
     {!!r?.unmatched?.length && <PartsLine title="Fitted parts without a book operation" parts={r.unmatched} />}
-    {segment.citation && <Text role="caption" as="p" className="k-item__line">Rule: {segment.citation}</Text>}
   </div>;
 }
 
@@ -133,7 +130,7 @@ export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
   if (appraisal.applicable && appraisal.totals?.priced_segments === 0 && appraisal.segments.length) {
     return <Section title="Labor appraisal by segment" coverage={coverage}>
       <Text role="caption" as="p">Not appraised: the reader has no segment with hours for this car yet.</Text>
-      {appraisal.logic_version && <Text role="caption" as="p">Reader: vehicle_labor_appraisal · {appraisal.logic_version}</Text>}
+      {appraisal.logic_version && <Text role="caption" as="p" className="vp-reader-version">Reader: vehicle_labor_appraisal · {appraisal.logic_version}</Text>}
     </Section>;
   }
   if (!appraisal.applicable || !priced.length) return null;
@@ -142,17 +139,16 @@ export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
   const withPurchases = rangeText(appraisal.totals?.with_unwitnessed_purchases);
   return <Section title="Labor appraisal by segment" coverage={coverage}>
     <Text role="caption" as="p">Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.</Text>
-    {witnessedTotal && withPurchases && <Rows title="Hours, two totals side by side">
+    {witnessedTotal && withPurchases && <div title={appraisal.totals?.rule ?? undefined}><Rows title="Hours, two totals side by side">
       <Row label="Witnessed" role="measure">{witnessedTotal}{appraisal.totals?.witnessed?.unknown_min_segments
         ? ` (${appraisal.totals.witnessed.unknown_min_segments} segments with no witnessed minimum)` : ''}</Row>
       <Row label="With purchases not seen fitted" role="measure">{withPurchases}</Row>
-    </Rows>}
-    {witnessedTotal && withPurchases && appraisal.totals?.rule && <Text role="caption" as="p">{appraisal.totals.rule}</Text>}
+    </Rows></div>}
     {byGrade.length > 0 && <Rows title="Hours by evidence grade">
       {byGrade.map(([grade, range]) => <Row key={grade} label={codeText(grade)} role="measure">{rangeText(range) ?? 'No hours'}</Row>)}
     </Rows>}
     <div className="k-items">{priced.map(s => <SegmentRows key={s.segment} segment={s} />)}</div>
-    {appraisal.logic_version && <Text role="caption" as="p">Reader: vehicle_labor_appraisal · {appraisal.logic_version}</Text>}
+    {appraisal.logic_version && <Text role="caption" as="p" className="vp-reader-version">Reader: vehicle_labor_appraisal · {appraisal.logic_version}</Text>}
   </Section>;
 }
 

@@ -48,8 +48,9 @@ describe('LaborAppraisalView', () => {
 
   it('names a fitted part only in the reader words and counts the rest', () => {
     const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={appraisal} />));
-    expect(page).toContain('3 of 3 not named by the reader');
-    expect(page).toContain('INT-CARPET-RR 2 h');
+    // Parts the reader does not name are counted; no operation code and no "not named" defect text reach the page.
+    expect(page).not.toMatch(/not named|INT-CARPET-RR|Rule:/);
+    expect(page).toMatch(/Fitted parts with a book operation: \d+/);
     expect(rangeText({ hours_min: 8, hours_typical: 12, hours_max: 16 })).toBe('8 h to 16 h, typical 12 h');
     expect(rangeText({ hours_min: 2.75, hours_typical: 2.75, hours_max: 2.75 })).toBe('2.75 h');
   });
@@ -62,7 +63,9 @@ describe('LaborAppraisalView', () => {
     const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={two} />));
     expect(page).toMatch(/Witnessed\s+88\.5 h to 149\.5 h, typical 112\.5 h/);
     expect(page).toMatch(/With purchases not seen fitted\s+130\.5 h to 259\.5 h, typical 174\.5 h/);
-    expect(page).toContain('Witnessed hours exclude purchases not seen fitted.');
+    // The reader's rule is its own identifiers: kept in the title attribute, not printed.
+    expect(page).not.toContain('Witnessed hours exclude purchases not seen fitted.');
+    expect(renderToStaticMarkup(<LaborAppraisalView appraisal={two} />)).toContain('title="Witnessed hours exclude purchases not seen fitted."');
   });
 
   it('says "not appraised" when the reader prices nothing', () => {
@@ -107,7 +110,7 @@ describe('LaborAppraisalView', () => {
       { item_id: 'a', hours: 2, operation_code: 'INT-SEAT', part: { catalog_part_id: 'c1', name: 'Front bucket seat cover' } },
       { item_id: 'b', hours: 1, operation_code: 'INT-SEAT' } ] } };
     const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={{ ...appraisal, segments: [seg] }} />));
-    expect(page).toContain('Front bucket seat cover INT-SEAT 2 h');
-    expect(page).toContain('1 of 2 part not in catalog');
+    expect(page).toContain('Front bucket seat cover, 2 h; 1 more');
+    expect(page).not.toMatch(/INT-SEAT|not in catalog/);
   });
 });
