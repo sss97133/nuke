@@ -16,6 +16,7 @@ import { AdminNotificationService } from '../../services/adminNotificationServic
 import toast from 'react-hot-toast';
 import '../../design-system.css';
 import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
+import { bucketForStoragePath } from '../../lib/ownStorage';
 import { getLightboxImageUrl } from '../../lib/imageOptimizer';
 
 interface ImageLightboxProps {
@@ -635,8 +636,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
       // Clean up storage file
       if (imageRecord?.storage_path) {
-        const bucket = imageRecord.storage_path.startsWith('vehicles/') ? 'vehicle-data' : 'vehicle-photos';
-        await supabase.storage.from(bucket).remove([imageRecord.storage_path]);
+        const bucket = bucketForStoragePath(imageRecord.storage_path);
+        if (bucket) await supabase.storage.from(bucket).remove([imageRecord.storage_path]);
       }
 
       toast.success('Image deleted');
