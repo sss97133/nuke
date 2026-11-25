@@ -9,18 +9,26 @@
 -- WHAT IT MEASURES (one proposal per call; every check stored in gate_measure; all or nothing, no person):
 --   SHAPE      status open; proposal_type modify_property; an agent proposer and no user proposer; payload field =
 --              'description'; payload keys only property_key, field, values_from, stored_in, null_reasons_from,
---              qualifier_of, description (so no data_type, namespace, label, cardinality, unit, scope or adds_values).
+--              qualifier_of (required, non-empty), dropped_values, description (so no data_type, namespace, label,
+--              cardinality, unit, scope or adds_values).
 --   SUPERSEDES the property's ratifying proposal (observation_properties.proposed_by_proposal_id), status approved;
 --              no other approved supersession of it; payload property_key = that property's key.
---   TEXT       the superseded text holds an 'Allowed values:' list and the new text holds none; the new text names
---              the values_from table.
+--   TEXT       the superseded text holds an 'Allowed values:' list (parsed: the first word of each comma item to the
+--              sentence end, parentheses removed) and the new text holds none in any wording (allowed value(s)); the new
+--              text names the values_from table.
 --   KEY TABLE  values_from = '<table>.<column>' in public, the column alone is the table's primary key or a unique key.
---   FK         stored_in = '<table>.<column>' in public with a foreign key (pg_constraint, contype f) from exactly that
---              column to exactly the values_from column: the property's storing column.
+--   FK         stored_in = '<table>.<column>' in public with a validated foreign key (pg_constraint, contype f,
+--              convalidated) from exactly that column to exactly the values_from column: the property's storing column.
 --   NO ORPHANS every value stored for the property resolves to a key row or is NULL with a reason row: (a) stored_in
---              rows of this property (when the table has property_key): stored column NULL counts as orphan;
---              (b) observations whose property is in qualifier_of (not superseded) carrying the key in structured_data:
---              the value is a key row, or it is absent and <key>_null_reason is a null_reasons_from row of this key.
+--              rows of this property (when the table has property_key): NULL or no key row counts as orphan;
+--              (b) observations whose property is in qualifier_of (is_superseded not true) carrying the key in
+--              structured_data: the value is a key row, or it is absent and <key>_null_reason is a null_reasons_from row
+--              of this key; (c) no current observation of any other property carries the key or its null reason.
+--   VALUE SET  values_added (key rows the old list lacked) and values_dropped (old-list values the key table lacks) are
+--              stored; each dropped value names its reason in payload dropped_values {value: reason}, a null_reasons_from
+--              row of this key, and dropped_values names nothing that was kept.
+--   (ta-skeptic2's attack 2026-11-25 01:44 PT added qualifier_of required, convalidated, the key-row orphan test, the
+--   list in any wording, (c), IS NOT TRUE, the value set and the lock on the superseded proposal.)
 --   UNCHANGED  the property's row other than description (type, namespace, key, label, cardinality, unit, kinds,
 --              categories, proposed_by_proposal_id) hashes the same before and after; no other registry row moves.
 -- On pass: the successor is approved (resolved_at, gate_measure, decision_rationale); the superseded proposal is
@@ -52,7 +60,11 @@ DECLARE
   null_clause text := 'false';
   qual_ids uuid[];
   n_stored bigint := 0; n_stored_orphan bigint := 0;
-  n_obs bigint := 0; n_obs_orphan bigint := 0;
+  n_obs bigint := 0; n_obs_orphan bigint := 0; n_obs_outside bigint := 0;
+  old_values text[] := '{}'; values_added text[] := '{}'; values_dropped text[] := '{}'; n_added bigint := 0;
+  tok text;
+  has_reason boolean;
+  quals_missing boolean;
   hash_before text; hash_after text; others_before text; others_after text;
   measure jsonb;
   decision text;
@@ -72,7 +84,8 @@ BEGIN
   ELSE
     IF coalesce(pr.payload ->> 'field', '') <> 'description' THEN reasons := reasons || 'not_description_only'::text; END IF;
     FOR k IN SELECT jsonb_object_keys(pr.payload) LOOP
-      IF k NOT IN ('property_key', 'field', 'values_from', 'stored_in', 'null_reasons_from', 'qualifier_of', 'description') THEN
+      IF k NOT IN ('property_key', 'field', 'values_from', 'stored_in', 'null_reasons_from', 'qualifier_of', 'dropped_values',
+                   'description') THEN
         reasons := reasons || ('payload_key_not_allowed:' || k);
       END IF;
     END LOOP;
@@ -86,18 +99,29 @@ BEGIN
     IF pr.supersedes_proposal_id IS DISTINCT FROM prop.proposed_by_proposal_id OR pr.supersedes_proposal_id IS NULL THEN
       reasons := reasons || 'supersedes_not_the_ratifying_proposal'::text;
     END IF;
-    SELECT * INTO orig FROM public.schema_proposals WHERE id = prop.proposed_by_proposal_id;
+    -- locked, so two successors of one text cannot both pass already_superseded (ta-skeptic2 should-fix c)
+    SELECT * INTO orig FROM public.schema_proposals WHERE id = prop.proposed_by_proposal_id FOR UPDATE;
     IF orig.id IS NULL OR orig.status <> 'approved' THEN reasons := reasons || 'superseded_not_approved'::text; END IF;
     IF EXISTS (SELECT 1 FROM public.schema_proposals s WHERE s.supersedes_proposal_id = prop.proposed_by_proposal_id
                 AND s.status = 'approved' AND s.id <> pr.id) THEN
       reasons := reasons || 'already_superseded'::text;
     END IF;
     -- TEXT
-    IF coalesce(prop.description, '') !~* 'allowed values:' THEN reasons := reasons || 'superseded_text_has_no_value_list'::text; END IF;
+    IF coalesce(prop.description, '') !~* 'allowed values:' THEN
+      reasons := reasons || 'superseded_text_has_no_value_list'::text;
+    ELSE
+      -- the old list: after 'Allowed values:' to the sentence end, parentheses removed, the first word of each comma item
+      SELECT coalesce(array_agg(DISTINCT w), '{}') INTO old_values
+        FROM regexp_split_to_table(regexp_replace(regexp_replace(substr(prop.description,
+                                 position('allowed values:' IN lower(prop.description)) + 15), '\..*$', '', 's'),
+                                                  '\([^)]*\)', '', 'g'), ',') item,
+             LATERAL (SELECT substring(regexp_replace(btrim(item), '^(and|or)\s+', '', 'i') FROM '^([a-z][a-z0-9_]*)\M') AS w) x
+       WHERE w IS NOT NULL;
+    END IF;
   END IF;
   IF coalesce(pr.payload ->> 'description', '') = '' THEN
     reasons := reasons || 'description_missing'::text;
-  ELSIF pr.payload ->> 'description' ~* 'allowed values:' THEN
+  ELSIF pr.payload ->> 'description' ~* '\mallowed\s+values?\M' THEN  -- any form, not only the colon (ta-skeptic2 must-fix 3)
     reasons := reasons || 'description_holds_value_list'::text;
   END IF;
 
@@ -131,7 +155,7 @@ BEGIN
         SELECT 1 FROM pg_constraint c
           JOIN pg_attribute sa ON sa.attrelid = c.conrelid AND sa.attnum = c.conkey[1]
           JOIN pg_attribute va ON va.attrelid = c.confrelid AND va.attnum = c.confkey[1]
-         WHERE c.contype = 'f' AND c.conrelid = s_rel AND c.confrelid = v_rel
+         WHERE c.contype = 'f' AND c.convalidated AND c.conrelid = s_rel AND c.confrelid = v_rel
            AND cardinality(c.conkey) = 1 AND sa.attname = sc AND va.attname = vc) THEN
       reasons := reasons || 'stored_in_no_foreign_key'::text;
     END IF;
@@ -146,15 +170,16 @@ BEGIN
       n_rel := NULL;
     END IF;
   END IF;
-  IF pr.payload ? 'qualifier_of' THEN
-    IF jsonb_typeof(pr.payload -> 'qualifier_of') <> 'array' THEN
-      reasons := reasons || 'qualifier_of_invalid'::text;
-    ELSE
-      SELECT array_agg(x) INTO quals FROM jsonb_array_elements_text(pr.payload -> 'qualifier_of') x;
-      SELECT array_agg(o.id) INTO qual_ids FROM public.observation_properties o WHERE o.property_key = ANY (quals);
-      IF coalesce(cardinality(qual_ids), 0) <> coalesce(cardinality(quals), 0) THEN
-        reasons := reasons || 'qualifier_of_unknown'::text;
-      END IF;
+  -- required and non-empty: the proposer does not choose whether the observation scan runs (ta-skeptic2 must-fix 1)
+  quals_missing := CASE WHEN jsonb_typeof(pr.payload -> 'qualifier_of') = 'array'
+                        THEN jsonb_array_length(pr.payload -> 'qualifier_of') = 0 ELSE true END;
+  IF quals_missing THEN
+    reasons := reasons || 'qualifier_of_missing'::text;
+  ELSE
+    SELECT array_agg(x) INTO quals FROM jsonb_array_elements_text(pr.payload -> 'qualifier_of') x;
+    SELECT array_agg(o.id) INTO qual_ids FROM public.observation_properties o WHERE o.property_key = ANY (quals);
+    IF coalesce(cardinality(qual_ids), 0) <> coalesce(cardinality(quals), 0) THEN
+      reasons := reasons || 'qualifier_of_unknown'::text;
     END IF;
   END IF;
 
@@ -162,7 +187,9 @@ BEGIN
   IF prop.id IS NOT NULL AND NOT (reasons && ARRAY['values_from_shape', 'values_from_table_missing', 'values_from_not_a_key',
                                                   'stored_in_shape', 'stored_in_table_missing', 'stored_in_no_foreign_key']) THEN
     IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = s_rel AND attname = 'property_key' AND NOT attisdropped) THEN
-      EXECUTE format('SELECT count(*), count(*) FILTER (WHERE %I IS NULL) FROM public.%I WHERE property_key = $1', sc, st)
+      -- NULL, or a value with no key row (a NOT VALID or later-dropped key would let one in: ta-skeptic2 must-fix 2)
+      EXECUTE format('SELECT count(*), count(*) FILTER (WHERE s.%1$I IS NULL OR NOT EXISTS (SELECT 1 FROM public.%3$I t '
+                     'WHERE t.%4$I = s.%1$I)) FROM public.%2$I s WHERE s.property_key = $1', sc, st, vt, vc)
          INTO n_stored, n_stored_orphan USING prop.property_key;
     END IF;
     IF qual_ids IS NOT NULL THEN
@@ -175,12 +202,39 @@ BEGIN
              (o.structured_data ->> $1 IS NOT NULL AND EXISTS (SELECT 1 FROM public.%I t WHERE t.%I::text = o.structured_data ->> $1))
           OR %s))
            FROM public.vehicle_observations o
-          WHERE o.property_id = ANY ($2) AND o.is_superseded = false
+          WHERE o.property_id = ANY ($2) AND o.is_superseded IS NOT TRUE
             AND (o.structured_data ? $1 OR o.structured_data ? ($1 || ''_null_reason''))',
         vt, vc, null_clause)
         INTO n_obs, n_obs_orphan USING prop.property_key, qual_ids;
     END IF;
     IF n_stored_orphan > 0 OR n_obs_orphan > 0 THEN reasons := reasons || 'stored_values_orphaned'::text; END IF;
+    -- the key carried by observations of any other property: none allowed (GIN on structured_data; 150 ms on
+    -- production for labor_system_key, 2026-11-25, EXPLAIN ANALYZE)
+    SELECT count(*) INTO n_obs_outside FROM public.vehicle_observations o
+     WHERE (o.structured_data ? prop.property_key OR o.structured_data ? (prop.property_key || '_null_reason'))
+       AND o.is_superseded IS NOT TRUE AND (o.property_id IS NULL OR o.property_id <> ALL (coalesce(qual_ids, '{}')));
+    IF n_obs_outside > 0 THEN reasons := reasons || 'key_carried_outside_qualifier_of'::text; END IF;
+    -- the value set adopted: key rows the old list lacked, and old-list values the key table lacks; each dropped value
+    -- names its null reason (payload dropped_values {value: reason}), a reason row of this key (should-fix b)
+    EXECUTE format('SELECT count(*), coalesce((array_agg(t.%1$I::text ORDER BY t.%1$I::text))[1:200], ''{}'') FROM public.%2$I t '
+                   'WHERE t.%1$I::text <> ALL ($1)', vc, vt) INTO n_added, values_added USING old_values;
+    EXECUTE format('SELECT coalesce(array_agg(v ORDER BY v), ''{}'') FROM unnest($1) v '
+                   'WHERE NOT EXISTS (SELECT 1 FROM public.%I t WHERE t.%I::text = v)', vt, vc) INTO values_dropped USING old_values;
+    IF jsonb_typeof(coalesce(pr.payload -> 'dropped_values', '{}'::jsonb)) <> 'object' THEN
+      reasons := reasons || 'dropped_values_invalid'::text;
+    ELSE
+      FOREACH tok IN ARRAY values_dropped LOOP
+        has_reason := false;
+        IF n_rel IS NOT NULL AND pr.payload -> 'dropped_values' ->> tok IS NOT NULL THEN
+          EXECUTE format('SELECT EXISTS (SELECT 1 FROM public.%I r WHERE r.property_key = $1 AND r.reason = $2)', nt)
+             INTO has_reason USING prop.property_key, pr.payload -> 'dropped_values' ->> tok;
+        END IF;
+        IF NOT has_reason THEN reasons := reasons || ('value_dropped_without_reason:' || tok); END IF;
+      END LOOP;
+      IF EXISTS (SELECT 1 FROM jsonb_object_keys(coalesce(pr.payload -> 'dropped_values', '{}'::jsonb)) d WHERE d <> ALL (values_dropped)) THEN
+        reasons := reasons || 'dropped_values_not_dropped'::text;
+      END IF;
+    END IF;
   END IF;
 
   decision := CASE WHEN cardinality(reasons) = 0 THEN 'ratified' ELSE 'refused' END;
@@ -189,7 +243,9 @@ BEGIN
     'property_key', prop.property_key, 'supersedes', prop.proposed_by_proposal_id,
     'values_from', pr.payload ->> 'values_from', 'stored_in', pr.payload ->> 'stored_in',
     'stored_rows', n_stored, 'stored_rows_orphaned', n_stored_orphan,
-    'observations', n_obs, 'observations_orphaned', n_obs_orphan,
+    'observations', n_obs, 'observations_orphaned', n_obs_orphan, 'observations_outside_qualifier_of', n_obs_outside,
+    'old_values', to_jsonb(old_values), 'values_added', to_jsonb(values_added), 'values_added_count', n_added,
+    'values_dropped', to_jsonb(values_dropped), 'dropped_values', pr.payload -> 'dropped_values',
     'reasons', to_jsonb(ARRAY(SELECT DISTINCT r FROM unnest(reasons) r ORDER BY r)));
 
   PERFORM set_config('nuke.schema_proposal_key_gate', 'on', true);
