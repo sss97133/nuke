@@ -28,8 +28,9 @@ const transmission: FacetItem[] = [
   { key: 'transmission.current.gear_ratios', facet: 'decode', value: null, unit: null, status: 'missing', rule: null, equation: null, sources: [],
     needed: 'transmission model identified by its ID stamp, and a cited ratio table for that model' },
   { key: 'transmission.current.model', facet: 'current', value: null, unit: null, status: 'conflict', rule: null, equation: null, needed: null, sources: [],
-    sides: [{ value: 'Model A', sources: [{ kind: 'listing', label: 'Seller listing', observed_at: '2025-05-06T00:00:00Z' }] },
-      { value: 'Model B', sources: [{ kind: 'image', label: 'photo reading', observed_at: '2026-02-03T00:00:00Z' }] }] },
+    agreement: { readings: 3, photos: 2, families: 1 },
+    sides: [{ value: 'Model A', witnesses: 2, sources: [{ kind: 'listing', label: 'Seller listing', observed_at: '2025-05-06T00:00:00Z' }] },
+      { value: 'Model B', witnesses: 1, sources: [{ kind: 'image', label: 'photo reading', observed_at: '2026-02-03T00:00:00Z' }] }] },
   { key: 'transmission.derived.rpm_at_60', facet: 'derived', value: 2450, unit: 'rpm', status: 'established', rule: null, needed: null, sources: [],
     equation: { expression: 'mph * top_gear_ratio * axle_ratio * 63360 / (60 * pi() * tire_diameter_in), mph = 60' } },
 ];
@@ -79,6 +80,9 @@ it('renders every item of a carried token as a row with status, sources, rule, e
   expect(host.textContent).toContain('Needed: transmission model identified by its ID stamp');
   expect(host.textContent).toContain('Model A');
   expect(host.textContent).toContain('Model B');
+  expect(host.textContent).toContain('Model A · 2 witnesses');
+  expect(host.textContent).toContain('Model B · 1 witness');
+  expect(host.textContent).toContain('3 readings · 2 photos · 1 reader family');
   expect(host.textContent).toContain('2,450 rpm');
   expect(host.textContent).toContain('Computed: mph * top gear ratio * axle ratio * 63360 / (60 * π * tire diameter in), mph = 60');
   expect(host.textContent).not.toMatch(/[{}]|\[object/);
