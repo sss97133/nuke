@@ -241,7 +241,7 @@ enum LaborWords {
     static func lines(_ s: LaborSegment, _ names: LaborNames? = nil) -> [String] {
         let known = [
             s.evidence_grade.map { "Evidence: \(ItemText.codeText($0))" } ?? "Ungraded by the reader",
-            s.counts_in == "unwitnessed" || s.counts_in == "unwitnessed_purchase" ? "counted with purchases not seen fitted" : nil,
+            s.counts_in == "unwitnessed" || s.counts_in == "unwitnessed_purchase" ? "counted with work not witnessed" : nil,
             s.hours_basis.map { "hours from \(ItemText.codeText($0))" },
             s.paper_hours.map { "\(h($0)!) on shop paper" },
             range(s.book_hours).map { "book range \($0)" },
@@ -326,7 +326,7 @@ struct LaborAppraisalContent: View {
                     Text("Hours, two totals side by side").font(.caption.weight(.semibold)).padding(.top, 4)
                     row("Witnessed", (LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
                         + LaborWords.witnessedUnknown(totals.witnessed))
-                    row("With purchases not seen fitted", with)
+                    row("With work not witnessed", with)
                 }
                 if let byGrade = appraisal.totals?.by_grade, !byGrade.isEmpty {
                     Text("Hours by evidence grade").font(.caption.weight(.semibold)).padding(.top, 4)
