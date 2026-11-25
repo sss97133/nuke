@@ -1,0 +1,311 @@
+{
+  "as_of": "2026-11-25T00:19:46.043531+00:00",
+  "totals": {
+    "hours_max": 269.50,
+    "hours_min": 132.50,
+    "hours_typical": 180.50
+  },
+  "segments": [
+    {
+      "status": "ok",
+      "segment": "engine",
+      "category": "powertrain",
+      "citation": "stage_transition_labor_map:powertrain none->rebuilt_original; machining paper hours win",
+      "hours_max": 50.75,
+      "hours_min": 50.75,
+      "book_hours": {
+        "hours_max": 50,
+        "hours_min": 20,
+        "hours_typical": 32
+      },
+      "hours_basis": "shop_paper",
+      "paper_hours": 50.75,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "rebuilt_original",
+          "from_stage": "none"
+        }
+      ],
+      "hours_typical": 50.75,
+      "evidence_count": 20,
+      "evidence_grade": null,
+      "range_below_paper": true
+    },
+    {
+      "status": "ok",
+      "segment": "gearbox",
+      "category": "powertrain",
+      "citation": "stage_transition_labor_map:powertrain none->trans_rebuild",
+      "hours_max": 16,
+      "hours_min": 8,
+      "book_hours": {
+        "hours_max": 16,
+        "hours_min": 8,
+        "hours_typical": 12
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "trans_rebuild",
+          "from_stage": "none"
+        }
+      ],
+      "hours_typical": 12,
+      "evidence_count": 2,
+      "evidence_grade": null,
+      "range_below_paper": false
+    },
+    {
+      "status": "ok",
+      "segment": "chassis",
+      "category": "chassis",
+      "citation": "stage_transition_labor_map:chassis stock->refreshed",
+      "hours_max": 24,
+      "hours_min": 8,
+      "book_hours": {
+        "hours_max": 24,
+        "hours_min": 8,
+        "hours_typical": 14
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "refreshed",
+          "from_stage": "stock"
+        }
+      ],
+      "hours_typical": 14,
+      "evidence_count": 29,
+      "evidence_grade": null,
+      "range_below_paper": false
+    },
+    {
+      "status": "ok",
+      "segment": "electrical",
+      "category": "electrical",
+      "citation": "stage_transition_labor_map:electrical original->rewire",
+      "hours_max": 20,
+      "hours_min": 8,
+      "book_hours": {
+        "hours_max": 20,
+        "hours_min": 8,
+        "hours_typical": 14
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "rewire",
+          "from_stage": "original"
+        }
+      ],
+      "hours_typical": 14,
+      "evidence_count": 8,
+      "evidence_grade": null,
+      "range_below_paper": false
+    },
+    {
+      "status": "ok",
+      "segment": "body_metal",
+      "category": "body",
+      "citation": "stage_transition_labor_map:body panel_* stripped->fabricated x distinct evidenced panel lines",
+      "hours_max": 84,
+      "hours_min": 28,
+      "book_hours": {
+        "hours_max": 84,
+        "hours_min": 28,
+        "hours_typical": 42
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "panel_*",
+          "to_stage": "fabricated",
+          "from_stage": "stripped",
+          "panel_count": 7,
+          "panel_multiplier": 7
+        }
+      ],
+      "hours_typical": 42,
+      "evidence_count": 7,
+      "evidence_grade": null,
+      "range_below_paper": false
+    },
+    {
+      "status": "ok",
+      "segment": "paint",
+      "category": "body",
+      "citation": "stage_transition_labor_map:body paint chain; charge only photographed steps",
+      "hours_max": 32,
+      "hours_min": 11,
+      "stage_steps": [
+        {
+          "status": "unsupported",
+          "to_stage": "primed",
+          "hours_max": null,
+          "hours_min": null,
+          "from_stage": "fabricated",
+          "photo_phase": null,
+          "hours_typical": null
+        },
+        {
+          "images": 2,
+          "status": "supported",
+          "to_stage": "blocked",
+          "hours_max": 24,
+          "hours_min": 8,
+          "from_stage": "primed",
+          "photo_phase": "paint_prep",
+          "hours_typical": 16
+        },
+        {
+          "images": 1,
+          "status": "supported",
+          "to_stage": "basecoated",
+          "hours_max": 8,
+          "hours_min": 3,
+          "from_stage": "blocked",
+          "photo_phase": "paint_application",
+          "hours_typical": 5
+        },
+        {
+          "status": "unsupported",
+          "to_stage": "clearcoated",
+          "hours_max": null,
+          "hours_min": null,
+          "from_stage": "basecoated",
+          "photo_phase": null,
+          "hours_typical": null
+        }
+      ],
+      "hours_typical": 21,
+      "evidence_count": 3,
+      "evidence_grade": "photographed_stage",
+      "unsupported_steps": [
+        {
+          "status": "unsupported",
+          "to_stage": "primed",
+          "from_stage": "fabricated",
+          "photo_phase": null
+        },
+        {
+          "status": "unsupported",
+          "to_stage": "clearcoated",
+          "from_stage": "basecoated",
+          "photo_phase": null
+        }
+      ]
+    },
+    {
+      "status": "ok",
+      "segment": "reassembly",
+      "category": "body",
+      "citation": "labor_operations via receipt_part_visible installed=yes + receipt_line_labor_operation",
+      "hours_max": 2.75,
+      "hours_min": 2.75,
+      "reassembly": {
+        "matched": [
+          {
+            "hours": 2.0,
+            "system": "interior",
+            "item_id": "d2c6e7d9-13eb-4705-ac7d-3c2bb658f6bc",
+            "image_id": "ab9ef879-a75f-4920-b043-7ab9d3815bcb",
+            "counted_in": "interior",
+            "judgment_id": "1e31e348-2244-48b9-b2c4-30cc653035d1",
+            "operation_code": "INT-CARPET-RR"
+          },
+          {
+            "hours": 0.5,
+            "system": "trim",
+            "item_id": "106a15e3-a8ce-4a57-a485-9c697fcca219",
+            "image_id": "3a87c815-f3a8-436e-8794-09c45908f9ff",
+            "judgment_id": "344995da-a87a-430b-af23-ce1408f9ed6e",
+            "operation_code": "ELEC-TAILLIGHTS"
+          },
+          {
+            "hours": 1.0,
+            "system": "interior",
+            "item_id": "df461492-d3f7-4005-86e3-7e6734431b4b",
+            "image_id": "8f1c29f7-0bec-4b48-8ad3-b080aa3e1363",
+            "counted_in": "interior",
+            "judgment_id": "3f5f43e4-67b6-47bf-afc8-a38b5b41b41e",
+            "operation_code": "INT-SEATS-RR"
+          }
+        ],
+        "unmatched": [
+          {
+            "hours": null,
+            "reason": "no book operation",
+            "item_id": "f9115b99-f55c-44db-a9a4-9b2362913ca8",
+            "image_id": "9225d27f-7138-4782-b8f3-ae63f2075458",
+            "judgment_id": "0bb772e0-9c69-46ab-9d08-2e9ee5ba72b0"
+          },
+          {
+            "hours": null,
+            "reason": "no book operation",
+            "item_id": "91f4587b-36af-4adf-8a53-f58ff710b005",
+            "image_id": "07bfa630-ea18-4907-8fe8-30368014f4e1",
+            "judgment_id": "10638429-7652-4edf-871f-abc7521601a6"
+          },
+          {
+            "hours": null,
+            "reason": "no book operation",
+            "item_id": "0ca0418c-9c1f-41e5-9154-fc956f5ec380",
+            "image_id": "f23ee056-c8c7-42b9-8788-e1341349eb40",
+            "judgment_id": "1201f73f-727f-4b26-a434-a6584020a3e7"
+          }
+        ],
+        "matched_count": 7,
+        "unmatched_count": 24
+      },
+      "stage_steps": [
+        {
+          "mode": "per_piece",
+          "zone": "*",
+          "to_stage": "assembled",
+          "from_stage": "clearcoated"
+        }
+      ],
+      "hours_typical": 2.75,
+      "evidence_count": 31,
+      "evidence_grade": "receipt_part_visible",
+      "hours_counted_elsewhere": 7.0
+    },
+    {
+      "status": "ok",
+      "segment": "interior",
+      "category": "interior",
+      "citation": "stage_transition_labor_map:interior needs_work->recovered",
+      "hours_max": 40,
+      "hours_min": 16,
+      "book_hours": {
+        "hours_max": 40,
+        "hours_min": 16,
+        "hours_typical": 24
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "recovered",
+          "from_stage": "needs_work"
+        }
+      ],
+      "hours_typical": 24,
+      "evidence_count": 26,
+      "evidence_grade": null,
+      "range_below_paper": false
+    }
+  ],
+  "applicable": true,
+  "vehicle_id": "20d21fb0-4651-4469-a0ba-e751309a1e54",
+  "logic_version": "vehicle_labor_appraisal/20261122203000.1"
+}
