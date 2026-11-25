@@ -3,7 +3,7 @@
 \set ON_ERROR_STOP on
 \ir test_private_row_reader_probes.sql
 RESET ROLE;
-CREATE TABLE public.work_sessions (id uuid PRIMARY KEY, user_id uuid, vehicle_id uuid);
+CREATE TABLE public.work_sessions (id uuid PRIMARY KEY, user_id uuid, vehicle_id uuid REFERENCES public.vehicles(id) ON DELETE CASCADE);
 ALTER TABLE public.work_sessions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY work_sessions_author ON public.work_sessions FOR SELECT TO authenticated USING (user_id = auth.uid());
 ALTER TABLE public.vehicle_images ENABLE ROW LEVEL SECURITY;
