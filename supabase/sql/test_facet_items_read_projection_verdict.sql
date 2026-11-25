@@ -50,11 +50,12 @@ CREATE TABLE public.observation_properties (id uuid PRIMARY KEY, property_key te
   cardinality text, verification_scope text, parent_property_id uuid, discriminator_key text, proposed_by_proposal_id uuid);
 CREATE TABLE public.listing_page_snapshots (id uuid PRIMARY KEY, success boolean, http_status int, platform text,
   listing_url text, html_sha256 text, metadata jsonb, fetched_at timestamptz, created_at timestamptz, html text);
-CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY, vehicle_id uuid, observed_at timestamptz, ingested_at timestamptz,
-  source_id uuid, source_url text, source_identifier text, kind public.observation_kind, content_hash text, structured_data jsonb,
-  content_text text, extraction_metadata jsonb, confidence_score numeric, is_superseded boolean DEFAULT false,
+CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles (id), observed_at timestamptz, ingested_at timestamptz,
+  source_id uuid REFERENCES public.observation_sources (id), source_url text, source_identifier text, kind public.observation_kind,
+  content_hash text, structured_data jsonb, content_text text, extraction_metadata jsonb, confidence_score numeric, is_superseded boolean DEFAULT false,
   superseded_by uuid, extraction_method text, raw_source_ref text, agent_cost_cents numeric, agent_model text,
-  property_id uuid, subject_type text DEFAULT 'vehicle', subject_id uuid, source_observation_id uuid, is_processed boolean);
+  property_id uuid REFERENCES public.observation_properties (id), subject_type text DEFAULT 'vehicle', subject_id uuid,
+  source_observation_id uuid REFERENCES public.vehicle_observations (id), is_processed boolean);  -- the four foreign keys live has
 CREATE INDEX ON public.vehicle_observations (ingested_at DESC);
 CREATE INDEX ON public.vehicle_observations (source_identifier, kind);
 GRANT SELECT ON public.vehicles, public.observation_properties, public.vehicle_observations TO anon, authenticated;
