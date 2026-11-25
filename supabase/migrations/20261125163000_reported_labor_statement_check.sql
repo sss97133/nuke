@@ -33,14 +33,18 @@
 --     labor_system_key / names_no_one_system (the ratified text's 'a job that names no one system: teardown,
 --     detailing, general'); labor_speaker_role / source_does_not_establish_speaker (the role is derived from the source
 --     row; a speaker it cannot establish is NULL with this reason, the weakest weight, never a value: lead ruling).
---   labor_stated_subject_key(subject, text_before) -> {kind, key, token} | NULL: the make or model key the subject
---     names (canonical_makes, make_alias_ref, canonical_models), written with a digit or with a capital that does not
---     open its sentence, and not directly after a preposition (text_before is the row text before the subject).
+--   labor_stated_subject_key(subject, text_before, text_after) -> {kind make_model_pair, make_id, make_alias_id, model_id,
+--     make_token, model_token} | NULL (lead ruling 2026-11-25, the pair rule): the subject names a car only as a make
+--     key (canonical_makes names and aliases, or a make_alias_ref alias of kind alias / case_punct / misspelled_make /
+--     truncated_make, not retired) directly followed by a model key of that make (canonical_models whose make text is
+--     that make's canonical, display or short name), optionally after a year. A make alone or a model alone resolves
+--     nothing. The pair is written starting with a digit or with a capital that does not open its sentence, and not
+--     directly after a preposition (optionally the/a/an and a year; text_before is the row text before the subject).
 --   reported_labor_statement_check(source_table, source_row_id, quote, low, high, qualifiers) -> jsonb
 --     {ok, disposition, reasons[], held_reasons[], contract, quote_hash, text_md5, page_vehicle_id, speaker_role,
 --     speaker_role_null_reason, speaker_role_basis, speaker_role_read, stated_subject_key}.
 --     disposition refused (any reason; nothing lands), held (well formed, but no work word in the figure's clause (its sentence cut at then / and then / but) or a
---     stated subject that names no key: held_reasons no_labor_context / stated_subject_unresolved; it lands, admits
+--     stated subject that names no make+model pair: held_reasons no_labor_context / subject_not_resolved; it lands, admits
 --     nothing and reaches no baseline) or admitted (ok true).
 --     Same source rules as gate A (schema_proposal_witness_sources: allowed table, row exists, not generated) and the
 --     same quote rule row (min_quote_chars, term_pattern, figure_required, whole-token verbatim), plus: quote <= 300
@@ -49,7 +53,7 @@
 --     and labor_system_key_null_reason; scope, statement_kind and time_basis required, listed and admitted; for task a
 --     system key or a null reason, never both; neither for whole_build; stated_subject <= 80 chars, a whole-token run
 --     of the quote holding no hour figure that resolves through labor_stated_subject_key; a subject that resolves to
---     nothing is held (held_reasons stated_subject_unresolved), never admitted as commenter_other_car. Figures, time phrases and the work word are read on the row text at the quote's span
+--     nothing is held (held_reasons subject_not_resolved), never admitted as commenter_other_car. Figures, time phrases and the work word are read on the row text at the quote's span
 --     (a trimmed quote cannot cut a figure or a time phrase). Thousands separators are read as printed.
 --     speaker_role is derived from the source row: auction_comments.is_seller and build_posts author = build_threads
 --     author give owner_seller; vehicles.description names no author (description_source: null or source_imported),
@@ -83,7 +87,7 @@ UPDATE public.schema_proposal_quote_rules
        labor_context_basis = 'same sample: of the 72 sentences the exclude pattern leaves, 12 hold a work word in the sentence of the figure (10 labor on ta-labor''s read; 2 not: a test mode, a pressure test) and 60 hold none (2 labor on ta-labor''s read: N hours with one person, a shop N hours to do; 1 unclear). A statement with no work word lands held (no_labor_context) and admits nothing (lead ruling 2026-11-25). The work word is read in the figure''s clause: its sentence cut at then / and then / but (0 of the 142 change). ta-skeptic2''s read of the same 142 (01:42 PT, own sentence split): 10 with a work word, 9 labor; 62 without, 2 labor, 1 unclear.'
  WHERE category = 'labor';
 UPDATE public.schema_proposal_quote_rules
-   SET stated_subject_basis = 'labor_stated_subject_key: a word run of the subject equal to a make or model key (canonical_makes names and aliases, make_alias_ref aliases not retired, canonical_models names and aliases; 13,664 distinct keys holding a letter, read 2026-11-25), written as the subject writes it starting with a digit or with a capital that does not open its sentence in the row text, and not directly after a preposition (at, in, to, of, for, from, with, near, by; optionally the/a/an); both rules are ta-skeptic2''s (01:42 PT). Sample: possessive phrases (my/our/his/her and up to four words) in auction_comments TABLESAMPLE SYSTEM (0.5) REPEATABLE (11) holding an hour figure, 256 distinct; 46 resolve, of which 33 name a car on ta-labor''s read and 13 do not (a place, a site, a collection, a dealer); of 60 unresolved sampled, 6 name a car (a digits-only model, or a model written in lower case). Without the capital test, car, motor, engine, truck, project and one resolve as canonical_models names. One call reads the key tables in 98 ms (EXPLAIN ANALYZE). ta-skeptic2''s read (live key tables loaded into PG17: 403 makes, 169 aliases, 4,497 models; 269 possessive phrases, TABLESAMPLE SYSTEM (0.5) REPEATABLE (11), hour-bearing): before the two rules 47 resolve, 32 a vehicle, 13 not, 2 unclear; the preposition rule removes 6 of the 13 and 0 vehicles; projected after both rules 41 resolve, 7 not a vehicle. canonical_models holds BAT, FL, Junior, Speed, Touring, Truck, One and Car as model keys; a false resolution would set commenter_other_car, so an unresolved subject is held.'
+   SET stated_subject_basis = 'labor_stated_subject_key (lead ruling 2026-11-25, pair rule): a make key directly followed by a model key of that make, optionally after a year; make keys canonical_makes names and aliases (403 rows) and make_alias_ref aliases not retired of kind alias, case_punct, misspelled_make, truncated_make; model keys canonical_models names and aliases whose make text equals the make''s canonical, display or short name (3,608 of 4,497 rows join), all read 2026-11-25; the pair starts with a digit or a capital that does not open its sentence and is not directly after a preposition (ta-skeptic2 01:42 PT), and its model token as written starts with a digit or a capital too. A pair directly followed by a receipt_line_systems key (singular or plural) names a part, not a car, and does not resolve (ta-skeptic2 2026-11-25: ''fitting a Pontiac GTO engine''); a possessive keeps the car. Measured on PG17 with the live key tables (exported 2026-11-25 04:1x PT): auction_comments TABLESAMPLE SYSTEM (0.5) REPEATABLE (11) holding an hour figure, 437 comments, 285 possessive phrases (my/our/his/her and up to four words), 256 distinct. The single-key rule resolved 40; the pair rule resolves 3 (a 2015 Chevrolet SS, a GMC C1500, a Ferrari 599 GTO), all 3 a car on ta-labor''s read, 0 not a car. Of the 37 it no longer resolves, 9 are not a car (a place, a site, an auction name, a collection, a bicycle) and 28 name a car by a make alone (Jeep, Buick, Saab, Chevy), a model alone (S2000, F12, CJ5, C36) or a model before a make word that is not a make key (M3 Touring, 997 Turbo); those 28 land held. One call reads the key tables in about 25 ms on production.'
  WHERE category = 'labor';
 
 INSERT INTO public.receipt_line_systems (system_key, label, expects_operation)
@@ -228,52 +232,83 @@ $fn$;
 REVOKE ALL ON FUNCTION public.labor_statement_value_admitted(text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.labor_statement_value_admitted(text, text) TO service_role;
 
--- labor_stated_subject must name a car by a key (ta-skeptic2 must-fix 5, 2026-11-25): a run of whole words of the
--- subject equal to a key of canonical_makes (canonical_name, display_name, short_name, aliases), make_alias_ref
--- (alias_text, not retired) or canonical_models (canonical_model, aliases), holding a letter, written starting with a
--- digit, or with a capital that does not open its sentence ('A very clean...', 'Truck took...' do not count), and not
--- directly after a preposition (at, in, to, of, for, from, with, near, by; optionally the/a/an: 'in Phoenix', 'era of
--- Porsche'). p_before is the row text before the subject (the check passes it). Basis:
--- schema_proposal_quote_rules.stated_subject_basis. Returns {kind, key, token} for the longest key, or NULL.
-CREATE OR REPLACE FUNCTION public.labor_stated_subject_key(p_subject text, p_before text DEFAULT '')
+-- labor_stated_subject must name a car by a make+model pair (lead ruling 2026-11-25, replacing the single-key rule of
+-- ta-skeptic2 must-fix 5): a make key directly followed by a model key of that make, optionally after a year
+-- ('1970 Pontiac GTO', 'Ferrari 599 GTO'). A make alone ('my Pontiac', '1998 Jeep') or a model alone ('my GTO', 'S2000')
+-- resolves nothing: the statement lands held (subject_not_resolved), never as commenter_other_car. Make keys:
+-- canonical_makes (canonical_name, display_name, short_name, aliases) and make_alias_ref (alias_text, not retired,
+-- kind alias / case_punct / misspelled_make / truncated_make; a model_as_make or brand_relation alias is not a make);
+-- model keys: canonical_models (canonical_model, aliases) whose make text equals that make's canonical, display or
+-- short name (3,608 of 4,497 rows join, read 2026-11-25). Make and model each start with a digit or a capital as
+-- written ('my Buick super clean' names no car); the pair's capital does not open
+-- its sentence, and not directly after a preposition (at, in, to, of, for, from, with, near, by; optionally the/a/an
+-- and a year). p_before is the row text before the subject (the check passes it). The longest pair wins. Basis:
+-- schema_proposal_quote_rules.stated_subject_basis.
+DROP FUNCTION IF EXISTS public.labor_stated_subject_key(text, text);
+CREATE OR REPLACE FUNCTION public.labor_stated_subject_key(p_subject text, p_before text DEFAULT '', p_after text DEFAULT '')
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
 DECLARE
   cand record;
   st int;
   before text;
   first text;
+  pair text;
+  nxt text;
 BEGIN
   IF p_subject IS NULL THEN RETURN NULL; END IF;
   FOR cand IN
     WITH s AS (SELECT ' ' || btrim(regexp_replace(lower(p_subject), '[^a-z0-9]+', ' ', 'g')) || ' ' AS cs),
-    c(kind, key, token) AS (
-      SELECT 'canonical_makes', m.id::text, t FROM public.canonical_makes m,
+    mk(make_id, alias_id, token) AS (
+      SELECT m.id, NULL::bigint, t FROM public.canonical_makes m,
              unnest(array_remove(ARRAY[m.canonical_name, m.display_name, m.short_name] || coalesce(m.aliases, '{}'::text[]), NULL)) t
       UNION ALL
-      SELECT 'make_alias_ref', a.id::text, a.alias_text FROM public.make_alias_ref a WHERE a.retired_at IS NULL
-      UNION ALL
-      SELECT 'canonical_models', cm.id::text, t FROM public.canonical_models cm,
-             unnest(array_remove(ARRAY[cm.canonical_model] || coalesce(cm.aliases, '{}'::text[]), NULL)) t),
-    k AS MATERIALIZED (SELECT kind, key, btrim(regexp_replace(lower(token), '[^a-z0-9]+', ' ', 'g')) AS token
-                         FROM c WHERE token ~ '[A-Za-z]')
-    SELECT k.kind, k.key, k.token FROM k, s
-     WHERE length(k.token) >= 2 AND strpos(s.cs, ' ' || k.token || ' ') > 0
-     GROUP BY k.kind, k.key, k.token
-     ORDER BY length(k.token) DESC, k.kind, k.key
+      SELECT m.id, a.id, a.alias_text FROM public.make_alias_ref a
+        JOIN public.canonical_makes m ON lower(m.canonical_name) = lower(a.canonical_make)
+       WHERE a.retired_at IS NULL AND a.kind IN ('alias', 'case_punct', 'misspelled_make', 'truncated_make')),
+    mkn AS MATERIALIZED (
+      SELECT DISTINCT x.make_id, x.alias_id, x.token
+        FROM s, LATERAL (SELECT mk.make_id, mk.alias_id, btrim(regexp_replace(lower(mk.token), '[^a-z0-9]+', ' ', 'g')) AS token
+                           FROM mk WHERE mk.token ~ '[A-Za-z]') x
+       WHERE length(x.token) >= 2 AND strpos(s.cs, ' ' || x.token || ' ') > 0),
+    mdn AS MATERIALIZED (
+      SELECT DISTINCT m.id AS make_id, cm.id AS model_id, btrim(regexp_replace(lower(t), '[^a-z0-9]+', ' ', 'g')) AS token
+        FROM public.canonical_makes m
+        JOIN public.canonical_models cm
+          ON lower(cm.make) IN (lower(m.canonical_name), lower(m.display_name), lower(coalesce(m.short_name, ''))),
+             unnest(array_remove(ARRAY[cm.canonical_model] || coalesce(cm.aliases, '{}'::text[]), NULL)) t
+       WHERE m.id IN (SELECT make_id FROM mkn))
+    SELECT a.make_id, a.alias_id, a.token AS make_token, b.model_id, b.token AS model_token
+      FROM mkn a JOIN mdn b ON b.make_id = a.make_id, s
+     WHERE b.token <> '' AND b.token <> a.token
+       AND strpos(s.cs, ' ' || a.token || ' ' || b.token || ' ') > 0
+     ORDER BY length(a.token) + length(b.token) DESC, a.alias_id NULLS FIRST, a.make_id, b.model_id
   LOOP
-    st := regexp_instr(p_subject, '\m' || replace(cand.token, ' ', '[^[:alnum:]]+') || '\M', 1, 1, 0, 'i');
+    st := regexp_instr(p_subject, '\m' || replace(cand.make_token, ' ', '[^[:alnum:]]+') || '[^[:alnum:]]+'
+                                   || replace(cand.model_token, ' ', '[^[:alnum:]]+') || '\M', 1, 1, 0, 'i');
     CONTINUE WHEN st = 0;
     first := substr(p_subject, st, 1);
     before := coalesce(p_before, '') || substr(p_subject, 1, st - 1);
     CONTINUE WHEN first !~ '[A-Z0-9]';
+    -- the model as written starts with a capital or a digit too ('my Buick super clean', 'my BMW turbo' name no car)
+    CONTINUE WHEN substr((regexp_match(substr(p_subject, st), '^' || replace(cand.make_token, ' ', '[^[:alnum:]]+')
+                    || '[^[:alnum:]]+(' || replace(cand.model_token, ' ', '[^[:alnum:]]+') || ')\M', 'i'))[1], 1, 1) !~ '[A-Z0-9]';
     CONTINUE WHEN first ~ '[A-Z]' AND before ~ '(^|[.!?;:])["'')\]]*\s*$';
-    CONTINUE WHEN before ~* '\m(at|in|to|of|for|from|with|near|by)\s+((the|a|an)\s+)?$';
-    RETURN jsonb_build_object('kind', cand.kind, 'key', cand.key, 'token', cand.token);
+    CONTINUE WHEN before ~* '\m(at|in|to|of|for|from|with|near|by)\s+((the|a|an)\s+)?([''‘’]?[0-9]{2,4}\s+)?$';
+    -- a pair followed by a car system names a part ('fitting a Pontiac GTO engine', ta-skeptic2 2026-11-25): the next
+    -- word is a receipt_line_systems key (or its singular or plural). A possessive ('GTO''s engine') keeps the car.
+    pair := (regexp_match(substr(p_subject, st), '^' || replace(cand.make_token, ' ', '[^[:alnum:]]+') || '[^[:alnum:]]+'
+                          || replace(cand.model_token, ' ', '[^[:alnum:]]+') || '\M', 'i'))[1];
+    -- the words after the pair run past the reader's span into the quote (p_after, ta-skeptic2 2026-11-25)
+    nxt := lower((regexp_match(substr(p_subject, st + length(pair)) || coalesce(p_after, ''), '^\s+([[:alpha:]]+)'))[1]);
+    CONTINUE WHEN nxt IS NOT NULL AND EXISTS (SELECT 1 FROM public.receipt_line_systems r
+                                               WHERE nxt IN (r.system_key, r.system_key || 's', rtrim(r.system_key, 's')));
+    RETURN jsonb_build_object('kind', 'make_model_pair', 'make_id', cand.make_id, 'make_alias_id', cand.alias_id,
+                              'model_id', cand.model_id, 'make_token', cand.make_token, 'model_token', cand.model_token);
   END LOOP;
   RETURN NULL;
 END $fn$;
-REVOKE ALL ON FUNCTION public.labor_stated_subject_key(text, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.labor_stated_subject_key(text, text) TO service_role;
+REVOKE ALL ON FUNCTION public.labor_stated_subject_key(text, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.labor_stated_subject_key(text, text, text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.reported_labor_statement_check(
   p_source_table text, p_source_row_id uuid, p_quote text, p_low numeric, p_high numeric, p_qualifiers jsonb)
@@ -453,7 +488,7 @@ BEGIN
   END IF;
   -- labor_stated_subject names the other car: a whole-token run of the quote (else refused: the reader's text is not
   -- verbatim) that resolves to a make or model key (labor_stated_subject_key) and holds no hour figure. A subject that
-  -- resolves to nothing ('I had', '2500 hours') is NULL with held reason stated_subject_unresolved: the statement lands
+  -- resolves to nothing ('I had', '2500 hours') is NULL with held reason subject_not_resolved: the statement lands
   -- held, never as commenter_other_car (lead ruling 2026-11-25).
   IF q ? 'labor_stated_subject' THEN
     subj := CASE WHEN jsonb_typeof(q -> 'labor_stated_subject') = 'string' THEN q ->> 'labor_stated_subject' END;
@@ -465,9 +500,10 @@ BEGIN
       -- the row text before the subject, so a capital opening its sentence and a preceding preposition are seen
       subj_key := public.labor_stated_subject_key(subj,
                     CASE WHEN txt IS NOT NULL AND position(p_quote IN txt) > 0
-                         THEN substr(txt, 1, position(p_quote IN txt) + pos - 2) ELSE '' END);
+                         THEN substr(txt, 1, position(p_quote IN txt) + pos - 2) ELSE '' END,
+                    substr(p_quote, pos + length(subj)));
       IF subj_key IS NULL OR (qr.figure_term_pattern IS NOT NULL AND subj ~* qr.figure_term_pattern) THEN
-        held := held || 'stated_subject_unresolved'::text;
+        held := held || 'subject_not_resolved'::text;
         subj_key := NULL;
       END IF;
     END IF;
