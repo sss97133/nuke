@@ -6,7 +6,7 @@
 -- rule row when its table exists; with no closing lot a dry run is posted at most every every_minutes and none without
 -- the rule; in a minute with a closing lot exactly one post, the real handoff, even when a probe is due; stream_calls
 -- keeps the newest 5; and bat_live_stream_check() reads failed for the outage's own answer (HTTP 500, replayed), no
--- response, a timeout, a 4xx, no call, a missed call with targets; passed on 2xx; a young unanswered call is skipped
+-- response, a call pg_net never sent, a timeout, a 4xx, no call, a missed call with targets; passed on 2xx; a young unanswered call is skipped
 -- and writes nothing; refuses without its rule row. Synthetic rows only.
 \set ON_ERROR_STOP on
 DO $$ BEGIN IF current_database() NOT LIKE 'dm_refinement_%' THEN RAISE EXCEPTION 'disposable database only'; END IF; END $$;
@@ -32,6 +32,7 @@ CREATE SCHEMA net;
 CREATE TABLE net._http_response (id bigint PRIMARY KEY, status_code integer, content_type text, headers jsonb, content text,
   timed_out boolean, error_msg text, created timestamptz NOT NULL DEFAULT now());
 CREATE TABLE net._posts (id bigserial PRIMARY KEY, url text, body jsonb);
+CREATE TABLE net.http_request_queue (id bigint PRIMARY KEY);
 CREATE FUNCTION net.http_post(url text, body jsonb DEFAULT '{}', params jsonb DEFAULT '{}', headers jsonb DEFAULT '{}',
   timeout_milliseconds integer DEFAULT 5000) RETURNS bigint LANGUAGE sql AS
   $$ INSERT INTO net._posts (url, body) VALUES (url, body) RETURNING id $$;
@@ -191,6 +192,16 @@ BEGIN
   PERFORM public._set(jsonb_build_array(public._call(9005, '4 minutes')), jsonb_build_object('at', now() - interval '4 minutes', 'stream_lots', 1));
   r := public.bat_live_stream_check();
   PERFORM public.assert(r ->> 'status' = 'failed' AND r ->> 'reason' = 'no_response', format('no answer after the wait (%s)', r));
+
+  INSERT INTO net.http_request_queue (id) VALUES (9010), (9011);
+  PERFORM public._set(jsonb_build_array(public._call(9003, '9 minutes'), public._call(9010, '5 minutes')),
+                      jsonb_build_object('at', now() - interval '5 minutes', 'stream_lots', 1));
+  r := public.bat_live_stream_check();
+  PERFORM public.assert(r ->> 'status' = 'passed' AND (r ->> 'request_id')::bigint = 9003,
+                        format('a call still queued at pg_net under every_minutes is skipped (%s)', r));
+  PERFORM public._set(jsonb_build_array(public._call(9011, '11 minutes')), jsonb_build_object('at', now() - interval '11 minutes', 'stream_lots', 0));
+  r := public.bat_live_stream_check();
+  PERFORM public.assert(r ->> 'status' = 'failed' AND r ->> 'reason' = 'still_queued', format('still queued after every_minutes (%s)', r));
 
   PERFORM public._set(jsonb_build_array(public._call(9006, '2 minutes')), jsonb_build_object('at', now() - interval '2 minutes', 'stream_lots', 1));
   r := public.bat_live_stream_check();

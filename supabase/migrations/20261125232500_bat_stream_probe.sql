@@ -26,7 +26,8 @@
 --        not_called               no call in 2 * every_minutes + missed_slack_minutes;
 --        not_called_with_targets  the puller's last run had stream lots and made no call;
 --        no_response / timed_out / error / http_<code>  for the newest call that is answered or older than
---                                 response_wait_minutes (a younger unanswered call is skipped, the one before it is read).
+--                                 response_wait_minutes (a younger unanswered call is skipped, the one before it is read);
+--        still_queued             a call pg_net has not sent (net.http_request_queue) after every_minutes.
 --      passed on a 2xx. With only a young unanswered call it writes nothing (the previous reading stands, 15 min).
 --   4. job_health_alarm_rules row bat-live-stream-check (alarm_after 15 min) when that table exists (20261125090700);
 --      if this lands first, a one-row follow-up seeds it after 20261125090700 deploys.
@@ -124,6 +125,7 @@ DECLARE
   v_run_lots integer;
   v_call    jsonb;
   v_found   boolean := false;
+  v_queued  boolean := false;
   v_code    integer;
   v_timed   boolean;
   v_err     text;
@@ -155,14 +157,16 @@ BEGIN
   ELSIF v_run_lots > 0 AND v_run_at > v_newest_at THEN
     v_status := 'failed'; v_reason := 'not_called_with_targets';
   ELSE
-    -- The newest call that is answered or old enough to have been; a younger unanswered call is skipped.
+    -- The newest call that is answered or old enough to have been; a younger unanswered call is skipped. A call pg_net
+    -- has not sent yet (still in net.http_request_queue) waits every_minutes before it reads still_queued.
     FOR c IN SELECT e, o FROM jsonb_array_elements(v_calls) WITH ORDINALITY t(e, o) ORDER BY o DESC LOOP
       CONTINUE WHEN coalesce(c.e ->> 'request_id', '') !~ '^[0-9]{1,18}$'
                  OR NOT coalesce(pg_input_is_valid(c.e ->> 'at', 'timestamp with time zone'), false);
       SELECT true, r.status_code, r.timed_out, r.error_msg INTO v_found, v_code, v_timed, v_err
         FROM net._http_response r WHERE r.id = (c.e ->> 'request_id')::bigint;
       v_found := coalesce(v_found, false);
-      IF v_found OR (c.e ->> 'at')::timestamptz <= v_now - make_interval(mins => v_wait) THEN
+      v_queued := NOT v_found AND EXISTS (SELECT 1 FROM net.http_request_queue q WHERE q.id = (c.e ->> 'request_id')::bigint);
+      IF v_found OR (c.e ->> 'at')::timestamptz <= v_now - make_interval(mins => CASE WHEN v_queued THEN v_every ELSE v_wait END) THEN
         v_call := c.e;
         EXIT;
       END IF;
@@ -171,7 +175,8 @@ BEGIN
       RETURN jsonb_build_object('status', 'pending', 'checked_at', v_now, 'calls', jsonb_array_length(v_calls));
     END IF;
     v_status := 'failed';
-    v_reason := CASE WHEN NOT v_found THEN 'no_response'
+    v_reason := CASE WHEN NOT v_found AND v_queued THEN 'still_queued'
+                     WHEN NOT v_found THEN 'no_response'
                      WHEN v_timed THEN 'timed_out'
                      WHEN v_err IS NOT NULL THEN 'error'
                      WHEN v_code IS NULL OR v_code NOT BETWEEN 200 AND 299 THEN 'http_' || coalesce(v_code::text, 'none')
@@ -197,7 +202,7 @@ $f$;
 REVOKE ALL ON FUNCTION public.bat_live_stream_check() FROM PUBLIC, anon, authenticated;
 
 COMMENT ON FUNCTION public.bat_live_stream_check() IS
-'Reads the BaT stream handoff''s answers: live_pull.stream_calls (stamped by bat_live_pull_run) against net._http_response, one job_assay_readings row (bat-live-stream-check), failed on not_called, not_called_with_targets, no_response, timed_out, error or a non-2xx. Rule row live_pull.stream_probe. Migration 20261125232500.';
+'Reads the BaT stream handoff''s answers: live_pull.stream_calls (stamped by bat_live_pull_run) against net._http_response, one job_assay_readings row (bat-live-stream-check), failed on not_called, not_called_with_targets, no_response, still_queued, timed_out, error or a non-2xx. Rule row live_pull.stream_probe. Migration 20261125232500.';
 
 -- The alarm rule row: written here when job_health_alarm_rules exists (20261125090700 deployed first); otherwise by the
 -- follow-up that lands after it.
