@@ -26,23 +26,31 @@
 --
 -- WRITER. retained_projection_grade_tick(), a procedure, every minute (job retained-projection-grade), as postgres,
 -- committing per chunk inside a budget (platform_config 'retained_projection_verdicts': enabled, budget_ms, chunk,
--- sweep_rows_min, sweep_rows_max, target_miss_share, pause_close_minutes, pause_on_failing_jobs). Each run: pause when a live lot closes within
--- pause_close_minutes (monitored_auctions) or the last run of a named job failed (cron.job_run_details, the reading
--- v_job_health makes, at 5 ms instead of 600 ms); else
+-- sweep_rows_min, sweep_rows_max, target_miss_share, census_rows, pause_close_minutes, watch, tick_seconds,
+-- stall_minutes, max_paused_ticks). Each run: pause when a live lot closes within pause_close_minutes
+-- (monitored_auctions), or a watch job's last run failed or ran past its max_run_seconds (cron.job_run_details: what
+-- this work can slow, never the job's coverage assay); else
 --   1. tail: projections by ingested_at (index), older than 10 minutes, after the watermark;
 --   2. sweep: stored verdicts by projection_id cursor, re-fingerprinted (0.1 ms a row warm), regraded when stale. A
 --      read never serves a stale verdict (the read recomputes input_fp); the sweep keeps the hit rate up, sized by the
 --      measured miss rate (rows a run = stale per minute / (2 x target_miss_share));
---   3. backfill: projections by source_identifier (index idx_vobs_source_identifier_kind; 0 of 2,881 sampled
---      projections break the 'retained_listing_<key>_v1:<uuid>' form), until done.
+--   3. census, then backfill by key: the census counts each car's projections once by source_identifier keyset
+--      (index idx_vobs_source_identifier_kind; 0 of 2,881 sampled projections break the
+--      'retained_listing_<key>_v1:<uuid>' form) into retained_projection_backfill_cars; then cars are graded in key
+--      order, publicly readable first, most projections first. Progress: v_retained_projection_backfill (graded /
+--      eligible cars, newest graded_at, status 'stalled' when nothing moved in 30 minutes), written each run as the
+--      job's own assay row in job_assay_readings, which v_job_health reads; a pause longer than max_paused_ticks
+--      reads 'paused_too_long' (red).
 -- The job is permanent: p, vehicles and snapshots change with no updated_at, so only the sweep finds a stale verdict.
 -- Verdicts are written by this job, not by the insert trigger: a BEFORE trigger cannot reference a row not yet written,
 -- and the admission it makes is not the root matcher (41 of 1,200 sampled rows are admitted and refused by the root,
 -- all on hidden cars).
 --
 -- READ. retained_projection_verdicts_for(uuid[]) (definer, anon and authenticated execute): ids in, (id, admitted) out,
--- only for counting verdicts on a car with is_public, deleted_at IS NULL and listing_kind not non_vehicle_item. No
--- registry column leaves it. It restates the vehicles read rule, so it is registered in private_row_policy_copies.
+-- only for counting verdicts on a car with is_public, deleted_at IS NULL and listing_kind not non_vehicle_item, whose
+-- source observation anon can read (its car public and observation_is_public, or the broadcast source; no private
+-- method), so a direct call is no oracle for a source the caller cannot read. No registry column leaves it. It
+-- restates the vehicles and vehicle_observations read rules, so both are registered in private_row_policy_copies.
 --
 -- GAUGE. retained_projection_verdict_gauge(): graded, remaining, newest graded_at, and the share of reads served from
 -- a verdict (estimated from the job's own counts: coverage x verdicts not waiting stale); then the miss rate, pass
@@ -69,9 +77,12 @@ CREATE TABLE IF NOT EXISTS public.retained_projection_grading_state (
   id                     boolean PRIMARY KEY DEFAULT true CHECK (id),
   closure                oid[] NOT NULL DEFAULT '{}',
   tail_watermark         timestamptz,
-  backfill_si            text,
-  backfill_id            uuid,
+  census_si              text,
+  census_id              uuid,
+  census_done            boolean NOT NULL DEFAULT false,
   backfill_done          boolean NOT NULL DEFAULT false,
+  backfill_progress_at   timestamptz,
+  paused_since           timestamptz,
   sweep_cursor           uuid,
   sweep_passes           integer NOT NULL DEFAULT 0,
   sweep_stale_this_pass  integer NOT NULL DEFAULT 0,
@@ -84,6 +95,23 @@ CREATE TABLE IF NOT EXISTS public.retained_projection_grading_state (
   last_run_at            timestamptz,
   last_run               jsonb
 );
+
+-- The backfill order is a key, not arrival order: one row per car holding retained projections (counted once by the
+-- census), graded car by car, publicly readable cars first, most projections first (those time out through the live
+-- matcher today). public_readable is the car's state at census time, an ordering key only; eligibility in the
+-- progress view is read live from vehicles.
+CREATE TABLE IF NOT EXISTS public.retained_projection_backfill_cars (
+  vehicle_id      uuid PRIMARY KEY REFERENCES public.vehicles (id) ON DELETE CASCADE,
+  projections     integer NOT NULL CHECK (projections >= 0),
+  public_readable boolean NOT NULL,
+  censused_at     timestamptz NOT NULL,
+  graded_at       timestamptz
+);
+CREATE INDEX IF NOT EXISTS retained_projection_backfill_cars_next
+  ON public.retained_projection_backfill_cars (public_readable DESC, projections DESC, vehicle_id) WHERE graded_at IS NULL;
+ALTER TABLE public.retained_projection_backfill_cars ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.retained_projection_backfill_cars FROM PUBLIC, anon, authenticated;
+CREATE INDEX IF NOT EXISTS retained_projection_verdicts_graded_at ON public.retained_projection_verdicts (graded_at);
 ALTER TABLE public.retained_projection_grading_state ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.retained_projection_grading_state FROM PUBLIC, anon, authenticated;
 INSERT INTO public.retained_projection_grading_state (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
@@ -157,8 +185,16 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $f$
     JOIN public.vehicle_observations o ON o.id = f.projection_id
     JOIN public.vehicles v ON v.id = o.vehicle_id
      AND v.is_public IS TRUE AND v.deleted_at IS NULL AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item'
+    JOIN public.vehicle_observations p ON p.id = o.source_observation_id
+    LEFT JOIN public.vehicles pv ON pv.id = p.vehicle_id
     CROSS JOIN k
    WHERE d.body_key = k.key
+     -- the source observation as anon reads it (vehicle_observations read policies, hash 16c9e48f...): a permissive
+     -- term (its car public and observation_is_public, or the broadcast source) and no restrictive private method
+     AND ((pv.is_public IS TRUE AND public.observation_is_public(p.kind, p.structured_data))
+          OR p.source_id = 'e980c7bd-404f-41f6-8a17-1c7cabd1d8a4')
+     AND coalesce(p.extraction_method, '') <> ALL (ARRAY['garage_owner_correction_v1', 'owner_statement_v1',
+           'owner_statement_org_link_v1', 'vehicle_statement_v1', 'work_order_payment_witness_sign_v1'])
      AND d.input_fp = f.input_fp
      AND (f.p_time IS NULL OR f.p_time <= d.graded_at)
 $f$;
@@ -182,19 +218,78 @@ BEGIN
   RETURN n;
 END $f$;
 
+-- Backfill progress as one row: graded cars / eligible cars (publicly readable, live), newest graded_at, and a status
+-- that turns 'stalled' (red) when cars remain and neither the census nor the backfill has moved in 30 minutes while
+-- the job is not paused. The job writes this row as its own assay (job_assay_readings 'retained-projection-grade'),
+-- which v_job_health reads.
+CREATE OR REPLACE VIEW public.v_retained_projection_backfill WITH (security_invoker = true) AS
+WITH g AS (SELECT * FROM public.retained_projection_grading_state WHERE id),
+rule AS (   -- typed thresholds from the rule row (platform_config 'retained_projection_verdicts'), defaults if absent
+  SELECT make_interval(mins => CASE WHEN c->>'stall_minutes' ~ '^\d{1,4}$' THEN (c->>'stall_minutes')::int ELSE 30 END) AS stall_after,
+         make_interval(secs => (CASE WHEN c->>'max_paused_ticks' ~ '^\d{1,5}$' THEN (c->>'max_paused_ticks')::int ELSE 60 END)
+                               * (CASE WHEN c->>'tick_seconds' ~ '^\d{1,4}$' THEN (c->>'tick_seconds')::int ELSE 60 END)) AS paused_after
+    FROM (SELECT coalesce((SELECT pc.config_value FROM public.platform_config pc WHERE pc.config_key = 'retained_projection_verdicts'),
+                          '{}'::jsonb) AS c) x),
+c AS (
+  SELECT count(*) AS cars,
+         count(*) FILTER (WHERE e.eligible) AS eligible_cars,
+         count(*) FILTER (WHERE e.eligible AND b.graded_at IS NOT NULL) AS graded_eligible_cars,
+         count(*) FILTER (WHERE b.graded_at IS NOT NULL) AS graded_cars,
+         coalesce(sum(b.projections) FILTER (WHERE e.eligible), 0) AS eligible_projections,
+         coalesce(sum(b.projections) FILTER (WHERE e.eligible AND b.graded_at IS NOT NULL), 0) AS graded_eligible_projections
+    FROM public.retained_projection_backfill_cars b
+    LEFT JOIN public.vehicles v ON v.id = b.vehicle_id
+   CROSS JOIN LATERAL (SELECT (v.is_public IS TRUE AND v.deleted_at IS NULL
+                               AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item') AS eligible) e)
+SELECT CASE WHEN NOT g.census_done THEN 'census' WHEN NOT g.backfill_done THEN 'grading' ELSE 'done' END AS phase,
+       c.cars, c.eligible_cars, c.graded_eligible_cars, c.graded_cars, c.eligible_projections, c.graded_eligible_projections,
+       g.census_si AS census_at_key,
+       (SELECT max(d.graded_at) FROM public.retained_projection_verdicts d) AS newest_graded_at,
+       g.backfill_progress_at,
+       g.last_run_at,
+       g.last_run->>'paused' AS paused,
+       g.paused_since,
+       rule.stall_after, rule.paused_after,
+       CASE WHEN g.paused_since IS NOT NULL AND g.paused_since < statement_timestamp() - rule.paused_after THEN 'paused_too_long'
+            WHEN g.census_done AND g.backfill_done THEN 'done'
+            WHEN g.paused_since IS NOT NULL THEN 'paused'
+            WHEN g.backfill_progress_at IS NULL OR g.backfill_progress_at < statement_timestamp() - rule.stall_after THEN 'stalled'
+            ELSE 'running' END AS status
+  FROM g, c, rule;
+REVOKE ALL ON public.v_retained_projection_backfill FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.retained_projection_record_assay(p_started timestamptz)
+RETURNS void LANGUAGE plpgsql SET search_path = pg_catalog, public AS $f$
+DECLARE r jsonb;
+BEGIN
+  IF to_regclass('public.job_assay_readings') IS NULL THEN RETURN; END IF;
+  SELECT to_jsonb(b) INTO r FROM public.v_retained_projection_backfill b;
+  r := r || jsonb_build_object('status', CASE r->>'status' WHEN 'stalled' THEN 'failed' WHEN 'paused_too_long' THEN 'failed'
+                                                           WHEN 'paused' THEN 'paused' ELSE 'passed' END,
+                               'backfill_status', r->>'status');
+  INSERT INTO public.job_assay_readings (jobname, reading, assayed_at, elapsed_ms, attempted_at, attempt_error, refresh_every, fresh_for)
+  VALUES ('retained-projection-grade', r, now(), greatest(0, round(extract(epoch FROM clock_timestamp() - p_started) * 1000))::integer,
+          now(), NULL, interval '1 minute', interval '5 minutes')
+  ON CONFLICT (jobname) DO UPDATE SET reading = EXCLUDED.reading, assayed_at = EXCLUDED.assayed_at, elapsed_ms = EXCLUDED.elapsed_ms,
+         attempted_at = EXCLUDED.attempted_at, attempt_error = NULL, refresh_every = EXCLUDED.refresh_every, fresh_for = EXCLUDED.fresh_for;
+END $f$;
+REVOKE ALL ON FUNCTION public.retained_projection_record_assay(timestamptz) FROM PUBLIC, anon, authenticated;
+
 -- No SET clause: a procedure with one cannot COMMIT. Every name below is schema-qualified.
 CREATE OR REPLACE PROCEDURE public.retained_projection_grade_tick()
 LANGUAGE plpgsql AS $f$
 DECLARE
   cfg jsonb := coalesce((SELECT c.config_value FROM public.platform_config c WHERE c.config_key = 'retained_projection_verdicts'), '{}');
-  budget_ms int := least(greatest(CASE WHEN cfg->>'budget_ms' ~ '^\d{1,5}$' THEN (cfg->>'budget_ms')::int END, 1000), 8000);
+  budget_ms int := least(greatest(CASE WHEN cfg->>'budget_ms' ~ '^\d{1,5}$' THEN (cfg->>'budget_ms')::int END, 1000), 5000);
   chunk int := least(greatest(CASE WHEN cfg->>'chunk' ~ '^\d{1,4}$' THEN (cfg->>'chunk')::int END, 10), 500);
   sweep_min int := least(greatest(CASE WHEN cfg->>'sweep_rows_min' ~ '^\d{1,6}$' THEN (cfg->>'sweep_rows_min')::int END, 0), 100000);
   sweep_max int := least(greatest(CASE WHEN cfg->>'sweep_rows_max' ~ '^\d{1,6}$' THEN (cfg->>'sweep_rows_max')::int END, 0), 200000);
   target numeric := least(greatest(CASE WHEN cfg->>'target_miss_share' ~ '^0?\.\d{1,6}$' THEN (cfg->>'target_miss_share')::numeric END, 0.0001), 0.5);
   sweep_rows int;
   pause_min int := least(greatest(CASE WHEN cfg->>'pause_close_minutes' ~ '^\d{1,3}$' THEN (cfg->>'pause_close_minutes')::int END, 0), 240);
-  jobs text[] := coalesce((SELECT array_agg(j) FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(cfg->'pause_on_failing_jobs') = 'array' THEN cfg->'pause_on_failing_jobs' END) j), '{}');
+  -- watch rows: {"job": <cron jobname>, "max_run_seconds": n, "pause_on_failed_run": bool}; the signals are the job's
+  -- own runs (a failed last run, a run longer than max_run_seconds or one still running past it), never its assay
+  watch jsonb := CASE WHEN jsonb_typeof(cfg->'watch') = 'array' THEN cfg->'watch' ELSE '[]'::jsonb END;
   t0 timestamptz := clock_timestamp();
   until timestamptz;
   st public.retained_projection_grading_state;
@@ -205,34 +300,52 @@ DECLARE
   i int;
   wm_hi timestamptz;
   last_si text; last_id uuid;
-  n_tail int := 0; n_backfill int := 0; n_swept int := 0; n_stale int := 0; pause text;
+  n_tail int := 0; n_backfill int := 0; n_census int := 0; n_cars int := 0; n_swept int := 0; n_stale int := 0; pause text;
+  census_rows int := least(greatest(CASE WHEN cfg->>'census_rows' ~ '^\d{1,5}$' THEN (cfg->>'census_rows')::int END, 100), 10000);
+  vids uuid[]; car uuid; n int;
 BEGIN
-  IF budget_ms IS NULL THEN budget_ms := 7000; END IF;
+  -- The role's 10 s statement_timeout covers the whole CALL (a COMMIT inside does not re-arm it). Work starts only
+  -- inside a 5 s budget, and a step (a fingerprint batch, 0.85-1.4 s per 500 live; a chunk, 50 x 28 ms cold) starts
+  -- only with 2.5 s of budget left, so the last one ends by about 7.5 s.
+  IF budget_ms IS NULL THEN budget_ms := 5000; END IF;
   IF chunk IS NULL THEN chunk := 50; END IF;
   IF sweep_min IS NULL THEN sweep_min := 1000; END IF;
   IF sweep_max IS NULL OR sweep_max < sweep_min THEN sweep_max := greatest(sweep_min, 50000); END IF;
   IF target IS NULL THEN target := 0.01; END IF;
   IF pause_min IS NULL THEN pause_min := 15; END IF;
-  until := t0 + make_interval(secs => budget_ms / 1000.0);
+  until := t0 + make_interval(secs => budget_ms / 1000.0) - interval '2.5 seconds';   -- the last moment a step may start
   IF NOT pg_try_advisory_lock(hashtextextended('retained_projection_grade_tick', 0)) THEN RETURN; END IF;
   PERFORM set_config('lock_timeout', '2s', false);
 
+  -- (each optional relation is tested in its own IF: plpgsql plans a whole condition, so a guard in the same
+  --  expression would not stop a missing relation from failing the plan)
   IF coalesce(cfg->>'enabled', 'true') <> 'true' THEN
     pause := 'disabled';
-  ELSIF pause_min > 0 AND to_regclass('public.monitored_auctions') IS NOT NULL AND EXISTS (
-      SELECT 1 FROM public.monitored_auctions m
-       WHERE m.is_live AND m.auction_end_time BETWEEN now() AND now() + make_interval(mins => pause_min)) THEN
-    pause := format('lots closing within %s min', pause_min);
-  ELSIF EXISTS (
-      SELECT 1 FROM cron.job j
-       WHERE j.jobname = ANY (jobs)
-         AND (SELECT d.status FROM cron.job_run_details d WHERE d.jobid = j.jobid ORDER BY d.runid DESC LIMIT 1) = 'failed') THEN
-    pause := 'a watched job''s last run failed';
+  END IF;
+  IF pause IS NULL AND pause_min > 0 AND to_regclass('public.monitored_auctions') IS NOT NULL THEN
+    IF EXISTS (SELECT 1 FROM public.monitored_auctions m
+                WHERE m.is_live AND m.auction_end_time BETWEEN now() AND now() + make_interval(mins => pause_min)) THEN
+      pause := format('lots closing within %s min', pause_min);
+    END IF;
+  END IF;
+  IF pause IS NULL THEN
+    SELECT format('%s: %s', w->>'job', CASE WHEN r.status = 'failed' THEN 'last run failed' ELSE 'run over max_run_seconds' END)
+      INTO pause
+      FROM jsonb_array_elements(watch) w
+      JOIN cron.job j ON j.jobname = w->>'job'
+      CROSS JOIN LATERAL (SELECT d.status, d.start_time, d.end_time FROM cron.job_run_details d
+                           WHERE d.jobid = j.jobid ORDER BY d.runid DESC LIMIT 1) r
+     WHERE (coalesce((w->>'pause_on_failed_run')::boolean, true) AND r.status = 'failed')
+        OR (w->>'max_run_seconds' ~ '^\d{1,5}$'
+            AND extract(epoch FROM coalesce(r.end_time, clock_timestamp()) - r.start_time) > (w->>'max_run_seconds')::int)
+     LIMIT 1;
   END IF;
   IF pause IS NOT NULL THEN
     UPDATE public.retained_projection_grading_state
-       SET last_run_at = t0, last_run = jsonb_build_object('paused', pause, 'ms', round(extract(epoch FROM clock_timestamp() - t0) * 1000))
+       SET last_run_at = t0, last_run = jsonb_build_object('paused', pause, 'ms', round(extract(epoch FROM clock_timestamp() - t0) * 1000)),
+           paused_since = coalesce(paused_since, t0)
      WHERE id;
+    PERFORM public.retained_projection_record_assay(t0);
     COMMIT;
     PERFORM pg_advisory_unlock(hashtextextended('retained_projection_grade_tick', 0));
     RETURN;
@@ -241,8 +354,8 @@ BEGIN
   fns := public.retained_projection_closure();
   key := public.retained_projection_body_key(fns);
   UPDATE public.retained_projection_grading_state SET closure = fns,
-         tail_watermark = coalesce(tail_watermark, now() - interval '10 minutes')
-   WHERE id AND (closure IS DISTINCT FROM fns OR tail_watermark IS NULL);
+         tail_watermark = coalesce(tail_watermark, now() - interval '10 minutes'), paused_since = NULL
+   WHERE id AND (closure IS DISTINCT FROM fns OR tail_watermark IS NULL OR paused_since IS NOT NULL);
   COMMIT;
 
   -- 1. tail: new projections, 10 minutes settled (a writer's open transaction commits rows with an earlier ingested_at),
@@ -256,11 +369,10 @@ BEGIN
      WHERE o.ingested_at > st.tail_watermark AND o.ingested_at <= wm_hi
        AND o.extraction_method = 'retained_listing_property_projection_v1';
     i := 1;
-    WHILE i <= coalesce(cardinality(batch), 0) LOOP
+    WHILE i <= coalesce(cardinality(batch), 0) AND clock_timestamp() < until LOOP
       n_tail := n_tail + public.retained_projection_grade_ids(batch[i:i + chunk - 1], key);
       COMMIT;
       i := i + chunk;
-      EXIT WHEN clock_timestamp() >= until;
     END LOOP;
     EXIT WHEN i <= coalesce(cardinality(batch), 0);   -- out of budget inside the window: the next run redoes it (upsert)
     UPDATE public.retained_projection_grading_state SET tail_watermark = wm_hi WHERE id;
@@ -306,11 +418,10 @@ BEGIN
        AND (d.body_key IS DISTINCT FROM key OR f.input_fp IS DISTINCT FROM d.input_fp
             OR (f.p_time IS NOT NULL AND f.p_time > d.graded_at));
     i := 1;
-    WHILE i <= coalesce(cardinality(ids), 0) LOOP
+    WHILE i <= coalesce(cardinality(ids), 0) AND clock_timestamp() < until LOOP
       PERFORM public.retained_projection_grade_ids(ids[i:i + chunk - 1], key);
       COMMIT;
       i := i + chunk;
-      EXIT WHEN clock_timestamp() >= until;
     END LOOP;
     n_stale := n_stale + coalesce(cardinality(ids), 0);
     EXIT WHEN i <= coalesce(cardinality(ids), 0);   -- out of budget: the cursor stays, the next run re-reads this batch
@@ -322,37 +433,73 @@ BEGIN
     COMMIT;
   END LOOP;
 
-  -- 3. backfill: every projection once, by source_identifier ('retained' .. 'retainee' bounds the prefix under the
-  --    database collation; the LIKE and the method decide)
+  -- 3a. census: count each car's projections once, by source_identifier keyset ('retained' .. 'retainee' bounds the
+  --     prefix under the database collation; the LIKE and the method decide). 2,000 rows: 1.4 s cold, 18 ms warm.
   LOOP
     EXIT WHEN clock_timestamp() >= until;
     SELECT * INTO st FROM public.retained_projection_grading_state WHERE id;
-    EXIT WHEN st.backfill_done;
-    SELECT array_agg(x.id), (array_agg(x.si ORDER BY x.si DESC, x.id DESC))[1], (array_agg(x.id ORDER BY x.si DESC, x.id DESC))[1]
-      INTO ids, last_si, last_id
-      FROM (SELECT o.id, o.source_identifier AS si FROM public.vehicle_observations o
-             WHERE o.source_identifier >= coalesce(st.backfill_si, 'retained') AND o.source_identifier < 'retainee'
-               AND (st.backfill_si IS NULL OR (o.source_identifier, o.id) > (st.backfill_si, st.backfill_id))
+    EXIT WHEN st.census_done;
+    SELECT array_agg(x.vehicle_id), (array_agg(x.si ORDER BY x.si DESC, x.id DESC))[1], (array_agg(x.id ORDER BY x.si DESC, x.id DESC))[1], count(*)
+      INTO vids, last_si, last_id, n
+      FROM (SELECT o.id, o.source_identifier AS si, o.vehicle_id FROM public.vehicle_observations o
+             WHERE o.source_identifier >= coalesce(st.census_si, 'retained') AND o.source_identifier < 'retainee'
+               AND (st.census_si IS NULL OR (o.source_identifier, o.id) > (st.census_si, st.census_id))
                AND o.source_identifier LIKE 'retained\_listing\_%'
                AND o.extraction_method = 'retained_listing_property_projection_v1'
-             ORDER BY o.source_identifier, o.id LIMIT chunk) x;
-    IF ids IS NULL THEN
-      UPDATE public.retained_projection_grading_state SET backfill_done = true WHERE id;
+             ORDER BY o.source_identifier, o.id LIMIT census_rows) x;
+    IF n = 0 THEN
+      UPDATE public.retained_projection_grading_state SET census_done = true, backfill_progress_at = clock_timestamp() WHERE id;
       COMMIT;
       EXIT;
     END IF;
-    SELECT array_agg(u.pid) INTO ids FROM unnest(ids) u(pid)
-     WHERE NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts d WHERE d.projection_id = u.pid);
-    n_backfill := n_backfill + public.retained_projection_grade_ids(ids, key);
-    UPDATE public.retained_projection_grading_state SET backfill_si = last_si, backfill_id = last_id WHERE id;
+    INSERT INTO public.retained_projection_backfill_cars AS b (vehicle_id, projections, public_readable, censused_at)
+    SELECT u.v, count(*), bool_or(v.is_public IS TRUE AND v.deleted_at IS NULL AND v.listing_kind IS DISTINCT FROM 'non_vehicle_item'),
+           clock_timestamp()
+      FROM unnest(vids) u(v) JOIN public.vehicles v ON v.id = u.v
+     GROUP BY u.v
+    ON CONFLICT (vehicle_id) DO UPDATE SET projections = b.projections + EXCLUDED.projections, censused_at = EXCLUDED.censused_at;
+    n_census := n_census + n;
+    UPDATE public.retained_projection_grading_state
+       SET census_si = last_si, census_id = last_id, backfill_progress_at = clock_timestamp() WHERE id;
     COMMIT;
+  END LOOP;
+
+  -- 3b. backfill: after the census, car by car in key order (publicly readable first, most projections first), a chunk
+  --     of the car's ungraded, unsuperseded projections per commit; a car with none left is marked graded.
+  LOOP
+    EXIT WHEN clock_timestamp() >= until;
+    SELECT * INTO st FROM public.retained_projection_grading_state WHERE id;
+    EXIT WHEN NOT st.census_done OR st.backfill_done;
+    SELECT b.vehicle_id INTO car FROM public.retained_projection_backfill_cars b
+     WHERE b.graded_at IS NULL ORDER BY b.public_readable DESC, b.projections DESC, b.vehicle_id LIMIT 1;
+    IF car IS NULL THEN
+      UPDATE public.retained_projection_grading_state SET backfill_done = true, backfill_progress_at = clock_timestamp() WHERE id;
+      COMMIT;
+      EXIT;
+    END IF;
+    SELECT array_agg(x.id) INTO ids FROM (
+      SELECT o.id FROM public.vehicle_observations o
+       WHERE o.vehicle_id = car AND o.extraction_method = 'retained_listing_property_projection_v1' AND o.is_superseded IS NOT TRUE
+         AND NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts d WHERE d.projection_id = o.id)
+       LIMIT chunk) x;
+    IF ids IS NULL THEN
+      UPDATE public.retained_projection_backfill_cars SET graded_at = clock_timestamp() WHERE vehicle_id = car;
+      n_cars := n_cars + 1;
+    ELSE
+      n_backfill := n_backfill + public.retained_projection_grade_ids(ids, key);
+    END IF;
+    UPDATE public.retained_projection_grading_state SET backfill_progress_at = clock_timestamp() WHERE id;
+    COMMIT;
+    car := NULL;
   END LOOP;
 
   UPDATE public.retained_projection_grading_state
      SET last_run_at = t0,
-         last_run = jsonb_build_object('tail', n_tail, 'swept', n_swept, 'sweep_rows', sweep_rows, 'stale', n_stale, 'backfill', n_backfill,
+         last_run = jsonb_build_object('tail', n_tail, 'swept', n_swept, 'sweep_rows', sweep_rows, 'stale', n_stale,
+                                       'census', n_census, 'backfill', n_backfill, 'cars_graded', n_cars,
                                        'ms', round(extract(epoch FROM clock_timestamp() - t0) * 1000))
    WHERE id;
+  PERFORM public.retained_projection_record_assay(t0);
   COMMIT;
   PERFORM pg_advisory_unlock(hashtextextended('retained_projection_grade_tick', 0));
 END $f$;
@@ -379,6 +526,7 @@ RETURNS jsonb LANGUAGE sql STABLE SET search_path = pg_catalog, public AS $f$
     'graded', n.graded,
     'remaining', CASE WHEN g.backfill_done THEN 0 ELSE greatest(est.projections - n.graded, 0) END,
     'remaining_is_estimate', NOT g.backfill_done,
+    'backfill', (SELECT to_jsonb(b) FROM public.v_retained_projection_backfill b),
     'newest_graded_at', n.newest,
     'served_from_verdict_share_est', CASE WHEN est.projections > 0 AND n.graded > 0 THEN round(
         least(n.graded / est.projections, 1)
@@ -393,7 +541,7 @@ RETURNS jsonb LANGUAGE sql STABLE SET search_path = pg_catalog, public AS $f$
     'tail_watermark', g.tail_watermark,
     'tail_lag_minutes', round(extract(epoch FROM now() - g.tail_watermark) / 60),
     'backfill_done', g.backfill_done,
-    'backfill_at', g.backfill_si,
+    'census_done', g.census_done,
     'closure_functions', cardinality(g.closure),
     'body_key_live', public.retained_projection_body_key(g.closure) IS NOT NULL,
     'last_run_at', g.last_run_at,
@@ -412,8 +560,8 @@ GRANT EXECUTE ON FUNCTION public.retained_projection_verdicts_for(uuid[]) TO ano
 
 INSERT INTO public.platform_config (config_key, config_value, description)
 VALUES ('retained_projection_verdicts',
-        '{"enabled": true, "budget_ms": 7000, "chunk": 50, "sweep_rows_min": 1000, "sweep_rows_max": 50000, "target_miss_share": 0.01, "pause_close_minutes": 15, "pause_on_failing_jobs": ["bat-live-pull"]}'::jsonb,
-        'retained_projection_verdict_v1: retained_projection_grade_tick() (job retained-projection-grade, every minute). budget_ms caps a run (max 8000 under the 10 s role timeout); chunk = projections graded per commit (50 x 28 ms cold = 1.4 s); sweep rows per run = stale per minute / (2 x target_miss_share), within sweep_rows_min..sweep_rows_max (0.1 ms a row warm); pauses while a live lot closes within pause_close_minutes or the last run of a pause_on_failing_jobs job failed. Migration 20261126063500.')
+        '{"enabled": true, "budget_ms": 5000, "chunk": 50, "sweep_rows_min": 1000, "sweep_rows_max": 50000, "target_miss_share": 0.01, "census_rows": 2000, "pause_close_minutes": 15, "tick_seconds": 60, "stall_minutes": 30, "stall_basis": "a step (2,000-row census step 1.4 s cold; a 50-projection chunk 1.4 s cold) fits every 60 s tick, so 30 ticks with no census or backfill movement is a stall, not a slow step", "max_paused_ticks": 60, "max_paused_basis": "lots close in bursts and pause_close_minutes is 15; 60 consecutive paused ticks (1 h) is a pause that will not clear by itself", "watch": [{"job": "bat-live-pull", "pause_on_failed_run": true, "max_run_seconds": 45, "basis": "cron.job_run_details, 24 h to 2026-11-25 13:40 UTC: 1,440 runs, p50 3.95 s, p95 44.87 s, max 63.09 s, 60 failed"}]}'::jsonb,
+        'retained_projection_verdict_v1: retained_projection_grade_tick() (job retained-projection-grade, every minute). budget_ms caps a run (max 5000; a step starts only with 2.5 s of it left, under the 10 s role timeout that covers the whole CALL); chunk = projections graded per commit (50 x 28 ms cold = 1.4 s); sweep rows per run = stale per minute / (2 x target_miss_share), within sweep_rows_min..sweep_rows_max (0.1 ms a row warm); pauses while a live lot closes within pause_close_minutes, or while a watch job''s last run failed or ran (or runs) past its max_run_seconds; its coverage assay is not a signal. v_retained_projection_backfill reads stall_minutes and max_paused_ticks x tick_seconds. Migration 20261126063500.')
 ON CONFLICT (config_key) DO NOTHING;
 
 -- The read restates the vehicles read rule for anon (is_public, plus deleted_at and listing_kind as the matcher does).
@@ -432,6 +580,24 @@ BEGIN
     END IF;
   END IF;
 END $copy$;
+
+-- The read also restates the vehicle_observations read rule for anon on the source observation.
+DO $copy2$
+BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
+    SELECT 'retained_projection_verdicts_for(uuid[])', 'vehicle_observations', 'p.cmd IN (''SELECT'', ''ALL'')', h.policy_hash,
+           'ta-readers', '20261126063500 restates the anon read of the source observation (vo_authenticated_read public term, '
+           || 'vo_public_broadcast_read, the four restrictive private-method policies)'
+      FROM public.private_row_policy_hash('vehicle_observations', 'p.cmd IN (''SELECT'', ''ALL'')') h
+     WHERE h.policy_hash = '16c9e48fc1fbfbe5dc4ae10fe8947c7c' OR current_database() LIKE 'dm_%'
+    ON CONFLICT (reader, relation, policy_filter) DO NOTHING;
+    IF NOT FOUND AND NOT EXISTS (SELECT 1 FROM public.private_row_policy_copies
+                                  WHERE reader = 'retained_projection_verdicts_for(uuid[])' AND relation = 'vehicle_observations') THEN
+      RAISE EXCEPTION 'vehicle_observations read policies changed since 2026-11-25 (hash 16c9e48f...); re-read before recording the copy';
+    END IF;
+  END IF;
+END $copy2$;
 
 DO $job$
 BEGIN

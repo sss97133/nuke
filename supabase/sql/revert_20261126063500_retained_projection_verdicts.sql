@@ -11,12 +11,20 @@ DO $$ BEGIN
   END IF;
 END $$;
 DELETE FROM public.platform_config WHERE config_key = 'retained_projection_verdicts';
+DO $$ BEGIN
+  IF to_regclass('public.job_assay_readings') IS NOT NULL THEN
+    DELETE FROM public.job_assay_readings WHERE jobname = 'retained-projection-grade';
+  END IF;
+END $$;
 DROP FUNCTION IF EXISTS public.retained_projection_verdict_gauge();
 DROP PROCEDURE IF EXISTS public.retained_projection_grade_tick();
+DROP FUNCTION IF EXISTS public.retained_projection_record_assay(timestamptz);
+DROP VIEW IF EXISTS public.v_retained_projection_backfill;
 DROP FUNCTION IF EXISTS public.retained_projection_grade_ids(uuid[], text);
 DROP FUNCTION IF EXISTS public.retained_projection_verdicts_for(uuid[]);
 DROP FUNCTION IF EXISTS public.retained_projection_input_fps(uuid[]);
 DROP FUNCTION IF EXISTS public.retained_projection_body_key(oid[]);
 DROP FUNCTION IF EXISTS public.retained_projection_closure();
+DROP TABLE IF EXISTS public.retained_projection_backfill_cars;
 DROP TABLE IF EXISTS public.retained_projection_grading_state;
 DROP TABLE IF EXISTS public.retained_projection_verdicts;

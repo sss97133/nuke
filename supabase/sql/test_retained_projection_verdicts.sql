@@ -23,7 +23,7 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;
 -- pg_cron, as far as the migration and the tick use it
 CREATE SCHEMA cron;
 CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text);
-CREATE TABLE cron.job_run_details (runid bigserial PRIMARY KEY, jobid bigint, status text);
+CREATE TABLE cron.job_run_details (runid bigserial PRIMARY KEY, jobid bigint, status text, start_time timestamptz, end_time timestamptz);
 CREATE FUNCTION cron.schedule(n text, s text, c text) RETURNS bigint LANGUAGE sql AS
   'INSERT INTO cron.job (jobname, schedule, command) VALUES (n, s, c) RETURNING jobid';
 CREATE FUNCTION cron.unschedule(n text) RETURNS boolean LANGUAGE sql AS 'DELETE FROM cron.job WHERE jobname = n RETURNING true';
@@ -31,6 +31,10 @@ CREATE FUNCTION cron.unschedule(n text) RETURNS boolean LANGUAGE sql AS 'DELETE 
 CREATE TABLE public.platform_config (id bigserial PRIMARY KEY, config_key text UNIQUE NOT NULL, config_value jsonb,
   description text, updated_at timestamptz DEFAULT now(), updated_by text);
 CREATE TABLE public.monitored_auctions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), is_live boolean, auction_end_time timestamptz);
+CREATE TABLE public.job_assay_readings (jobname text PRIMARY KEY, reading jsonb, assayed_at timestamptz, elapsed_ms integer,
+  attempted_at timestamptz, attempt_error text, refresh_every interval, fresh_for interval, run_started_at timestamptz,
+  CONSTRAINT job_assay_readings_cadence_check CHECK (refresh_every > '00:00:00'::interval AND fresh_for > refresh_every),
+  CONSTRAINT job_assay_readings_clock_check CHECK ((assayed_at IS NULL) = (elapsed_ms IS NULL) AND elapsed_ms >= 0));
 CREATE TABLE public.private_row_policy_copies (reader text, relation text, policy_filter text, recorded_hash text,
   owner_lane text, note text, recorded_at timestamptz DEFAULT now(), active boolean DEFAULT true,
   PRIMARY KEY (reader, relation, policy_filter));
@@ -369,6 +373,21 @@ DO $$ BEGIN
     RAISE EXCEPTION 'FAIL pause on closing lots'; END IF;
   RAISE NOTICE 'PASS paused while a lot closes within 15 minutes';
 END $$;
+-- A pause longer than max_paused_ticks x tick_seconds (60 x 60 s) is its own red reading.
+UPDATE public.retained_projection_grading_state SET paused_since = now() - interval '2 hours' WHERE id;
+CALL public.retained_projection_grade_tick();
+DO $$ BEGIN
+  IF (SELECT status FROM public.v_retained_projection_backfill) <> 'paused_too_long'
+     OR (SELECT reading->>'status' FROM public.job_assay_readings WHERE jobname = 'retained-projection-grade') <> 'failed'
+     OR (SELECT paused_since FROM public.retained_projection_grading_state) > now() - interval '1 hour' THEN
+    RAISE EXCEPTION 'FAIL long pause not red: %', (SELECT to_jsonb(b) FROM public.v_retained_projection_backfill b); END IF;
+  RAISE NOTICE 'PASS a pause past max_paused_ticks reads paused_too_long in the view and failed in the job''s assay row';
+END $$;
+UPDATE public.retained_projection_grading_state SET paused_since = now() WHERE id;
+DO $$ BEGIN
+  IF (SELECT status FROM public.v_retained_projection_backfill) <> 'paused' THEN RAISE EXCEPTION 'FAIL short pause'; END IF;
+  RAISE NOTICE 'PASS a short pause reads paused';
+END $$;
 DELETE FROM public.monitored_auctions;
 INSERT INTO cron.job (jobname) VALUES ('bat-live-pull');
 INSERT INTO cron.job_run_details (jobid, status) SELECT jobid, 'failed' FROM cron.job WHERE jobname = 'bat-live-pull';
@@ -380,15 +399,76 @@ DO $$ BEGIN
   RAISE NOTICE 'PASS paused while bat-live-pull''s last run failed';
 END $$;
 INSERT INTO cron.job_run_details (jobid, status) SELECT jobid, 'succeeded' FROM cron.job WHERE jobname = 'bat-live-pull';
+-- ... and while its last run ran past max_run_seconds (45), or is still running past it.
+INSERT INTO cron.job_run_details (jobid, status, start_time, end_time)
+SELECT jobid, 'succeeded', now() - interval '120 seconds', now() - interval '50 seconds' FROM cron.job WHERE jobname = 'bat-live-pull';
+CALL public.retained_projection_grade_tick();
+DO $$ BEGIN
+  IF (SELECT count(*) FROM public.retained_projection_verdicts) <> 0
+     OR (SELECT last_run->>'paused' FROM public.retained_projection_grading_state) <> 'bat-live-pull: run over max_run_seconds' THEN
+    RAISE EXCEPTION 'FAIL pause on a long run: %', (SELECT last_run FROM public.retained_projection_grading_state); END IF;
+  RAISE NOTICE 'PASS paused while bat-live-pull''s last run took 70 s (over 45)';
+END $$;
+INSERT INTO cron.job_run_details (jobid, status, start_time, end_time)
+SELECT jobid, 'running', now() - interval '60 seconds', NULL FROM cron.job WHERE jobname = 'bat-live-pull';
+CALL public.retained_projection_grade_tick();
+DO $$ BEGIN
+  IF (SELECT last_run->>'paused' FROM public.retained_projection_grading_state) <> 'bat-live-pull: run over max_run_seconds' THEN
+    RAISE EXCEPTION 'FAIL pause on a running long run'; END IF;
+  RAISE NOTICE 'PASS paused while a bat-live-pull run has been running for 60 s';
+END $$;
+INSERT INTO cron.job_run_details (jobid, status, start_time, end_time)
+SELECT jobid, 'succeeded', now() - interval '10 seconds', now() - interval '6 seconds' FROM cron.job WHERE jobname = 'bat-live-pull';
+-- The job's coverage assay is not a signal: a fresh failed reading does not pause the grading below.
+INSERT INTO public.job_assay_readings (jobname, reading, assayed_at, elapsed_ms, refresh_every, fresh_for)
+VALUES ('bat-live-pull', '{"status": "failed"}', now(), 1, interval '5 minutes', interval '15 minutes');
 
 -- Grade: the tail sees nothing settled (projections were ingested a day ago, before the watermark), the backfill all 11.
 CALL public.retained_projection_grade_tick();
 DO $$ BEGIN
   IF (SELECT count(*) FROM public.retained_projection_verdicts) <> 11
-     OR NOT (SELECT backfill_done FROM public.retained_projection_grading_state) THEN
+     OR NOT (SELECT census_done AND backfill_done FROM public.retained_projection_grading_state) THEN
     RAISE EXCEPTION 'FAIL backfill: % verdicts', (SELECT count(*) FROM public.retained_projection_verdicts); END IF;
-  RAISE NOTICE 'PASS backfill graded 11, run %', (SELECT last_run FROM public.retained_projection_grading_state);
+  IF (SELECT paused_since FROM public.retained_projection_grading_state) IS NOT NULL THEN RAISE EXCEPTION 'FAIL paused_since kept'; END IF;
+  RAISE NOTICE 'PASS backfill graded 11 with bat-live-pull''s assay reading failed (not a signal), run %',
+    (SELECT last_run FROM public.retained_projection_grading_state);
 END $$;
+-- The order is a key: the census counted A 9 (public), C 1 (public), B 1 (private); cars finished A, then C, then B
+-- (each car's graded_at is the clock when its last projection was graded).
+DO $$
+DECLARE a timestamptz; c timestamptz; b timestamptz; r record;
+BEGIN
+  SELECT graded_at INTO a FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a1';
+  SELECT graded_at INTO c FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1';
+  SELECT graded_at INTO b FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000b1';
+  IF NOT (a < c AND c < b) OR (SELECT string_agg(projections::text || public_readable::text, ',' ORDER BY vehicle_id)
+                                 FROM public.retained_projection_backfill_cars) <> '9true,1false,1true' THEN
+    RAISE EXCEPTION 'FAIL backfill order: A % C % B %', a, c, b; END IF;
+  SELECT * INTO r FROM public.v_retained_projection_backfill;
+  IF r.phase <> 'done' OR r.status <> 'done' OR r.cars <> 3 OR r.eligible_cars <> 2 OR r.graded_eligible_cars <> 2
+     OR r.eligible_projections <> 10 OR r.newest_graded_at IS NULL
+     OR (SELECT reading->>'status' FROM public.job_assay_readings WHERE jobname = 'retained-projection-grade') <> 'passed' THEN
+    RAISE EXCEPTION 'FAIL progress row %', to_jsonb(r); END IF;
+  RAISE NOTICE 'PASS backfill by key (A 9 public, C 1 public, B 1 private); progress: % of % eligible cars, status %, assay passed',
+    r.graded_eligible_cars, r.eligible_cars, r.status;
+END $$;
+-- A stalled backfill is a red row: cars remain, nothing moved for 30 minutes, not paused.
+UPDATE public.retained_projection_grading_state
+   SET backfill_done = false, backfill_progress_at = now() - interval '45 minutes', last_run = '{"tail": 0}' WHERE id;
+-- The threshold is the rule row's stall_minutes: at 60 the same 45 minutes reads running.
+UPDATE public.platform_config SET config_value = config_value || '{"stall_minutes": 60}' WHERE config_key = 'retained_projection_verdicts';
+DO $$ BEGIN
+  IF (SELECT status FROM public.v_retained_projection_backfill) <> 'running' THEN RAISE EXCEPTION 'FAIL stall_minutes not read'; END IF;
+END $$;
+UPDATE public.platform_config SET config_value = config_value || '{"stall_minutes": 30}' WHERE config_key = 'retained_projection_verdicts';
+DO $$ BEGIN
+  PERFORM public.retained_projection_record_assay(now());
+  IF (SELECT status FROM public.v_retained_projection_backfill) <> 'stalled'
+     OR (SELECT reading->>'status' FROM public.job_assay_readings WHERE jobname = 'retained-projection-grade') <> 'failed' THEN
+    RAISE EXCEPTION 'FAIL stalled backfill not red: %', (SELECT to_jsonb(b) FROM public.v_retained_projection_backfill b); END IF;
+  RAISE NOTICE 'PASS a stalled backfill (45 min, stall_minutes 30 from the rule row; 60 reads running) reads stalled and failed';
+END $$;
+UPDATE public.retained_projection_grading_state SET backfill_done = true, backfill_progress_at = now() WHERE id;
 ANALYZE public.vehicle_observations;
 DO $$ DECLARE g jsonb := public.retained_projection_verdict_gauge(); BEGIN
   IF (g->>'graded')::int <> 11 OR (g->>'remaining')::int <> 0 OR (g->>'backfill_done')::boolean IS NOT TRUE
@@ -553,12 +633,47 @@ DO $$ BEGIN
 END $$;
 SELECT pg_temp.check_e('after the mutants', 9);
 
+-- The read carries the viewer term on the source observation (anon's read of it), so a direct call is no oracle: p2
+-- gains a key observation_is_public refuses; after regrading, e002's verdict is current and admitted (the matcher as
+-- owner still admits it) but the read returns no row for it; the read without that term would.
+-- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture row in an empty disposable PG17 database only.
+UPDATE public.vehicle_observations SET structured_data = structured_data || '{"email": "redacted"}'::jsonb
+ WHERE id = '00000000-0000-0000-0000-00000000d002';
+CALL public.retained_projection_grade_tick();
+DO $$
+DECLARE e constant uuid := '00000000-0000-0000-0000-00000000e002'; n int; d text; leaked boolean;
+  term constant text := 'AND ((pv.is_public IS TRUE AND public.observation_is_public(p.kind, p.structured_data))';
+BEGIN
+  IF NOT public.retained_listing_property_result_matches('00000000-0000-0000-0000-00000000d002',
+           (SELECT property_id FROM public.vehicle_observations WHERE id = e), e) THEN
+    RAISE EXCEPTION 'FAIL vacuous: the matcher refuses e002'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts v JOIN public.retained_projection_input_fps(ARRAY[e]) f
+                   ON f.projection_id = v.projection_id WHERE v.projection_id = e AND v.admitted AND v.input_fp = f.input_fp) THEN
+    RAISE EXCEPTION 'FAIL vacuous: e002 has no current admitted verdict'; END IF;
+  SET LOCAL ROLE anon;
+  SELECT count(*) INTO n FROM public.retained_projection_verdicts_for(ARRAY[e]);
+  RESET ROLE;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL oracle: verdicts_for returns e002 whose source anon cannot read'; END IF;
+  d := pg_get_functiondef('public.retained_projection_verdicts_for(uuid[])'::regprocedure);
+  IF position(term IN d) = 0 THEN RAISE EXCEPTION 'mutant anchor missing'; END IF;
+  EXECUTE replace(d, term, 'AND (true');
+  SET LOCAL ROLE anon;
+  leaked := EXISTS (SELECT 1 FROM public.retained_projection_verdicts_for(ARRAY[e]));
+  RESET ROLE;
+  EXECUTE d;
+  IF NOT leaked THEN RAISE EXCEPTION 'FAIL mutant survived: the read without the source term still hides e002'; END IF;
+  RAISE NOTICE 'PASS no oracle: e002 (admitted, current) is withheld from a direct call when anon cannot read its source; mutant killed';
+END $$;
+SELECT pg_temp.check_e('after the source turned private', 8);
+
 \ir revert_20261126063500_retained_projection_verdicts.sql
 DO $$ BEGIN
   IF to_regclass('public.retained_projection_verdicts') IS NOT NULL OR to_regprocedure('public.retained_projection_verdicts_for(uuid[])') IS NOT NULL
      OR EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'retained-projection-grade')
      OR EXISTS (SELECT 1 FROM public.platform_config WHERE config_key = 'retained_projection_verdicts')
-     OR EXISTS (SELECT 1 FROM public.private_row_policy_copies WHERE reader = 'retained_projection_verdicts_for(uuid[])') THEN
+     OR EXISTS (SELECT 1 FROM public.private_row_policy_copies WHERE reader = 'retained_projection_verdicts_for(uuid[])')
+     OR to_regclass('public.retained_projection_backfill_cars') IS NOT NULL OR to_regclass('public.v_retained_projection_backfill') IS NOT NULL
+     OR EXISTS (SELECT 1 FROM public.job_assay_readings WHERE jobname = 'retained-projection-grade') THEN
     RAISE EXCEPTION 'FAIL revert left something'; END IF;
   RAISE NOTICE 'PASS revert removes the table, functions, job, config row and policy copy';
 END $$;
