@@ -42,6 +42,18 @@
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
+-- The quote rule row gains the two patterns a VALUE needs (skeptic2 / lead 2026-11-25): the figure recorded must be the
+-- number directly before the hour term, and time-left / time-since phrasing is not labor.
+ALTER TABLE public.schema_proposal_quote_rules
+  ADD COLUMN IF NOT EXISTS figure_term_pattern text,
+  ADD COLUMN IF NOT EXISTS exclude_pattern text,
+  ADD COLUMN IF NOT EXISTS exclude_basis text;
+UPDATE public.schema_proposal_quote_rules
+   SET figure_term_pattern = '\m([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)\+?\s*(?:(?:-|to)\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)\+?\s*)?(?:man[- ]?)?(?:hours?|hrs?)\M',
+       exclude_pattern = '\m(?:ends?|ending|closes?|closing|over|starts?|starting)\s+in\s+(?:about\s+|around\s+|less than\s+|under\s+)?[0-9][0-9.,]*\s*(?:hours?|hrs?)\M|\m[0-9][0-9.,]*\s*(?:more\s+)?(?:hours?|hrs?)\s+(?:left|remaining|to\s+go|ago|from\s+now)\M',
+       exclude_basis = 'auction_comments TABLESAMPLE SYSTEM (0.2) REPEATABLE (7), read 2026-11-25: 138 comments hold a figure directly before an hour term; 48 of them match this pattern (auction time left or time since: ends in N hours, N hours left / ago); 0 of the 4 with labor phrasing (man hours, hours of work, hours in it) match it. Case found by ta-skeptic2: Bidding ends in 2 hours, good luck.'
+ WHERE category = 'labor';
+
 INSERT INTO public.receipt_line_systems (system_key, label, expects_operation)
 VALUES ('tires', 'Tires', true)
 ON CONFLICT (system_key) DO NOTHING;
@@ -67,6 +79,29 @@ SELECT 'claude-reported-labor-hours', 'modify_property', 'open', o.proposed_by_p
    AND NOT EXISTS (SELECT 1 FROM public.schema_proposals p
                     WHERE p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
                       AND p.payload ->> 'values_from' = 'receipt_line_systems.system_key');
+
+-- labor_speaker_role comes from the source row, not the reader (lead ruling 2026-11-25); a role the source cannot support
+-- is 'unknown', the weakest. Filed open beside the ratified text, as for the system key.
+INSERT INTO public.schema_proposals (proposed_by_agent_key, proposal_type, status, supersedes_proposal_id, payload, evidence)
+SELECT 'claude-reported-labor-hours', 'modify_property', 'open', o.proposed_by_proposal_id,
+       jsonb_build_object(
+         'property_key', 'labor_speaker_role',
+         'field', 'description',
+         'adds_values', jsonb_build_array('unknown'),
+         'derived_from', 'the source row: auction_comments.is_seller; build_posts author = build_threads author; vehicles.description is the listing seller''s text',
+         'description', 'Who made the statement, derived from the source row, never from the reader. owner_seller: the seller of the lot '
+           || '(auction_comments.is_seller), the author of the build thread (build_posts.author_handle = build_threads.author_handle) or '
+           || 'the listing text (vehicles.description). commenter_other_car: anyone else whose quote names the other car '
+           || '(labor_stated_subject, verbatim in the quote). unknown: any other speaker; the weakest role, counted by no baseline that '
+           || 'needs the speaker. shop_builder and third_party stay in the list for a source that can establish them.'),
+       jsonb_build_array(jsonb_build_object('role', 'measurement', 'measured_on', '2026-11-25',
+         'what', 'auction_comments.is_seller is populated: a 0.2% sample held 50,843 rows, 7,184 true, 0 null (ta-skeptic2); build_posts 1% sample: 250 of 629 posts by the thread author (author_handle)',
+         'basis', 'a reader-asserted role passed the check as owner_seller for a commenter (ta-skeptic2 2026-11-25)'))
+  FROM public.observation_properties o
+ WHERE o.property_key = 'labor_speaker_role' AND o.proposed_by_proposal_id IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM public.schema_proposals p
+                    WHERE p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
+                      AND p.payload -> 'adds_values' ? 'unknown');
 
 CREATE TABLE IF NOT EXISTS public.labor_statement_values (
   property_key text NOT NULL REFERENCES public.observation_properties(property_key),
@@ -112,6 +147,14 @@ SELECT o.property_key, v.value, o.proposed_by_proposal_id
  WHERE o.proposed_by_proposal_id IS NOT NULL AND o.data_type = 'enum'
 ON CONFLICT (property_key, value) DO NOTHING;
 
+INSERT INTO public.labor_statement_values (property_key, value, proposal_id)
+SELECT 'labor_speaker_role', 'unknown', p.id
+  FROM public.observation_properties o
+  JOIN public.schema_proposals p ON p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
+                                AND p.payload -> 'adds_values' ? 'unknown'
+ WHERE o.property_key = 'labor_speaker_role'
+ON CONFLICT (property_key, value) DO NOTHING;
+
 INSERT INTO public.labor_statement_values (property_key, value, proposal_id, system_key)
 SELECT 'labor_system_key', s.system_key, p.id, s.system_key
   FROM public.receipt_line_systems s
@@ -126,16 +169,18 @@ BEGIN
   SELECT count(*) FILTER (WHERE system_key IS NULL), count(*) FILTER (WHERE system_key IS NOT NULL)
     INTO n_enum, n_sys FROM public.labor_statement_values;
   SELECT count(*) INTO n_keys FROM public.receipt_line_systems;
-  IF n_enum <> 13 OR n_sys <> n_keys THEN
-    RAISE EXCEPTION 'reported_labor_hours_v1: expected 13 prose values and % system rows, found % and % (are the 8 keys ratified?)',
+  IF n_enum <> 14 OR n_sys <> n_keys THEN
+    RAISE EXCEPTION 'reported_labor_hours_v1: expected 14 prose values and % system rows, found % and % (are the 8 keys ratified?)',
       n_keys, n_enum, n_sys;
   END IF;
   SELECT string_agg(l.property_key || '.' || l.value, ', ') INTO bad
     FROM public.labor_statement_values l
     JOIN public.observation_properties o ON o.property_key = l.property_key
    WHERE l.system_key IS NULL
-     AND (coalesce(substring(o.description FROM 'Allowed values:(.*)$'), '') !~ ('\m' || l.value || '\M')
-          OR o.proposed_by_proposal_id IS DISTINCT FROM l.proposal_id);
+     AND NOT (o.proposed_by_proposal_id = l.proposal_id
+              AND coalesce(substring(o.description FROM 'Allowed values:(.*)$'), '') ~ ('\m' || l.value || '\M'))
+     AND NOT EXISTS (SELECT 1 FROM public.schema_proposals p WHERE p.id = l.proposal_id AND p.proposal_type = 'modify_property'
+                        AND p.supersedes_proposal_id = o.proposed_by_proposal_id AND p.payload -> 'adds_values' ? l.value);
   IF bad IS NOT NULL THEN
     RAISE EXCEPTION 'reported_labor_hours_v1: values not in their ratified key''s Allowed values text: %', bad;
   END IF;
@@ -151,10 +196,12 @@ DECLARE
   txt text;
   generated boolean;
   pos int;
-  figs numeric[];
   q jsonb := coalesce(p_qualifiers, '{}'::jsonb);
   k text;
-  veh uuid;
+  page_veh uuid;
+  role text;
+  role_basis text;
+  at_term boolean;
 BEGIN
   SELECT * INTO qr FROM public.schema_proposal_quote_rules WHERE category = 'labor';
   IF NOT FOUND THEN reasons := reasons || 'no_quote_rule'::text; END IF;
@@ -181,6 +228,7 @@ BEGIN
     IF length(p_quote) > 300 THEN reasons := reasons || 'quote_too_long'::text; END IF;
     IF qr.category IS NOT NULL AND p_quote !~* qr.term_pattern THEN reasons := reasons || 'quote_no_term'::text; END IF;
     IF qr.figure_required AND p_quote !~ '[0-9]' THEN reasons := reasons || 'quote_no_figure'::text; END IF;
+    IF qr.exclude_pattern IS NOT NULL AND p_quote ~* qr.exclude_pattern THEN reasons := reasons || 'quote_time_phrase'::text; END IF;
     IF txt IS NOT NULL THEN
       pos := position(p_quote IN txt);
       IF pos = 0 OR substr(txt, pos - 1, 1) ~ '[[:alnum:]]' OR substr(txt, pos + length(p_quote), 1) ~ '[[:alnum:]]' THEN
@@ -189,16 +237,23 @@ BEGIN
     END IF;
   END IF;
 
-  figs := ARRAY(SELECT replace(m[1], ',', '')::numeric
-                  FROM regexp_matches(coalesce(p_quote, ''), '([0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?)', 'g') m);
+  -- The figures recorded are the ones directly before the hour term (the rule row's figure_term_pattern): low is a
+  -- match's first figure and high, when given, the same match's second (or the first, for a single figure).
   IF p_low IS NULL OR p_low <= 0 THEN
     reasons := reasons || 'low_missing'::text;
-  ELSIF NOT (p_low = ANY (figs)) THEN
-    reasons := reasons || 'low_not_in_quote'::text;
-  END IF;
-  IF p_high IS NOT NULL THEN
-    IF p_high < coalesce(p_low, 0) THEN reasons := reasons || 'high_below_low'::text; END IF;
-    IF NOT (p_high = ANY (figs)) THEN reasons := reasons || 'high_not_in_quote'::text; END IF;
+  ELSIF qr.figure_term_pattern IS NULL THEN
+    reasons := reasons || 'no_figure_term_rule'::text;
+  ELSE
+    SELECT bool_or(replace(m[1], ',', '')::numeric = p_low) INTO at_term
+      FROM regexp_matches(coalesce(p_quote, ''), qr.figure_term_pattern, 'gi') m;
+    IF NOT coalesce(at_term, false) THEN reasons := reasons || 'low_not_at_term'::text; END IF;
+    IF p_high IS NOT NULL THEN
+      IF p_high < p_low THEN reasons := reasons || 'high_below_low'::text; END IF;
+      SELECT bool_or(replace(m[1], ',', '')::numeric = p_low
+                     AND replace(coalesce(m[2], m[1]), ',', '')::numeric = p_high) INTO at_term
+        FROM regexp_matches(coalesce(p_quote, ''), qr.figure_term_pattern, 'gi') m;
+      IF NOT coalesce(at_term, false) THEN reasons := reasons || 'high_not_at_term'::text; END IF;
+    END IF;
   END IF;
 
   IF jsonb_typeof(q) <> 'object' THEN
@@ -219,7 +274,7 @@ BEGIN
       reasons := reasons || ('qualifier_value_unknown:' || k);
     END IF;
   END LOOP;
-  FOREACH k IN ARRAY ARRAY['labor_scope', 'labor_speaker_role', 'labor_statement_kind', 'labor_time_basis'] LOOP
+  FOREACH k IN ARRAY ARRAY['labor_scope', 'labor_statement_kind', 'labor_time_basis'] LOOP
     IF NOT q ? k THEN reasons := reasons || ('qualifier_missing:' || k); END IF;
   END LOOP;
   IF q ? 'labor_system_key' AND q ? 'labor_system_key_null_reason' THEN
@@ -235,20 +290,36 @@ BEGIN
     reasons := reasons || 'stated_subject_not_in_quote'::text;
   END IF;
 
+  -- The page the statement appeared on, and the speaker's role as the source row says it. page_vehicle_id is never the
+  -- subject: a commenter's hours are about the car the commenter names, which is often not the lot.
   IF txt IS NOT NULL THEN
     IF p_source_table = 'auction_comments' THEN
-      SELECT c.vehicle_id INTO veh FROM public.auction_comments c WHERE c.id = p_source_row_id;
+      SELECT c.vehicle_id, CASE WHEN c.is_seller IS TRUE THEN 'owner_seller' END
+        INTO page_veh, role FROM public.auction_comments c WHERE c.id = p_source_row_id;
+      role_basis := CASE WHEN role IS NOT NULL THEN 'auction_comments.is_seller' END;
     ELSIF p_source_table = 'build_posts' THEN
-      SELECT t.vehicle_id INTO veh FROM public.build_posts b JOIN public.build_threads t ON t.id = b.build_thread_id
+      SELECT t.vehicle_id, CASE WHEN b.author_handle IS NOT NULL AND b.author_handle = t.author_handle THEN 'owner_seller' END
+        INTO page_veh, role FROM public.build_posts b JOIN public.build_threads t ON t.id = b.build_thread_id
        WHERE b.id = p_source_row_id;
+      role_basis := CASE WHEN role IS NOT NULL THEN 'build_posts.author_handle = build_threads.author_handle' END;
     ELSIF p_source_table = 'vehicles' THEN
-      veh := p_source_row_id;
+      page_veh := p_source_row_id;
+      role := 'owner_seller';
+      role_basis := 'vehicles.description: the listing text';
     END IF;
   END IF;
+  IF role IS NULL AND q ->> 'labor_speaker_role' = 'commenter_other_car' AND q ? 'labor_stated_subject'
+     AND NOT ('stated_subject_not_in_quote' = ANY (reasons)) THEN
+    role := 'commenter_other_car';
+    role_basis := 'labor_stated_subject: the quote names another car';
+  END IF;
+  role := coalesce(role, 'unknown');
+  role_basis := coalesce(role_basis, 'the source row does not establish the speaker');
 
   RETURN jsonb_build_object('ok', cardinality(reasons) = 0, 'reasons', to_jsonb(reasons),
     'contract', 'reported_labor_hours_v1', 'quote_hash', md5(coalesce(p_quote, '')), 'text_md5', md5(txt),
-    'source_vehicle_id', veh);
+    'page_vehicle_id', page_veh, 'speaker_role', role, 'speaker_role_basis', role_basis,
+    'speaker_role_read', q -> 'labor_speaker_role');
 END $fn$;
 COMMENT ON FUNCTION public.reported_labor_statement_check(text, uuid, text, numeric, numeric, jsonb) IS
   'reported_labor_hours_v1: the one check a reported labor statement passes before ingest-observation lands it. Reads schema_proposal_witness_sources, schema_proposal_quote_rules (labor) and labor_statement_values; ok false with reasons otherwise.';

@@ -12,19 +12,24 @@ INSERT INTO public.receipt_line_systems (system_key, label, expects_operation) V
 \ir ../migrations/20261125163000_reported_labor_statement_check.sql
 
 -- guardrail-allow(center-key-fk): build_threads.vehicle_id: synthetic fixture table in a disposable test database
-CREATE TABLE IF NOT EXISTS public.build_threads (id uuid PRIMARY KEY, vehicle_id uuid);
+CREATE TABLE IF NOT EXISTS public.build_threads (id uuid PRIMARY KEY, vehicle_id uuid, author_handle text);
 ALTER TABLE public.build_posts ADD COLUMN IF NOT EXISTS build_thread_id uuid;
-ALTER TABLE public.auction_comments ADD COLUMN IF NOT EXISTS vehicle_id uuid;
+ALTER TABLE public.auction_comments ADD COLUMN IF NOT EXISTS vehicle_id uuid, ADD COLUMN IF NOT EXISTS is_seller boolean;
+ALTER TABLE public.build_posts ADD COLUMN IF NOT EXISTS author_handle text;
 -- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture database)
 INSERT INTO public.vehicles (id, description) VALUES
   ('30000000-0000-0000-0000-000000000001', 'Restored by the owner. I put 1,200 hours into the body and paint over four years. Sold new in Ohio.'),
   ('30000000-0000-0000-0000-000000000002', 'Generated summary. The shop spent 300 hours on the engine.');
 UPDATE public.vehicles SET description_generated_at = now() WHERE id = '30000000-0000-0000-0000-000000000002';
-INSERT INTO public.build_threads (id, vehicle_id) VALUES ('31000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001');
-INSERT INTO public.build_posts (id, content_text, build_thread_id) VALUES
-  ('32000000-0000-0000-0000-000000000001', 'Update. Rebuilding the motor took about 40-60 hrs of my own time. More soon.', '31000000-0000-0000-0000-000000000001');
-INSERT INTO public.auction_comments (id, comment_text, vehicle_id) VALUES
-  ('33000000-0000-0000-0000-000000000001', 'Nice car. I had 2500 hours in my 1970 Pontiac GTO without the paint.', '30000000-0000-0000-0000-000000000001');
+INSERT INTO public.build_threads (id, vehicle_id, author_handle) VALUES ('31000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'builder_a');
+INSERT INTO public.build_posts (id, content_text, build_thread_id, author_handle) VALUES
+  ('32000000-0000-0000-0000-000000000001', 'Update. Rebuilding the motor took about 40-60 hrs of my own time. More soon.', '31000000-0000-0000-0000-000000000001', 'builder_a'),
+  ('32000000-0000-0000-0000-000000000002', 'Following along. My own motor took about 80 hrs of evenings to rebuild.', '31000000-0000-0000-0000-000000000001', 'reader_b');
+INSERT INTO public.auction_comments (id, comment_text, vehicle_id, is_seller) VALUES
+  ('33000000-0000-0000-0000-000000000001', 'Nice car. I had 2500 hours in my 1970 Pontiac GTO without the paint.', '30000000-0000-0000-0000-000000000001', false),
+  ('33000000-0000-0000-0000-000000000002', 'Did the LS3 swap last spring, it took me about 40 hours total.', '30000000-0000-0000-0000-000000000001', true),
+  ('33000000-0000-0000-0000-000000000003', 'Bidding ends in 2 hours, good luck to all.', '30000000-0000-0000-0000-000000000001', true),
+  ('33000000-0000-0000-0000-000000000004', 'Fresh gearbox in it, the T56 hours meter on the dash reads zero now.', '30000000-0000-0000-0000-000000000001', true);
 
 DO $$
 DECLARE r jsonb;
@@ -37,7 +42,10 @@ DECLARE r jsonb;
   ac uuid := '33000000-0000-0000-0000-000000000001';
   q3 text := 'I had 2500 hours in my 1970 Pontiac GTO without the paint';
 BEGIN
-  PERFORM pg_temp.ok('13 prose values, each from its ratified key', (SELECT count(*) FROM public.labor_statement_values WHERE system_key IS NULL) = 13);
+  PERFORM pg_temp.ok('14 prose values: 13 from the ratified keys, unknown from the open superseding proposal',
+    (SELECT count(*) FROM public.labor_statement_values WHERE system_key IS NULL) = 14
+    AND EXISTS (SELECT 1 FROM public.labor_statement_values l JOIN public.schema_proposals p ON p.id = l.proposal_id
+                 WHERE l.property_key = 'labor_speaker_role' AND l.value = 'unknown' AND p.proposal_type = 'modify_property' AND p.status = 'open'));
   PERFORM pg_temp.ok('time_basis has unknown', EXISTS (SELECT 1 FROM public.labor_statement_values WHERE property_key = 'labor_time_basis' AND value = 'unknown'));
   PERFORM pg_temp.ok('tires is a receipt system key now', EXISTS (SELECT 1 FROM public.receipt_line_systems WHERE system_key = 'tires'));
   PERFORM pg_temp.ok('system values are exactly the receipt_line_systems keys, each by FK',
@@ -54,14 +62,37 @@ BEGIN
 
   -- accepts, one per source
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q);
-  PERFORM pg_temp.ok('description accepted, thousands separator read: ' || r::text, (r->>'ok')::boolean
-    AND r->>'source_vehicle_id' = v1::text AND r->>'contract' = 'reported_labor_hours_v1');
+  PERFORM pg_temp.ok('description accepted, thousands separator read, listing text is the seller: ' || r::text, (r->>'ok')::boolean
+    AND r->>'page_vehicle_id' = v1::text AND r->>'contract' = 'reported_labor_hours_v1' AND r->>'speaker_role' = 'owner_seller'
+    AND NOT (r ? 'source_vehicle_id') AND NOT (r ? 'subject_vehicle_id'));
   r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, task_q);
-  PERFORM pg_temp.ok('build post range accepted, car through the thread: ' || r::text, (r->>'ok')::boolean
-    AND r->>'source_vehicle_id' = v1::text);
+  PERFORM pg_temp.ok('build post range accepted, page car through the thread, thread author is owner_seller: ' || r::text,
+    (r->>'ok')::boolean AND r->>'page_vehicle_id' = v1::text AND r->>'speaker_role' = 'owner_seller');
+  r := public.reported_labor_statement_check('build_posts', '32000000-0000-0000-0000-000000000002',
+         'My own motor took about 80 hrs of evenings to rebuild', 80, NULL, task_q);
+  PERFORM pg_temp.ok('another member''s post: role unknown whatever the reader said: ' || r::text,
+    (r->>'ok')::boolean AND r->>'speaker_role' = 'unknown' AND r->>'speaker_role_read' = 'owner_seller');
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL,
          '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"1970 Pontiac GTO"}');
-  PERFORM pg_temp.ok('comment about another car accepted with its stated subject: ' || r::text, (r->>'ok')::boolean);
+  PERFORM pg_temp.ok('comment about another car: accepted, commenter_other_car from the quote, page car is not the subject: ' || r::text,
+    (r->>'ok')::boolean AND r->>'speaker_role' = 'commenter_other_car' AND r->>'page_vehicle_id' = v1::text);
+  r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL, ok_q);
+  PERFORM pg_temp.ok('a non-seller commenter read as owner_seller is unknown', (r->>'ok')::boolean AND r->>'speaker_role' = 'unknown');
+  r := public.reported_labor_statement_check('auction_comments', ac, q3, 1970, NULL, ok_q);
+  PERFORM pg_temp.ok('the model year is not the hours (2500 hours in my 1970 GTO)', r->'reasons' ? 'low_not_at_term');
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000002',
+         'Did the LS3 swap last spring, it took me about 40 hours total', 3, NULL, task_q);
+  PERFORM pg_temp.ok('the 3 in LS3 is not the hours', r->'reasons' ? 'low_not_at_term');
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000002',
+         'Did the LS3 swap last spring, it took me about 40 hours total', 40, NULL, task_q);
+  PERFORM pg_temp.ok('the figure at the term is: 40 hours, seller comment is owner_seller: ' || r::text,
+    (r->>'ok')::boolean AND r->>'speaker_role' = 'owner_seller');
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000003',
+         'Bidding ends in 2 hours, good luck to all', 2, NULL, ok_q);
+  PERFORM pg_temp.ok('time left is not labor', r->'reasons' ? 'quote_time_phrase');
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000004',
+         'the T56 hours meter on the dash reads zero now', 56, NULL, task_q);
+  PERFORM pg_temp.ok('a number glued to letters is not a figure (T56 hours)', r->'reasons' ? 'low_not_at_term');
 
   -- refusals
   r := public.reported_labor_statement_check('vehicles', '30000000-0000-0000-0000-000000000002', 'The shop spent 300 hours on the engine', 300, NULL, ok_q);
@@ -77,15 +108,15 @@ BEGIN
   r := public.reported_labor_statement_check('vehicles', v1, 'put 1,200 hours into the body and paint over four year', 1200, NULL, ok_q);
   PERFORM pg_temp.ok('quote cut inside a word refused', r->'reasons' ? 'quote_not_in_row');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1300, NULL, ok_q);
-  PERFORM pg_temp.ok('low not printed refused', r->'reasons' ? 'low_not_in_quote');
+  PERFORM pg_temp.ok('low not printed refused', r->'reasons' ? 'low_not_at_term');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 200, NULL, ok_q);
-  PERFORM pg_temp.ok('a fragment of 1,200 is not a printed figure', r->'reasons' ? 'low_not_in_quote');
+  PERFORM pg_temp.ok('a fragment of 1,200 is not a printed figure', r->'reasons' ? 'low_not_at_term');
   r := public.reported_labor_statement_check('vehicles', v1, q1, NULL, NULL, ok_q);
   PERFORM pg_temp.ok('no low refused', r->'reasons' ? 'low_missing');
   r := public.reported_labor_statement_check('build_posts', bp, q2, 60, 40, task_q);
   PERFORM pg_temp.ok('high below low refused', r->'reasons' ? 'high_below_low');
   r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 80, task_q);
-  PERFORM pg_temp.ok('high not printed refused', r->'reasons' ? 'high_not_in_quote');
+  PERFORM pg_temp.ok('high not printed refused', r->'reasons' ? 'high_not_at_term');
   r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, task_q - 'labor_system_key');
   PERFORM pg_temp.ok('task without a system refused', r->'reasons' ? 'system_key_missing');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q || '{"labor_system_key":"paint"}');
@@ -106,8 +137,10 @@ BEGIN
   PERFORM pg_temp.ok('value outside the ratified list refused', r->'reasons' ? 'qualifier_value_unknown:labor_time_basis');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q || '{"labor_mood":"proud"}');
   PERFORM pg_temp.ok('unknown qualifier key refused', r->'reasons' ? 'qualifier_unknown:labor_mood');
+  r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q - 'labor_statement_kind');
+  PERFORM pg_temp.ok('missing statement kind refused', r->'reasons' ? 'qualifier_missing:labor_statement_kind');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q - 'labor_speaker_role');
-  PERFORM pg_temp.ok('missing speaker role refused', r->'reasons' ? 'qualifier_missing:labor_speaker_role');
+  PERFORM pg_temp.ok('no reader role: derived from the source', (r->>'ok')::boolean AND r->>'speaker_role' = 'owner_seller');
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL, ok_q || '{"labor_stated_subject":"1973 Pontiac Firebird"}');
   PERFORM pg_temp.ok('stated subject not in the quote refused', r->'reasons' ? 'stated_subject_not_in_quote');
   r := public.reported_labor_statement_check('vehicles', v1, repeat('I put 1,200 hours into it. ', 12), 1200, NULL, ok_q);
@@ -193,11 +226,14 @@ AS $function$;
 $function$;
 -- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture database)
 INSERT INTO public.vehicle_observations (vehicle_id, kind, structured_data) VALUES
-  (NULL, 'work_record', jsonb_build_object('contract', 'reported_labor_hours_v1', 'source_vehicle_id', '30000000-0000-0000-0000-000000000001',
-    'source_table', 'vehicles', 'source_row_id', '30000000-0000-0000-0000-000000000001', 'labor_scope', 'whole_build', 'task', 'body and paint'));
+  (NULL, 'work_record', jsonb_build_object('contract', 'reported_labor_hours_v1', 'page_vehicle_id', '30000000-0000-0000-0000-000000000001',
+    'source_table', 'auction_comments', 'source_row_id', '33000000-0000-0000-0000-000000000001', 'labor_scope', 'whole_build',
+    'labor_speaker_role', 'commenter_other_car', 'labor_stated_subject', '1970 Pontiac GTO', 'task', 'the other car''s build'));
 DO $$
 DECLARE v1 uuid := '30000000-0000-0000-0000-000000000001';
 BEGIN
+  PERFORM pg_temp.ok('a commenter_other_car statement reaches no car', NOT EXISTS (
+    SELECT 1 FROM public.vehicle_observations WHERE structured_data ->> 'contract' = 'reported_labor_hours_v1' AND vehicle_id IS NOT NULL));
   PERFORM pg_temp.ok('statement row: proj_disposition unchanged',
     (SELECT disposition FROM public.proj_disposition WHERE vehicle_id = v1) = 'unknown');
   PERFORM pg_temp.ok('statement row: not on the public build log', NOT EXISTS (SELECT 1 FROM public.vehicle_build_log_public(v1)));
