@@ -66,11 +66,26 @@ BEGIN
   SELECT id, evidence INTO pid, ev0 FROM public.schema_proposals
    WHERE proposed_by_agent_key = 'claude-reported-labor-hours' AND payload->>'property_key' = 'labor_hours_reported_low';
   UPDATE public.schema_proposals
-     SET evidence = evidence || jsonb_build_array(jsonb_build_object('role', 'prototype_row', 'source_table', 'build_posts',
-                     'row_id', (SELECT min(id::text) FROM public.build_posts), 'quote', 'before.', 'reads', 'low=999'))
+     SET evidence = ev0 || jsonb_build_array((SELECT e || '{"reads": "low=999"}'::jsonb FROM jsonb_array_elements(ev0) e
+                                               WHERE e->>'role' = 'prototype_row' LIMIT 1))
    WHERE id = pid;
   m := public.schema_proposal_key_gate((SELECT ids FROM gate_ids));
   PERFORM pg_temp.ok('read number absent from quote: refused', m->>'decision' = 'refused' AND m->'reasons' ? 'citation_read_not_in_quote');
+  -- a one-character quote is verbatim in any row: refused as too short (ta-skeptic's probe)
+  UPDATE public.schema_proposals
+     SET evidence = ev0 || jsonb_build_array(jsonb_build_object('role', 'prototype_row', 'source_table', 'build_posts',
+                     'row_id', (SELECT min(id::text) FROM public.build_posts), 'quote', 'e', 'reads', ''))
+   WHERE id = pid;
+  m := public.schema_proposal_key_gate((SELECT ids FROM gate_ids));
+  PERFORM pg_temp.ok('one-character quote: refused', m->>'decision' = 'refused' AND m->'reasons' ? 'citation_quote_too_short');
+  -- a quote that starts inside a word is not verbatim on word boundaries
+  UPDATE public.schema_proposals
+     SET evidence = ev0 || jsonb_build_array((SELECT e || jsonb_build_object('quote', substr(e->>'quote', 2))
+                                               FROM jsonb_array_elements(ev0) e
+                                              WHERE e->>'role' = 'prototype_row' AND e->>'quote' ~ '^[[:alnum:]]{2}' LIMIT 1))
+   WHERE id = pid;
+  m := public.schema_proposal_key_gate((SELECT ids FROM gate_ids));
+  PERFORM pg_temp.ok('quote cut inside a word: refused', m->>'decision' = 'refused' AND m->'reasons' ? 'citation_quote_not_in_row');
   UPDATE public.schema_proposals
      SET evidence = ev0 || jsonb_build_array(jsonb_build_object('role', 'prototype_row', 'source_table', 'receipts',
                      'row_id', gen_random_uuid(), 'quote', 'x', 'reads', ''))
@@ -110,6 +125,9 @@ BEGIN
     AND (SELECT count(*) FROM public.observation_properties) = (SELECT count(*) FROM gate_props_before) + 8);
   m := public.schema_proposal_key_gate((SELECT ids FROM gate_ids));
   PERFORM pg_temp.ok('second call refused', m->>'decision' = 'refused' AND m->'reasons' ? 'status_approved');
+  PERFORM pg_temp.ok('second call keeps the ratifying measure on every approved row', (
+    SELECT bool_and(gate_measure->>'decision' = 'ratified') FROM public.schema_proposals
+     WHERE id = ANY ((SELECT ids FROM gate_ids)::uuid[])));
 END $$;
 
 DO $$ BEGIN

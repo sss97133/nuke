@@ -14,7 +14,8 @@
 --             CHECKs (data_type, cardinality, namespace, scope) decide at apply, inside a subtransaction: a refusal there
 --             rolls back every status and registration of the call and is stored as 'apply_refused: <message>'.
 --   WITNESS   at least one evidence entry of role prototype_row, and for each: its source_table has a row in
---             schema_proposal_witness_sources, the cited row exists, the row's text column holds the quote verbatim,
+--             schema_proposal_witness_sources, the cited row exists, the quote has at least that row's min_quote_words,
+--             the row's text column holds the quote verbatim on word boundaries,
 --             and every number the entry reads (low=N, high=N) occurs as a number in the quote.
 --   NOTHING RATIFIED MOVES  observation_properties rows other than the new keys: same count and same content hash
 --             before and after the apply.
@@ -37,6 +38,7 @@ COMMENT ON COLUMN public.schema_proposals.gate_measure IS
 CREATE TABLE IF NOT EXISTS public.schema_proposal_witness_sources (
   source_table text PRIMARY KEY CHECK (source_table ~ '^[a-z][a-z0-9_]*$'),
   text_column text NOT NULL CHECK (text_column ~ '^[a-z][a-z0-9_]*$'),
+  min_quote_words integer NOT NULL CHECK (min_quote_words > 0),
   note text
 );
 COMMENT ON TABLE public.schema_proposal_witness_sources IS
@@ -44,10 +46,12 @@ COMMENT ON TABLE public.schema_proposal_witness_sources IS
 ALTER TABLE public.schema_proposal_witness_sources ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.schema_proposal_witness_sources FROM anon, authenticated;
 GRANT SELECT ON public.schema_proposal_witness_sources TO service_role;
-INSERT INTO public.schema_proposal_witness_sources (source_table, text_column, note) VALUES
-  ('auction_comments', 'comment_text', 'auction comment body'),
-  ('build_posts', 'content_text', 'forum build post body'),
-  ('vehicles', 'description', 'listing description held on the vehicle')
+-- min_quote_words 4: the shortest of the 25 prototype quotes the first gated proposals cite (measured 2026-11-25;
+-- longest 12). A shorter quote (one character passed the verbatim test in ta-skeptic's probe) is refused.
+INSERT INTO public.schema_proposal_witness_sources (source_table, text_column, min_quote_words, note) VALUES
+  ('auction_comments', 'comment_text', 4, 'auction comment body'),
+  ('build_posts', 'content_text', 4, 'forum build post body'),
+  ('vehicles', 'description', 4, 'listing description held on the vehicle')
 ON CONFLICT (source_table) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.schema_proposal_key_gate(p_proposal_ids uuid[])
@@ -137,7 +141,16 @@ BEGIN
         reasons := reasons || 'citation_row_missing'::text;
         CONTINUE;
       END IF;
-      IF coalesce(ev->>'quote', '') = '' OR position(ev->>'quote' IN txt) = 0 THEN
+      IF coalesce(array_length(regexp_split_to_array(btrim(coalesce(ev->>'quote', '')), '\s+'), 1), 0) < src.min_quote_words
+         OR btrim(coalesce(ev->>'quote', '')) = '' THEN
+        cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'quote_too_short');
+        reasons := reasons || 'citation_quote_too_short'::text;
+        CONTINUE;
+      END IF;
+      -- verbatim, on word boundaries: the characters either side of the quote are not letters or digits
+      IF position(ev->>'quote' IN txt) = 0
+         OR substr(txt, position(ev->>'quote' IN txt) - 1, 1) ~ '[[:alnum:]]'
+         OR substr(txt, position(ev->>'quote' IN txt) + length(ev->>'quote'), 1) ~ '[[:alnum:]]' THEN
         cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'quote_not_in_row');
         reasons := reasons || 'citation_quote_not_in_row'::text;
         CONTINUE;
@@ -189,10 +202,11 @@ BEGIN
     decision := 'refused';
     measure := measure || jsonb_build_object('decision', decision,
                  'reasons', (measure->'reasons') || to_jsonb('apply_refused: ' || SQLERRM));
-    UPDATE public.schema_proposals SET gate_measure = measure WHERE id = ANY (p_proposal_ids);
+    UPDATE public.schema_proposals SET gate_measure = measure WHERE id = ANY (p_proposal_ids) AND status = 'open';
    END;
   ELSE
-    UPDATE public.schema_proposals SET gate_measure = measure WHERE id = ANY (p_proposal_ids);
+    -- a refusal never overwrites the measure that ratified an approved row
+    UPDATE public.schema_proposals SET gate_measure = measure WHERE id = ANY (p_proposal_ids) AND status = 'open';
   END IF;
   RETURN measure;
 END $fn$;
