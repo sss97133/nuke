@@ -287,3 +287,14 @@ it('prints years, casting numbers and codes as-is, quantities with separators, a
   expect(host.textContent).toContain('first day: Sep 26, 2024 · last day: Jan 13, 2025');
   expect(host.textContent).not.toContain('1,970');
 });
+
+it('a claim says how many independent sources agree, and a lone claim says nothing extra', async () => {
+  const item = (key: string, sources: number): FacetItem => ({ key, facet: 'current', value: '1973', status: 'claim',
+    unit: null, rule: null, equation: null, needed: null,
+    agreement: { sources, source_families: sources },
+    sources: [{ kind: 'listing', label: 'Listing', value_label: '1973', observed_at: '2026-01-02T00:00:00Z' }] });
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="year" items={{ year: [item('year.recorded', 2)] }} />);
+  expect(host.textContent).toContain('2 sources agree · 2 source families');
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="year" items={{ year: [item('year.recorded', 1)] }} />);
+  expect(host.textContent).not.toContain('sources agree');
+});
