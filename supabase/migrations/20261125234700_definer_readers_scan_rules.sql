@@ -16,8 +16,12 @@
 --      image_scan_metadata_for_viewer, wrapped as {byok_deep_analysis: <copy>} so the same rule rows apply (narrative,
 --      text regions, place hint, notes and questions withheld; the car's plate withheld inside kept labels). The worker
 --      itself returns the copy raw to the photo's uploader, a caller tied to the car and service_role. The rules are the
---      compiled row, read once per call. Rows chosen, work sessions, receipts, gaps and owner_note: unchanged
---      (owner_comment observations are public by observation_is_public; 0 deep-read photos carry one, 2026-11-25).
+--      compiled row, read once per call. Rows chosen, receipts and gaps: unchanged.
+--      The three other free-text carriers go to p_user_id only (ta-skeptic, #3978 must-fix 2026-11-25): a work
+--      session's title becomes its work_type for anyone else (prod, read-only: 1,095 of 1,925 sessions titled on public
+--      cars, 780 over 40 characters, 406 place-shaped 'at/in <Capitalized>'; work_type is a 16-value vocabulary);
+--      owner_note (the latest owner_comment observation's content_text, read with no public or tied test) and
+--      file_name (the camera or upload name, free text) are NULL for anyone else.
 --   2. vehicle_axle_type_evidence: a photo row's printed words pass through the worker as the text region (rank 0) or
 --      component label (rank 1) they were read from, with the photo's uploader and the car: a text region is withheld
 --      from an untied caller (printed NULL, the axle type and image id kept); a label keeps its words.
@@ -82,14 +86,14 @@ BEGIN
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
            'id', s.id, 'url', s.image_url, 'thumb', COALESCE(s.thumbnail_url, s.image_url),
            'vehicle_id', s.vehicle_id, 'taken_at', s.taken_at,
-           'file_name', s.file_name,
+           'file_name', CASE WHEN v_is_owner IS TRUE THEN s.file_name END,
            'narrative', NULLIF(s.narrative, ''),
            'components', s.components,
            'part_numbers', s.part_numbers,
            'intent', COALESCE(s.confirmed_intent, s.model_intent),
            'intent_confidence', s.intent_confidence,
            'intent_confirmed', s.intent_confirmed,
-           'owner_note', s.owner_note,
+           'owner_note', CASE WHEN v_is_owner IS TRUE THEN s.owner_note END,
            'analyzed_by', s.analyzed_by,
            'analyzed_at', s.analyzed_at
          ) ORDER BY s.taken_at), '[]'::jsonb)
@@ -150,7 +154,9 @@ BEGIN
 
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
            'id', ws.id,
-           'title', COALESCE(ws.title, ws.work_type, 'work session'),
+           -- a stranger gets the closed work_type vocabulary, not the owner's free-text title
+           'title', CASE WHEN v_is_owner IS TRUE THEN COALESCE(ws.title, ws.work_type, 'work session')
+                         ELSE COALESCE(ws.work_type, 'work session') END,
            'vehicle_id', ws.vehicle_id,
            'duration_minutes', ws.duration_minutes,
            'total_job_cost', CASE WHEN v_is_owner THEN ws.total_job_cost ELSE NULL END,

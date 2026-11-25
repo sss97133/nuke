@@ -9,6 +9,9 @@
 --   * vehicle_axle_type_evidence (live body, md5 checked): before, anon reads the printed words of a photo's text region.
 --     After, anon and a stranger get the photo row with its axle type and image id and printed NULL; a component label
 --     keeps its words with the plate withheld; the owner, a tied viewer and service_role read the text.
+--   * the day receipt's other free-text carriers (ta-skeptic must-fix): before, anon reads a work session's own title,
+--     the owner's note on the photo and its file name; after, anyone but p_user_id gets the work_type and NULL for the
+--     note and the file name, and p_user_id reads all three.
 --   * get_analysis_stream (live body, unchanged): anon and a stranger get no rows; the uploader gets their own reading.
 --   * two private_row_probes rows (ranks 30, 31); the revert restores both live bodies (md5) and removes the probe rows.
 --   * ta-skeptic's #3935 should-fixes: the worker withholds a plate split by a carriage return; the id-keyed reader
@@ -18,7 +21,9 @@
 -- by the raw words -> "axle: anon ..."; the rules read as an empty array -> "day receipt: anon ..."; the probe block
 -- skipped -> "probes: ..."; the separator edit skipped -> "worker: a plate split by a carriage return ..."; the
 -- reader's is_sensitive term removed -> "scan reader: anon gets NULL for a sensitive approved photo ..."; its deleted_at
--- term removed -> "scan reader: anon gets NULL for a photo on a deleted public car".
+-- term removed -> "scan reader: anon gets NULL for a photo on a deleted public car"; the title gate removed -> "day
+-- receipt: anon and a stranger get the work type, no owner note and no file name"; the owner_note or the file_name gate
+-- removed -> "day receipt: anon gets the photo, its labels ..." (its no-TST check on the whole photo), before that line.
 -- Fixture: fixtures/scan_metadata_schema.sql (the #3935 schema), then the tables and live helper bodies these readers
 -- read. Fixture rows only, in a disposable database. -- ALLOW_RAW_TESTIMONY_WRITE
 \ir fixtures/scan_metadata_schema.sql
@@ -147,6 +152,15 @@ INSERT INTO public.vehicle_observations (vehicle_id, kind, structured_data, agen
   ('a0000000-0000-0000-0000-00000000000a', 'condition', '{"image_id": "10000000-0000-0000-0000-000000000007",
      "components_seen": [{"label": "posi differential tag TST PL8-9"}]}', 'fixture-model', 'reviewed_image_analysis_v1');
 INSERT INTO public.user_image_deep_reads (user_id, image_id) VALUES ('00000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001');
+-- The day's three other free-text carriers (ta-skeptic must-fix): the photo's file name, the owner's comment on it and a
+-- work session's own title (work_type is the closed vocabulary a stranger gets instead).
+UPDATE public.vehicle_images SET file_name = 'TSTFILE-home.jpg' WHERE id = '10000000-0000-0000-0000-000000000001';
+INSERT INTO public.vehicle_observations (vehicle_id, kind, content_text, structured_data) VALUES
+  ('a0000000-0000-0000-0000-00000000000a', 'comment', 'TSTNOTE from the owner',
+   '{"analysis_kind": "owner_comment", "image_id": "10000000-0000-0000-0000-000000000001"}');
+INSERT INTO public.work_sessions (id, user_id, vehicle_id, session_date, title, work_type, duration_minutes, total_job_cost, session_type) VALUES
+  ('50000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-00000000000a',
+   '2026-11-20', 'TSTTITLE at TSTPLACE-W', 'bodywork', 90, 1200, 'work');
 
 -- t_receipt(uid, 'field'): the day receipt's first photo field as the caller; t_axle(uid): the photo rows, one line.
 CREATE FUNCTION public.t_receipt(p_uid text, p_field text) RETURNS text LANGUAGE plpgsql AS $$
@@ -170,12 +184,25 @@ BEGIN
   RESET ROLE;
   RETURN coalesce(o, 'none');
 END $$;
-GRANT EXECUTE ON FUNCTION public.t_receipt(text, text), public.t_axle(text) TO anon, authenticated, service_role;
+-- t_free(uid): the three free-text carriers as the caller: work title | owner_note | file_name.
+CREATE FUNCTION public.t_free(p_uid text) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE r jsonb;
+BEGIN
+  PERFORM public.t_claims(p_uid);
+  EXECUTE format('SET LOCAL ROLE %I', CASE p_uid WHEN '' THEN 'anon' WHEN 'service' THEN 'service_role' ELSE 'authenticated' END);
+  r := public.get_user_day_receipt('00000000-0000-0000-0000-000000000001', '2026-11-20');
+  RESET ROLE;
+  RETURN coalesce(r #>> '{work_sessions,0,title}', 'null') || ' | ' || coalesce(r #>> '{photos,0,owner_note}', 'null') || ' | '
+      || coalesce(r #>> '{photos,0,file_name}', 'null');
+END $$;
+GRANT EXECUTE ON FUNCTION public.t_receipt(text, text), public.t_axle(text), public.t_free(text) TO anon, authenticated, service_role;
 
 -- Before: the defect, on the live bodies.
 BEGIN;
-SELECT public.t_receipt('', 'narrative') AS b_narr, public.t_axle('') AS b_axle \gset
+SELECT public.t_receipt('', 'narrative') AS b_narr, public.t_axle('') AS b_axle, public.t_free('') AS b_free \gset
 ROLLBACK;
+SELECT public.t_assert(:'b_free' = 'TSTTITLE at TSTPLACE-W | TSTNOTE from the owner | TSTFILE-home.jpg',
+  format('before: anon reads the work title, the owner note and the file name (%s)', :'b_free'));
 SELECT public.t_assert(:'b_narr' = 'TSTNARR at TSTPLACE-H' AND :'b_axle' LIKE '%POSITRACTION%',
   format('before: anon reads the deep narrative from the day receipt and photo text from the axle reader (%s / %s)', :'b_narr', :'b_axle'));
 
@@ -192,6 +219,17 @@ SELECT public.t_assert(:'a_narr' = 'null' AND :'a_parts' = 'null' AND :'a_comp' 
   AND :'a_intent' = 'restoration' AND :'a_id' = '10000000-0000-0000-0000-000000000001' AND :'a_all' !~ 'TST',
   format('day receipt: anon gets the photo, its labels (plate withheld) and intent, no narrative or text regions (%s)', :'a_all'));
 SELECT public.t_assert(:'s_all' = :'a_all', 'day receipt: a signed-in stranger reads what anon reads');
+
+-- 1b. The free-text carriers go to p_user_id only (ta-skeptic must-fix): anyone else gets the work_type for the title
+--     and no owner note or file name; p_user_id reads all three as stored.
+BEGIN;
+SELECT public.t_free('') AS f_anon, public.t_free('00000000-0000-0000-0000-000000000002') AS f_str,
+       public.t_free('00000000-0000-0000-0000-000000000001') AS f_own \gset
+ROLLBACK;
+SELECT public.t_assert(:'f_anon' = 'bodywork | null | null' AND :'f_str' = :'f_anon',
+  format('day receipt: anon and a stranger get the work type, no owner note and no file name (%s / %s)', :'f_anon', :'f_str'));
+SELECT public.t_assert(:'f_own' = 'TSTTITLE at TSTPLACE-W | TSTNOTE from the owner | TSTFILE-home.jpg',
+  format('day receipt: p_user_id reads the title, owner note and file name as stored (%s)', :'f_own'));
 
 -- 2. p_user_id, the car's mechanic (tied) and service_role read the reading as stored.
 BEGIN;
