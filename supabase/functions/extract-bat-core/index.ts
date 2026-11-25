@@ -56,6 +56,7 @@ import { readBatPartyLine, type BatSellerType } from "../_shared/batSellerType.t
 import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
+import { staleClosedSnapshot } from "./staleSnapshot.ts";
 import { resolveBatVehicleIdentity } from "./vehicleIdentity.ts";
 import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type EndRow } from "./auctionClose.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
@@ -1297,7 +1298,9 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
 
-        if (!snapErr && snap?.html && String(snap.html).length > 1000) {
+        const staleReason = !snapErr && snap?.html ? staleClosedSnapshot(String(snap.html), Date.now()) : null;
+        if (staleReason) console.log(`extract-bat-core: snapshot skipped for ${listingUrlCanonical}: ${staleReason}`);
+        if (!snapErr && !staleReason && snap?.html && String(snap.html).length > 1000) {
           html = String(snap.html);
           httpStatus = typeof (snap as any)?.http_status === "number" ? (snap as any).http_status : 200;
           userAgent = `snapshot:${String((snap as any)?.id || "")}`;
