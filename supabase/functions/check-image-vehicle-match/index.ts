@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { cloudVisionJSON, cloudVisionMultiJSON, platformVisionMultiJSON } from "../_shared/visionFallback.ts";
-import { authenticateWriter, requireWriteAuth, writeAuthResponse } from "../_shared/writeGuard.ts";
+import { authenticateWriter, requireAdminOrService, requireWriteAuth, writeAuthResponse } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
 import { assertComparisonReceiptCapacity, comparisonReceiptPatch, parseReferenceDecision,
@@ -370,6 +370,12 @@ Deno.serve(async (req: Request) => {
       }
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
+    // The legacy modes below (check, build_signatures, disambiguate) write with the service client on the vehicle_id,
+    // user_id and images the caller names, so they answer the service key or an active admin only; signed in is anyone
+    // while sign-up is open (2026-11-25). The subject modes above are scoped to the caller's own account.
+    const notAdmin = await requireAdminOrService(req, { headers: corsHeaders });
+    if (notAdmin) return notAdmin;
 
     // =====================================================================
     // MODE: build_signatures

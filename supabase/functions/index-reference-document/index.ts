@@ -6,7 +6,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getUserApiKey } from '../_shared/getUserApiKey.ts'
 import { enrichReceiptProducts } from './receiptProducts.ts';
-import { isServiceCaller, requireWriteAuth } from '../_shared/writeGuard.ts';
+import { authenticateWriter, isServiceCaller, requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from '../_shared/geminiGuard.ts';
 import { recordSuppliedReference, ReferenceError, sha256 } from './suppliedReference.ts';
@@ -82,6 +82,15 @@ Deno.serve(async (req) => {
     }
     const { document_id, pdf_url, user_id, mode, page_start, page_end } = body
     if (!pdf_url) throw new Error('Missing pdf_url')
+    // user_id picks whose provider key pays for the read: a signed-in caller may name only themself; anyone else
+    // needs the service key or an active admin (2026-11-25). Whether the caller owns document_id is checked in the
+    // row-owner work.
+    const writer = await authenticateWriter(req)
+    const namesSelf = writer.ok && writer.caller.kind === 'user' && typeof user_id === 'string' && user_id === writer.caller.userId
+    if (!namesSelf) {
+      const notAdmin = await requireAdminOrService(req, { headers: corsHeaders })
+      if (notAdmin) return notAdmin
+    }
 
     const processingMode = mode || 'structure' // 'structure' | 'extract_parts'
     console.log(`Indexing: ${pdf_url} [${processingMode}] Pages: ${page_start || 'all'}-${page_end || 'all'}`)
