@@ -76,6 +76,15 @@ BEGIN
   RETURN 'inserted';
 EXCEPTION WHEN insufficient_privilege THEN RETURN 'refused ' || SQLSTATE;
 END $$;
+CREATE FUNCTION pg_temp.try_insert_self_anchor() RETURNS text LANGUAGE plpgsql AS $$
+BEGIN
+  -- ALLOW_RAW_TESTIMONY_WRITE: contract fixture; the direct POST shape ta-skeptic2 forged, actor = the caller.
+  INSERT INTO public.reattribution_audit(observation_type, old_observation_id, new_observation_id, new_vehicle_id, reason, actor_user_id)
+  VALUES ('image', gen_random_uuid(), gen_random_uuid(), 'f0000000-0000-0000-0000-00000000000f',
+          'first_attribution: forged signal=owner_session_confirm', auth.uid());
+  RETURN 'inserted';
+EXCEPTION WHEN insufficient_privilege THEN RETURN 'refused ' || SQLSTATE;
+END $$;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA pg_temp TO authenticated;
 
 -- Before: the owner's own move is refused at the audit insert.
@@ -126,6 +135,7 @@ SELECT pg_temp.try_move('image', '30000000-0000-0000-0000-000000000001', 'f00000
   '0a000000-0000-0000-0000-0000000000a0') AS owner_move \gset
 SELECT count(*) AS owner_reads_audit FROM reattribution_audit \gset
 SELECT pg_temp.try_insert_forged() AS forged \gset
+SELECT pg_temp.try_insert_self_anchor() AS forged_self \gset
 RESET ROLE;
 SELECT t_assert(:'owner_move' = 'ok true', 'the owner''s signed-in move succeeds');
 SELECT t_assert((SELECT vehicle_id FROM vehicle_images WHERE id = '30000000-0000-0000-0000-000000000001') = 'f0000000-0000-0000-0000-00000000000f',
@@ -136,6 +146,8 @@ SELECT t_assert((SELECT count(*) FROM reattribution_audit WHERE old_observation_
   'exactly one audit row, actor = the owner');
 SELECT t_assert(:owner_reads_audit = 0, 'a signed-in user reads no audit rows (no SELECT policy)');
 SELECT t_assert(:'forged' LIKE 'refused%', 'an audit row naming another actor is refused');
+SELECT t_assert(:'forged_self' LIKE 'refused%', 'a direct audit insert naming oneself, outside relink_testimony, is refused');
+SELECT t_assert(NOT EXISTS (SELECT FROM reattribution_audit WHERE reason LIKE 'first_attribution:%'), 'no forged anchor row landed');
 
 -- The uploader moves their own photo off a car they are not tied to, onto one they may edit.
 SELECT pg_temp.as_user('0b000000-0000-0000-0000-0000000000b0');
@@ -152,4 +164,4 @@ SELECT md5(pg_get_functiondef('public.relink_testimony(text,uuid,uuid,text,uuid,
 \ir ../migrations/20261126001000_relink_testimony_signed_in_audit.sql
 SELECT t_assert(md5(pg_get_functiondef('public.relink_testimony(text,uuid,uuid,text,uuid,text)'::regprocedure)) = :'after_md5',
   're-applying the migration changes nothing');
-SELECT t_assert(:'after_md5' = '352cfd15f63920d1de6512831fa043b8', 'the after-fingerprint in the guard is this body''s'); -- gitleaks:allow (function-definition fingerprint, not a secret)
+SELECT t_assert(:'after_md5' = '75e6ce278c45b9c18e400ac25dd6c8af', 'the after-fingerprint in the guard is this body''s'); -- gitleaks:allow (function-definition fingerprint, not a secret)

@@ -13,7 +13,11 @@
 --     (vehicle_viewer_tied: owner, record owner, creator, uploader of the vehicle, or a granted access). An
 --     observation: only one on a vehicle the caller is tied to. Anyone else: 42501, nothing written.
 --   * service-role calls: unchanged (no auth.role() of authenticated or anon).
--- The audit policy admits a row only with the caller's own id as actor. There is no SELECT policy, so a signed-in user
+-- The audit policy admits a row only with the caller's own id as actor, and only while relink_testimony holds the
+-- transaction-local mark nuke.audit_writer = 'relink_testimony' (set just before its insert, cleared after). A direct
+-- POST /rest/v1/reattribution_audit carries no mark and is refused, so a signed-in user cannot forge a reason shape that
+-- capture_sets_score reads as an owner-filed anchor (ta-skeptic2). PostgREST sets no custom setting from a request, and
+-- set_config is not exposed through the API. There is no SELECT policy, so a signed-in user
 -- reads no audit rows.
 --
 -- Refused when the live definition changed since it was read (md5 of pg_get_functiondef, 2026-11-25, equal to
@@ -27,7 +31,7 @@ DECLARE f text;
 BEGIN
   f := md5(pg_get_functiondef('public.relink_testimony(text,uuid,uuid,text,uuid,text)'::regprocedure));
   IF f NOT IN ('95a376b1ed76d9bf2e60edfe8c1ae988', -- gitleaks:allow (function-definition fingerprint read 2026-11-25, not a secret)
-               '352cfd15f63920d1de6512831fa043b8') THEN -- gitleaks:allow (function-definition fingerprint after this migration, not a secret)
+               '75e6ce278c45b9c18e400ac25dd6c8af') THEN -- gitleaks:allow (function-definition fingerprint after this migration, not a secret)
     RAISE EXCEPTION 'relink_testimony(6, text) changed since 2026-11-25 (md5 %); review before replacement', f;
   END IF;
 END
@@ -223,6 +227,8 @@ BEGIN
             HINT = 'A BEFORE UPDATE trigger (such as the vision gate) or a row policy kept the row where it was.';
   END IF;
 
+  -- The audit policy admits a signed-in row only while this function holds the writer mark (transaction-local).
+  PERFORM set_config('nuke.audit_writer', 'relink_testimony', true);
   INSERT INTO reattribution_audit (
     observation_type, old_observation_id, old_vehicle_id,
     new_observation_id, new_vehicle_id, reason, actor_user_id)
@@ -232,6 +238,7 @@ BEGIN
     p_reason || CASE WHEN v_demoted THEN ' [is_primary demoted: target already has a primary]' ELSE '' END
              || CASE WHEN v_use_override THEN format(' [vision gate %s overridden: %s]', v_gate, v_override) ELSE '' END,
     p_actor_user_id);
+  PERFORM set_config('nuke.audit_writer', '', true);
 
   RETURN jsonb_build_object(
     'success', true,
@@ -250,6 +257,7 @@ $function$
 DROP POLICY IF EXISTS reattribution_audit_actor_insert ON public.reattribution_audit;
 CREATE POLICY reattribution_audit_actor_insert ON public.reattribution_audit
   FOR INSERT TO authenticated
-  WITH CHECK (actor_user_id = (SELECT auth.uid()));
+  WITH CHECK (actor_user_id = (SELECT auth.uid())
+              AND current_setting('nuke.audit_writer', true) = 'relink_testimony');
 
 COMMIT;
