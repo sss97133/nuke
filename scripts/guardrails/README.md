@@ -76,3 +76,12 @@ Codex hook coverage must be established separately.
 
 Preserve existing checks, use the current owner-authorized scope for configuration changes, and record the actual
 execution path and its limits. See `scripts/ci/README.md` for local gate behavior.
+
+## Measured incidents the checks do not cover yet
+
+- 2026-11-25, two green PRs broke main together. #3826 asserted `r.starts === 4` in
+  `scripts/photo-pipeline/subscription-reader-batch.test.mjs`. #3827 added a fifth reader (`answer-receipt-parts`).
+  Each PR passed against its own base. They merged at 04:02Z and 04:13Z, and main's Frontend Tests failed from run
+  45545609310 (head 0dc598266) until #3835. No check here reads the combined tree before a merge. When two open PRs
+  touch the same assertion or test file, use a merge queue, or rebase onto main and re-run CI before merging. The
+  enforcing form is GitHub's merge queue, or branch protection's "require branches to be up to date", on `main`.
