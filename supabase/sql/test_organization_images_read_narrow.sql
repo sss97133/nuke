@@ -71,20 +71,33 @@ BEGIN
   RETURN result;
 END; $function$;
 GRANT EXECUTE ON FUNCTION public.extract_work_order_data(uuid) TO anon, authenticated;
+-- The live tie test (20261019210000): active owner or active contributor; callers are not granted it.
+CREATE FUNCTION public.work_order_org_member(p_user uuid, p_organization_id uuid) RETURNS boolean LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public' AS $function$
+BEGIN
+  RETURN p_user IS NOT NULL AND p_organization_id IS NOT NULL AND (
+    EXISTS (SELECT 1 FROM public.business_ownership bo WHERE bo.business_id = p_organization_id AND bo.owner_id = p_user AND bo.status = 'active')
+    OR EXISTS (SELECT 1 FROM public.organization_contributors oc WHERE oc.organization_id = p_organization_id AND oc.user_id = p_user
+      AND oc.status = 'active'));
+END $function$;
+REVOKE ALL ON FUNCTION public.work_order_org_member(uuid, uuid) FROM PUBLIC, anon, authenticated;
 
--- Organisation 0e1; uploader ...f1, organisation owner ...f2, a stranger ...f3, another organisation's owner ...f4.
+-- Organisation 0e1; uploader ...f1, organisation owner ...f2, a stranger ...f3, another organisation's owner ...f4,
+-- an active contributor of 0e1 ...f5.
 INSERT INTO public.business_ownership VALUES ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f2', 'active'),
                                              ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000f4', 'active');
+INSERT INTO public.organization_contributors VALUES ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f5', 'active');
 INSERT INTO public.organization_images (id, organization_id, user_id, image_url, visibility_level, is_sensitive, ocr_extracted_data,
                                         latitude, longitude, exif_data, contains_financial_data) VALUES
   ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f1', 'u1', 'public', false, '{"t":"x"}', 1, 1, '{"location":{}}', false),
   ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f1', 'u2', 'public', NULL, '{"t":"x"}', NULL, NULL, NULL, false),
-  ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f1', 'u3', 'internal_only', true, '{"t":"x"}', 1, 1, '{}', true);
+  ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f1', 'u3', 'internal_only', true, '{"t":"x"}', 1, 1, '{}', true),
+  ('00000000-0000-0000-0000-0000000000b4', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f1', 'u4', 'owner_only', false, '{"t":"x"}', 1, 1, '{}', false);
 
 -- Before: the exposure the audit measured.
 SET ROLE anon; SELECT set_config('test.uid', '', false);
-SELECT public.assert((SELECT count(*) FROM public.organization_images) = 3, 'before: anon reads all 3 rows');
-SELECT public.assert((SELECT count(ocr_extracted_data) FROM public.organization_images) = 3, 'before: anon reads OCR');
+SELECT public.assert((SELECT count(*) FROM public.organization_images) = 4, 'before: anon reads all 4 rows');
+SELECT public.assert((SELECT count(ocr_extracted_data) FROM public.organization_images) = 4, 'before: anon reads OCR');
 SELECT public.assert(public.extract_work_order_data('00000000-0000-0000-0000-0000000000b3') ? 'image_url', 'before: anon gets the internal url');
 RESET ROLE;
 
@@ -94,10 +107,15 @@ RESET ROLE;
 -- The logged-out profile page's select (OrganizationProfile.tsx, live column list).
 \set profile_select 'SELECT id, organization_id, user_id, image_url, thumbnail_url, medium_url, large_url, category, caption, is_primary, taken_at, latitude, longitude, uploaded_at, created_at, is_sensitive, blur_preview, contains_financial_data, location_name, exif_data FROM public.organization_images'
 
+\set base_select 'SELECT id, organization_id, user_id, image_url, thumbnail_url, medium_url, large_url, category, caption, is_primary, taken_at, uploaded_at, created_at, is_sensitive, blur_preview, contains_financial_data FROM public.organization_images'
+\set locations 'SELECT count(*) FROM public.organization_image_locations(''00000000-0000-0000-0000-0000000000e1'')'
+
 -- Logged out.
 SET ROLE anon; SELECT set_config('test.uid', '', false);
 SELECT public.assert((SELECT count(id) FROM public.organization_images) = 2, 'anon: the 2 public non-sensitive rows only');
-SELECT public.assert(NOT public.denied(:'profile_select'), 'anon: the profile select still succeeds');
+SELECT public.assert(NOT public.denied(:'profile_select'), 'anon: the old profile select still succeeds');
+SELECT public.assert(NOT public.denied(:'base_select'), 'anon: the new base select succeeds');
+SELECT public.assert(public.denied(:'locations'), 'anon: cannot execute organization_image_locations');
 SELECT public.assert(public.denied('SELECT ocr_extracted_data FROM public.organization_images'), 'anon: OCR denied');
 SELECT public.assert(public.denied('SELECT ai_analysis FROM public.organization_images'), 'anon: ai_analysis denied');
 SELECT public.assert(public.denied('SELECT ai_description FROM public.organization_images'), 'anon: ai_description denied');
@@ -114,17 +132,23 @@ SELECT set_config('test.uid', '00000000-0000-0000-0000-0000000000f3', false);
 SELECT public.assert((SELECT count(id) FROM public.organization_images) = 2, 'stranger: public rows only');
 SELECT public.assert(public.denied('SELECT ocr_extracted_data FROM public.organization_images'), 'stranger: OCR denied');
 SELECT public.assert(public.extract_work_order_data('00000000-0000-0000-0000-0000000000b3') ? 'error', 'stranger: internal row not found');
+SELECT public.assert((SELECT count(*) FROM public.organization_image_locations('00000000-0000-0000-0000-0000000000e1')) = 0, 'stranger: no locations');
 SELECT set_config('test.uid', '00000000-0000-0000-0000-0000000000f4', false);
 SELECT public.assert((SELECT count(id) FROM public.organization_images) = 2, 'other organisation owner: public rows only');
+SELECT public.assert((SELECT count(*) FROM public.organization_image_locations('00000000-0000-0000-0000-0000000000e1')) = 0, 'other organisation owner: no locations');
+SELECT set_config('test.uid', '00000000-0000-0000-0000-0000000000f5', false);
+SELECT public.assert((SELECT count(*) FROM public.organization_image_locations('00000000-0000-0000-0000-0000000000e1')) = 3, 'contributor: locations of public + internal rows, not owner_only');
 
 -- Tied: the uploader and the organisation's active owner.
 SELECT set_config('test.uid', '00000000-0000-0000-0000-0000000000f1', false);
-SELECT public.assert((SELECT count(id) FROM public.organization_images) = 3, 'uploader: all 3 including the internal row');
+SELECT public.assert((SELECT count(id) FROM public.organization_images) = 4, 'uploader: all 4 including internal and owner_only');
 SELECT public.assert(NOT public.denied(:'profile_select'), 'uploader: the profile select succeeds');
 SELECT public.assert(public.extract_work_order_data('00000000-0000-0000-0000-0000000000b3') ? 'image_url', 'uploader: internal row found');
 SELECT public.assert(public.denied('SELECT ocr_extracted_data FROM public.organization_images'), 'uploader: OCR stays server-side');
+SELECT public.assert((SELECT count(*) FROM public.organization_image_locations('00000000-0000-0000-0000-0000000000e1')) = 4, 'uploader: all 4 locations');
 SELECT set_config('test.uid', '00000000-0000-0000-0000-0000000000f2', false);
 SELECT public.assert((SELECT count(id) FROM public.organization_images WHERE visibility_level = 'internal_only') = 1, 'org owner: reads the internal row');
+SELECT public.assert((SELECT count(*) FROM public.organization_image_locations('00000000-0000-0000-0000-0000000000e1')) = 4, 'org owner: all 4 locations');
 RESET ROLE;
 
 SELECT public.assert((SELECT count(*) FROM pg_policies WHERE tablename = 'organization_images' AND cmd = 'SELECT' AND qual = 'true') = 0,
@@ -136,6 +160,6 @@ SELECT public.assert(NOT has_function_privilege('anon', 'public.extract_work_ord
 -- The revert restores the before state.
 \ir revert_20261125080000_organization_images_read_narrow.sql
 SET ROLE anon; SELECT set_config('test.uid', '', false);
-SELECT public.assert((SELECT count(ocr_extracted_data) FROM public.organization_images) = 3, 'revert: before state restored');
+SELECT public.assert((SELECT count(ocr_extracted_data) FROM public.organization_images) = 4, 'revert: before state restored');
 RESET ROLE;
 \echo organization_images_read_narrow: ok

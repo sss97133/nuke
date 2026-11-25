@@ -18,7 +18,9 @@
 --   * anon loses UPDATE / DELETE on the table (no policy ever admitted them; grant hygiene).
 --   * extract_work_order_data runs as the caller, so RLS decides whether the image exists for them; it reads image_url
 --     only.
--- NOT CHANGED HERE (open, reported on the board): latitude, longitude, location_name and exif_data (404 rows carry
+--   * organization_image_locations(org): where each photo was taken, for tied viewers only (below). The organisation
+--     page (same pull request) reads base columns and merges this in for a signed-in caller.
+-- NOT CHANGED HERE (next migration, after the page is live): latitude, longitude, location_name and exif_data (404 rows carry
 -- exif_data.location) stay granted because the public organisation profile names them in its select; revoking them
 -- before the page stops selecting them fails the logged-out gallery with 42501 (#2293, 2026-10-19).
 --
@@ -55,6 +57,29 @@ BEGIN
   RETURN jsonb_build_object('status', 'pending_ocr', 'image_url', v_url, 'requires_manual_entry', TRUE);
 END;
 $function$;
+
+-- Where a photo was taken, for tied viewers only. The organisation page reads its gallery from the base columns and
+-- merges these in for a signed-in caller; once that page is live, a later migration revokes latitude, longitude,
+-- location_name and exif_data from anon and authenticated. Tie test: the uploader; the organisation's active owner
+-- (business_ownership); an active member by work_order_org_member, for the levels its policies admit members to
+-- (public, internal_only).
+CREATE OR REPLACE FUNCTION public.organization_image_locations(p_organization_id uuid)
+RETURNS TABLE (id uuid, latitude numeric, longitude numeric, location_name text, exif_data jsonb)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT oi.id, oi.latitude, oi.longitude, oi.location_name, oi.exif_data
+    FROM public.organization_images oi
+   WHERE oi.organization_id = p_organization_id
+     AND (SELECT auth.uid()) IS NOT NULL
+     AND (oi.user_id = (SELECT auth.uid())
+          OR EXISTS (SELECT 1 FROM public.business_ownership bo
+                      WHERE bo.business_id = oi.organization_id AND bo.owner_id = (SELECT auth.uid()) AND bo.status = 'active')
+          OR (coalesce(oi.visibility_level, 'public') IN ('public', 'internal_only')
+              AND public.work_order_org_member((SELECT auth.uid()), oi.organization_id)))
+$$;
+COMMENT ON FUNCTION public.organization_image_locations(uuid) IS
+  'organization_images_read_v1: latitude, longitude, location_name, exif_data of an organisation''s photos, for the uploader, the active owner, and active members on public / internal_only rows. Anyone else gets no rows.';
+REVOKE ALL ON FUNCTION public.organization_image_locations(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.organization_image_locations(uuid) TO authenticated, service_role;
 
 COMMENT ON POLICY org_images_public_view ON public.organization_images IS
   'organization_images_read_v1: with the USING (true) policies dropped, this and the three level policies decide every read.';

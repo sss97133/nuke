@@ -158,6 +158,35 @@ interface OrgImage {
   contains_financial_data?: boolean;
 }
 
+// organization_images_read_v1: the gallery reads base columns only. Where a photo was taken (latitude, longitude,
+// location_name, exif_data) comes from organization_image_locations, which answers the uploader and the
+// organisation's active owners and contributors only; anyone else, and a logged-out visitor, gets the photos without it.
+const ORG_IMAGE_BASE_COLUMNS =
+  'id, organization_id, user_id, image_url, thumbnail_url, medium_url, large_url, category, caption, is_primary, ' +
+  'taken_at, uploaded_at, created_at, is_sensitive, blur_preview, contains_financial_data';
+
+async function loadOrganizationImages(organizationId: string) {
+  const { data, error } = await supabase
+    .from('organization_images')
+    .select(ORG_IMAGE_BASE_COLUMNS)
+    .eq('organization_id', organizationId)
+    .order('taken_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (error || !data || data.length === 0) return { data: data as OrgImage[] | null, error };
+  const { data: session } = await supabase.auth.getSession();
+  if (!session?.session) return { data: data as OrgImage[], error: null };
+  const { data: places } = await supabase.rpc('organization_image_locations', { p_organization_id: organizationId });
+  if (!Array.isArray(places) || places.length === 0) return { data: data as OrgImage[], error: null };
+  const byId = new Map(places.map((p: any) => [p.id, p]));
+  return {
+    data: (data as OrgImage[]).map((img) => {
+      const p: any = byId.get(img.id);
+      return p ? { ...img, latitude: p.latitude, longitude: p.longitude, location_name: p.location_name, exif_data: p.exif_data } : img;
+    }),
+    error: null,
+  };
+}
+
 interface OrgVehicle {
   id: string;
   vehicle_id: string;
@@ -742,33 +771,7 @@ export default function OrganizationProfile() {
       });
 
       // Reload images with all fields
-      const { data: orgImages, error: imagesError } = await supabase
-        .from('organization_images')
-        .select(`
-          id,
-          organization_id,
-          user_id,
-          image_url,
-          thumbnail_url,
-          medium_url,
-          large_url,
-          category,
-          caption,
-          is_primary,
-          taken_at,
-          latitude,
-          longitude,
-          uploaded_at,
-          created_at,
-          is_sensitive,
-          blur_preview,
-          contains_financial_data,
-          location_name,
-          exif_data
-        `)
-        .eq('organization_id', organizationId)
-        .order('taken_at', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false });
+      const { data: orgImages, error: imagesError } = await loadOrganizationImages(organizationId);
       
       if (!imagesError && orgImages) {
         console.log(`Reloaded ${orgImages.length} images after upload`);
@@ -1277,33 +1280,7 @@ export default function OrganizationProfile() {
       // Images - Load ALL fields needed for display
       (async () => {
         try {
-          const { data: orgImages, error: imagesError } = await supabase
-            .from('organization_images')
-            .select(`
-              id,
-              organization_id,
-              user_id,
-              image_url,
-              thumbnail_url,
-              medium_url,
-              large_url,
-              category,
-              caption,
-              is_primary,
-              taken_at,
-              latitude,
-              longitude,
-              uploaded_at,
-              created_at,
-              is_sensitive,
-              blur_preview,
-              contains_financial_data,
-              location_name,
-              exif_data
-            `)
-            .eq('organization_id', organizationId)
-            .order('taken_at', { ascending: false, nullsFirst: false })
-            .order('created_at', { ascending: false });
+          const { data: orgImages, error: imagesError } = await loadOrganizationImages(organizationId);
           
           if (imagesError) {
             // Error loading images - show empty

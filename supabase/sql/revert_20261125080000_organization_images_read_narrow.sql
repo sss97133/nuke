@@ -33,3 +33,4 @@ BEGIN
 END;
 $function$;
 COMMENT ON POLICY org_images_public_view ON public.organization_images IS NULL;
+DROP FUNCTION IF EXISTS public.organization_image_locations(uuid);
