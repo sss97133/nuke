@@ -26,11 +26,13 @@
 --
 -- WRITER. retained_projection_grade_tick(), a procedure, every minute (job retained-projection-grade), as postgres,
 -- committing per chunk inside a budget (platform_config 'retained_projection_verdicts': enabled, budget_ms, chunk,
--- sweep_rows, pause_close_minutes, pause_on_failing_jobs). Each run: pause when a live lot closes within
+-- sweep_rows_min, sweep_rows_max, target_miss_share, pause_close_minutes, pause_on_failing_jobs). Each run: pause when a live lot closes within
 -- pause_close_minutes (monitored_auctions) or the last run of a named job failed (cron.job_run_details, the reading
 -- v_job_health makes, at 5 ms instead of 600 ms); else
 --   1. tail: projections by ingested_at (index), older than 10 minutes, after the watermark;
---   2. sweep: stored verdicts by projection_id cursor, re-fingerprinted (0.1 ms a row warm), regraded when stale;
+--   2. sweep: stored verdicts by projection_id cursor, re-fingerprinted (0.1 ms a row warm), regraded when stale. A
+--      read never serves a stale verdict (the read recomputes input_fp); the sweep keeps the hit rate up, sized by the
+--      measured miss rate (rows a run = stale per minute / (2 x target_miss_share));
 --   3. backfill: projections by source_identifier (index idx_vobs_source_identifier_kind; 0 of 2,881 sampled
 --      projections break the 'retained_listing_<key>_v1:<uuid>' form), until done.
 -- The job is permanent: p, vehicles and snapshots change with no updated_at, so only the sweep finds a stale verdict.
@@ -42,8 +44,9 @@
 -- only for counting verdicts on a car with is_public, deleted_at IS NULL and listing_kind not non_vehicle_item. No
 -- registry column leaves it. It restates the vehicles read rule, so it is registered in private_row_policy_copies.
 --
--- GAUGE. retained_projection_verdict_gauge(): rows, admitted, newest graded_at, tail watermark and lag, backfill
--- cursor and done, sweep passes and stale found, last run.
+-- GAUGE. retained_projection_verdict_gauge(): graded, remaining, newest graded_at, and the share of reads served from
+-- a verdict (estimated from the job's own counts: coverage x verdicts not waiting stale); then the miss rate, pass
+-- length, tail lag, backfill cursor and last run.
 --
 -- REVERT. supabase/sql/revert_20261126063500_retained_projection_verdicts.sql
 -- TEST. supabase/sql/test_retained_projection_verdicts.sql
@@ -72,7 +75,11 @@ CREATE TABLE IF NOT EXISTS public.retained_projection_grading_state (
   sweep_cursor           uuid,
   sweep_passes           integer NOT NULL DEFAULT 0,
   sweep_stale_this_pass  integer NOT NULL DEFAULT 0,
+  sweep_rows_this_pass   integer NOT NULL DEFAULT 0,
+  sweep_pass_started_at  timestamptz,
   last_pass_stale        integer,
+  last_pass_rows         integer,
+  last_pass_minutes      numeric,
   last_pass_completed_at timestamptz,
   last_run_at            timestamptz,
   last_run               jsonb
@@ -182,7 +189,10 @@ DECLARE
   cfg jsonb := coalesce((SELECT c.config_value FROM public.platform_config c WHERE c.config_key = 'retained_projection_verdicts'), '{}');
   budget_ms int := least(greatest(CASE WHEN cfg->>'budget_ms' ~ '^\d{1,5}$' THEN (cfg->>'budget_ms')::int END, 1000), 8000);
   chunk int := least(greatest(CASE WHEN cfg->>'chunk' ~ '^\d{1,4}$' THEN (cfg->>'chunk')::int END, 10), 500);
-  sweep_rows int := least(greatest(CASE WHEN cfg->>'sweep_rows' ~ '^\d{1,6}$' THEN (cfg->>'sweep_rows')::int END, 0), 100000);
+  sweep_min int := least(greatest(CASE WHEN cfg->>'sweep_rows_min' ~ '^\d{1,6}$' THEN (cfg->>'sweep_rows_min')::int END, 0), 100000);
+  sweep_max int := least(greatest(CASE WHEN cfg->>'sweep_rows_max' ~ '^\d{1,6}$' THEN (cfg->>'sweep_rows_max')::int END, 0), 200000);
+  target numeric := least(greatest(CASE WHEN cfg->>'target_miss_share' ~ '^0?\.\d{1,6}$' THEN (cfg->>'target_miss_share')::numeric END, 0.0001), 0.5);
+  sweep_rows int;
   pause_min int := least(greatest(CASE WHEN cfg->>'pause_close_minutes' ~ '^\d{1,3}$' THEN (cfg->>'pause_close_minutes')::int END, 0), 240);
   jobs text[] := coalesce((SELECT array_agg(j) FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(cfg->'pause_on_failing_jobs') = 'array' THEN cfg->'pause_on_failing_jobs' END) j), '{}');
   t0 timestamptz := clock_timestamp();
@@ -199,7 +209,9 @@ DECLARE
 BEGIN
   IF budget_ms IS NULL THEN budget_ms := 7000; END IF;
   IF chunk IS NULL THEN chunk := 50; END IF;
-  IF sweep_rows IS NULL THEN sweep_rows := 5000; END IF;
+  IF sweep_min IS NULL THEN sweep_min := 1000; END IF;
+  IF sweep_max IS NULL OR sweep_max < sweep_min THEN sweep_max := greatest(sweep_min, 50000); END IF;
+  IF target IS NULL THEN target := 0.01; END IF;
   IF pause_min IS NULL THEN pause_min := 15; END IF;
   until := t0 + make_interval(secs => budget_ms / 1000.0);
   IF NOT pg_try_advisory_lock(hashtextextended('retained_projection_grade_tick', 0)) THEN RETURN; END IF;
@@ -255,7 +267,18 @@ BEGIN
     COMMIT;
   END LOOP;
 
-  -- 2. sweep: re-fingerprint stored verdicts in projection_id order; regrade the ones that no longer count
+  -- 2. sweep: re-fingerprint stored verdicts in projection_id order; regrade the ones that no longer count. A read never
+  --    serves a stale verdict (verdicts_for recomputes input_fp), so the sweep only keeps the hit rate up. It is sized by
+  --    the measured miss rate: with s verdicts going stale a minute and a pass of P minutes, about s*P/2 of them wait
+  --    stale; holding that under target_miss_share of the V verdicts takes V/P = s/(2*target) rows a minute.
+  SELECT * INTO st FROM public.retained_projection_grading_state WHERE id;
+  sweep_rows := least(greatest(sweep_min,
+                  CASE WHEN st.last_pass_minutes > 0 AND st.last_pass_stale IS NOT NULL
+                       THEN ceil(st.last_pass_stale / st.last_pass_minutes / (2 * target))::int END), sweep_max);
+  IF st.sweep_pass_started_at IS NULL THEN
+    UPDATE public.retained_projection_grading_state SET sweep_pass_started_at = clock_timestamp() WHERE id;
+    COMMIT;
+  END IF;
   WHILE n_swept < sweep_rows AND clock_timestamp() < until LOOP
     SELECT * INTO st FROM public.retained_projection_grading_state WHERE id;
     SELECT array_agg(x.projection_id ORDER BY x.projection_id) INTO batch FROM (
@@ -265,7 +288,10 @@ BEGIN
     IF batch IS NULL THEN
       UPDATE public.retained_projection_grading_state
          SET sweep_cursor = NULL, sweep_passes = sweep_passes + 1, last_pass_stale = sweep_stale_this_pass,
-             sweep_stale_this_pass = 0, last_pass_completed_at = clock_timestamp() WHERE id;
+             last_pass_rows = sweep_rows_this_pass,
+             last_pass_minutes = round(extract(epoch FROM clock_timestamp() - coalesce(sweep_pass_started_at, clock_timestamp())) / 60, 3),
+             sweep_stale_this_pass = 0, sweep_rows_this_pass = 0, sweep_pass_started_at = clock_timestamp(),
+             last_pass_completed_at = clock_timestamp() WHERE id;
       COMMIT;
       EXIT;
     END IF;
@@ -290,7 +316,8 @@ BEGIN
     EXIT WHEN i <= coalesce(cardinality(ids), 0);   -- out of budget: the cursor stays, the next run re-reads this batch
     UPDATE public.retained_projection_grading_state
        SET sweep_cursor = batch[cardinality(batch)],
-           sweep_stale_this_pass = sweep_stale_this_pass + coalesce(cardinality(ids), 0)
+           sweep_stale_this_pass = sweep_stale_this_pass + coalesce(cardinality(ids), 0),
+           sweep_rows_this_pass = sweep_rows_this_pass + cardinality(batch)
      WHERE id;
     COMMIT;
   END LOOP;
@@ -323,7 +350,7 @@ BEGIN
 
   UPDATE public.retained_projection_grading_state
      SET last_run_at = t0,
-         last_run = jsonb_build_object('tail', n_tail, 'swept', n_swept, 'stale', n_stale, 'backfill', n_backfill,
+         last_run = jsonb_build_object('tail', n_tail, 'swept', n_swept, 'sweep_rows', sweep_rows, 'stale', n_stale, 'backfill', n_backfill,
                                        'ms', round(extract(epoch FROM clock_timestamp() - t0) * 1000))
    WHERE id;
   COMMIT;
@@ -332,22 +359,46 @@ END $f$;
 
 CREATE OR REPLACE FUNCTION public.retained_projection_verdict_gauge()
 RETURNS jsonb LANGUAGE sql STABLE SET search_path = pg_catalog, public AS $f$
+  -- Four numbers: graded, remaining, newest write, share of reads served from a verdict. The last is derived from the
+  -- job's own counts, never counted at read time: coverage (graded / projections, a pg_stats estimate) times the
+  -- share of verdicts not waiting stale (stale per minute x pass minutes / 2, over graded).
+  WITH g AS (SELECT * FROM public.retained_projection_grading_state WHERE id),
+  n AS (SELECT count(*) AS graded, count(*) FILTER (WHERE admitted) AS admitted, max(graded_at) AS newest
+          FROM public.retained_projection_verdicts),
+  est AS (
+    SELECT round(c.reltuples::numeric * coalesce(s.most_common_freqs[array_position(s.most_common_vals::text::text[],
+                 'retained_listing_property_projection_v1')], 0)::numeric) AS projections
+      FROM pg_class c LEFT JOIN pg_stats s
+        ON s.schemaname = 'public' AND s.tablename = 'vehicle_observations' AND s.attname = 'extraction_method'
+     WHERE c.oid = 'public.vehicle_observations'::regclass),
+  r AS (
+    SELECT CASE WHEN g.last_pass_minutes > 0 THEN g.last_pass_stale / g.last_pass_minutes END AS stale_per_min,
+           CASE WHEN g.last_pass_rows > 0 THEN round(g.last_pass_stale::numeric / g.last_pass_rows, 4) END AS pass_miss_share
+      FROM g)
   SELECT jsonb_build_object(
-    'verdicts', (SELECT count(*) FROM public.retained_projection_verdicts),
-    'admitted', (SELECT count(*) FROM public.retained_projection_verdicts WHERE admitted),
-    'newest_graded_at', (SELECT max(graded_at) FROM public.retained_projection_verdicts),
+    'graded', n.graded,
+    'remaining', CASE WHEN g.backfill_done THEN 0 ELSE greatest(est.projections - n.graded, 0) END,
+    'remaining_is_estimate', NOT g.backfill_done,
+    'newest_graded_at', n.newest,
+    'served_from_verdict_share_est', CASE WHEN est.projections > 0 AND n.graded > 0 THEN round(
+        least(n.graded / est.projections, 1)
+        * greatest(1 - coalesce(r.stale_per_min * g.last_pass_minutes / 2, 0) / n.graded, 0), 4) END,
+    'admitted', n.admitted,
+    'projections_est', est.projections,
+    'last_pass_miss_share', r.pass_miss_share,
+    'stale_per_minute', round(r.stale_per_min, 2),
+    'last_pass_minutes', g.last_pass_minutes,
+    'sweep_passes', g.sweep_passes,
+    'last_pass_completed_at', g.last_pass_completed_at,
     'tail_watermark', g.tail_watermark,
     'tail_lag_minutes', round(extract(epoch FROM now() - g.tail_watermark) / 60),
     'backfill_done', g.backfill_done,
     'backfill_at', g.backfill_si,
-    'sweep_passes', g.sweep_passes,
-    'last_pass_stale', g.last_pass_stale,
-    'last_pass_completed_at', g.last_pass_completed_at,
     'closure_functions', cardinality(g.closure),
     'body_key_live', public.retained_projection_body_key(g.closure) IS NOT NULL,
     'last_run_at', g.last_run_at,
     'last_run', g.last_run)
-  FROM public.retained_projection_grading_state g WHERE g.id
+  FROM g, n, est, r
 $f$;
 
 REVOKE ALL ON FUNCTION public.retained_projection_closure() FROM PUBLIC, anon, authenticated, service_role;
@@ -361,8 +412,8 @@ GRANT EXECUTE ON FUNCTION public.retained_projection_verdicts_for(uuid[]) TO ano
 
 INSERT INTO public.platform_config (config_key, config_value, description)
 VALUES ('retained_projection_verdicts',
-        '{"enabled": true, "budget_ms": 7000, "chunk": 50, "sweep_rows": 5000, "pause_close_minutes": 15, "pause_on_failing_jobs": ["bat-live-pull"]}'::jsonb,
-        'retained_projection_verdict_v1: retained_projection_grade_tick() (job retained-projection-grade, every minute). budget_ms caps a run (max 8000 under the 10 s role timeout); chunk = projections graded per commit (50 x 28 ms cold = 1.4 s); sweep_rows = verdicts re-fingerprinted per run (5000 x 0.1 ms warm); pauses while a live lot closes within pause_close_minutes or the last run of a pause_on_failing_jobs job failed. Migration 20261126063500.')
+        '{"enabled": true, "budget_ms": 7000, "chunk": 50, "sweep_rows_min": 1000, "sweep_rows_max": 50000, "target_miss_share": 0.01, "pause_close_minutes": 15, "pause_on_failing_jobs": ["bat-live-pull"]}'::jsonb,
+        'retained_projection_verdict_v1: retained_projection_grade_tick() (job retained-projection-grade, every minute). budget_ms caps a run (max 8000 under the 10 s role timeout); chunk = projections graded per commit (50 x 28 ms cold = 1.4 s); sweep rows per run = stale per minute / (2 x target_miss_share), within sweep_rows_min..sweep_rows_max (0.1 ms a row warm); pauses while a live lot closes within pause_close_minutes or the last run of a pause_on_failing_jobs job failed. Migration 20261126063500.')
 ON CONFLICT (config_key) DO NOTHING;
 
 -- The read restates the vehicles read rule for anon (is_public, plus deleted_at and listing_kind as the matcher does).

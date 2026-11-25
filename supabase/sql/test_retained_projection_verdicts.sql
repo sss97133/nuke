@@ -51,11 +51,12 @@ CREATE TABLE public.observation_properties (id uuid PRIMARY KEY, property_key te
   cardinality text, verification_scope text, parent_property_id uuid, discriminator_key text, proposed_by_proposal_id uuid);
 CREATE TABLE public.listing_page_snapshots (id uuid PRIMARY KEY, success boolean, http_status int, platform text,
   listing_url text, html_sha256 text, metadata jsonb, fetched_at timestamptz, created_at timestamptz, html text);
-CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY, vehicle_id uuid, observed_at timestamptz, ingested_at timestamptz,
-  source_id uuid, source_url text, source_identifier text, kind public.observation_kind, content_hash text, structured_data jsonb,
-  content_text text, extraction_metadata jsonb, confidence_score numeric, is_superseded boolean DEFAULT false,
+CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles (id), observed_at timestamptz, ingested_at timestamptz,
+  source_id uuid REFERENCES public.observation_sources (id), source_url text, source_identifier text, kind public.observation_kind,
+  content_hash text, structured_data jsonb, content_text text, extraction_metadata jsonb, confidence_score numeric, is_superseded boolean DEFAULT false,
   superseded_by uuid, extraction_method text, raw_source_ref text, agent_cost_cents numeric, agent_model text,
-  property_id uuid, subject_type text DEFAULT 'vehicle', subject_id uuid, source_observation_id uuid, is_processed boolean);
+  property_id uuid REFERENCES public.observation_properties (id), subject_type text DEFAULT 'vehicle', subject_id uuid,
+  source_observation_id uuid REFERENCES public.vehicle_observations (id), is_processed boolean);  -- the four foreign keys live has
 CREATE INDEX ON public.vehicle_observations (ingested_at DESC);
 CREATE INDEX ON public.vehicle_observations (source_identifier, kind);
 GRANT SELECT ON public.vehicles, public.observation_properties, public.vehicle_observations TO anon, authenticated;
@@ -388,10 +389,36 @@ DO $$ BEGIN
     RAISE EXCEPTION 'FAIL backfill: % verdicts', (SELECT count(*) FROM public.retained_projection_verdicts); END IF;
   RAISE NOTICE 'PASS backfill graded 11, run %', (SELECT last_run FROM public.retained_projection_grading_state);
 END $$;
+ANALYZE public.vehicle_observations;
 DO $$ DECLARE g jsonb := public.retained_projection_verdict_gauge(); BEGIN
-  IF (g->>'verdicts')::int <> 11 OR (g->>'backfill_done')::boolean IS NOT TRUE OR (g->>'body_key_live')::boolean IS NOT TRUE
-     OR (g->>'closure_functions')::int < 16 THEN RAISE EXCEPTION 'FAIL gauge %', g; END IF;
-  RAISE NOTICE 'PASS gauge: %', g;
+  IF (g->>'graded')::int <> 11 OR (g->>'remaining')::int <> 0 OR (g->>'backfill_done')::boolean IS NOT TRUE
+     OR (g->>'newest_graded_at') IS NULL OR (g->>'served_from_verdict_share_est') IS NULL
+     OR (g->>'body_key_live')::boolean IS NOT TRUE OR (g->>'closure_functions')::int < 16 THEN RAISE EXCEPTION 'FAIL gauge %', g; END IF;
+  RAISE NOTICE 'PASS gauge (graded, remaining, newest write, served share): %, %, %, %', g->>'graded', g->>'remaining',
+    g->>'newest_graded_at' IS NOT NULL, g->>'served_from_verdict_share_est';
+END $$;
+-- The sweep is sized by the measured miss rate: rows a run = stale per minute / (2 x target_miss_share), within
+-- sweep_rows_min .. sweep_rows_max. 600 stale over a 1-minute pass at target 0.01 gives 30,000; 0 stale gives the floor.
+UPDATE public.retained_projection_grading_state SET last_pass_stale = 600, last_pass_minutes = 1, last_pass_rows = 11 WHERE id;
+CALL public.retained_projection_grade_tick();
+DO $$ DECLARE r jsonb := (SELECT last_run FROM public.retained_projection_grading_state WHERE id);
+  g jsonb := public.retained_projection_verdict_gauge(); BEGIN
+  IF (r->>'sweep_rows')::int <> 30000 THEN RAISE EXCEPTION 'FAIL sweep sizing at 600 stale a minute: %', r; END IF;
+  RAISE NOTICE 'PASS sweep sized by miss rate: 600 stale/min -> % rows a run; gauge served share %', r->>'sweep_rows', g->>'served_from_verdict_share_est';
+END $$;
+-- The served share falls as verdicts wait stale: 11 stale over a 1-minute pass leaves 5.5 of 11 waiting on average.
+UPDATE public.retained_projection_grading_state SET last_pass_stale = 11, last_pass_minutes = 1, last_pass_rows = 11 WHERE id;
+DO $$ DECLARE g jsonb := public.retained_projection_verdict_gauge(); want numeric; BEGIN
+  want := round(least(11 / (g->>'projections_est')::numeric, 1) * 0.5, 4);
+  IF (g->>'served_from_verdict_share_est')::numeric IS DISTINCT FROM want OR (g->>'last_pass_miss_share')::numeric <> 1 THEN
+    RAISE EXCEPTION 'FAIL served share with stale verdicts: % (want %)', g, want; END IF;
+  RAISE NOTICE 'PASS served share with half the verdicts waiting stale: % (projections_est %)', want, g->>'projections_est';
+END $$;
+UPDATE public.retained_projection_grading_state SET last_pass_stale = 0, last_pass_minutes = 1 WHERE id;
+CALL public.retained_projection_grade_tick();
+DO $$ DECLARE r jsonb := (SELECT last_run FROM public.retained_projection_grading_state WHERE id); BEGIN
+  IF (r->>'sweep_rows')::int <> 1000 THEN RAISE EXCEPTION 'FAIL sweep floor at 0 stale: %', r; END IF;
+  RAISE NOTICE 'PASS sweep floor at 0 stale: % rows a run', r->>'sweep_rows';
 END $$;
 -- Counted: 1-8 and 10 (A and C public); not 9 (p ingested after graded_at: the clock rule), not 11 (car B private).
 SELECT pg_temp.check_e('after grading', 9);
