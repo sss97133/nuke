@@ -16,9 +16,10 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { authenticateWriter, requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { ADVANCEABLE_STATUSES, ensurePipelineMilestones, RECORDED_STATUS } from '../_shared/transferSeed.ts';
+import { decideTransferAccess, PARTY_ACTIONS, partyToken, scopeBodyToCaller, storableSignalMetadata } from './partyGate.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = projectSecretKey()!;
@@ -69,10 +70,25 @@ Deno.serve(async (req) => {
   const denied = await requireWriteAuth(req, { allowAnonymous: hasPartyToken, headers: corsHeaders });
   if (denied) return denied;
 
+  // Signed in is anyone while sign-up is open (2026-11-25): past the write guard, the caller's right to the named transfer
+  // is decided in partyGate.ts on the same parsed body the action then runs with.
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   try {
-    const body = await req.json();
+    const parsed = await req.json();
+    const privileged = (await requireAdminOrService(req, { headers: corsHeaders })) === null;
+    const writer = await authenticateWriter(req);
+    const callerUserId = writer.ok && writer.caller.kind === 'user' ? writer.caller.userId : null;
+    const access = await decideTransferAccess(parsed ?? {}, { privileged, userId: callerUserId }, async (id) => {
+      const { data } = await supabase
+        .from('ownership_transfers')
+        .select('from_user_id, to_user_id, buyer_access_token, seller_access_token')
+        .eq('id', id)
+        .maybeSingle();
+      return data ?? null;
+    });
+    if (!access.ok) return json({ error: access.error }, access.status);
+    const body = scopeBodyToCaller(parsed, access);
     const { action } = body;
 
     switch (action) {
@@ -212,7 +228,7 @@ async function ingestSignal(supabase: ReturnType<typeof createClient>, body: {
         received_at: signal_at ?? new Date().toISOString(),
         milestone_type_inferred: classified.milestone_type ?? null,
         ai_classification_confidence: classified.confidence ?? null,
-        raw_metadata: signal_metadata ?? null,
+        raw_metadata: storableSignalMetadata(signal_metadata),
       })
       .select('id')
       .single();
@@ -562,17 +578,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// A transfer party acting through the party page: one of the party actions, naming a transfer, with that transfer's buyer
-// or seller access token (top-level access_token, or signal_metadata.token as the page sends it for ingest_signal).
-const PARTY_ACTIONS = new Set(['ingest_signal', 'advance_manual', 'get_next_milestone']);
-
+/** Lets a party-page request with that transfer's access token past the write guard; partyGate decides the rest. */
 async function hasPartyToken(req: Request): Promise<boolean> {
   try {
     const body = await req.clone().json();
     if (!PARTY_ACTIONS.has(body?.action) || typeof body?.transfer_id !== 'string') return false;
-    const token = typeof body?.access_token === 'string'
-      ? body.access_token
-      : (typeof body?.signal_metadata?.token === 'string' ? body.signal_metadata.token : null);
+    const token = partyToken(body);
     if (!token) return false;
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const { data } = await admin
