@@ -50,6 +50,7 @@ import { RETAINED_IDENTITY_MODE, retainedIdentitySelector, ingestRetainedIdentit
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { HISTORICAL_ASK_MODE, HISTORICAL_ASK_PROFILE } from "./historicalAsks.ts";
 import { HISTORICAL_ASK_METHOD, historicalAskStore, ingestHistoricalAsk, HistoricalAskRefusal } from "./historicalAskIntake.ts";
+import { REPORTED_LABOR_MODE, REPORTED_LABOR_METHOD, ingestReportedLabor, ReportedLaborRefusal } from "./reportedLaborHours.ts";
 import { TITLE_FACET_KEYS, TITLE_FACET_METHOD, TITLE_FACET_MODE, titleFacetSelector, deriveTitleFacet } from "./titleFacets.ts";
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
@@ -465,6 +466,29 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     }
     if (input.extraction_method === HISTORICAL_ASK_METHOD || input.structured_data?.profile === HISTORICAL_ASK_PROFILE) {
       return new Response(JSON.stringify({ error: "Historical asking testimony requires its protected mode" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (input.mode === REPORTED_LABOR_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Reported labor intake requires service role", writes: 0 }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      try {
+        const rpc = (fn: string, args: Record<string, unknown>) => supabase.rpc(fn, args);
+        return new Response(JSON.stringify(await ingestReportedLabor(rpc, input as unknown as Record<string, unknown>)),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (error) {
+        if (!(error instanceof ReportedLaborRefusal)) throw error;
+        return new Response(JSON.stringify({ success: false, mode: REPORTED_LABOR_MODE, ...error.partial, error: error.message }),
+          { status: error.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+    if (input.extraction_method === REPORTED_LABOR_METHOD
+        || (input.structured_data as Record<string, unknown> | undefined)?.contract === REPORTED_LABOR_METHOD) {
+      return new Response(JSON.stringify({ error: "Reported labor statements require their protected mode", writes: 0 }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     retainedListingBudget = [RETAINED_LISTING_DRAIN_MODE, RETAINED_REPORTED_WORK_MODE, ...RETAINED_PROPERTY_MODES].includes(input.mode ?? "");
