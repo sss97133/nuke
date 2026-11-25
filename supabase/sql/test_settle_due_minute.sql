@@ -1,5 +1,5 @@
 -- Contract for 20261124195400_settle_due_minute (empty disposable PG17, cron.schedule stubbed). Asserts the job keeps its
--- command, gets minute 6, and a re-apply leaves one job.
+-- command behind a client_min_messages prefix, gets minute 6, and a re-apply leaves one job.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF to_regnamespace('cron') IS NOT NULL THEN RAISE EXCEPTION 'Requires an empty disposable database'; END IF;
@@ -19,6 +19,6 @@ CREATE TEMP TABLE c0 AS SELECT command FROM cron.job;
 DO $$ BEGIN
   ASSERT (SELECT count(*) FROM cron.job) = 1, 'one job';
   ASSERT (SELECT schedule FROM cron.job) = '6-59/10 * * * *', 'minute 6';
-  ASSERT (SELECT command FROM cron.job) = (SELECT command FROM c0), 'command unchanged';
+  ASSERT (SELECT command FROM cron.job) = 'SET client_min_messages = error; ' || (SELECT command FROM c0), 'same command, notices quiet';
 END $$;
 \echo settle_due_minute: ok
