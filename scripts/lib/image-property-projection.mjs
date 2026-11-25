@@ -277,7 +277,7 @@ async function applyImagePropertyClaimsLegacy(sb, claims, { runMs = 60000 } = {}
           row.data.source?.slug !== claim.source_slug || row.data.source_identifier !== claim.source_identifier ||
           row.data.extraction_method !== claim.extraction_method || row.data.agent_model !== claim.agent_model ||
           row.data.raw_source_ref !== claim.raw_source_ref ||
-          // the source reading as the typed key, not only inside structured_data (migration 20261125191500)
+          // the source reading as the typed key, not only inside structured_data (migration 20261125211500)
           row.data.source_observation_id !== claim.structured_data.source_observation_id ||
           eventTime === null || ingestTime === null || expectedEventTime === null ||
           eventTime !== expectedEventTime || ingestTime < eventTime ||
@@ -455,7 +455,7 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     const tail = result.data[result.data.length - 1];
     cursor = { at: tail.ingested_at, id: tail.id };
   }
-  // Rows this projection landed before its source reading became a typed key (migration 20261125191500) are re-landed by the
+  // Rows this projection landed before its source reading became a typed key (migration 20261125211500) are re-landed by the
   // database as successors carrying the key, the old row superseded by its successor. Vehicle walk only, after the walk.
   let typedSource = null;
   if (apply && !imageIds && !reason) {

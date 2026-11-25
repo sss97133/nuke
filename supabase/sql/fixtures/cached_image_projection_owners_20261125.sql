@@ -1,5 +1,5 @@
 -- Live definitions read 2026-11-25 01:30 PT (pg_get_functiondef, read-only) of the two owners migration
--- 20261125191500_cached_image_projection_source_key.sql patches by anchor. Loaded verbatim so the migration's hash guards
+-- 20261125211500_cached_image_projection_source_key.sql patches by anchor. Loaded verbatim so the migration's hash guards
 -- see what production holds. Used by supabase/sql/test_cached_image_projection_source_key.sql.
 CREATE OR REPLACE FUNCTION public.validate_retained_listing_property_source()
  RETURNS trigger

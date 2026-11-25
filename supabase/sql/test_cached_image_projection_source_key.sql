@@ -1,4 +1,4 @@
--- PG17 contract for 20261125191500_cached_image_projection_source_key.sql. EMPTY disposable dm_refinement_* database only.
+-- PG17 contract for 20261125211500_cached_image_projection_source_key.sql. EMPTY disposable dm_refinement_* database only.
 -- The two owners it patches are loaded from their live definitions (fixtures/cached_image_projection_owners_20261125.sql),
 -- so the migration's hash and anchor guards run against what production holds. All rows are made up.
 --   1. a projection row whose typed key names its current source reading lands; a forged, stale or mismatched one is refused
@@ -123,7 +123,7 @@ SELECT pg_temp.land('55555555-5555-4555-8555-000000000003','image_visible_paint_
 UPDATE public.vehicle_observations SET is_superseded=true, superseded_by='55555555-5555-4555-8555-000000000002'
  WHERE id='55555555-5555-4555-8555-000000000003';
 
-\ir ../migrations/20261125191500_cached_image_projection_source_key.sql
+\ir ../migrations/20261125211500_cached_image_projection_source_key.sql
 
 -- 1. the guard branch
 DO $$ DECLARE r uuid; BEGIN
