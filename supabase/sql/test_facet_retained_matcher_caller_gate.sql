@@ -34,10 +34,11 @@ CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean, deleted_at
 CREATE TABLE public.observation_sources (id uuid PRIMARY KEY, slug text UNIQUE, supported_observations public.observation_kind[]);
 CREATE TABLE public.observation_properties (id uuid PRIMARY KEY, property_key text, label text, data_type text, unit text,
   namespace text, applies_to_kinds public.observation_kind[], ratified_at timestamptz, deprecated_at timestamptz);
-CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY, vehicle_id uuid, observed_at timestamptz, ingested_at timestamptz,
-  source_id uuid, source_url text, source_identifier text, kind public.observation_kind, content_hash text, structured_data jsonb,
+CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles (id), observed_at timestamptz, ingested_at timestamptz,
+  source_id uuid REFERENCES public.observation_sources (id), source_url text, source_identifier text, kind public.observation_kind, content_hash text, structured_data jsonb,
   confidence_score numeric, is_superseded boolean DEFAULT false, extraction_method text, raw_source_ref text,
-  agent_cost_cents numeric, property_id uuid, subject_type text DEFAULT 'vehicle', subject_id uuid, source_observation_id uuid);
+  agent_cost_cents numeric, property_id uuid REFERENCES public.observation_properties (id), subject_type text DEFAULT 'vehicle', subject_id uuid,
+  source_observation_id uuid REFERENCES public.vehicle_observations (id));  -- the four foreign keys live has
 GRANT SELECT ON public.vehicles, public.observation_sources, public.observation_properties, public.vehicle_observations
   TO anon, authenticated;
 ALTER TABLE public.observation_sources ENABLE ROW LEVEL SECURITY;
