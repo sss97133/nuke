@@ -249,6 +249,19 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 
+-- gaps by amount (migration 20261124163400): the worklist orders by money; a line on two cars counts once.
+\i supabase/migrations/20261124163400_receipt_line_gaps_by_amount.sql
+UPDATE public.receipt_items SET total_price = 1 WHERE description <> 'wing mount';
+UPDATE public.receipt_items SET total_price = 500 WHERE description = 'wing mount';
+SELECT public.assert(term IN ('wing', 'mount') AND amount = 500, 'top term by amount: ' || term || ' ' || amount)
+  FROM (SELECT * FROM public.receipt_line_gap_terms LIMIT 1) t;
+INSERT INTO public.receipt_vehicle_links VALUES
+  ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a1', 'linked', NULL);
+SELECT public.assert(amount = 500 AND vehicles = 2, 'a line on two cars counts its amount once: ' || amount)
+  FROM public.receipt_line_gap_terms WHERE term = 'wing';
+DELETE FROM public.receipt_vehicle_links WHERE receipt_id = '00000000-0000-0000-0000-0000000000b2'
+   AND vehicle_id = '00000000-0000-0000-0000-0000000000a1';
+
 -- promote: the gate (migration 20261124163200).
 \i supabase/migrations/20261124163200_receipt_line_rule_promote.sql
 DELETE FROM public.receipt_line_rules WHERE rule_id = 'op.600.spoiler-vendor-two';
