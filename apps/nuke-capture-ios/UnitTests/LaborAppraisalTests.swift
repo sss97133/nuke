@@ -109,4 +109,35 @@ final class LaborAppraisalTests: XCTestCase {
         ProfileClock.timeZone = TimeZone(identifier: "UTC")!
         XCTAssertEqual(LaborWords.coverage(a), "4 of 5 segments with hours · Nov 25, 2026")
     }
+
+    private func decode(_ j: String) throws -> LaborAppraisal { try JSONDecoder().decode(LaborAppraisal.self, from: Data(j.utf8)) }
+
+    func testStoredFoldStateNeverPrintsStaleHoursAsCurrent() throws {
+        let zone = ProfileClock.timeZone
+        defer { ProfileClock.timeZone = zone }
+        ProfileClock.timeZone = TimeZone(identifier: "UTC")!
+        let notYet = try decode(#"{"vehicle_id":"v","status":"not_yet_computed","segments":[],"state":{"fresh":false,"computed":false,"error":null}}"#)
+        XCTAssertTrue(LaborWords.noReadYet(notYet))
+        XCTAssertEqual(LaborWords.foldState(notYet), "No hours yet: not yet computed")
+        let recomputing = try decode(#"{"vehicle_id":"v","status":"recomputing","segments":[]}"#)
+        XCTAssertTrue(LaborWords.noReadYet(recomputing))
+        XCTAssertNil(LaborWords.foldState(recomputing))
+
+        var stale = try appraisal()
+        stale.state = .init(fresh: false, computed: true, computed_at: "2026-11-25T18:00:00.123456+00:00", key_current: true)
+        XCTAssertFalse(LaborWords.noReadYet(stale))
+        XCTAssertEqual(LaborWords.foldState(stale), "As of Nov 25, 2026, recomputing")
+        stale.state?.label = "recomputing after new evidence"
+        XCTAssertEqual(LaborWords.foldState(stale), "As of Nov 25, 2026, recomputing after new evidence")
+        var fresh = try appraisal()
+        fresh.state = .init(fresh: true, computed: true, computed_at: "2026-11-25T18:00:00+00:00")
+        XCTAssertNil(LaborWords.foldState(fresh))
+        XCTAssertNil(LaborWords.foldState(try appraisal()))
+    }
+
+    func testBasisInTheReadersWordsElseTheKey() {
+        let names = LaborNames(bases: ["uncited_seed": .init(label: "book estimate, no cited source")])
+        XCTAssertEqual(LaborWords.basisWords("uncited_seed", names), "book estimate, no cited source")
+        XCTAssertEqual(LaborWords.basisWords("shop_paper", names), "shop paper")
+    }
 }

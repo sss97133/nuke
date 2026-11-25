@@ -94,6 +94,9 @@ struct LaborAppraisal: Decodable, Equatable {
         var hours_typical: Double?
         var hours_max: Double?
         var by_grade: [String: LaborRange]?
+        /// The reader's sums by where the book hours come from (labor_hours_bases key), beside by_grade.
+        var by_basis: [String: LaborRange]?
+        var uncited_segments: Int?
         var witnessed: WitnessedTotal?
         /// with_unwitnessed is the renamed with_unwitnessed_purchases (an alias for one release).
         var with_unwitnessed: LaborRange?
@@ -109,13 +112,33 @@ struct LaborAppraisal: Decodable, Equatable {
     var totals: Totals?
     /// The keys' words, read from their own rows (20261125073000).
     var names: LaborNames?
+    /// "not_yet_computed" (or "recomputing") with no segments: the stored fold has no read for this car yet.
+    var status: String?
+    /// The stored fold's state (20261125153000). Absent when the read was computed at read time.
+    var state: FoldState?
+
+    struct FoldState: Decodable, Equatable {
+        /// true: the hours are current. false with computed true: the last good read, served while the fold recomputes.
+        var fresh: Bool?
+        var computed: Bool?
+        var computed_at: String?
+        var evidence_changed_at: String?
+        var key_current: Bool?
+        var queued: Bool?
+        var error: String?
+        /// The reader's own words for the state, when it sends them.
+        var label: String?
+    }
 }
 
 struct LaborNames: Decodable, Equatable {
     struct Transition: Decodable, Equatable { var label: String? }
     struct Operation: Decodable, Equatable { var name: String? }
+    struct Basis: Decodable, Equatable { var label: String?; var meaning: String?; var rank: Int? }
     var transitions: [String: Transition]?
     var operations: [String: Operation]?
+    /// labor_hours_bases rows by basis_key: the reader's words for each basis.
+    var bases: [String: Basis]?
 }
 
 /// The web renderer's words (LaborAppraisal.tsx), ported one function to one function.
@@ -242,7 +265,7 @@ enum LaborWords {
         let known = [
             s.evidence_grade.map { "Evidence: \(ItemText.codeText($0))" } ?? "Ungraded by the reader",
             s.counts_in == "unwitnessed" || s.counts_in == "unwitnessed_purchase" ? "counted with work not witnessed" : nil,
-            s.hours_basis.map { "hours from \(ItemText.codeText($0))" },
+            s.hours_basis.map { "hours from \(basisWords($0, names))" },
             s.paper_hours.map { "\(h($0)!) on shop paper" },
             range(s.book_hours).map { "book range \($0)" },
             s.hours_counted_elsewhere.map { "\(h($0)!) counted in other segments" },
@@ -256,6 +279,27 @@ enum LaborWords {
         if let m = s.reassembly?.matched, !m.isEmpty { out.append(parts("Fitted parts with a book operation", m, names)) }
         if let u = s.reassembly?.unmatched, !u.isEmpty { out.append(parts("Fitted parts without a book operation", u, names)) }
         return out
+    }
+
+    /// A basis key in the reader's words (names.bases), else the key itself.
+    static func basisWords(_ key: String, _ names: LaborNames? = nil) -> String {
+        names?.bases?[key]?.label.flatMap { $0.isEmpty ? nil : $0 } ?? ItemText.codeText(key)
+    }
+
+    /// The stored fold's state in one line, or nil when the hours are current (or the read was computed at read time).
+    /// Hours that are not fresh are never shown as current: "As of Nov 25, 2026, recomputing".
+    static func foldState(_ a: LaborAppraisal) -> String? {
+        guard let st = a.state else { return nil }
+        let label = st.label.flatMap { $0.isEmpty ? nil : $0 }
+        if st.computed != true || a.status == "not_yet_computed" { return label ?? "No hours yet: not yet computed" }
+        if st.fresh == true { return nil }
+        return [ProfileClock.day(st.computed_at ?? a.as_of).map { "As of \($0)" }, label ?? "recomputing"]
+            .compactMap { $0 }.joined(separator: ", ")
+    }
+
+    /// No stored read yet: the reader returned no segments and says so in its status.
+    static func noReadYet(_ a: LaborAppraisal) -> Bool {
+        (a.status == "not_yet_computed" || a.status == "recomputing") && a.segments.isEmpty
     }
 
     /// The coverage line, as the kit's CoverageView prints it.
@@ -317,16 +361,31 @@ struct LaborAppraisalContent: View {
     private var priced: [LaborSegment] { appraisal.segments.filter { $0.hours_typical != nil } }
 
     var body: some View {
-        if appraisal.applicable == true, appraisal.totals?.priced_segments == 0, !appraisal.segments.isEmpty {
-            section { caption("Not appraised: the reader has no segment with hours for this car yet.") }
+        if LaborWords.noReadYet(appraisal) {
+            // A status line like the loading one, not a section: the reader returned no segments to count.
+            Text("Labor appraisal: " + (LaborWords.foldState(appraisal) ?? "No hours yet: recomputing"))
+                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
+                .accessibilityIdentifier("labor-state")
+        } else if appraisal.applicable == true, appraisal.totals?.priced_segments == 0, !appraisal.segments.isEmpty {
+            section {
+                stateLine
+                caption("Not appraised: the reader has no segment with hours for this car yet.")
+            }
         } else if appraisal.applicable == true, !priced.isEmpty {
             section {
+                stateLine
                 caption("Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.")
                 if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed ?? totals.with_unwitnessed_purchases) {
                     Text("Hours, two totals side by side").font(.caption.weight(.semibold)).padding(.top, 4)
                     row("Witnessed", (LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
                         + LaborWords.witnessedUnknown(totals.witnessed))
                     row("With work not witnessed", with)
+                }
+                if let byBasis = appraisal.totals?.by_basis, !byBasis.isEmpty {
+                    Text("Hours by basis").font(.caption.weight(.semibold)).padding(.top, 4)
+                    ForEach(byBasis.keys.sorted(), id: \.self) { basis in
+                        row(LaborWords.basisWords(basis, appraisal.names), LaborWords.range(byBasis[basis]) ?? "No hours")
+                    }
                 }
                 if let byGrade = appraisal.totals?.by_grade, !byGrade.isEmpty {
                     Text("Hours by evidence grade").font(.caption.weight(.semibold)).padding(.top, 4)
@@ -363,6 +422,10 @@ struct LaborAppraisalContent: View {
             content()
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
+    }
+
+    @ViewBuilder private var stateLine: some View {
+        if let line = LaborWords.foldState(appraisal) { caption(line).accessibilityIdentifier("labor-state") }
     }
 
     private func caption(_ s: String) -> some View {
