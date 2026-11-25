@@ -7,11 +7,15 @@ import { bounded } from '../../../services/accountingCloseout';
 export interface LaborPart {
   item_id: string; hours: number | null; operation_code?: string | null; system?: string | null; counted_in?: string | null;
   reason?: string | null; description?: string | null; name?: string | null; day?: string | null;
+  /** The catalog part the piece resolves to (catalog_parts key). Absent when the piece has no catalog row. */
+  part?: { catalog_part_id: string; name: string | null } | null;
+  /** fitted | not_fitted | unwitnessed; an unwitnessed piece carries the state of its fitted question. */
+  witness?: string | null; question_state?: string | null;
 }
 export interface LaborStageStep {
   from_stage?: string | null; to_stage?: string | null; zone?: string | null; status?: string | null; photo_phase?: string | null;
   images?: number | null; hours_min?: number | null; hours_typical?: number | null; hours_max?: number | null;
-  panel_count?: number | null; mode?: string | null;
+  panel_count?: number | null; mode?: string | null; pieces?: LaborPart[] | null;
 }
 export interface LaborRange { hours_min: number | null; hours_typical: number | null; hours_max: number | null }
 /** One segment of vehicle_labor_appraisal, as the reader returns it. */
@@ -20,13 +24,22 @@ export interface LaborSegment extends LaborRange {
   hours_basis?: string | null; paper_hours?: number | null; book_hours?: LaborRange | null; range_below_paper?: boolean | null;
   evidence_grade?: string | null; evidence_count?: number | null; stage_steps?: LaborStageStep[] | null;
   hours_counted_elsewhere?: number | null; fitted_parts?: number | null;
+  /** witnessed | unwitnessed_purchase: which of the reader's two totals this segment's hours belong to. */
+  counts_in?: string | null; counted_in?: string | null;
+  witnessed_hours_min?: number | null; witnessed_hours_typical?: number | null; witnessed_hours_max?: number | null;
+  witness_share?: { pieces?: LaborPart[] | null } | null;
   reassembly?: { matched?: LaborPart[]; unmatched?: LaborPart[]; matched_count?: number; unmatched_count?: number } | null;
 }
 export interface LaborAppraisal {
   vehicle_id: string; as_of: string | null; logic_version: string | null; applicable: boolean;
   segments: LaborSegment[];
   /** The reader's per-grade sums. The blended totals beside them are never printed. */
-  totals: (LaborRange & { by_grade?: Record<string, LaborRange> | null }) | null;
+  totals: (LaborRange & {
+    by_grade?: Record<string, LaborRange> | null;
+    /** The reader's two totals, side by side: hours witnessed, and hours including purchases not seen fitted. */
+    witnessed?: LaborRange | null; with_unwitnessed_purchases?: LaborRange | null;
+    priced_segments?: number | null; unwitnessed_purchase_segments?: number | null; rule?: string | null;
+  }) | null;
 }
 
 /** The labor appraisal by segment, computed by the database. No arithmetic happens here. */
