@@ -1,7 +1,7 @@
 /** A bounded read of the existing image ledger, shared by the profile and field drill. */
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
-import { vehicleImageGallerySource } from '../../../lib/vehicleImageColumns';
+import { vehicleImageGallerySource, splitScanReadingColumns, withScanReadings } from '../../../lib/vehicleImageColumns';
 import { FIELD_TOKEN, facetImageCitations, type FacetImageCitation } from './facetImageCitations';
 
 export interface EvidenceImage {
@@ -166,21 +166,29 @@ export function useVehicleImageEvidence(vehicleId: string | undefined, field?: s
       const timeout = setTimeout(abort, 12_000);
       try {
         const gallerySource = await vehicleImageGallerySource();
+        const drillTerms = areas.length ? FIELD_TERMS[field!] || [] : [];
+        // Signed out, the view redacts the reading for every photo of the car below the sort; read the page without it,
+        // then the readings of exactly its rows. A drill that filters on the reading redacts each candidate anyway (the
+        // view's one call a row serves its filter and its columns), so it stays one read.
+        const scan = (gallerySource as string) === 'vehicle_images_public' && drillTerms.length === 0 ? splitScanReadingColumns(SELECT) : null;
         let query = supabase.from(gallerySource)
-          .select(SELECT, { count: 'exact' }).eq('vehicle_id', vehicleId!)
+          .select(scan ? scan.page : SELECT, { count: 'exact' }).eq('vehicle_id', vehicleId!)
           .eq('vehicle_image_gallery_eligible', true)
           .not('is_sensitive', 'is', true).not('is_duplicate', 'is', true)
           .not('is_superseded', 'is', true).is('superseded_by', null).not('image_url', 'is', null)
           .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")');
         if (areas.length) query = query.not('is_document', 'is', true).or([
           ...areas.map(area => `vehicle_zone.like.${area}*`),
-          ...(FIELD_TERMS[field!] || []).flatMap(term => [`caption.ilike.*${term}*`, `ai_scan_metadata->byok_deep_analysis->>narrative_one_line.ilike.*${term}*`, `ai_scan_metadata->byok_deep_analysis->>components_seen.ilike.*${term}*`]),
+          ...drillTerms.flatMap(term => [`caption.ilike.*${term}*`, `ai_scan_metadata->byok_deep_analysis->>narrative_one_line.ilike.*${term}*`, `ai_scan_metadata->byok_deep_analysis->>components_seen.ilike.*${term}*`]),
         ].join(','));
         const { data, count, error } = await query
           .order('is_primary', { ascending: false }).order(areas.length ? 'taken_at' : 'created_at', { ascending: !areas.length, nullsFirst: false })
           .limit(CAP).abortSignal(controller.signal);
         if (error) throw error;
-        const images = ((data || []) as EvidenceImage[]).filter(image => webSourceUrl(image.image_url))
+        const rows = (data || []) as unknown as EvidenceImage[];
+        const read = scan ? await withScanReadings(rows, scan.readings, { signal: controller.signal }) : null;
+        if (read?.error) throw read.error;
+        const images = (read?.data ?? rows).filter(image => webSourceUrl(image.image_url))
           .map(image => ({ ...image, thumbnail_url: webSourceUrl(image.thumbnail_url), medium_url: webSourceUrl(image.medium_url) }));
         return { images, total: count, complete: count !== null && images.length >= count, readAt: new Date().toISOString() };
       } finally {
