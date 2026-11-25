@@ -426,7 +426,8 @@ function resolveTarget(target, reference, year) {
     if (!row) return { type: target.type, code: target.code, state: 'code_absent_from_reference' };
     const min = row.model_year_min, max = row.model_year_max;
     return { type: target.type, code: row.code, name: row.name, system: row.system, state: 'resolved',
-      hours: { min: null, typical: Number(row.base_hours), max: null }, range_basis: 'single_book_value_no_range',
+      hours: { min: null, typical: row.base_hours == null ? null : Number(row.base_hours), max: null },
+      range_basis: row.base_hours == null ? 'no_book_hours' : 'single_book_value_no_range',
       materials: null, method: 'labor_operations.base_hours', label: 'seed_uncalibrated',
       year_applicability: min == null && max == null ? 'unstated' : !Number.isInteger(year) ? 'vehicle_year_unknown'
         : (min == null || year >= min) && (max == null || year <= max) ? 'in_range' : 'out_of_range' };

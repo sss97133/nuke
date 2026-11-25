@@ -296,4 +296,25 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 
+-- unpriced keys (migration 20261124163300): an operation may have no book hours only when it says why.
+\i supabase/migrations/20261124163300_labor_operations_unpriced_keys.sql
+SELECT public.assert(count(*) = 14 AND bool_and(base_hours IS NULL), 'unpriced keys: ' || count(*))
+  FROM public.labor_operations WHERE notes LIKE 'Classification key added 2026-11-24%';
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO public.labor_operations (code, base_hours) VALUES ('X-NO-REASON', NULL);
+    RAISE EXCEPTION 'FAIL: NULL hours without a reason accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END $$;
+-- A rule can key a fitted piece to an unpriced operation through the gate; the fold calls it operation_no_hours.
+INSERT INTO public.receipt_items (id, receipt_id, description) VALUES
+  ('00000000-0000-0000-0000-000000000c10', '00000000-0000-0000-0000-0000000000b1', 'hood decal');
+SELECT public.assert(gap = 'no_operation', 'decal before') FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-000000000c10';
+SELECT public.assert(m->>'decision' = 'promoted', 'decal rule: ' || m::text)
+  FROM public.receipt_line_rule_propose('op.800.decals', 'labor_operation', 800, '\ydecal\y', 'TRIM-DECALS', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-000000000c10']::uuid[], p_scope_make => 'Pontiac') m;
+SELECT public.assert(gap = 'operation_no_hours' AND operation_code = 'TRIM-DECALS' AND base_hours IS NULL, 'decal after')
+  FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-000000000c10';
+
 \echo 'test_receipt_line_rules: PASS'
