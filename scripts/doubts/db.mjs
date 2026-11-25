@@ -14,6 +14,12 @@ export function client(env = process.env) {
     }
   };
   const rpc = (fn, body) => req(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(body) });
-  return { req, rpc };
+  // An edge function call (a sanctioned writer): { ok, status, json }; a 4xx is returned, not thrown, so a refusal is counted.
+  const fn = async (name, body) => {
+    const res = await fetch(`${url}/functions/v1/${name}`, { method: 'POST', headers: h, body: JSON.stringify(body), signal: AbortSignal.timeout(60000) });
+    const t = await res.text(); let json = null; try { json = t ? JSON.parse(t) : null; } catch { json = null; }
+    return { ok: res.ok, status: res.status, json };
+  };
+  return { req, rpc, fn };
 }
 export const arg = (argv, n, d) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : d; };

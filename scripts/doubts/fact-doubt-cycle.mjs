@@ -7,10 +7,13 @@
 //   2. answer: answer-fact-doubts.mjs's main, department-wide (--all-vehicles), up to --answer-limit pending doubts, on the
 //      subscription reader (`claude -p`, no key). Each blind task is built from its own question row, so answering across
 //      vehicles reads nothing of another question.
-// Writes only through the two scripts' writers (raise_evidence_judgment, retire_evidence_judgment, claim_evidence_judgments,
-// answer_evidence_judgment). Prints one JSON summary line (counts and ids only, never a value or a reader's words).
+//   3. land: land-fact-doubt-readings.mjs's main posts every answered value doubt not yet landed (this fire's and any
+//      earlier one's) to ingest-observation as a keyed reading with its photo as witness (fact_doubt_reread_v1). The fact
+//      reader then counts it as one more reader: a second lineage establishes, a different value is a conflict.
+// Writes only through the scripts' writers (raise_evidence_judgment, retire_evidence_judgment, claim_evidence_judgments,
+// answer_evidence_judgment, ingest-observation). Prints one JSON summary line (counts and ids only, never a value or a reader's words).
 //   dotenvx run -q -f ~/nuke/.env -- node scripts/doubts/fact-doubt-cycle.mjs --owner <uuid> [--vehicles 3]
-//        [--answer-limit 6] [--window-hours 24] [--out file.json] [--dry-run]
+//        [--answer-limit 6] [--land-limit 50] [--window-hours 24] [--out file.json] [--dry-run]
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -18,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { client, arg } from './db.mjs';
 import { main as raiseMain } from './raise-fact-doubts.mjs';
 import { main as answerMain } from './answer-fact-doubts.mjs';
+import { main as landMain } from './land-fact-doubt-readings.mjs';
 
 const UUID36 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -40,14 +44,18 @@ export function pickVehicles({ recent, all, cursor, n }) {
 export async function main(argv = process.argv.slice(2), env = process.env, deps = {}) {
   const owner = arg(argv, '--owner'); const n = Number(arg(argv, '--vehicles', 3));
   const answerLimit = Number(arg(argv, '--answer-limit', 6)); const windowHours = Number(arg(argv, '--window-hours', 24));
+  const landLimit = Number(arg(argv, '--land-limit', 50));
   const dry = argv.includes('--dry-run'); const out = arg(argv, '--out');
   if (!UUID36.test(owner ?? '')) throw new Error('--owner <uuid> required');
-  if (!(n >= 0 && n <= 20) || !(answerLimit >= 0 && answerLimit <= 50)) throw new Error('--vehicles 0..20, --answer-limit 0..50');
+  if (!(n >= 0 && n <= 20) || !(answerLimit >= 0 && answerLimit <= 50) || !(landLimit >= 0 && landLimit <= 200)) {
+    throw new Error('--vehicles 0..20, --answer-limit 0..50, --land-limit 0..200');
+  }
   const db = deps.db ?? client(env);
-  const raise = deps.raise ?? raiseMain; const answer = deps.answer ?? answerMain;
+  const raise = deps.raise ?? raiseMain; const answer = deps.answer ?? answerMain; const land = deps.land ?? landMain;
   const cursorFile = deps.cursorFile ?? join(homedir(), 'nuke', 'logs', '.fact-doubt-cursor');
   const summary = { cli: 'fact-doubt-cycle', dry_run: dry, vehicles: [], raised: 0, existing: 0, retired: 0, skipped_no_frames: 0,
-    answered: 0, answered_value: 0, failed: 0, pending_before: 0, errors: 0, error_classes: {}, stopped: null };
+    answered: 0, answered_value: 0, failed: 0, pending_before: 0, landed: 0, land_duplicate: 0, land_refused: 0, land_failed: 0,
+    errors: 0, error_classes: {}, stopped: null };
   const err = (cls) => { summary.errors++; summary.error_classes[cls] = (summary.error_classes[cls] ?? 0) + 1; };
 
   // 1. raise
@@ -93,8 +101,17 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
       summary.read = summary.answered;
     } catch (e) { err('answer'); summary.stopped = String(e.message).slice(0, 120); }
   }
+  // 3. land readable answers as keyed readings (ingest-observation)
+  if (landLimit > 0) {
+    try {
+      const l = await land(['--limit', String(landLimit), ...(dry ? ['--dry-run'] : [])], env);
+      summary.landed = l.landed; summary.land_duplicate = l.duplicate; summary.land_refused = l.refused; summary.land_failed = l.failed;
+      for (const [cls, k] of Object.entries(l.refusal_classes ?? {})) summary.error_classes[`land ${cls}`] = (summary.error_classes[`land ${cls}`] ?? 0) + k;
+      if (l.failed) err('land');
+    } catch { err('land'); }
+  }
   // a receipt file only when the fire did something (the wrapper keeps no empty files)
-  const did = summary.raised + summary.retired + summary.answered + summary.failed + summary.errors > 0;
+  const did = summary.raised + summary.retired + summary.answered + summary.failed + summary.landed + summary.land_refused + summary.errors > 0;
   if (out && did) { try { writeFileSync(out, JSON.stringify(summary)); } catch { err('out'); } }
   return summary;
 }
