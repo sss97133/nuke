@@ -47,14 +47,26 @@ const ALLOWLIST = {
   "universal-search": "public read; its one write (register_make_model_subject) is idempotent and bounded to canonical make/model/year",
 };
 
-// Functions that write with the service client on ids or text the caller supplies, and so must refuse an ordinary
-// signed-in caller too (sign-up is open with email auto-confirmed, so "signed in" is anyone): each must call
-// requireOwnerOrService, requireAdminOrService or isServiceCaller before it reads the request body.
-// Say which rows a stranger could otherwise write.
-const SERVICE_SCOPED = {
-  "deal-jacket-pipeline": "moves a caller-named vehicle_images row onto a car picked from caller text, creates cars, overwrites vehicles.vin/mileage/sale_price/origin_metadata, runs paid extraction (2026-11-25)",
-  "forensic-deal-jacket": "stores extractions on a caller-named image and writes vehicles.origin_metadata; runs paid AI (2026-09-29)",
-};
+// Caller classes (scripts/guardrails/edge-caller-classes.json). requireWriteAuth admits anyone signed in, and sign-up
+// is open with email auto-confirmed, so every function that passes it and then writes with the service client needs
+// one row saying who may call it:
+//   service    the service key or an active admin (or the company owner): the function calls requireAdminOrService,
+//              requireOwnerOrService or isServiceCaller as a top-level statement before it reads the body.
+//   self       an end user calls it and every write is keyed to the caller's own verified id; the row says how.
+//   row_owner  an end user calls it on ids it names (vehicle_id, image_id, organization_id ...); the row names the id
+//              (owns). Until it calls a requireCallerCan* ownership helper the row stays status "open", and the
+//              number of open rows may only shrink (open_ceiling).
+//   public     deliberately callable by anyone signed in, with bounded writes; the row says why.
+// CHECK_WRITE_GUARD_MANIFEST points at a fixture manifest (check-write-guard.test.mjs); production never sets it.
+const MANIFEST_PATH = process.env.CHECK_WRITE_GUARD_MANIFEST || path.join(REPO, "scripts/guardrails/edge-caller-classes.json");
+const MANIFEST = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+const CLASSES = new Set(["service", "self", "row_owner", "public"]);
+const OWNER_HELPER = /\brequireCallerCan[A-Z]\w*\(/;
+const SERVICE_CLIENT = /projectSecretKey\(|SERVICE_ROLE_KEY/;
+function fnSources(fn) {
+  return readdirSync(path.join(FN_DIR, fn)).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+    .map((f) => readFileSync(path.join(FN_DIR, fn, f), "utf8"));
+}
 // The gate: a statement of its own that returns its refusal (requireOwnerOrService / requireAdminOrService into a
 // const, then `if (x) return`; or `if (!(await isServiceCaller(req))) return`). Group 1 is its indent.
 const STRONG_GATE = /^( *)(?:(?:const|let) (\w+) = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b[^;]*;\s*if \(\2\) return\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b[^\n]*\)\)\s*(?:return\b|\{\s*return\b))/gm;
@@ -205,8 +217,31 @@ while (changed) {
 const writers = [...info].filter(([, i]) => i.reasons.length);
 const unguarded = writers.filter(([fn, i]) => !i.guarded && !(fn in ALLOWLIST));
 const preflightRuns = [...info].filter(([, i]) => i.usesGuard && i.preflight);
-const scopedOpen = Object.keys(SERVICE_SCOPED).filter((fn) => info.has(fn) && !gatedBeforeBody(fn));
-const scopedStale = Object.keys(SERVICE_SCOPED).filter((fn) => !info.has(fn));
+// Every guarded writer that builds a service client needs a caller class.
+const rows = MANIFEST.functions ?? {};
+const serviceWriters = writers.filter(([fn, i]) => i.guarded && fnSources(fn).some((src) => SERVICE_CLIENT.test(src))).map(([fn]) => fn);
+const classProblems = [];
+for (const fn of serviceWriters) {
+  const row = rows[fn];
+  if (!row) { classProblems.push(`${fn}: no caller class (add a row to edge-caller-classes.json)`); continue; }
+  if (!CLASSES.has(row.class)) { classProblems.push(`${fn}: unknown class '${row.class}'`); continue; }
+  if (!String(row.reason ?? "").trim()) classProblems.push(`${fn}: class ${row.class} needs a reason`);
+  if (row.class === "service" && !gatedBeforeBody(fn)) {
+    classProblems.push(`${fn}: class service, but no requireAdminOrService / requireOwnerOrService / isServiceCaller before the body is read`);
+  }
+  if (row.class === "row_owner") {
+    if (!String(row.owns ?? "").trim()) classProblems.push(`${fn}: class row_owner must name the id it owns (owns)`);
+    if (row.status !== "open" && !fnSources(fn).some((src) => OWNER_HELPER.test(src))) {
+      classProblems.push(`${fn}: class row_owner is not open, but calls no requireCallerCan* ownership helper`);
+    }
+  }
+}
+const openRows = Object.entries(rows).filter(([, r]) => r.class === "row_owner" && r.status === "open").map(([fn]) => fn);
+if (openRows.length > (MANIFEST.open_ceiling ?? 0)) {
+  classProblems.push(`${openRows.length} open row_owner rows exceed open_ceiling ${MANIFEST.open_ceiling ?? 0}: the open list may only shrink`);
+}
+// A rename would otherwise drop a function out of the check without anyone noticing.
+const scopedStale = Object.keys(rows).filter((fn) => !info.has(fn));
 const stale = Object.keys(ALLOWLIST).filter((fn) => !info.has(fn));
 const idle = Object.keys(ALLOWLIST).filter((fn) => info.has(fn) && !info.get(fn).reasons.length);
 
@@ -226,13 +261,12 @@ console.log(
 for (const fn of stale) console.log(`  note: allowlist entry '${fn}' has no function directory (stale)`);
 for (const fn of idle) console.log(`  note: allowlist entry '${fn}' no longer writes (drop it)`);
 if (scopedStale.length) {
-  // A rename would otherwise drop the function out of the check without anyone noticing.
-  console.error(`\n✗ service-scoped entr${scopedStale.length === 1 ? "y has" : "ies have"} no function directory: ${scopedStale.join(", ")} (rename the entry with the function)`);
+  console.error(`\n✗ caller-class entr${scopedStale.length === 1 ? "y has" : "ies have"} no function directory: ${scopedStale.join(", ")} (rename the entry with the function)`);
 }
-if (scopedOpen.length) {
-  console.error(`\n✗ ${scopedOpen.length} service-scoped function(s) admit any signed-in caller:`);
-  for (const fn of scopedOpen) console.error(`  ${fn}  (${SERVICE_SCOPED[fn]})`);
-  console.error("\nRight after requireWriteAuth, before the body is read, add\n`const notOwner = await requireOwnerOrService(req); if (notOwner) return notOwner;`\n(or requireAdminOrService / isServiceCaller), as forensic-deal-jacket does.");
+if (classProblems.length) {
+  console.error(`\n✗ ${classProblems.length} caller-class problem(s) (scripts/guardrails/edge-caller-classes.json):`);
+  for (const p of classProblems) console.error(`  ${p}`);
+  console.error("\nA service-class function adds, right after requireWriteAuth and before the body is read:\n`const notAdmin = await requireAdminOrService(req); if (notAdmin) return notAdmin;`");
 }
 if (preflightRuns.length) {
   console.error(`\n✗ ${preflightRuns.length} guarded function(s) run their handler for an anonymous OPTIONS request:`);
@@ -244,5 +278,5 @@ if (unguarded.length) {
   for (const [fn, i] of unguarded) console.error(`  ${fn}  (${i.reasons.join("; ")})`);
   console.error("\nAdd `const denied = await requireWriteAuth(req); if (denied) return denied;` as the first statement of the handler\n(import from ../_shared/writeGuard.ts), or allowlist it in scripts/guardrails/check-write-guard.mjs with the auth that refuses anonymous callers.");
 }
-if (unguarded.length || preflightRuns.length || scopedOpen.length || scopedStale.length) process.exit(1);
-console.log("✓ every writing function refuses anonymous callers");
+if (unguarded.length || preflightRuns.length || classProblems.length || scopedStale.length) process.exit(1);
+console.log(`✓ every writing function refuses anonymous callers; ${serviceWriters.length} service-client writers classed (${openRows.length} row_owner open)`);

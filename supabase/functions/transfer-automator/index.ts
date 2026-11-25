@@ -15,7 +15,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import {
   buildMilestones,
@@ -39,6 +39,9 @@ Deno.serve(async (req) => {
   // transfer for any vehicle (seed_from_listing) and run the staleness sweep over every milestone.
   const denied = await requireWriteAuth(req, { allowAnonymous: isAuctionSeed, headers: corsHeaders });
   if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req, { allowAnonymous: isAuctionSeed, headers: corsHeaders });
+  if (notAdmin) return notAdmin;
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
