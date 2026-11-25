@@ -62,9 +62,17 @@ BEGIN
 
   -- accepts, one per source
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q);
-  PERFORM pg_temp.ok('description accepted, thousands separator read, listing text is the seller: ' || r::text, (r->>'ok')::boolean
-    AND r->>'page_vehicle_id' = v1::text AND r->>'contract' = 'reported_labor_hours_v1' AND r->>'speaker_role' = 'owner_seller'
-    AND NOT (r ? 'source_vehicle_id') AND NOT (r ? 'subject_vehicle_id'));
+  PERFORM pg_temp.ok('description: thousands separator read; no author column, so speaker unknown and it waits: ' || r::text,
+    r->'reasons' = '["speaker_role_unratified"]'::jsonb
+    AND r->>'page_vehicle_id' = v1::text AND r->>'contract' = 'reported_labor_hours_v1' AND r->>'speaker_role' = 'unknown'
+    AND r->>'speaker_role_read' = 'owner_seller' AND NOT (r ? 'source_vehicle_id') AND NOT (r ? 'subject_vehicle_id'));
+  -- a trimmed quote cannot cut a figure out of its number or range, or a time phrase down to its hours
+  r := public.reported_labor_statement_check('vehicles', v1, '200 hours into the body and paint over four years', 200, NULL, ok_q);
+  PERFORM pg_temp.ok('quote trimmed inside 1,200 refused: ' || r::text, r->'reasons' ? 'figure_term_cut' AND r->'reasons' ? 'low_not_at_term');
+  r := public.reported_labor_statement_check('build_posts', bp, '60 hrs of my own time', 60, NULL, task_q);
+  PERFORM pg_temp.ok('quote trimmed inside 40-60 hrs refused: ' || r::text, r->'reasons' ? 'figure_term_cut');
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000003', '2 hours, good luck to all', 2, NULL, ok_q);
+  PERFORM pg_temp.ok('quote trimmed past ends in refused: ' || r::text, r->'reasons' ? 'quote_time_phrase');
   r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, task_q);
   PERFORM pg_temp.ok('build post range accepted, page car through the thread, thread author is owner_seller: ' || r::text,
     (r->>'ok')::boolean AND r->>'page_vehicle_id' = v1::text AND r->>'speaker_role' = 'owner_seller');
@@ -147,8 +155,10 @@ BEGIN
   PERFORM pg_temp.ok('a key ratified before still admits once its proposal is superseded by a ratified one: ' || r::text, (r->>'ok')::boolean);
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL, ok_q);
   PERFORM pg_temp.ok('after ratification speaker unknown admits: ' || r::text, (r->>'ok')::boolean AND r->>'speaker_role' = 'unknown');
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, task_q);
+  PERFORM pg_temp.ok('owner_seller still admits after its proposal is superseded: ' || r::text, (r->>'ok')::boolean AND r->>'speaker_role' = 'owner_seller');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q);
-  PERFORM pg_temp.ok('owner_seller still admits after its proposal is superseded: ' || r::text, (r->>'ok')::boolean);
+  PERFORM pg_temp.ok('after ratification a description admits as unknown: ' || r::text, (r->>'ok')::boolean AND r->>'speaker_role' = 'unknown');
   UPDATE public.schema_proposals p SET status = 'open'
     FROM public.observation_properties o
    WHERE o.property_key IN ('labor_system_key', 'labor_speaker_role') AND p.proposal_type = 'modify_property'
@@ -170,8 +180,17 @@ BEGIN
   PERFORM pg_temp.ok('unknown qualifier key refused', r->'reasons' ? 'qualifier_unknown:labor_mood');
   r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q - 'labor_statement_kind');
   PERFORM pg_temp.ok('missing statement kind refused', r->'reasons' ? 'qualifier_missing:labor_statement_kind');
-  r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q - 'labor_speaker_role');
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, task_q - 'labor_speaker_role');
   PERFORM pg_temp.ok('no reader role: derived from the source', (r->>'ok')::boolean AND r->>'speaker_role' = 'owner_seller');
+  r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL,
+         '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"I"}');
+  PERFORM pg_temp.ok('a one-letter subject does not name a car', r->'reasons' ? 'stated_subject_not_in_quote' AND r->>'speaker_role' = 'unknown');
+  r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL,
+         '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"1970 Pontiac G"}');
+  PERFORM pg_temp.ok('a subject cut inside a word refused', r->'reasons' ? 'stated_subject_not_in_quote');
+  r := public.reported_labor_statement_check('auction_comments', ac, 'I had 2500 hours in my 1970 Pontiac GTO without the paint', 2500, NULL,
+         '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"without the paint"}');
+  PERFORM pg_temp.ok('a subject with no name refused', r->'reasons' ? 'stated_subject_not_in_quote');
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL, ok_q || '{"labor_stated_subject":"1973 Pontiac Firebird"}');
   PERFORM pg_temp.ok('stated subject not in the quote refused', r->'reasons' ? 'stated_subject_not_in_quote');
   r := public.reported_labor_statement_check('vehicles', v1, repeat('I put 1,200 hours into it. ', 12), 1200, NULL, ok_q);

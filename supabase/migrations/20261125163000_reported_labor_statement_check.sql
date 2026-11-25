@@ -40,10 +40,13 @@
 --     figure of a figure_term_pattern match and high, when given, the same match's second (never any number in the
 --     sentence); qualifiers only the 6 labor keys and labor_system_key_null_reason; scope, statement_kind and
 --     time_basis required, listed and admitted; for task a system key or a null reason, never both; neither for
---     whole_build; stated_subject <= 80 chars and inside the quote. Thousands separators are read as printed.
---     speaker_role is derived from the source row: auction_comments.is_seller, build_posts author = build_threads
---     author, and vehicles.description (the listing text) give owner_seller; a quote naming another car
---     (labor_stated_subject) gives commenter_other_car; anything else is 'unknown'. The reader's role is returned
+--     whole_build; stated_subject <= 80 chars, a whole-token run of the quote, 2+ words, one a name (capital or digit).
+--     Figures and time phrases are read on the row text at the quote's span (a trimmed quote cannot cut a figure or a
+--     time phrase). Thousands separators are read as printed.
+--     speaker_role is derived from the source row: auction_comments.is_seller and build_posts author = build_threads
+--     author give owner_seller; vehicles.description names no author (description_source: null or source_imported),
+--     so it gives nothing; a quote naming another car (labor_stated_subject) gives commenter_other_car; anything else
+--     is 'unknown'. The reader's role is returned
 --     as speaker_role_read and decides nothing.
 --     page_vehicle_id is the car of the page the statement appeared on (auction_comments.vehicle_id; build_posts ->
 --     build_threads.vehicle_id; vehicles.id). It is never the subject: hours reach a vehicle only through a subject
@@ -101,10 +104,10 @@ SELECT 'claude-reported-labor-hours', 'modify_property', 'open', o.proposed_by_p
          'property_key', 'labor_speaker_role',
          'field', 'description',
          'adds_values', jsonb_build_array('unknown'),
-         'derived_from', 'the source row: auction_comments.is_seller; build_posts author = build_threads author; vehicles.description is the listing seller''s text',
+         'derived_from', 'the source row: auction_comments.is_seller; build_posts author = build_threads author; vehicles.description has no author column, so its speaker is unknown',
          'description', 'Who made the statement, derived from the source row, never from the reader. owner_seller: the seller of the lot '
-           || '(auction_comments.is_seller), the author of the build thread (build_posts.author_handle = build_threads.author_handle) or '
-           || 'the listing text (vehicles.description). commenter_other_car: anyone else whose quote names the other car '
+           || '(auction_comments.is_seller) or the author of the build thread (build_posts.author_handle = build_threads.author_handle). '
+           || 'commenter_other_car: anyone else whose quote names the other car '
            || '(labor_stated_subject, verbatim in the quote). unknown: any other speaker; the weakest role, counted by no baseline that '
            || 'needs the speaker. shop_builder and third_party stay in the list for a source that can establish them.'),
        jsonb_build_array(jsonb_build_object('role', 'measurement', 'measured_on', '2026-11-25',
@@ -234,7 +237,17 @@ DECLARE
   page_veh uuid;
   role text;
   role_basis text;
-  at_term boolean;
+  qend int;
+  n int;
+  ms int;
+  me int;
+  f1 numeric;
+  f2 numeric;
+  at_low boolean := false;
+  at_high boolean := false;
+  cut boolean := false;
+  timed boolean := false;
+  subj text;
 BEGIN
   SELECT * INTO qr FROM public.schema_proposal_quote_rules WHERE category = 'labor';
   IF NOT FOUND THEN reasons := reasons || 'no_quote_rule'::text; END IF;
@@ -261,7 +274,6 @@ BEGIN
     IF length(p_quote) > 300 THEN reasons := reasons || 'quote_too_long'::text; END IF;
     IF qr.category IS NOT NULL AND p_quote !~* qr.term_pattern THEN reasons := reasons || 'quote_no_term'::text; END IF;
     IF qr.figure_required AND p_quote !~ '[0-9]' THEN reasons := reasons || 'quote_no_figure'::text; END IF;
-    IF qr.exclude_pattern IS NOT NULL AND p_quote ~* qr.exclude_pattern THEN reasons := reasons || 'quote_time_phrase'::text; END IF;
     IF txt IS NOT NULL THEN
       pos := position(p_quote IN txt);
       IF pos = 0 OR substr(txt, pos - 1, 1) ~ '[[:alnum:]]' OR substr(txt, pos + length(p_quote), 1) ~ '[[:alnum:]]' THEN
@@ -270,22 +282,57 @@ BEGIN
     END IF;
   END IF;
 
-  -- The figures recorded are the ones directly before the hour term (the rule row's figure_term_pattern): low is a
-  -- match's first figure and high, when given, the same match's second (or the first, for a single figure).
+  -- Figures and time phrases are read on the ROW text at the quote's span, never on the quote alone, so trimming a quote
+  -- cannot cut a figure out of '1,200' or '40-60 hrs', or a time phrase down to its hours (ta-labor advisor review
+  -- 2026-11-25). A figure_term_pattern match wholly inside the span gives the figures: low is its first figure and high,
+  -- when given, the same match's second (or the first, for a single figure). A match the span cuts refuses
+  -- figure_term_cut. Any exclude_pattern match touching the span refuses quote_time_phrase.
+  IF pos > 0 THEN
+    qend := pos + length(p_quote);
+    IF qr.exclude_pattern IS NOT NULL THEN
+      n := 1;
+      LOOP
+        ms := regexp_instr(txt, qr.exclude_pattern, 1, n, 0, 'i');
+        EXIT WHEN ms = 0 OR n > 200;
+        me := regexp_instr(txt, qr.exclude_pattern, 1, n, 1, 'i');
+        IF ms < qend AND me > pos THEN timed := true; END IF;
+        n := n + 1;
+      END LOOP;
+    END IF;
+    IF qr.figure_term_pattern IS NOT NULL THEN
+      n := 1;
+      LOOP
+        ms := regexp_instr(txt, qr.figure_term_pattern, 1, n, 0, 'i');
+        EXIT WHEN ms = 0 OR n > 200;
+        me := regexp_instr(txt, qr.figure_term_pattern, 1, n, 1, 'i');
+        IF ms < qend AND me > pos THEN
+          IF ms < pos OR me > qend THEN
+            cut := true;
+          ELSE
+            f1 := replace(regexp_substr(txt, qr.figure_term_pattern, 1, n, 'i', 1), ',', '')::numeric;
+            f2 := replace(coalesce(regexp_substr(txt, qr.figure_term_pattern, 1, n, 'i', 2),
+                                   regexp_substr(txt, qr.figure_term_pattern, 1, n, 'i', 1)), ',', '')::numeric;
+            IF f1 = p_low THEN
+              at_low := true;
+              IF f2 = p_high THEN at_high := true; END IF;
+            END IF;
+          END IF;
+        END IF;
+        n := n + 1;
+      END LOOP;
+    END IF;
+  END IF;
+  IF timed THEN reasons := reasons || 'quote_time_phrase'::text; END IF;
+  IF cut THEN reasons := reasons || 'figure_term_cut'::text; END IF;
   IF p_low IS NULL OR p_low <= 0 THEN
     reasons := reasons || 'low_missing'::text;
   ELSIF qr.figure_term_pattern IS NULL THEN
     reasons := reasons || 'no_figure_term_rule'::text;
   ELSE
-    SELECT bool_or(replace(m[1], ',', '')::numeric = p_low) INTO at_term
-      FROM regexp_matches(coalesce(p_quote, ''), qr.figure_term_pattern, 'gi') m;
-    IF NOT coalesce(at_term, false) THEN reasons := reasons || 'low_not_at_term'::text; END IF;
+    IF NOT at_low THEN reasons := reasons || 'low_not_at_term'::text; END IF;
     IF p_high IS NOT NULL THEN
       IF p_high < p_low THEN reasons := reasons || 'high_below_low'::text; END IF;
-      SELECT bool_or(replace(m[1], ',', '')::numeric = p_low
-                     AND replace(coalesce(m[2], m[1]), ',', '')::numeric = p_high) INTO at_term
-        FROM regexp_matches(coalesce(p_quote, ''), qr.figure_term_pattern, 'gi') m;
-      IF NOT coalesce(at_term, false) THEN reasons := reasons || 'high_not_at_term'::text; END IF;
+      IF NOT at_high THEN reasons := reasons || 'high_not_at_term'::text; END IF;
     END IF;
   END IF;
 
@@ -319,10 +366,17 @@ BEGIN
   ELSIF q ->> 'labor_scope' = 'whole_build' AND (q ? 'labor_system_key' OR q ? 'labor_system_key_null_reason') THEN
     reasons := reasons || 'system_key_on_whole_build'::text;
   END IF;
-  IF q ? 'labor_stated_subject' AND (jsonb_typeof(q -> 'labor_stated_subject') <> 'string'
-       OR length(btrim(q ->> 'labor_stated_subject')) = 0 OR length(q ->> 'labor_stated_subject') > 80
-       OR position(q ->> 'labor_stated_subject' IN coalesce(p_quote, '')) = 0) THEN
-    reasons := reasons || 'stated_subject_not_in_quote'::text;
+  -- labor_stated_subject names the other car: a whole-token run of the quote, at least two words, one of them a name
+  -- (a capital or a digit: '1970 Pontiac GTO', 'my GTO'; not 'I', 'my car'). The floor is ta-labor's judgment, not a
+  -- measured rule; it is what lets commenter_other_car be derived, so a skeptic attacks it.
+  IF q ? 'labor_stated_subject' THEN
+    subj := CASE WHEN jsonb_typeof(q -> 'labor_stated_subject') = 'string' THEN q ->> 'labor_stated_subject' END;
+    pos := CASE WHEN subj IS NULL OR p_quote IS NULL THEN 0 ELSE position(subj IN p_quote) END;
+    IF subj IS NULL OR length(subj) > 80 OR subj <> btrim(subj) OR array_length(regexp_split_to_array(subj, '\s+'), 1) < 2
+       OR subj !~ '\m[A-Z0-9]' OR pos = 0
+       OR substr(p_quote, pos - 1, 1) ~ '[[:alnum:]]' OR substr(p_quote, pos + length(subj), 1) ~ '[[:alnum:]]' THEN
+      reasons := reasons || 'stated_subject_not_in_quote'::text;
+    END IF;
   END IF;
 
   -- The page the statement appeared on, and the speaker's role as the source row says it. page_vehicle_id is never the
@@ -339,8 +393,9 @@ BEGIN
       role_basis := CASE WHEN role IS NOT NULL THEN 'build_posts.author_handle = build_threads.author_handle' END;
     ELSIF p_source_table = 'vehicles' THEN
       page_veh := p_source_row_id;
-      role := 'owner_seller';
-      role_basis := 'vehicles.description: the listing text';
+      -- vehicles.description_source does not name the author (1% sample 2026-11-25: 6,656 null, 2,761
+      -- source_imported, 1 user_input): a publisher's listing prose is not the seller speaking, so the role stays NULL.
+      NULL;
     END IF;
   END IF;
   IF role IS NULL AND q ->> 'labor_speaker_role' = 'commenter_other_car' AND q ? 'labor_stated_subject'
