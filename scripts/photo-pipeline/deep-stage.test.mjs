@@ -15,6 +15,7 @@ import {
   PLACE_SCENES, PRINT_WORDS, REFUSAL_STREAK_STOP, refusalStreak, saysPictureOfPicture, sceneForAutomatic, thinNarrative, thinVerdict, thinViolation,
   cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput, QUESTION_TOKENS, standingReadingHold, standingReadingQuery,
   PROJECTION_WORDS, finishedLanding, ownReading, ownReadingQuery, projectionAnswer,
+  UnclaimedDeepReadingError, assertDeepClaim, claimedWorkQuery,
 } from './deep-stage.mjs';
 import { receiptForDeepResult } from './stage-queue.mjs';
 
@@ -386,13 +387,21 @@ test('a failed read is tried once more; a fault that is the batch\'s is not', as
 // readings: what the standing-reading question returns (readings of the photo that are not this reader's);
 // own: what the own-reading question returns (this reader's newest current reading); project: the intake's projection of a stored reading
 function frameDeps({ row = {}, answers = [], orchestrator = async () => ({ http: 200, success: true, observation_id: '30000000-0000-4000-8000-000000000001' }), download = { ok: true, status: 200 }, snapshotFails = false, readings = [], readingsFail = false,
-  own = [], ownFails = false, project = async (id) => ({ http: 200, success: true, observation_id: id, thin_tier: true, superseded_readings: 0 }) } = {}) {
-  const calls = { rest: [], ask: [], orchestrator: [], project: [], order: [] };
+  own = [], ownFails = false, project = async (id) => ({ http: 200, success: true, observation_id: id, thin_tier: true, superseded_readings: 0 }), claim = 'claimed' } = {}) {
+  const calls = { rest: [], ask: [], orchestrator: [], project: [], order: [], claims: [] };
   const base = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg', updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null, deep_stamp: null,
     is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, doc_flag: null, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...row };
   let n = 0;
   return { calls, deps: {
     rest: async (q) => {
+      // the claim check (assertDeepClaim) comes first and is kept apart, so the questions below keep their places
+      if (q.startsWith('image_stage_work?')) {
+        calls.claims.push(q);
+        if (claim === 'fail') throw new Error('503');
+        if (claim === 'none') return [];
+        const id = q.match(/[?&]id=eq\.(\d+)/)?.[1];
+        return [{ id: Number(id), image_id: claim === 'other' ? '99999999-0000-4000-8000-000000000009' : IMAGE, stage: 'deep_reading', status: 'claimed' }];
+      }
       calls.rest.push(q);
       // the photo's deep readings, asked of the observations themselves after the photo row shows no stamp: first the
       // readings that are not this reader's, then this reader's own (told apart as the database would, by the tier filter)
@@ -409,7 +418,43 @@ function frameDeps({ row = {}, answers = [], orchestrator = async () => ({ http:
 }
 const opts = (dir, extra = {}) => ({ dir, contract: 'CONTRACT TEXT', model: DEFAULT_MODEL, runId: 'claude-cli-fire-test', reader: 'claude-cli claude-sonnet-5-5 subscription', now: () => new Date('2026-11-20T18:05:00Z'), admits: ADMITS, ...extra });
 const withDir = async (fn) => { const dir = mkdtempSync(join(tmpdir(), 'deep-stage-test-')); try { return await fn(dir); } finally { rmSync(dir, { recursive: true, force: true }); } };
-const frame = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg' };
+const frame = { work_id: 7, id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg' };
+
+// The one daily cap (image_pipeline_stages.daily_cap, 20261126091500) is counted when claim_image_stage_work hands an item out,
+// so a deep reading without a claimed item is a reading around the cap. Both hosts run this function.
+test('no claimed work item, no deep reading: a named photo, a dry run, an item handed back or another photo\'s item is refused before any fetch or model call', () => withDir(async (dir) => {
+  const refused = async (f, depsOpts, why, extra = {}) => {
+    const { deps, calls } = frameDeps({ answers: [cli(verdict()), cli(verdict())], ...depsOpts });
+    await assert.rejects(deepReadFrame(f, deps, opts(dir, extra)),
+      (e) => e instanceof UnclaimedDeepReadingError && e.code === 'deep_reading_unclaimed' && e.reason === why, `${why}: ${JSON.stringify(f.work_id)}`);
+    assert.deepEqual([calls.ask.length, calls.order.length, calls.rest.length, calls.orchestrator.length, calls.project.length], [0, 0, 0, 0, 0],
+      `${why}: no model call, no photo row, no download, no post`);
+    return calls;
+  };
+  // a frame that did not come from a claim (the dry run's named ids, any other caller): no work item id at all
+  const { work_id: _w, ...named } = frame;
+  assert.equal((await refused(named, {}, 'no_work_id')).claims.length, 0, 'not even the question is asked');
+  for (const bad of [0, -3, 1.5, '', '7a', '07', null, true, {}, Number.MAX_SAFE_INTEGER + 2]) await refused({ ...frame, work_id: bad }, {}, 'no_work_id');
+  await refused(named, {}, 'no_work_id', { post: false });   // the dry run spends the subscription too
+  // the database holds no claimed deep_reading item with that id for this photo
+  const none = await refused(frame, { claim: 'none' }, 'not_claimed');
+  assert.deepEqual(none.claims, [claimedWorkQuery(7)]);
+  assert.equal(claimedWorkQuery(7), 'image_stage_work?select=id,image_id,stage,status&id=eq.7&stage=eq.deep_reading&status=eq.claimed&limit=1');
+  await refused(frame, { claim: 'other' }, 'not_claimed');
+  await refused(frame, { claim: 'fail' }, 'claim_unreadable');
+  // a claimed item, its id as a number or as PostgREST's bigint string: read as before
+  for (const work_id of [7, '7']) {
+    const { deps, calls } = frameDeps({ answers: [cli(verdict()), cli(verdict())] });
+    const r = await deepReadFrame({ ...frame, work_id }, deps, opts(dir));
+    assert.equal(r.receipt.outcome, 'succeeded');
+    assert.deepEqual([calls.claims.length, calls.ask.length], [1, 2]);
+  }
+  // the check on its own, as a caller outside deepReadFrame would use it
+  await assert.doesNotReject(assertDeepClaim(frame, async () => [{ id: 7, image_id: IMAGE, stage: 'deep_reading', status: 'claimed' }]));
+  await assert.rejects(assertDeepClaim(frame, async () => [{ id: 7, image_id: IMAGE, stage: 'deep_reading', status: 'queued' }]), (e) => e.reason === 'not_claimed');
+  await assert.rejects(assertDeepClaim(frame, async () => [{ id: 8, image_id: IMAGE, stage: 'deep_reading', status: 'claimed' }]), (e) => e.reason === 'not_claimed');
+  await assert.rejects(assertDeepClaim(frame, async () => [{ id: 7, image_id: IMAGE, stage: 'keyed_values', status: 'claimed' }]), (e) => e.reason === 'not_claimed');
+}));
 
 test('two agreeing reads: the row is snapshotted before the download, both reads use the lean call, the envelope is posted, the receipt succeeds with the cost in its detail', () => withDir(async (dir) => {
   const { deps, calls } = frameDeps({ answers: [cli(verdict()), cli(verdict())] });
