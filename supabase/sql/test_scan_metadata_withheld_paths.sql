@@ -2,23 +2,40 @@
 -- Proves 20261125200000_scan_metadata_withheld_paths.sql:
 --   * vehicle_images_public keeps production's column list, order and types (signature md5 as read 2026-11-25),
 --     security_invoker and grants; only ai_scan_metadata changes.
---   * anon and a signed-in stranger get no withheld path on any photo (place_hint, the four OCR-text paths, document
---     fields, license_plate, location, extracted_text, person_visible, recipient, shipment_number, price,
---     cost_basis_input), checked against a list written here, independent of the rule table; every other key, siblings
---     of a withheld key included, comes back as stored.
---   * the uploader (an untied photographer included), a viewer tied to the vehicle, service_role and a direct database
---     session still get every key.
---   * vehicle_image_findings: anon and a stranger get gallery-eligible frames only (no document, no privacy-withheld
---     frame) and no license_plate; the owner and a tied viewer get every frame they read with license_plate; an untied
---     uploader gets their own frame's plate only.
---   * a whole-row gallery test over the view (the #3868 policy shape) never calls the helper (plan text).
---   * deleting the place_hint rule row brings place_hint back to anon (the rule row is what withholds it).
--- Which assertion fails if a rule row is removed from the migration: "rule rows: 14 paths" and, with that count
--- changed to match, "anon: no withheld path on any photo (fixed list)" (mutation run 2026-11-25).
+--   * anon and a signed-in stranger get no withheld path on any photo (24 paths: place_hint, the OCR-text paths,
+--     document fields, license_plate, location, person, shipment and money keys, and the model free text: agent_notes,
+--     open_questions, open_facts, narrative, damage_callouts, framing, classification description and medium_context,
+--     appraiser text), checked against a list written here, independent of the rule table; no license_plate element in
+--     v2 vehicle_fields; the car's plate replaced by [withheld] inside a kept label, written with other spaces and case;
+--     every other key, siblings of a withheld key and the other array elements included, comes back as stored.
+--   * the uploader (an untied photographer included), a viewer tied to the vehicle, service_role (BYPASSRLS) and a
+--     direct database session still get every key; PostgREST's authenticator with empty claims is stripped like anon.
+--   * vehicle_image_findings: anon and a stranger get gallery-eligible frames only and no license_plate; the owner and a
+--     tied viewer get every frame they read with license_plate; an untied uploader gets their own frame's plate only.
+--   * get_image_deep_analysis (the live body, md5 checked): anon and a stranger get the scene, none of the withheld
+--     text; the uploader and a tied mechanic get every field.
+--   * a whole-row gallery test over the view never calls the helper; three projections evaluate it once per row; the
+--     rules are one InitPlan evaluated once per statement.
+--   * deleting the place_hint rule row brings place_hint back to anon; overlapping rules ({presence} and
+--     {presence,place_hint}) remove the whole object; a plate redaction that would break the JSON withholds the whole
+--     analysis; a caller's own rules cannot make the helper confirm any value but the plate.
+--   * image_scan_text_path_gaps: 0 on the fixture, a new long model-text path reported; service_role only.
+--   * the revert applies and restores the live bodies (their md5).
+-- Which assertion fails if the fix is removed (mutation run 2026-11-25, each failing a named assertion): a rule row
+-- renamed or its value changed -> "anon: no withheld path on any photo (fixed list)"; the authenticator guard ->
+-- "authenticator session with empty claims"; rules read per row -> "plan: the rules are one InitPlan"; the patch merge
+-- in the removal tree -> the fixed list; get_image_deep_analysis left raw -> the migration's verify block; the JSON
+-- fallback -> "value redaction that would break the JSON"; both overlap prunings -> "overlapping rules".
 -- Fixture: supabase/sql/fixtures/photo_reading_select_base.sql, then production's full vehicle_images column list and
 -- the live vehicle_images_public definition (pg_get_viewdef md5 checked) with its gallery overload re-created verbatim.
 -- Fixture rows only, in a disposable database. -- ALLOW_RAW_TESTIMONY_WRITE
 \ir fixtures/photo_reading_select_base.sql
+-- service_role reads as in production (BYPASSRLS), also on a cluster where the role already existed without it.
+ALTER ROLE service_role BYPASSRLS;
+-- The vehicles columns the vehicle_value rules read (not granted to anon or authenticated, as live 2026-11-25).
+ALTER TABLE public.vehicles ADD COLUMN license_plate text, ADD COLUMN owner_name text, ADD COLUMN owner_contact text,
+  ADD COLUMN purchase_location text;
+UPDATE public.vehicles SET license_plate = 'tst-pl8 9';
 
 -- Production's full vehicle_images columns (2026-11-25, pg_attribute; the base fixture holds a subset).
 -- guardrail-allow(center-key-fk): vehicle_images.suggested_vehicle_id: production has no foreign key on it (pg_constraint 2026-11-25)
@@ -399,6 +416,98 @@ DO $$ BEGIN
   END IF;
   RAISE NOTICE 'PASS: fixture vehicle_images_public and its gallery overload hash to production''s 2026-11-25 text';
 END $$;
+-- vehicle_image_findings as live (20261014052000; prosrc md5 checked by the migration's guard).
+CREATE OR REPLACE FUNCTION public.vehicle_image_findings(p_vehicle_id uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO ''
+AS $function$
+  WITH frames AS (
+    SELECT j.*, vi.vision_analyzed_at
+      FROM public.vehicle_images vi
+      LEFT JOIN LATERAL jsonb_to_record(CASE WHEN jsonb_typeof(vi.ai_scan_metadata) = 'object' THEN vi.ai_scan_metadata END) AS j(
+             classifier jsonb, error jsonb, vin jsonb, license_plate jsonb, engine jsonb, engine_guess jsonb, engine_badge jsonb,
+             transmission jsonb, color_visible jsonb, interior_trim jsonb, odometer jsonb, mileage_at_listing jsonb, source jsonb,
+             part_number jsonb, critical jsonb, privacy_concern jsonb, attribution_concern jsonb, phase jsonb, scene_class jsonb,
+             make_guess jsonb, model_guess jsonb, year_guess jsonb, confidence jsonb, byok_deep_analysis jsonb) ON true
+     WHERE vi.vehicle_id = p_vehicle_id
+     LIMIT 5000
+  ),
+  reported AS (
+    SELECT o.row
+      FROM frames f
+      CROSS JOIN LATERAL (
+        SELECT coalesce(jsonb_object_agg(t.k, t.v), '{}'::jsonb) AS row
+          FROM (VALUES
+                 ('classifier', f.classifier), ('error', f.error), ('vin', f.vin), ('license_plate', f.license_plate),
+                 ('engine', f.engine), ('engine_guess', f.engine_guess), ('engine_badge', f.engine_badge),
+                 ('transmission', f.transmission), ('color_visible', f.color_visible), ('interior_trim', f.interior_trim),
+                 ('odometer', f.odometer), ('mileage_at_listing', f.mileage_at_listing), ('source', f.source),
+                 ('part_number', f.part_number), ('critical', f.critical), ('privacy_concern', f.privacy_concern),
+                 ('attribution_concern', f.attribution_concern), ('phase', f.phase), ('scene_class', f.scene_class),
+                 ('make_guess', f.make_guess), ('model_guess', f.model_guess), ('year_guess', f.year_guess),
+                 ('confidence', f.confidence),
+                 ('byok_scene_type', f.byok_deep_analysis -> 'scene_type'),
+                 ('byok_build_phase_guess', f.byok_deep_analysis -> 'build_phase_guess'),
+                 ('byok_confidence', f.byok_deep_analysis -> 'confidence'),
+                 ('vision_analyzed_at', to_jsonb(f.vision_analyzed_at))
+               ) AS t(k, v)
+         WHERE t.v IS NOT NULL AND t.v <> 'null'::jsonb
+      ) o
+     WHERE o.row <> '{}'::jsonb
+  )
+  SELECT jsonb_build_object(
+           'total', (SELECT count(*) FROM frames),
+           'rows', coalesce((SELECT jsonb_agg(row) FROM reported), '[]'::jsonb));
+$function$;
+REVOKE ALL ON FUNCTION public.vehicle_image_findings(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.vehicle_image_findings(uuid) TO anon, authenticated, service_role;
+-- get_image_deep_analysis as live (20261125160500), with the table its review check reads.
+CREATE TABLE public.image_observations (image_id uuid REFERENCES public.vehicle_images(id), is_active boolean, observed_by text,
+  agent_version text, confidence_basis jsonb);
+CREATE OR REPLACE FUNCTION public.get_image_deep_analysis(p_image_id uuid)
+ RETURNS TABLE(image_id uuid, narrative text, intent text, intent_confidence numeric, scene_type text, build_phase text, place_hint text, confidence numeric, agent_model text, agent_notes text, analyzed_at timestamp with time zone, paint_state text, rust_severity text, completeness text, damage_callouts jsonb, components jsonb, open_questions jsonb, needs_review boolean)
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+ -- definer_readers_visibility_v1: shown, uploader or tied (20261125160500)
+ SELECT vi.id,b->>'narrative_one_line',b->>'intent',nullif(b->>'intent_confidence','')::numeric,
+  b->>'scene_type',b->>'build_phase_guess',b->'presence'->>'place_hint',nullif(b->>'confidence','')::numeric,
+  b->>'agent_model',b->>'agent_notes',nullif(b->>'analyzed_at','')::timestamptz,
+  b->'state_observations'->>'paint_state',b->'state_observations'->>'rust_severity',
+  b->'state_observations'->>'completeness',b->'state_observations'->'damage_callouts',
+  b->'components_seen',b->'open_questions',nullif(b->>'needs_review','')::boolean
+ FROM public.vehicle_images vi
+ CROSS JOIN LATERAL(SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS b) j
+ WHERE vi.id=p_image_id AND vi.ai_scan_metadata ? 'byok_deep_analysis'
+   AND (coalesce(b->>'prompt_version','')<>'reviewed_image_analysis_v1' OR EXISTS(
+     SELECT 1 FROM public.image_observations io WHERE io.image_id=vi.id AND io.is_active
+       AND io.observed_by='caller-byok' AND io.agent_version='reviewed_image_analysis_v1'
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=b->>'observation_id'
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,image_url}'=vi.image_url
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,vehicle_id}'=vi.vehicle_id::text))
+   AND (
+     coalesce((
+       SELECT true
+       FROM public.vehicle_images_public vip
+       JOIN public.vehicles v ON v.id = vip.vehicle_id
+       WHERE vip.id = vi.id
+         AND coalesce(vip.is_sensitive, false) = false
+         AND v.is_public = true
+         AND v.deleted_at IS NULL
+         AND public.vehicle_image_gallery_eligible(vip)), false)
+     OR ((SELECT auth.uid()) IS NOT NULL AND vi.user_id = (SELECT auth.uid()))
+     OR public.vehicle_viewer_tied(vi.vehicle_id));
+$function$
+;
+GRANT EXECUTE ON FUNCTION public.get_image_deep_analysis(uuid) TO anon, authenticated, service_role;
+DO $$ BEGIN
+  IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.get_image_deep_analysis(uuid)'::regprocedure) <> '35593b09f682203f625e5c058740a29d' THEN
+    RAISE EXCEPTION 'FAIL: fixture get_image_deep_analysis does not hash to production''s 2026-11-25 body';
+  END IF;
+END $$;
 
 -- Two more photos on public car A: clean_a (u1, metadata with no withheld path) and photog_a (uploaded by u3, who is not
 -- tied to A). Every photo gets metadata; tokens TST* mark each withheld value.
@@ -412,14 +521,21 @@ UPDATE public.vehicle_images SET ai_scan_metadata = '{
   "classifier": "fixture", "scene_class": "exterior", "license_plate": "TSTPLATE1", "location": "TSTPLACE-L",
   "extracted_text": "TSTOCR-E", "recipient": "TSTPERSON-R", "shipment_number": "TSTSHIP", "price": "TSTMONEY-P",
   "cost_basis_input": "TSTMONEY-C",
-  "classification": {"label": "exterior", "detected_text": ["TSTOCR-D"],
+  "classification": {"label": "exterior", "detected_text": ["TSTOCR-D"], "description": "TSTDESC", "medium_context": "TSTMED",
     "v2": {"vin": {"value": "1GKEV18K8LF000000"}, "text_lines": [{"text": "TSTOCR-L", "confidence": 0.9}],
+      "vehicle_fields": [{"field_name": "color", "value": "red", "evidence": "paint"},
+                         {"field_name": "license_plate", "value": "TSTPLATE2", "evidence": "TSTPLATE2 on the rear"}],
       "document": {"kind": "receipt", "fields": {"owner_address": "TSTPLACE-A", "vendor_phone": "TSTPHONE"}}}},
   "deep_analysis": {"subject": {"kind": "engine", "text_visible": ["TSTOCR-V"]}},
   "full_classification": {"person_visible": {"name": "TSTPERSON-N", "technician_id": 7}, "kept": 1},
-  "byok_deep_analysis": {"scene_type": "engine_bay", "narrative_one_line": "kept narrative",
+  "byok_deep_analysis": {"scene_type": "engine_bay", "narrative_one_line": "TSTNARR at TSTPLACE-H",
     "presence": {"person": false, "dog": false, "place_hint": "TSTPLACE-H"},
-    "text_regions": [{"text": "TSTOCR-T", "bbox": [0, 0, 1, 1], "confidence": 0.9}]}}'::jsonb
+    "text_regions": [{"text": "TSTOCR-T", "bbox": [0, 0, 1, 1], "confidence": 0.9}],
+    "agent_notes": "TSTNOTE plate TSTPLATE1", "open_questions": ["TSTQ"], "saturation": {"version": "s1", "open_facts": ["TSTFACT"]},
+    "state_observations": {"paint_state": "good", "damage_callouts": ["TSTDMG"]}, "camera_pose": {"yaw": 10, "framing": "TSTFRAME"},
+    "components_seen": [{"label": "plate reads TST PL8-9 on the bumper"}, {"label": "chrome bumper"}]},
+  "appraiser": {"primary_label": "Exterior", "description": "TSTAPPD", "context": "TSTAPPC"},
+  "route_result": "routed to the deep reader after the classifier marked the frame exterior and rich enough"}'::jsonb
  WHERE id <> '10000000-0000-0000-0000-000000000008';
 UPDATE public.vehicle_images SET ai_scan_metadata = '{"classifier": "fixture", "byok_deep_analysis": {"scene_type": "interior", "presence": {"person": true}}}'::jsonb
  WHERE id = '10000000-0000-0000-0000-000000000008';
@@ -440,8 +556,10 @@ SELECT public.t_assert((SELECT md5(string_agg(attname || ' ' || format_type(attt
           WHERE attrelid = 'public.vehicle_images_public'::regclass AND attnum > 0 AND NOT attisdropped) = :'sig_before'
   AND (SELECT reloptions::text || relacl::text || pg_get_userbyid(relowner) FROM pg_class WHERE oid = 'public.vehicle_images_public'::regclass) = :'opts_before',
   'view: same 156 columns, names, order and types; same security_invoker, grants and owner');
-SELECT public.t_assert((SELECT count(*) FROM public.image_scan_withheld_paths WHERE basis LIKE 'census 2026-11-25%') = 14,
-  'rule rows: 14 paths, each with its census basis');
+SELECT public.t_assert((SELECT count(*) FROM public.image_scan_withheld_paths GROUP BY () HAVING true) IS NOT NULL
+  AND (SELECT string_agg(rule_kind || ':' || n, ',' ORDER BY rule_kind) FROM (SELECT rule_kind, count(*) n FROM public.image_scan_withheld_paths GROUP BY 1) k)
+      = 'array_element:1,free_text:16,path:8,reviewed_keep:11,vehicle_value:1',
+  'rule rows: 8 path, 16 free_text, 1 array_element, 1 vehicle_value (license_plate), 11 reviewed_keep, each with its basis');
 SELECT public.t_assert(NOT has_table_privilege('anon', 'public.image_scan_withheld_paths', 'SELECT')
   AND NOT has_table_privilege('authenticated', 'public.image_scan_withheld_paths', 'SELECT'), 'rule table: not readable by anon or authenticated');
 
@@ -451,7 +569,11 @@ CREATE FUNCTION public.t_withheld_hits(p jsonb) RETURNS bigint LANGUAGE sql IMMU
     '{byok_deep_analysis,presence,place_hint}', '{byok_deep_analysis,text_regions}', '{license_plate}', '{location}',
     '{extracted_text}', '{full_classification,person_visible}', '{recipient}', '{shipment_number}', '{price}',
     '{cost_basis_input}', '{classification,detected_text}', '{classification,v2,text_lines}',
-    '{classification,v2,document,fields}', '{deep_analysis,subject,text_visible}']::text[]) AS w(path)
+    '{classification,v2,document,fields}', '{deep_analysis,subject,text_visible}',
+    '{byok_deep_analysis,agent_notes}', '{byok_deep_analysis,open_questions}', '{byok_deep_analysis,saturation,open_facts}',
+    '{byok_deep_analysis,narrative_one_line}', '{byok_deep_analysis,state_observations,damage_callouts}',
+    '{byok_deep_analysis,camera_pose,framing}', '{classification,description}', '{classification,medium_context}',
+    '{appraiser,description}', '{appraiser,context}']::text[]) AS w(path)
   WHERE (e -> 'm') #> w.path::text[] IS NOT NULL $$;
 CREATE FUNCTION public.t_view_read() RETURNS jsonb LANGUAGE sql STABLE AS $$
   SELECT coalesce(jsonb_agg(jsonb_build_object('l', public.t_label2(id), 'm', ai_scan_metadata) ORDER BY id), '[]') FROM public.vehicle_images_public $$;
@@ -463,12 +585,18 @@ SELECT public.t_view_read() AS anon_read \gset
 RESET ROLE;
 SELECT public.t_assert(jsonb_array_length(:'anon_read'::jsonb) >= 4, format('anon reads photos through the view (%s)', jsonb_array_length(:'anon_read'::jsonb)));
 SELECT public.t_assert(public.t_withheld_hits(:'anon_read'::jsonb) = 0 AND :'anon_read' NOT LIKE '%TST%', 'anon: no withheld path on any photo (fixed list)');
+SELECT public.t_assert(:'anon_read' NOT LIKE '%"license_plate"%' AND :'anon_read' NOT ILIKE '%pl8%', 'anon: no plate element in vehicle_fields and the car''s plate nowhere in the text');
 SELECT public.t_assert((SELECT e -> 'm' FROM jsonb_array_elements(:'anon_read'::jsonb) e WHERE e ->> 'l' = 'shown_a')
   = '{"classifier": "fixture", "scene_class": "exterior", "full_classification": {"kept": 1},
-      "classification": {"label": "exterior", "v2": {"vin": {"value": "1GKEV18K8LF000000"}, "document": {"kind": "receipt"}}},
+      "classification": {"label": "exterior", "v2": {"vin": {"value": "1GKEV18K8LF000000"}, "document": {"kind": "receipt"},
+        "vehicle_fields": [{"field_name": "color", "value": "red", "evidence": "paint"}]}},
       "deep_analysis": {"subject": {"kind": "engine"}},
-      "byok_deep_analysis": {"scene_type": "engine_bay", "narrative_one_line": "kept narrative", "presence": {"person": false, "dog": false}}}'::jsonb,
-  'anon: shown_a keeps every other key as stored (scene, narrative, presence flags, siblings of a withheld key)');
+      "byok_deep_analysis": {"scene_type": "engine_bay", "presence": {"person": false, "dog": false},
+        "saturation": {"version": "s1"}, "state_observations": {"paint_state": "good"}, "camera_pose": {"yaw": 10},
+        "components_seen": [{"label": "plate reads [withheld] on the bumper"}, {"label": "chrome bumper"}]},
+      "appraiser": {"primary_label": "Exterior"},
+      "route_result": "routed to the deep reader after the classifier marked the frame exterior and rich enough"}'::jsonb,
+  'anon: shown_a keeps every other key as stored (scene, presence flags, siblings of a withheld key, the other array element, reviewed system text), the car''s plate replaced inside a kept label');
 SELECT public.t_assert((SELECT e -> 'm' FROM jsonb_array_elements(:'anon_read'::jsonb) e WHERE e ->> 'l' = 'clean_a')
   = (SELECT ai_scan_metadata FROM public.vehicle_images WHERE id = '10000000-0000-0000-0000-000000000008'), 'anon: a photo with no withheld path comes back unchanged');
 
@@ -484,8 +612,8 @@ SELECT public.t_view_read() AS u3_read \gset
 RESET ROLE;
 SELECT public.t_assert((SELECT string_agg(e ->> 'l', ',' ORDER BY e ->> 'l') FROM jsonb_array_elements(:'u3_read'::jsonb) e WHERE e::text LIKE '%TSTPLACE-H%') = 'photog_a,photog_b',
   'untied uploader: place_hint on their own two photos (public car A, private car B), on no one else''s');
-SELECT public.t_assert(public.t_withheld_hits((SELECT jsonb_agg(e) FROM jsonb_array_elements(:'u3_read'::jsonb) e WHERE e ->> 'l' = 'photog_a')) = 14,
-  'untied uploader: all 14 withheld paths on their own photo');
+SELECT public.t_assert(public.t_withheld_hits((SELECT jsonb_agg(e) FROM jsonb_array_elements(:'u3_read'::jsonb) e WHERE e ->> 'l' = 'photog_a')) = 24,
+  'untied uploader: all 24 withheld paths on their own photo');
 
 -- 5. Tied viewers: the owner (u1) and A's mechanic (u4) read every key on A's photos, the mechanic on u3's photo too.
 SELECT public.t_claims('00000000-0000-0000-0000-000000000001'); SET ROLE authenticated;
@@ -493,7 +621,7 @@ SELECT public.t_view_read() AS u1_read \gset
 SELECT public.t_claims('00000000-0000-0000-0000-000000000004');
 SELECT public.t_view_read() AS u4_read \gset
 RESET ROLE;
-SELECT public.t_assert((SELECT bool_and(e::text LIKE '%TSTPLACE-H%' AND e::text LIKE '%TSTPLATE1%') FROM jsonb_array_elements(:'u1_read'::jsonb) e WHERE e ->> 'l' <> 'clean_a')
+SELECT public.t_assert((SELECT bool_and(e::text LIKE '%TSTPLACE-H%' AND e::text LIKE '%TSTPLATE1%' AND e::text LIKE '%TST PL8-9%' AND e::text LIKE '%TSTPLATE2%') FROM jsonb_array_elements(:'u1_read'::jsonb) e WHERE e ->> 'l' <> 'clean_a')
   AND (SELECT count(*) FROM jsonb_array_elements(:'u1_read'::jsonb) e WHERE e ->> 'l' <> 'clean_a') >= 6,
   'owner: every withheld value on every photo they read (shown, unfiled, private, deleted car, document, plate, photographer''s)');
 SELECT public.t_assert((SELECT string_agg(e ->> 'l', ',' ORDER BY e ->> 'l') FROM jsonb_array_elements(:'u4_read'::jsonb) e WHERE e::text LIKE '%TSTPLACE-H%')
@@ -505,8 +633,9 @@ SELECT public.t_view_read() AS svc_read \gset
 RESET ROLE;
 SELECT set_config('request.jwt.claims', '', false);
 SELECT public.t_view_read() AS db_read \gset
-SELECT public.t_assert(public.t_withheld_hits(:'svc_read'::jsonb) = 112 AND public.t_withheld_hits(:'db_read'::jsonb) = 112,
-  format('service_role and a direct session: all 14 paths on all 8 photos that carry them (%s, %s)', public.t_withheld_hits(:'svc_read'::jsonb), public.t_withheld_hits(:'db_read'::jsonb)));
+SELECT public.t_assert(public.t_withheld_hits(:'svc_read'::jsonb) = 192 AND public.t_withheld_hits(:'db_read'::jsonb) = 192
+  AND :'svc_read' LIKE '%TST PL8-9%' AND :'db_read' LIKE '%TSTPLATE2%',
+  format('service_role and a direct session: all 24 paths on all 8 photos that carry them, plate text intact (%s, %s)', public.t_withheld_hits(:'svc_read'::jsonb), public.t_withheld_hits(:'db_read'::jsonb)));
 
 -- 7. vehicle_image_findings on public car A (shown_a, document_a, plate_a, clean_a, photog_a).
 CREATE FUNCTION public.t_findings_summary(p uuid) RETURNS jsonb LANGUAGE sql STABLE AS $$
@@ -569,5 +698,112 @@ SELECT public.t_view_read()::text LIKE '%TSTPLACE-H%' AS back_without_rule \gset
 RESET ROLE;
 ROLLBACK;
 SELECT public.t_assert(:'back_without_rule'::boolean, 'rule rows drive it: deleting the place_hint row returns place_hint to anon');
+
+-- 10. PostgREST's authenticator with no claims (role anon set, claims empty) is not a direct session: it is stripped.
+SET SESSION AUTHORIZATION authenticator;
+SET ROLE anon;
+SELECT set_config('request.jwt.claims', '', false);
+SELECT public.t_view_read() AS authr_read \gset
+RESET ROLE;
+RESET SESSION AUTHORIZATION;
+SELECT public.t_assert(jsonb_array_length(:'authr_read'::jsonb) >= 4 AND public.t_withheld_hits(:'authr_read'::jsonb) = 0 AND :'authr_read' NOT LIKE '%TST%',
+  'authenticator session with empty claims: stripped like anon');
+
+-- 11. get_image_deep_analysis on shown_a: anon and a stranger get no place, notes, questions, narrative or damage text;
+--     the uploader and the tied mechanic get every field.
+CREATE FUNCTION public.t_gida(p uuid) RETURNS jsonb LANGUAGE sql STABLE AS $$
+  SELECT to_jsonb(g) FROM public.get_image_deep_analysis(p) g $$;
+GRANT EXECUTE ON FUNCTION public.t_gida(uuid) TO anon, authenticated, service_role;
+SELECT id AS shown_a_id FROM public.vehicle_images WHERE public.t_label2(id) = 'shown_a' \gset
+SELECT public.t_claims(''); SET ROLE anon;
+SELECT public.t_gida(:'shown_a_id') AS g_anon \gset
+SELECT public.t_claims('00000000-0000-0000-0000-000000000002'); SET ROLE authenticated;
+SELECT public.t_gida(:'shown_a_id') AS g_u2 \gset
+SELECT public.t_claims('00000000-0000-0000-0000-000000000001');
+SELECT public.t_gida(:'shown_a_id') AS g_u1 \gset
+SELECT public.t_claims('00000000-0000-0000-0000-000000000004');
+SELECT public.t_gida(:'shown_a_id') AS g_u4 \gset
+RESET ROLE;
+SELECT public.t_assert(:'g_anon'::jsonb ->> 'scene_type' = 'engine_bay' AND :'g_anon' NOT LIKE '%TST%' AND :'g_anon'::jsonb ->> 'place_hint' IS NULL
+  AND :'g_anon'::jsonb ->> 'agent_notes' IS NULL AND :'g_u2'::jsonb = :'g_anon'::jsonb,
+  'get_image_deep_analysis, anon and stranger: the photo''s scene, none of the withheld text');
+SELECT public.t_assert(:'g_u1'::jsonb ->> 'place_hint' = 'TSTPLACE-H' AND :'g_u1'::jsonb ->> 'agent_notes' LIKE 'TSTNOTE%'
+  AND :'g_u4'::jsonb = :'g_u1'::jsonb, 'get_image_deep_analysis, uploader and tied mechanic: every field');
+
+-- 12. The free-text check: no long string in the fixture escapes a rule; a new model-text path is reported.
+SELECT public.t_assert((SELECT count(*) FROM public.vehicle_images vi, public.image_scan_text_path_gaps(vi.ai_scan_metadata) g) = 0,
+  'free-text check: every string longer than 40 characters in the fixture sits under a rule');
+SELECT public.t_assert((SELECT array_agg(g ORDER BY g) FROM public.image_scan_text_path_gaps(
+    '{"new_reader": {"notes": [{"text": "a model sentence that names a street and a town and runs long"}]}, "route_result": "routed to the deep reader after the classifier marked it"}'::jsonb) g)
+  = '{new_reader.notes.[].text}'::text[], 'free-text check: a new long-string path is reported (array steps as []), a reviewed one is not');
+SELECT public.t_assert(NOT has_function_privilege('anon', 'public.image_scan_text_path_gaps(jsonb,integer,text)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.image_scan_text_path_gaps(jsonb,integer,text)', 'EXECUTE'), 'free-text check: service_role only');
+
+-- 13. The rules are read once per statement, not once per row: one evaluation (an InitPlan, loops=1) in the plan.
+SELECT public.t_claims(''); SET ROLE anon;
+CREATE TEMP TABLE t_rplan (l text);
+DO $$ DECLARE l text; BEGIN
+  FOR l IN EXECUTE $q$EXPLAIN (ANALYZE, VERBOSE, COSTS OFF, TIMING OFF, SUMMARY OFF) SELECT ai_scan_metadata -> 'classification' FROM public.vehicle_images_public$q$ LOOP
+    INSERT INTO t_rplan VALUES (l);
+  END LOOP;
+END $$;
+RESET ROLE;
+SELECT string_agg(l, E'\n') AS rplan FROM t_rplan \gset
+SELECT public.t_assert(
+  (length(:'rplan') - length(replace(:'rplan', 'Output: image_scan_rules(', ''))) / length('Output: image_scan_rules(') = 1
+  AND :'rplan' ~ 'InitPlan[^\n]*\n[^\n]*Result \(actual rows=1 loops=1\)\n[^\n]*Output: image_scan_rules\(',
+  'plan: the rules are one InitPlan evaluated once (loops=1), not once per row');
+
+-- 14. A rule on a whole object and one inside it: the whole object goes, the siblings stay (rolled back).
+BEGIN;
+INSERT INTO public.image_scan_withheld_paths (rule_kind, path, reason, basis)
+  VALUES ('free_text', '{byok_deep_analysis,presence}', 'test', 'test');
+SELECT public.t_claims(''); SET ROLE anon;
+SELECT (SELECT e -> 'm' -> 'byok_deep_analysis' FROM jsonb_array_elements(public.t_view_read()) e WHERE e ->> 'l' = 'shown_a') AS nested_b \gset
+RESET ROLE;
+ROLLBACK;
+SELECT public.t_assert(NOT (:'nested_b'::jsonb ? 'presence') AND :'nested_b'::jsonb -> 'camera_pose' = '{"yaw": 10}'
+  AND :'nested_b'::jsonb ->> 'scene_type' = 'engine_bay', 'overlapping rules: {presence} and {presence,place_hint} remove presence, keep the siblings');
+
+-- 15. The plate inside a kept string is replaced and the JSON stays valid; a plate that matches a bare number breaks the
+--     JSON text, and the photo's analysis is withheld whole rather than served (fixture rows, rolled back).
+-- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture)
+BEGIN;
+UPDATE public.vehicles SET license_plate = '48-2915' WHERE id = 'a0000000-0000-0000-0000-00000000000a';
+UPDATE public.vehicle_images SET ai_scan_metadata = ai_scan_metadata || '{"seen_at": "2026-11-25 48 2915"}'
+ WHERE public.t_label2(id) = 'shown_a';
+SELECT public.t_claims(''); SET ROLE anon;
+SELECT (SELECT e -> 'm' FROM jsonb_array_elements(public.t_view_read()) e WHERE e ->> 'l' = 'shown_a') AS plate_str \gset
+RESET ROLE;
+UPDATE public.vehicle_images SET ai_scan_metadata = ai_scan_metadata || '{"odometer_reading": 482915}'
+ WHERE public.t_label2(id) = 'shown_a';
+SET ROLE anon;
+SELECT (SELECT e -> 'm' FROM jsonb_array_elements(public.t_view_read()) e WHERE e ->> 'l' = 'shown_a') AS plate_num \gset
+RESET ROLE;
+ROLLBACK;
+SELECT public.t_assert(:'plate_str'::jsonb ->> 'seen_at' = '2026-11-25 [withheld]' AND :'plate_str'::jsonb ->> 'scene_class' = 'exterior',
+  'value redaction: the plate in a kept string, written with other separators, is replaced; the rest stays');
+SELECT public.t_assert(:'plate_num'::jsonb = '{"withheld": true}', 'value redaction that would break the JSON: the analysis is withheld whole');
+
+-- 17. A caller who passes their own rules cannot use the helper as an oracle for any vehicles column but the plate
+--     (owner_name set on car A, a crafted vehicle_value rule for it): the text comes back as passed.
+-- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture)
+BEGIN;
+UPDATE public.vehicles SET owner_name = 'Tstowner Q' WHERE id = 'a0000000-0000-0000-0000-00000000000a';
+SELECT public.t_claims(''); SET ROLE anon;
+SELECT public.image_scan_metadata_for_viewer('{"x": "Tstowner Q"}'::jsonb, NULL, 'a0000000-0000-0000-0000-00000000000a',
+  ARRAY[ROW('vehicle_value', '{}', '{}', 0, 'owner_name', '', 4)::public.image_scan_rule]) AS oracle_owner \gset
+SELECT public.image_scan_metadata_for_viewer('{"x": "tst-pl8 9"}'::jsonb, NULL, 'a0000000-0000-0000-0000-00000000000a',
+  ARRAY[ROW('vehicle_value', '{}', '{}', 0, 'license_plate', '', 4)::public.image_scan_rule]) AS oracle_plate \gset
+RESET ROLE;
+ROLLBACK;
+SELECT public.t_assert(:'oracle_owner'::jsonb = '{"x": "Tstowner Q"}' AND :'oracle_plate'::jsonb = '{"x": "[withheld]"}',
+  'crafted rules: only the plate is ever redacted (the plate is the one value the helper can confirm)');
+
+-- 16. The revert applies: the 2026-11-25 bodies come back (its own md5 checks) and the new objects are gone.
+\ir revert_20261125200000_scan_metadata_withheld_paths.sql
+SELECT public.t_assert(to_regtype('public.image_scan_rule') IS NULL AND to_regclass('public.image_scan_withheld_paths') IS NULL
+  AND to_regprocedure('public.image_scan_rules(text)') IS NULL AND to_regprocedure('public.image_scan_text_path_gaps(jsonb,integer,text)') IS NULL,
+  'revert: rule table, type and helpers dropped, live bodies restored');
 
 SELECT 'scan_metadata_withheld_paths contract: PASS' AS result;

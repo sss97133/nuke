@@ -1,6 +1,6 @@
 -- Revert of 20261125200000_scan_metadata_withheld_paths.sql: vehicle_images_public serves ai_scan_metadata raw again,
--- vehicle_image_findings reads vehicle_images with no gallery test (its 20261014052000 body), and the helper and the
--- rule table are dropped. Run by hand only if the migration must be undone; it re-opens the place_hint and plate leak.
+-- vehicle_image_findings reads vehicle_images with no gallery test (its 20261014052000 body), get_image_deep_analysis
+-- reads byok_deep_analysis raw (its 20261125160500 body), and the helpers, the rule type and the rule table are dropped. Run by hand only if the migration must be undone; it re-opens the place_hint and plate leak.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
@@ -211,13 +211,58 @@ $function$;
 REVOKE ALL ON FUNCTION public.vehicle_image_findings(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_image_findings(uuid) TO anon, authenticated, service_role;
 
+-- get_image_deep_analysis: its 20261125160500 body, reading byok_deep_analysis raw.
+CREATE OR REPLACE FUNCTION public.get_image_deep_analysis(p_image_id uuid)
+ RETURNS TABLE(image_id uuid, narrative text, intent text, intent_confidence numeric, scene_type text, build_phase text, place_hint text, confidence numeric, agent_model text, agent_notes text, analyzed_at timestamp with time zone, paint_state text, rust_severity text, completeness text, damage_callouts jsonb, components jsonb, open_questions jsonb, needs_review boolean)
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+ -- definer_readers_visibility_v1: shown, uploader or tied (20261125160500)
+ SELECT vi.id,b->>'narrative_one_line',b->>'intent',nullif(b->>'intent_confidence','')::numeric,
+  b->>'scene_type',b->>'build_phase_guess',b->'presence'->>'place_hint',nullif(b->>'confidence','')::numeric,
+  b->>'agent_model',b->>'agent_notes',nullif(b->>'analyzed_at','')::timestamptz,
+  b->'state_observations'->>'paint_state',b->'state_observations'->>'rust_severity',
+  b->'state_observations'->>'completeness',b->'state_observations'->'damage_callouts',
+  b->'components_seen',b->'open_questions',nullif(b->>'needs_review','')::boolean
+ FROM public.vehicle_images vi
+ CROSS JOIN LATERAL(SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS b) j
+ WHERE vi.id=p_image_id AND vi.ai_scan_metadata ? 'byok_deep_analysis'
+   AND (coalesce(b->>'prompt_version','')<>'reviewed_image_analysis_v1' OR EXISTS(
+     SELECT 1 FROM public.image_observations io WHERE io.image_id=vi.id AND io.is_active
+       AND io.observed_by='caller-byok' AND io.agent_version='reviewed_image_analysis_v1'
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=b->>'observation_id'
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,image_url}'=vi.image_url
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,vehicle_id}'=vi.vehicle_id::text))
+   AND (
+     coalesce((
+       SELECT true
+       FROM public.vehicle_images_public vip
+       JOIN public.vehicles v ON v.id = vip.vehicle_id
+       WHERE vip.id = vi.id
+         AND coalesce(vip.is_sensitive, false) = false
+         AND v.is_public = true
+         AND v.deleted_at IS NULL
+         AND public.vehicle_image_gallery_eligible(vip)), false)
+     OR ((SELECT auth.uid()) IS NOT NULL AND vi.user_id = (SELECT auth.uid()))
+     OR public.vehicle_viewer_tied(vi.vehicle_id));
+$function$;
+
+DROP FUNCTION IF EXISTS public.image_scan_text_path_gaps(jsonb, integer, text);
 DROP FUNCTION IF EXISTS public.image_scan_metadata_for_viewer(jsonb, uuid, uuid);
+DROP FUNCTION IF EXISTS public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[]);
+DROP FUNCTION IF EXISTS public.image_scan_rules(text);
+DROP TYPE IF EXISTS public.image_scan_rule;
 DROP TABLE IF EXISTS public.image_scan_withheld_paths;
 
 DO $verify$
 BEGIN
   IF md5(pg_get_viewdef('public.vehicle_images_public'::regclass)) <> '21ad7028a04d54602de5c195f175cdf2' THEN
     RAISE EXCEPTION 'vehicle_images_public is not the 2026-11-25 definition';
+  END IF;
+  IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.vehicle_image_findings(uuid)'::regprocedure) <> '3f3b62421cfc0b516106029ecf0945a9'
+     OR (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.get_image_deep_analysis(uuid)'::regprocedure) <> '35593b09f682203f625e5c058740a29d' THEN
+    RAISE EXCEPTION 'vehicle_image_findings or get_image_deep_analysis is not its 2026-11-25 body';
   END IF;
 END
 $verify$;
