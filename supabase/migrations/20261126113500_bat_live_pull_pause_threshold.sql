@@ -11,13 +11,13 @@
 --     then cron 510 runs under statement_timeout 50s and a failed run writes no sample, so a sample is never over ~50 s:
 --     the rule can no longer see that stall, only load.
 --   * bat-live-pull, cron.job_run_details, 24 h to 06:13 PT: 1,440 runs, 61 failed (statement timeout), p50 3.7 s,
---     p90 18.9 s. Hourly p50 2.5-3.8 s from 06:00 to 15:00 PT 11-24 (the 11-24 closes, 10:00-15:05 PT, included),
+--     p90 18.9 s. Hourly p50 2.5-3.8 s from 07:00 to 15:00 PT 11-24 (the 11-24 closes, 10:00-15:05 PT, included),
 --     8.1-14.6 s from 16:00 to 20:00 PT, 4.2-5.7 s overnight, 11.3 s at 06:00 PT 11-25. In that last stretch the samples
 --     ran 0.5-39.5 s with the backend in IO DataFileRead (pg_stat_activity samples at 06:16-06:17), during
 --     autovacuum of vehicles and alongside data-set-grades-backfill (every minute since 18:00 PT 11-24),
 --     data-set-public-counts and model-fold-tick.
 --   * Its own statements are cheap (EXPLAIN ANALYZE, warm): retire 39 ms, dispatch 1.7 s, board sync 213 ms,
---     reconcile 26 ms, relive 31 ms. The run time is shared IO load, which pausing the reads does not relieve.
+--     reconcile 26 ms, relive 31 ms. The run time is shared IO load; a paused run still costs nearly the same (the up-to-6 reads a minute it would dispatch were not measured).
 --   * Rolling median of the previous 10 successful cron runs over the 24 h: over 15 s in 19 minutes, over 20 s in 7,
 --     over 30 s in 0. At 15000 the rule drops closing reads exactly when load is high. The 11-25 closes (189 lots,
 --     10:00-13:30 PT) read at closing_slots 1 per minute and have no slack for paused minutes.
