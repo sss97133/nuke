@@ -2,7 +2,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { LaborAppraisalView, rangeText, witnessText, witnessedHoursText, witnessedTotalText } from './LaborAppraisal';
+import { LaborAppraisalView, rangeText, stepText, witnessText, witnessedHoursText, witnessedTotalText, witnessedUnknownText } from './LaborAppraisal';
 import live214500 from './__fixtures__/labor-appraisal-214500.json';
 import type { LaborAppraisal } from './hooks/useLaborAppraisal';
 import live from './__fixtures__/labor-appraisal.json';
@@ -92,6 +92,16 @@ describe('LaborAppraisalView', () => {
     expect(witnessedTotalText({ ...w, max_witnessed: false })).toBe('at least 71 h, typical 81 h');
     expect(witnessedTotalText({ ...w, hours_max: null })).toBe('at least 71 h, typical 81 h');
     expect(witnessedTotalText({ hours_min: null, hours_typical: null, hours_max: 40 })).toBeNull();
+    // 20261125033000: a witnessed max that leaves segments unknown is not a bound either.
+    expect(witnessedTotalText({ hours_min: 71, hours_typical: 81, hours_max: 92, unknown_max_segments: 4 })).toBe('at least 71 h, typical 81 h');
+    expect(witnessedUnknownText({ unknown_min_segments: 4, unknown_max_segments: 4 })).toBe(' (4 segments with no witnessed minimum, 4 with no witnessed maximum)');
+    expect(witnessedUnknownText({ unknown_min_segments: 0, unknown_max_segments: null })).toBe('');
+  });
+
+  it('names a stage step by the reader\'s transition label, else by its stages', () => {
+    const names = { transitions: { t1: { label: 'Full body block sand' } } };
+    expect(stepText({ transition_id: 't1', from_stage: 'primed', to_stage: 'blocked' }, names)).toBe('Full body block sand');
+    expect(stepText({ transition_id: 't2', from_stage: 'primed', to_stage: 'blocked' }, names)).toBe('primed to blocked');
   });
 
   it('says a missing witnessed minimum instead of filling it', () => {

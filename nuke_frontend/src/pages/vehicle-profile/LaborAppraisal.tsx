@@ -1,6 +1,6 @@
 import React from 'react';
 import { Section, Rows, Row, Text, codeText } from '../../kit';
-import { useLaborAppraisal, type LaborAppraisal as Appraisal, type LaborPart, type LaborRange, type LaborSegment, type LaborStageStep } from './hooks/useLaborAppraisal';
+import { useLaborAppraisal, type LaborAppraisal as Appraisal, type LaborNames, type LaborPart, type LaborRange, type LaborSegment, type LaborStageStep } from './hooks/useLaborAppraisal';
 
 /**
  * vehicle_labor_appraisal, segment by segment, as the reader returns it. Every hour figure, grade and rule is the reader's;
@@ -17,8 +17,10 @@ export function rangeText(r: LaborRange | null | undefined): string | null {
   return `${h(r.hours_min)} to ${h(r.hours_max)}, typical ${h(r.hours_typical)}`;
 }
 
-const stepText = (s: LaborStageStep) => [
-  [s.from_stage, s.to_stage].filter(Boolean).map(v => codeText(String(v))).join(' to '),
+/** A stage step: the reader's label for its transition when it names one, else its two stages. */
+export const stepText = (s: LaborStageStep, names?: LaborNames | null) => [
+  (s.transition_id && names?.transitions?.[s.transition_id]?.label)
+    || [s.from_stage, s.to_stage].filter(Boolean).map(v => codeText(String(v))).join(' to '),
   s.zone && !s.zone.includes('*') ? codeText(s.zone) : null,
   s.status ? codeText(s.status) : null,
   s.photo_phase ? `photographed as ${codeText(s.photo_phase)}` : null,
@@ -28,13 +30,14 @@ const stepText = (s: LaborStageStep) => [
 ].filter(Boolean).join(' · ');
 
 /** A part line as the reader names it: the catalog part's name, else the reader's own words. Without them it is counted. */
-const partWords = (p: LaborPart) => p.part?.name || p.name || p.description || null;
+const partWords = (p: LaborPart, names?: LaborNames | null) => p.part?.name || p.name || p.description
+  || (p.operation_code ? names?.operations?.[p.operation_code]?.name : null) || null;
 
 /** The reassembly parts: each named part with its hours, the rest counted. Operation codes are the book's keys, not
  *  words, so they are not printed; a part the reader does not name is counted, never flagged. */
-function PartsLine({ title, parts }: { title: string; parts: LaborPart[] }) {
-  const named = parts.filter(p => partWords(p));
-  const said = named.map(p => [partWords(p), h(p.hours)].filter(Boolean).join(', '));
+export function PartsLine({ title, parts, names }: { title: string; parts: LaborPart[]; names?: LaborNames | null }) {
+  const named = parts.filter(p => partWords(p, names));
+  const said = named.map(p => [partWords(p, names), h(p.hours)].filter(Boolean).join(', '));
   const others = parts.length - named.length;
   return <Text role="caption" as="p" className="k-item__line">
     {title}: {parts.length}{said.length ? `. ${said.join('; ')}` : ''}{said.length && others ? `; ${others} more` : ''}
@@ -84,12 +87,21 @@ export function witnessText(segment: LaborSegment): string | null {
 
 /** The witnessed total as the reader marks it. A max the reader marks unwitnessed (max_witnessed false), or does not
  *  send, is not printed as the top of a witnessed range: "at least 71 h, typical 81 h". No bound is decided here. */
-export function witnessedTotalText(w: (LaborRange & { max_witnessed?: boolean | null }) | null | undefined): string | null {
+export function witnessedTotalText(w: (LaborRange & { max_witnessed?: boolean | null; unknown_max_segments?: number | null }) | null | undefined): string | null {
   if (!w || w.hours_typical == null) return null;
-  if (w.max_witnessed === false || (w.hours_max == null && w.hours_min != null)) {
+  if (w.max_witnessed === false || (w.unknown_max_segments ?? 0) > 0 || (w.hours_max == null && w.hours_min != null)) {
     return w.hours_min != null && w.hours_min !== w.hours_typical ? `at least ${h(w.hours_min)}, typical ${h(w.hours_typical)}` : `at least ${h(w.hours_typical)}`;
   }
   return rangeText(w);
+}
+
+/** The reader's counts of segments with no witnessed minimum or maximum, said beside the witnessed total. */
+export function witnessedUnknownText(w: { unknown_min_segments?: number | null; unknown_max_segments?: number | null } | null | undefined): string {
+  const said = [
+    w?.unknown_min_segments ? `${w.unknown_min_segments} segments with no witnessed minimum` : null,
+    w?.unknown_max_segments ? `${w.unknown_max_segments} with no witnessed maximum` : null,
+  ].filter(Boolean);
+  return said.length ? ` (${said.join(', ')})` : '';
 }
 
 /** The segment's witnessed hours, when the reader sends them and they differ from its hours. A missing minimum is
@@ -104,7 +116,7 @@ export function witnessedHoursText(segment: LaborSegment): string | null {
 }
 
 /** One segment as one kit item: its name and hours on the row, then how the hours are known, line by line. */
-export function SegmentRows({ segment }: { segment: LaborSegment }) {
+export function SegmentRows({ segment, names }: { segment: LaborSegment; names?: LaborNames | null }) {
   const r = segment.reassembly;
   const known = [
     segment.evidence_grade ? `Evidence: ${codeText(segment.evidence_grade)}` : 'Ungraded by the reader',
@@ -126,9 +138,9 @@ export function SegmentRows({ segment }: { segment: LaborSegment }) {
     {witnessedHours && <Text role="caption" as="p" className="k-item__line">{witnessedHours}</Text>}
     {witnessed && <Text role="caption" as="p" className="k-item__line">Pieces: {witnessed}</Text>}
     {segment.range_below_paper && <Text role="caption" as="p" className="k-item__line">The book range is below the hours on shop paper; the paper hours are used.</Text>}
-    {!!segment.stage_steps?.length && <Text role="caption" as="p" className="k-item__line">Stages: {segment.stage_steps.map(stepText).join('; ')}</Text>}
-    {!!r?.matched?.length && <PartsLine title="Fitted parts with a book operation" parts={r.matched} />}
-    {!!r?.unmatched?.length && <PartsLine title="Fitted parts without a book operation" parts={r.unmatched} />}
+    {!!segment.stage_steps?.length && <Text role="caption" as="p" className="k-item__line">Stages: {segment.stage_steps.map(s => stepText(s, names)).join('; ')}</Text>}
+    {!!r?.matched?.length && <PartsLine title="Fitted parts with a book operation" parts={r.matched} names={names} />}
+    {!!r?.unmatched?.length && <PartsLine title="Fitted parts without a book operation" parts={r.unmatched} names={names} />}
   </div>;
 }
 
@@ -150,14 +162,13 @@ export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
   return <Section title="Labor appraisal by segment" coverage={coverage}>
     <Text role="caption" as="p">Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.</Text>
     {appraisal.totals?.witnessed && withPurchases && <div title={appraisal.totals?.rule ?? undefined}><Rows title="Hours, two totals side by side">
-      <Row label="Witnessed" role="measure">{witnessedTotal ?? 'none established'}{appraisal.totals?.witnessed?.unknown_min_segments
-        ? ` (${appraisal.totals.witnessed.unknown_min_segments} segments with no witnessed minimum)` : ''}</Row>
+      <Row label="Witnessed" role="measure">{witnessedTotal ?? 'none established'}{witnessedUnknownText(appraisal.totals?.witnessed)}</Row>
       <Row label="With purchases not seen fitted" role="measure">{withPurchases}</Row>
     </Rows></div>}
     {byGrade.length > 0 && <Rows title="Hours by evidence grade">
       {byGrade.map(([grade, range]) => <Row key={grade} label={codeText(grade)} role="measure">{rangeText(range) ?? 'No hours'}</Row>)}
     </Rows>}
-    <div className="k-items">{priced.map(s => <SegmentRows key={s.segment} segment={s} />)}</div>
+    <div className="k-items">{priced.map(s => <SegmentRows key={s.segment} segment={s} names={appraisal.names} />)}</div>
     {appraisal.logic_version && <Text role="caption" as="p" className="vp-reader-version">Reader: vehicle_labor_appraisal · {appraisal.logic_version}</Text>}
   </Section>;
 }
