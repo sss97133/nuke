@@ -133,6 +133,10 @@ export async function claimStageWorkUpTo(rpc, { stage, limit, leaseSeconds, user
 // about one photo's prompt, not the account.
 export const USAGE_LIMIT = /usage limit|(?:hit|reached) your [\w' -]{0,24}limit|(?:5-hour|session|weekly|opus|sonnet) limit reached|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b/i;
 const OUTPUT_INVALID = /no JSON|not valid JSON|in JSON at position|Unexpected (?:token|end)|is not valid JSON/i;
+// the CLI refused its own login before any request (no API status): a malformed or expired token fails every photo the same
+// way. 2026-11-24, first Actions fire: "Invalid auth token   Fix external auth token   Invalid Authorization header value from
+// CLAUDE_CODE_OAUTH_TOKEN: it contains a line break", typed reader_exited, so every claimed photo would have spent a receipt.
+export const LOGIN_REFUSED = /invalid auth token|fix external auth token|invalid authorization header|invalid api key|oauth token (?:has )?(?:expired|been revoked|revoked)|please run \/login|not logged in/i;
 // the API cannot be reached from this machine: the next photo would fail the same way
 const API_DOWN = /API Error: (?:5\d\d|Connection|connect|fetch failed|network|socket)|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT/i;
 
@@ -174,7 +178,7 @@ export function receiptForResult(result, { reader, promptVersion } = {}) {
     if (result.reader.invalidOutput || OUTPUT_INVALID.test(msg)) return { outcome: 'unavailable', error_class: 'reader_output_invalid', retry_after_seconds: 1800, detail };
     if (api === 429 || api === 529 || USAGE_LIMIT.test(msg)) return { outcome: 'rate_limited', error_class: 'reader_usage_limit', http_status: api || null, retry_after_seconds: 3600, stop: true, detail };
     // a login that stopped working fails every photo the same way
-    if (api === 401 || api === 403) return { outcome: 'unavailable', error_class: 'reader_unauthorized', http_status: api, retry_after_seconds: 3600, stop: true, detail };
+    if (api === 401 || api === 403 || LOGIN_REFUSED.test(msg)) return { outcome: 'unavailable', error_class: 'reader_unauthorized', http_status: api || null, retry_after_seconds: 3600, stop: true, detail };
     if (api >= 500 || API_DOWN.test(msg)) return { outcome: 'unavailable', error_class: 'reader_api_unreachable', http_status: api || null, retry_after_seconds: 1800, stop: true, detail };
     return { outcome: 'unavailable', error_class: 'reader_exited', http_status: api || null, retry_after_seconds: 1800, detail };
   }

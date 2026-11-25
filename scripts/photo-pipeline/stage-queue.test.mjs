@@ -304,3 +304,19 @@ test('--owner config takes the one owner the reconciler names, and refuses anyth
     await assert.rejects(ownerFromStageConfig(rest(cfg)), (e) => e.code === 'owner_config' && !e.message.includes(id));
   }
 });
+
+test('a login the CLI refuses before any request ends the batch, like a 401', () => {
+  const ctx = { reader: 'claude-cli test subscription', promptVersion: 'v' };
+  for (const msg of [
+    'reader error: Invalid auth token   Fix external auth token   Invalid Authorization header value from CLAUDE_CODE_OAUTH_TOKEN: it contains a line break at character 80 (110 characters on 2 lines).',
+    'claude exited 1: Invalid API key · Please run /login',
+    'reader error: OAuth token has expired',
+  ]) {
+    const r = receiptForResult({ reader: { error: msg } }, ctx);
+    assert.equal(r.error_class, 'reader_unauthorized', msg);
+    assert.equal(r.stop, true, msg);
+    assert.equal(r.http_status, null, msg);
+  }
+  assert.equal(receiptForResult({ reader: { error: 'reader error: x', apiStatus: 401 } }, ctx).http_status, 401);
+  assert.equal(receiptForResult({ reader: { error: 'claude exited 1: boom' } }, ctx).error_class, 'reader_exited');
+});
