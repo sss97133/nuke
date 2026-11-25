@@ -31,7 +31,21 @@ SELECT c, 1 FROM unnest(ARRAY['ELEC-WIRING-HARNESS','ELEC-GAUGES','ELEC-HEADLIGH
   'MECH-SUSPENSION-FRONT','MECH-TRANS-RR','TRIM-BUMPERS-REAR','TRIM-BUMPERS-FRONT','TRIM-GRILLE','TRIM-MIRRORS',
   'BODY-REPLACE-HOOD','BODY-REPLACE-FENDER','BODY-RUST-PANEL']) c;
 
-CREATE TABLE public.receipt_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), description text, part_number text);
+CREATE TABLE public.receipt_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_id uuid, description text, part_number text,
+  total_price numeric, hours numeric, line_date date, performer text
+);
+CREATE TABLE public.receipts (
+  id uuid PRIMARY KEY, vendor_name text, document_kind text, is_superseded boolean, duplicate_of uuid
+);
+CREATE TABLE public.vehicles (id uuid PRIMARY KEY, make text, year int);
+CREATE TABLE public.receipt_vehicle_links (
+  receipt_id uuid, vehicle_id uuid, status text, retired_at timestamptz
+);
+CREATE FUNCTION public.receipt_doc_kind_quoted(k text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT coalesce(k = 'quote', false) $$;
+CREATE FUNCTION public.receipt_doc_kind_excluded(k text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT coalesce(k = 'personal_purchase', false) $$;
+CREATE FUNCTION public.receipt_line_kind(d text, pn text, p numeric, h numeric, ld date, perf text) RETURNS text
+LANGUAGE sql IMMUTABLE AS $$ SELECT CASE WHEN d ~* '^labor' THEN 'labor' ELSE 'part' END $$;
 CREATE TABLE public.evidence_judgment_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), question_kind text, params jsonb
 );
@@ -167,6 +181,69 @@ DO $$ BEGIN
     INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, system_key, source, proposed_by_agent_key)
     VALUES ('sys.905.anon', 'system', 905, 'x', 'body', 'test', 'test');
     RAISE EXCEPTION 'FAIL: anon wrote a rule';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END $$;
+RESET ROLE;
+
+-- gaps: the unmatched fold (migration 20261124163100).
+\i supabase/migrations/20261124163100_receipt_line_gaps.sql
+DELETE FROM public.receipt_line_rules WHERE status <> 'active' OR rule_id LIKE '%test%';
+INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a1', 'Pontiac', 1973),
+                                   ('00000000-0000-0000-0000-0000000000a2', 'Chevrolet', 1977);
+INSERT INTO public.receipts VALUES
+  ('00000000-0000-0000-0000-0000000000b1', 'Vendor One', 'parts_service', false, NULL),
+  ('00000000-0000-0000-0000-0000000000b2', 'Vendor Two', 'unknown', false, NULL),
+  ('00000000-0000-0000-0000-0000000000b3', 'Pet Shop', 'personal_purchase', false, NULL),
+  ('00000000-0000-0000-0000-0000000000b4', 'Vendor One', 'parts_service', true, NULL),
+  ('00000000-0000-0000-0000-0000000000b5', 'Vendor Two', 'parts_service', false, NULL);
+INSERT INTO public.receipt_vehicle_links VALUES
+  ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000a1', 'linked', NULL),
+  ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a2', 'linked', NULL),
+  ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000a1', 'linked', NULL),
+  ('00000000-0000-0000-0000-0000000000b4', '00000000-0000-0000-0000-0000000000a1', 'linked', NULL),
+  ('00000000-0000-0000-0000-0000000000b5', '00000000-0000-0000-0000-0000000000a1', 'retired', now());
+DELETE FROM public.receipt_items;
+INSERT INTO public.receipt_items (id, receipt_id, description) VALUES
+  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000b1', 'clutch kit'),          -- classified
+  ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000b1', 'rear spoiler decal'),  -- trim, no op
+  ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-0000000000b2', 'wing mount'),          -- no system
+  ('00000000-0000-0000-0000-0000000000c9', '00000000-0000-0000-0000-0000000000b2', 'spoiler blade'),       -- trim, no op, second car
+  ('00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-0000000000b2', 'hex bolts'),           -- hardware
+  ('00000000-0000-0000-0000-0000000000c5', '00000000-0000-0000-0000-0000000000b2', 'labor install'),       -- not a part
+  ('00000000-0000-0000-0000-0000000000c6', '00000000-0000-0000-0000-0000000000b3', 'dog food'),            -- excluded kind
+  ('00000000-0000-0000-0000-0000000000c7', '00000000-0000-0000-0000-0000000000b4', 'spoiler'),             -- superseded
+  ('00000000-0000-0000-0000-0000000000c8', '00000000-0000-0000-0000-0000000000b5', 'spoiler');             -- retired link
+SELECT public.assert(count(*) = 5, 'gap population: ' || count(*)) FROM public.receipt_line_gaps;
+SELECT public.assert(gap IS NULL AND operation_code = 'MECH-TRANS-RR' AND operation_rule_id = 'op.130.mech-trans-rr',
+                     'classified line') FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-0000000000c1';
+SELECT public.assert(gap = 'no_operation' AND system_key = 'trim', 'trim gap')
+  FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-0000000000c2';
+SELECT public.assert(gap = 'no_system', 'no system') FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-0000000000c3';
+SELECT public.assert(gap = 'no_operation_expected', 'hardware') FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-0000000000c4';
+-- The worklist puts the word two vehicles share first.
+SELECT public.assert(term = 'spoiler' AND vehicles = 2 AND lines = 2, 'top term: ' || term)
+  FROM (SELECT * FROM public.receipt_line_gap_terms LIMIT 1) t;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.receipt_line_gap_terms WHERE term IN ('dog', 'food', 'hex', 'bolts')),
+                     'excluded or expected lines leaked into the worklist');
+-- A scoped rule fills a gap only for its vendor's lines.
+INSERT INTO public.labor_operations (code, base_hours) VALUES ('TRIM-SPOILER-RR', 1) ON CONFLICT DO NOTHING;
+INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, operation_code, scope_vendor_pattern,
+                                       status, source, proposed_by_agent_key, promoted_at)
+VALUES ('op.600.spoiler-vendor-two', 'labor_operation', 600, '\yspoiler\y', 'TRIM-SPOILER-RR', 'vendor two', 'active',
+        'test fixture', 'test', now());
+SELECT public.assert(gap IS NULL, 'scoped rule fills its vendor line') FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-0000000000c9';
+SELECT public.assert(gap = 'no_operation', 'scoped rule leaves the other vendor') FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-0000000000c2';
+SET ROLE anon;
+DO $$ BEGIN
+  BEGIN
+    PERFORM 1 FROM public.receipt_line_gaps;
+    RAISE EXCEPTION 'FAIL: anon read receipt_line_gaps';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM 1 FROM public.receipt_line_gap_counts;
+    RAISE EXCEPTION 'FAIL: anon read receipt_line_gap_counts';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 END $$;
