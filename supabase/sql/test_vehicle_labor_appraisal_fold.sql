@@ -222,6 +222,29 @@ DO $$ BEGIN
 END $$;
 SELECT public.vehicle_labor_appraisal_fold(v) FROM fold_v;
 
+-- A plain INSERT of a labor input on a car with a row stamps it and is admitted at priority 2 (the new-input path).
+DELETE FROM public.model_fold_signal;
+INSERT INTO public.receipts (id, vehicle_id) SELECT '20000000-0000-0000-0000-000000000002', v FROM fold_v;
+DO $$
+DECLARE vid uuid := (SELECT v FROM fold_v);
+BEGIN
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'false', 'receipt insert: stamped stale');
+  PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = vid AND g.priority = 2),
+                        'receipt insert: admitted at priority 2');
+END $$;
+-- A stamp older than 24.8 days (int milliseconds overflow) still folds and logs its wait.
+UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = now() - interval '400 days',
+       folded_at = now() - interval '401 days' WHERE vehicle_id = (SELECT v FROM fold_v);
+DO $$
+DECLARE vid uuid := (SELECT v FROM fold_v); r jsonb;
+BEGIN
+  r := public.vehicle_labor_appraisal_fold(vid);
+  PERFORM public.assert(NOT (r ? 'error'), 'old stamp folds: ' || r::text);
+  PERFORM public.assert((SELECT wait_ms FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = vid ORDER BY id DESC LIMIT 1)
+                        > 400::bigint * 86400 * 1000 - 1, 'old stamp: wait logged in bigint ms');
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'true', 'old stamp: fresh after fold');
+END $$;
+
 -- A no-op update keeps the key; a rule row edit moves it, every row is stale, and the seed signals them again.
 CREATE TEMP TABLE key0 AS SELECT public.vehicle_labor_appraisal_logic_key() AS k;
 UPDATE public.labor_hours_bases SET meaning = meaning WHERE basis_key = 'uncited_seed';

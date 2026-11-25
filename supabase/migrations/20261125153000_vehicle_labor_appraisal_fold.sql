@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_labor_appraisal_fold_runs (
   vehicle_id uuid NOT NULL REFERENCES public.vehicles(id) ON DELETE CASCADE,
   started_at timestamptz NOT NULL,
   stamped_at timestamptz,
-  wait_ms integer,
+  wait_ms bigint,
   ms integer NOT NULL,
   error text
 );
@@ -180,7 +180,7 @@ BEGIN
       read_hash = excluded.read_hash, logic_version = excluded.logic_version, folded_key = excluded.folded_key,
       folded_at = excluded.folded_at, ms = excluded.ms, error = NULL, updated_at = now();
     INSERT INTO public.vehicle_labor_appraisal_fold_runs (vehicle_id, started_at, stamped_at, wait_ms, ms)
-    VALUES (p_vehicle, t0, stamp, (extract(epoch FROM t0 - stamp) * 1000)::int, ms);
+    VALUES (p_vehicle, t0, stamp, (extract(epoch FROM t0 - stamp) * 1000)::bigint, ms);
     RETURN jsonb_build_object('vehicle_id', p_vehicle, 'ms', ms, 'key', k);
   EXCEPTION WHEN OTHERS THEN
     ms := (extract(epoch FROM clock_timestamp() - t0) * 1000)::int;
@@ -188,7 +188,7 @@ BEGIN
     VALUES (p_vehicle, k, ms, left(SQLERRM, 500), now())
     ON CONFLICT (vehicle_id) DO UPDATE SET ms = excluded.ms, error = excluded.error, updated_at = now();
     INSERT INTO public.vehicle_labor_appraisal_fold_runs (vehicle_id, started_at, stamped_at, wait_ms, ms, error)
-    VALUES (p_vehicle, t0, stamp, (extract(epoch FROM t0 - stamp) * 1000)::int, ms, left(SQLERRM, 500));
+    VALUES (p_vehicle, t0, stamp, (extract(epoch FROM t0 - stamp) * 1000)::bigint, ms, left(SQLERRM, 500));
     RETURN jsonb_build_object('vehicle_id', p_vehicle, 'ms', ms, 'error', left(SQLERRM, 500));
   END;
 END $fn$;
@@ -380,10 +380,10 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog,
       FROM public.vehicle_labor_appraisal_state s),
   runs AS (
     SELECT count(*) AS folds_24h,
-           count(*) FILTER (WHERE r.stamped_at IS NOT NULL) AS stamps_answered_24h,
+           count(*) FILTER (WHERE r.stamped_at IS NOT NULL AND r.error IS NULL) AS stamps_answered_24h,
            count(*) FILTER (WHERE r.error IS NOT NULL) AS errors_24h,
-           round((percentile_cont(0.5) WITHIN GROUP (ORDER BY (r.wait_ms + r.ms)) FILTER (WHERE r.stamped_at IS NOT NULL) / 1000.0)::numeric, 1) AS stale_p50_s,
-           round((percentile_cont(0.9) WITHIN GROUP (ORDER BY (r.wait_ms + r.ms)) FILTER (WHERE r.stamped_at IS NOT NULL) / 1000.0)::numeric, 1) AS stale_p90_s
+           round((percentile_cont(0.5) WITHIN GROUP (ORDER BY (r.wait_ms + r.ms)) FILTER (WHERE r.stamped_at IS NOT NULL AND r.error IS NULL) / 1000.0)::numeric, 1) AS stale_p50_s,
+           round((percentile_cont(0.9) WITHIN GROUP (ORDER BY (r.wait_ms + r.ms)) FILTER (WHERE r.stamped_at IS NOT NULL AND r.error IS NULL) / 1000.0)::numeric, 1) AS stale_p90_s
       FROM public.vehicle_labor_appraisal_fold_runs r WHERE r.started_at > now() - interval '24 hours')
   SELECT jsonb_build_object('rows', st.n_rows, 'off_key', st.off_key, 'stale_now', st.stale_now, 'errored', st.errored,
     'newest_folded_at', st.newest_folded_at, 'folds_24h', runs.folds_24h, 'stamps_answered_24h', runs.stamps_answered_24h,
