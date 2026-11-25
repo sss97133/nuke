@@ -45,6 +45,7 @@ jobs:
           supabase/functions/ingest-observation/financialCandidates_test.ts
           supabase/functions/ingest-observation/financialCandidateContext_test.ts
           supabase/functions/ingest-observation/financialPngPixels.test.ts
+          supabase/functions/ingest-observation/batLiveCollector.test.ts
       - name: Install native source-processing build dependencies
         timeout-minutes: 12
         run: |

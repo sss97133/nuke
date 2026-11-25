@@ -145,6 +145,7 @@ end $function$;
 \ir ../migrations/20261125141500_labor_hours_basis.sql
 \ir ../migrations/20261125153000_vehicle_labor_appraisal_fold.sql
 \ir ../migrations/20261125153000_vehicle_labor_appraisal_fold.sql
+\ir ../migrations/20261125210500_vehicle_labor_appraisal_fold_reapply.sql
 
 -- Every fixture car is in scope through one judgment request row (the fixture's own rows, or one added here).
 INSERT INTO public.evidence_judgment_requests (vehicle_id, question_kind, status)

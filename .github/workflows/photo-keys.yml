@@ -95,12 +95,21 @@ jobs:
         # The lane itself is standard-library Python; the CLI is its only dependency.
         run: npm install -g @anthropic-ai/claude-code
 
-      - &check-subscription
-        name: Check the subscription sign-in (no model call, no database call)
+      # The only step that names the secret. It removes the whitespace the stored value holds, masks the joined value and
+      # exports it through GITHUB_ENV for this job's later steps (scripts/ci/subscription-token.sh). A later step must not
+      # name the secret in its own env: that would put the stored value back (scripts/guardrails/workflow-log-counts-only.mjs).
+      - &subscription-token
+        name: Take the subscription token (whitespace removed, masked, shape printed)
         if: inputs.step != 'properties'
         shell: bash
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: bash scripts/ci/subscription-token.sh
+
+      - &check-subscription
+        name: Check the subscription sign-in (no model call, no database call)
+        if: inputs.step != 'properties'
+        shell: bash
         run: |
           unset ANTHROPIC_API_KEY
           echo "cred-check | CLAUDE_CODE_OAUTH_TOKEN length: ${#CLAUDE_CODE_OAUTH_TOKEN}"
@@ -129,7 +138,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           KEYS_PHOTOS: ${{ inputs.photos }}
           KEYS_MODEL: ${{ inputs.model }}
           KEYS_AFTER: ${{ inputs.after }}
@@ -160,8 +168,24 @@ jobs:
           # The lane's exit code is the step's: 0 work done or nothing left; 1 a read failed, the writer did not
           # take what was sent, or the model call failed for three photos in a row; 2 bad input; 3 usage limit;
           # 4 authentication; 5 no photo could be keyed.
-          # -u: one line a photo reaches the log as it happens, so a run the timeout ends still shows how far it got.
-          python3 -u scripts/photo-pipeline/keys_lane.py "${args[@]}"
+          # This log and the step summary are public. The lane prints text lines, and two of them can carry model words
+          # (what the claude CLI said; the states it could not land, by name). So only lines that start with one of the
+          # lane's own fixed phrases and hold nothing but lowercase words, digits and punctuation reach the log; a count
+          # dictionary passes only when its keys are lowercase words and its values numbers. Every other line is dropped,
+          # and stderr is only counted. The lane's own summary goes to a file nobody reads; the summary below is built
+          # from the lines shown. -u and --unbuffered: one line a photo reaches the log as it happens, so a run the
+          # timeout ends still shows how far it got (the cursor line included).
+          show='select(test("^(keys lane|photo [0-9]+ of [0-9]+|photos|registry|statements|rejected, by kind of problem|reader failures|writer|re-sends|not checked by code|lane rows on this vehicle|model time|cursor for --after|result)[:, ]")
+            and (gsub("\\{(\u0027[a-z_ ]{1,40}\u0027: [0-9]+(, )?)*\\}"; "") | test("^[a-z0-9 ,;:()=._-]{1,300}$")))'
+          rc=0
+          GITHUB_STEP_SUMMARY="$RUNNER_TEMP/lane-summary" python3 -u scripts/photo-pipeline/keys_lane.py "${args[@]}" 2>"$RUNNER_TEMP/said" \
+            | jq -R -r --unbuffered "$show" | tee "$RUNNER_TEMP/shown" || rc=$?
+          echo "stderr: $(wc -l < "$RUNNER_TEMP/said" | tr -d ' ') lines withheld"
+          {
+            echo "### Keys lane ($([ "$KEYS_WRITE" = "true" ] && echo write || echo 'dry run'), exit $rc)"
+            sed 's/^/- /' "$RUNNER_TEMP/shown"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
 
       # The existing projection (scripts/deep-image-analysis-byok.mjs project-cached, scripts/lib/image-property-projection.mjs):
       # a stored deep reading already holds rust_severity, paint_state and completeness for its photo, and the registry has
@@ -202,17 +226,17 @@ jobs:
           if [ "$KEYS_WRITE" = "true" ]; then args+=(--apply); fi
           rc=0
           node scripts/deep-image-analysis-byok.mjs "${args[@]}" >"$RUNNER_TEMP/receipt" 2>"$RUNNER_TEMP/said" || rc=$?
-          # This log is public. From the receipt: the named counts, and words made of a to z and "_" only. No vehicle
-          # id, no row id, no list. From stderr: the script's own fixed error line, or only how many lines there were.
+          # This log is public. From the receipt: the named counts, and words made of a to z and "_" only (deferred is
+          # rebuilt from its counts; no other object passes). No vehicle id, no row id, no list. From stderr: its line
+          # count only (the receipt's reason says why a run stopped).
           show='objects | {mode, route, sampled_condition_rows, source_rows, eligible_claims, window_limit, pages_walked,
             reached_oldest_row, model_calls, already_projected, already_projected_superseded, released_intent_only_clarification, inserted, duplicates,
             verified, failed, unattempted, reason,
             deferred: ((.deferred // {}) | if type == "object" then with_entries(select((.key | test("^[a-z_]{1,40}$")) and (.value | type) == "number")) else {} end)}
-            | with_entries(select((.value | type) as $t | $t == "number" or $t == "boolean" or $t == "object" or ($t == "string" and (.value | test("^[a-z_]{1,40}$")))))'
+            | with_entries(select(.key == "deferred" or ((.value | type) as $t | $t == "number" or $t == "boolean" or ($t == "string" and (.value | test("^[a-z_]{1,40}$"))))))'
           line="$( { [ -s "$RUNNER_TEMP/receipt" ] && tail -n 1 "$RUNNER_TEMP/receipt" | jq -ce "$show" 2>/dev/null; } || true )"
           if [ -n "$line" ]; then echo "$line"; else echo "no receipt was printed"; fi
-          said="$(grep -m1 -oE '^Error: project-cached: [a-z ]{1,60}$' "$RUNNER_TEMP/said" || true)"
-          if [ -n "$said" ]; then echo "$said"; elif [ -s "$RUNNER_TEMP/said" ]; then echo "stderr: $(wc -l < "$RUNNER_TEMP/said") lines withheld"; fi
+          echo "stderr: $(wc -l < "$RUNNER_TEMP/said" | tr -d ' ') lines withheld"
           {
             echo "### Stored readings to registered properties ($([ "$KEYS_WRITE" = "true" ] && echo write || echo 'dry run'))"
             if [ -n "$line" ]; then echo "$line" | jq -r 'to_entries[] | "- \(.key): \(.value | tojson)"'; else echo "- no receipt was printed"; fi
@@ -240,6 +264,7 @@ jobs:
 
       # The keys job's own steps: the CLI, the sign-in check that refuses an API-key login, and the database client.
       - *install-claude
+      - *subscription-token
       - *check-subscription
       - *install-database-client
 
@@ -249,22 +274,12 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
           [ -n "$SUPABASE_URL" ] || { echo "::error::SUPABASE_URL not set."; exit 2; }
           [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::SUPABASE_SERVICE_ROLE_KEY not set."; exit 2; }
           [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || { echo "::error::CLAUDE_CODE_OAUTH_TOKEN (subscription) not set."; exit 4; }
-          # The secret was stored wrapped (the first fire, 2026-11-24: the CLI refused it as "contains a line break at
-          # character 80"; `claude auth status` does not catch that). A token holds no whitespace, so every whitespace
-          # character is removed and the rejoined value is masked (a multi-line secret is masked line by line). Only its
-          # shape is printed: how many characters were removed, its length, and whether it has the subscription prefix.
-          raw_len=${#CLAUDE_CODE_OAUTH_TOKEN}
-          CLAUDE_CODE_OAUTH_TOKEN="$(printf '%s' "$CLAUDE_CODE_OAUTH_TOKEN" | tr -d '[:space:]')"
-          echo "::add-mask::$CLAUDE_CODE_OAUTH_TOKEN"
-          export CLAUDE_CODE_OAUTH_TOKEN
-          prefix=no; case "$CLAUDE_CODE_OAUTH_TOKEN" in sk-ant-oat*) prefix=yes;; esac
-          echo "token shape | removed: $(( raw_len - ${#CLAUDE_CODE_OAUTH_TOKEN} )) whitespace, length: ${#CLAUDE_CODE_OAUTH_TOKEN}, subscription prefix: $prefix"
+          # The token was cleaned, masked and exported by the "Take the subscription token" step above.
           # --owner config: the reader takes the one owner platform_config image_stage_reconciler.user_ids names, so no id
           # is in this file, on a command line or in the log. Same model, flags and reader name as the Mac's full fire.
           started=$(date +%s); rc=0
@@ -300,8 +315,10 @@ jobs:
             if [ -n "$line" ]; then echo "$line" | jq -r 'to_entries[] | "- \(.key): \(.value | tojson)"'; else echo "- no summary was printed"; fi
           } >> "$GITHUB_STEP_SUMMARY"
           # The heartbeat, as the Mac posts it (reader-heartbeat.mjs: nothing is posted when the reader failed or printed
-          # no summary). record_reader_heartbeat admits one name for this reader, so this run writes the Mac's row; host
-          # says which wrote it. The summary travels in the environment and is parsed as JSON, never run.
-          READER_NAME=subscription-frame-classifier READER_HOST=github_actions READER_SUMMARY="$summary" READER_EXIT="$rc" \
+          # no summary), under this host's own name (20261125171000), so the Mac's subscription-frame-classifier row stays
+          # the Mac's. assay_subscription_readers (cron subscription-reader-watch, its row in v_job_health) fails when this
+          # row is over an hour old while the stages this reader claims hold due work. The summary travels in the
+          # environment and is parsed as JSON, never run.
+          READER_NAME=subscription-frame-classifier-actions READER_HOST=github_actions READER_SUMMARY="$summary" READER_EXIT="$rc" \
             READER_ELAPSED_MS="$(( ( $(date +%s) - started ) * 1000 ))" node scripts/photo-pipeline/reader-heartbeat.mjs 2>/dev/null || true
           exit "$rc"
