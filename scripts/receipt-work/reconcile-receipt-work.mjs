@@ -184,13 +184,17 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       }
     } catch (e) { summary.errors.push(`${vid}: ${e.message}`); }
   }
-  if (out) writeFileSync(out, scratch.map((x) => JSON.stringify(x)).join('\n') + '\n');
+  // a scheduled run that changed nothing leaves no scratch file (the subscription reader runs this every full fire)
+  const changed = noDb || summary.written || summary.retracted || summary.judgments_inserted || summary.judgments_revived
+    || Object.keys(summary.judgments_retired).length || summary.errors.length;
+  if (out && changed) writeFileSync(out, scratch.map((x) => JSON.stringify(x)).join('\n') + '\n');
   summary.rollback = [`select * from rollback_garage_derivation_run('${runId}', '<reason>', false);`,
     `select * from rollback_evidence_judgment_run('${runId}', '<reason>', false);`];
   return summary;
 }
 
 if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().then((s) => { console.log(JSON.stringify(s, null, 1)); process.exitCode = s.errors.length ? 1 : 0; })
+  // one line: the subscription reader logs the last line of its readers' output
+  main().then((s) => { console.log(JSON.stringify(s)); process.exitCode = s.errors.length ? 1 : 0; })
     .catch((e) => { console.error(e.message); process.exitCode = 1; });
 }
