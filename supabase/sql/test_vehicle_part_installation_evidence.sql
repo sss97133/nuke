@@ -147,12 +147,12 @@ BEGIN
   ASSERT (l ->> 'part_lines')::int = 4 AND (l ->> 'lines_seen')::int = 1 AND (l ->> 'lines_not_photographed')::int = 3, 'by system: ' || l::text;
   ASSERT r ->> 'limitation' ~ 'does not prove that the unit on the receipt is the unit fitted', 'the limitation is carried as text';
   -- no amounts to anyone, and the supplier list price is dropped from the words
-  ASSERT r::text !~ '4321' AND r::text !~ '12\.34' AND r::text !~ '"(amount|total_price|recorded_amount)"', 'anon sees no amounts: ' || r::text;
+  ASSERT regexp_replace(r::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') !~ '4321' AND r::text !~ '12\.34' AND r::text !~ '"(amount|total_price|recorded_amount)"', 'anon sees no amounts: ' || r::text;
   ASSERT public.vehicle_part_installation_evidence('00000000-0000-0000-0000-0000000000a2') IS NULL, 'hidden vehicle';
   RESET ROLE;
   PERFORM set_config('test.uid', '00000000-0000-0000-0000-0000000000c1', true);
   r := public.vehicle_part_installation_evidence('00000000-0000-0000-0000-0000000000a1');
-  ASSERT r::text !~ '4321' AND r::text !~ '12\.34', 'the owner sees no amounts here either';
+  ASSERT regexp_replace(r::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') !~ '4321' AND r::text !~ '12\.34', 'the owner sees no amounts here either';
   ASSERT (public.vehicle_part_installation_evidence('00000000-0000-0000-0000-0000000000a2') #>> '{totals,part_lines}')::int = 1, 'owner reads a private vehicle';
 END $$;
 

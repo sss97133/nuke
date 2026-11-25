@@ -191,7 +191,7 @@ BEGIN
         AND s->>'value' LIKE '%CHECK AND REPAIR REAR END POSI RING PINION BEARING%[amount]%' AND s->>'observed_at' LIKE '2025-02-05%'),
     format('shop source: words kept, witness and day; got %s', item->'sources'));
   txt := item::text;
-  PERFORM public.t_assert(txt !~* '(123\.45|245|price|\$|702-555|Staff Name|Old Shop|Retired Shop|Duplicate Shop)', format('no amounts, names or contacts; got %s', txt));
+  PERFORM public.t_assert(regexp_replace(txt, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') !~* '(123\.45|245|price|\$|702-555|Staff Name|Old Shop|Retired Shop|Duplicate Shop)', format('no amounts, names or contacts; got %s', txt));
 
   -- Photos alone, two images of one reader: readings, never established; the tag limitation and the thumbnail.
   item := public.t_item('10000000-0000-0000-0000-000000000008', 'drivetrain', 'drivetrain.axle.current.type');

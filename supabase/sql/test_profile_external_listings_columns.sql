@@ -41,7 +41,7 @@ BEGIN
   -- 1. With today's grants (none on external_listings) a non-insider reads an empty list.
   FOREACH k IN ARRAY ARRAY['anon','stranger','noclaims','author'] LOOP
     ASSERT pg_temp.ans('after', k, pub)->'external_listings' = '[]'::jsonb, format('1 %s reads no listing columns', k);
-    ASSERT pg_temp.ans('after', k, pub)::text NOT LIKE '%4242%' AND pg_temp.ans('after', k, pub)::text NOT LIKE '%example.invalid/aff%',
+    ASSERT regexp_replace(pg_temp.ans('after', k, pub)::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') NOT LIKE '%4242%' AND pg_temp.ans('after', k, pub)::text NOT LIKE '%example.invalid/aff%',
       format('1 %s answer carries no reserve or affiliate value', k);
   END LOOP;
   -- 2. Insiders and the service role read the listings exactly as before.

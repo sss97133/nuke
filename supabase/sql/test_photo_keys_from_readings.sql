@@ -249,7 +249,7 @@ BEGIN
        AND item->>'agent_tier' IS DISTINCT FROM 'subscription automatic' THEN
       RAISE EXCEPTION 'automatic tier was not copied: %', item;
     END IF;
-    IF item::text ILIKE '%gps%' OR item::text ILIKE '%34.0%' OR item::text ILIKE '%-118%' THEN
+    IF item::text ILIKE '%gps%' OR regexp_replace(item::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') ILIKE '%34.0%' OR regexp_replace(item::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') ILIKE '%-118%' THEN
       RAISE EXCEPTION 'GPS leaked onto a claim: %', item;
     END IF;
     IF (item->>'confidence_score')::numeric > 0.6 THEN

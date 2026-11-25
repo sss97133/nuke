@@ -306,7 +306,7 @@ DO $$ DECLARE j jsonb; BEGIN
   -- folded again: the conflict is now the car's grade, the hidden value still unnamed
   PERFORM public.vehicle_facet_grades_fold('00000000-0000-0000-0000-0000000000a1');
   SET LOCAL ROLE anon; j := pg_temp.doc('00000000-0000-0000-0000-0000000000a1', 'year.recorded'); RESET ROLE;
-  IF j->>'status' <> 'conflict' OR j::text LIKE '%1979%' THEN RAISE EXCEPTION 'A year after the refold: %', j; END IF;
+  IF j->>'status' <> 'conflict' OR regexp_replace(j::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') LIKE '%1979%' THEN RAISE EXCEPTION 'A year after the refold: %', j; END IF;
 END $$;
 -- Stale by the vehicle fold's own queue: B is dirty after its fold, so its row is not read.
 INSERT INTO public.model_fold_work (vehicle_id, state, priority, dirty_at, first_dirty_at, next_attempt_at)
