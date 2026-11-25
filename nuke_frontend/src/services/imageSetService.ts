@@ -284,7 +284,7 @@ export class ImageSetService {
       .from('image_set_members')
       .select(`
         *,
-        vehicle_images (*)
+        vehicle_images:vehicle_images_public (*)
       `)
       .eq('image_set_id', setId)
       .order('display_order', { ascending: true });

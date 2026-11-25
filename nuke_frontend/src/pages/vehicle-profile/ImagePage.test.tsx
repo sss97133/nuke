@@ -9,7 +9,10 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => fixture.auth }));
 vi.mock('react-router-dom', async original => ({ ...await original<typeof import('react-router-dom')>(), useParams: () => fixture.route }));
 vi.mock('../../lib/supabase', () => {
   const from = (table: string) => {
-    const call = { table, filters: [] as any[], selected: '', single: false, limit: 0, signal: undefined as AbortSignal | undefined };
+    // vehicle_images_public is the table's rows through the view that strips withheld ai_scan_metadata paths; the fixture
+    // answers it as vehicle_images and keeps the relation the page named.
+    const call = { table: table === 'vehicle_images_public' ? 'vehicle_images' : table, relation: table, filters: [] as any[],
+      selected: '', single: false, limit: 0, signal: undefined as AbortSignal | undefined };
     const query: any = {
       select: (s: string) => { call.selected = s; return query; },
       eq: (k: string, v: unknown) => { call.filters.push([k, v]); return query; },
@@ -99,6 +102,9 @@ it('gates the parent and image before dependent reads, including scoped raw refe
   await mount();
   expect(fixture.calls.slice(0, 2).map(c => c.table)).toEqual(['vehicles', 'vehicle_images']);
   expect(fixture.calls.filter(c => c.table === 'vehicle_images').every(c => id(c) === IMAGE && id(c, 'vehicle_id') === VEHICLE)).toBe(true);
+  const scanReads = fixture.calls.filter(c => String(c.selected).includes('ai_scan_metadata') || c.selected === '*');
+  expect(scanReads.length).toBeGreaterThan(0);
+  expect(scanReads.filter(c => c.table === 'vehicle_images').every(c => c.relation === 'vehicle_images_public')).toBe(true);
   expect(fixture.calls.every(c => c.signal instanceof AbortSignal)).toBe(true);
   expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
   expect(host.textContent).toContain('Device metadata'); expect(host.textContent).not.toContain('Chain of Custody');

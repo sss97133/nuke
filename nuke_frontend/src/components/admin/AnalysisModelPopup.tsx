@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 interface AnalysisModelPopupProps {
   modelName: string;
@@ -195,7 +196,7 @@ export const AnalysisModelPopup: React.FC<AnalysisModelPopupProps> = ({
     try {
       // Count images extracted with this model
       const { data: images, error } = await supabase
-        .from('vehicle_images')
+        .from(VEHICLE_IMAGES_READ)
         .select('ai_scan_metadata, created_at')
         .not('ai_scan_metadata', 'is', null)
         .limit(1000); // Sample to get stats

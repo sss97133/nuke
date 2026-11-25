@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase';
 import { getPlatformDisplayName, normalizePlatform } from '../../services/platformNomenclature';
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
 import { useFieldEvidence, type FieldEvidenceMap } from './hooks/useFieldEvidence';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 async function getEdgeFunctionErrorMessage(err: any): Promise<string> {
   try {
@@ -147,7 +148,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
         // 2. Check vehicle_images ai_scan_metadata — project just the three VIN
         // paths instead of whole blobs (122KB -> 3KB for 50 rows, prod-measured).
         const { data: images, error: imagesError } = await supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select(
             'vin_tag_vin:ai_scan_metadata->vin_tag->>vin, spid_vin:ai_scan_metadata->spid_data->extracted_data->>vin, appraiser_vin:ai_scan_metadata->appraiser->extracted_data->>vin',
           )

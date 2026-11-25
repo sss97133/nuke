@@ -1,3 +1,4 @@
+import { VEHICLE_IMAGES_READ } from '../lib/vehicleImageColumns';
 /**
  * Global Upload Status Service
  * Manages upload and AI processing progress across the entire application
@@ -166,7 +167,7 @@ class GlobalUploadStatusService {
         // 2. is_sensitive flag being set
         // 3. ai_last_scanned timestamp set
         const { data: images, error: imgError } = await supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select('id, ai_scan_metadata, is_sensitive, ai_last_scanned')
           .in('id', job.imageIds);
 

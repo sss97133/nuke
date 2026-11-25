@@ -13,7 +13,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/button';
 import './vehicle-evidence-detail.css';
 import { supabase } from '../../lib/supabase';
-import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
+import { vehicleImageRowColumns, VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 import { webSourceUrl, readImageWitnesses } from './hooks/useVehicleImageEvidence';
 
 interface ImageRow {
@@ -213,7 +213,7 @@ const ImagePageContent: React.FC = () => {
           imgFullRes,
           witFullRes,
         ] = await Promise.all([
-          supabase.from('vehicle_images').select(await vehicleImageRowColumns()).eq('id', imageId).eq('vehicle_id', vehicleId).limit(1).abortSignal(controller.signal),
+          supabase.from(VEHICLE_IMAGES_READ).select(await vehicleImageRowColumns()).eq('id', imageId).eq('vehicle_id', vehicleId).limit(1).abortSignal(controller.signal),
           supabase.from('observation_witnesses').select('*').eq('image_id', imageId).limit(200).abortSignal(controller.signal),
         ]);
 

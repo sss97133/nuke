@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import '../../styles/unified-design-system.css';
 import { ImageHoverPreview, IDHoverCard, AutoIDWrapper, AnalysisModelPopup } from '../../components/admin';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 const ExtractionMonitor: React.FC = () => {
   const [stats, setStats] = useState({
@@ -61,7 +62,7 @@ const ExtractionMonitor: React.FC = () => {
         
         // Recent extracted images only (limit to 100 for performance)
         supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select('ai_scan_metadata, id, image_url, created_at, vehicle_id')
           .not('is_document', 'is', true)
           .not('image_url', 'is', null)
@@ -71,7 +72,7 @@ const ExtractionMonitor: React.FC = () => {
         
         // Recent unextracted images only (limit to 50)
         supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select('id, image_url, created_at, vehicle_id, ai_scan_metadata')
           .not('is_document', 'is', true)
           .not('image_url', 'is', null)

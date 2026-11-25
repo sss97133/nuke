@@ -14,7 +14,7 @@ import { ComprehensiveWorkOrderReceipt } from './ComprehensiveWorkOrderReceipt';
 import { ParticipantBadge } from './auction/AuctionBadges';
 import { generateDaySummary, generateEventSummary } from '../utils/timelineSummary';
 import WorkSessionEventCard from './timeline/WorkSessionEventCard';
-import { vehicleImageRowColumns } from '../lib/vehicleImageColumns';
+import { vehicleImageRowColumns, VEHICLE_IMAGES_READ } from '../lib/vehicleImageColumns';
 
 // Types
 // Note: DB supports auction_* event types via timeline_events constraint migration.
@@ -1197,7 +1197,7 @@ const VehicleTimeline: React.FC<{
                                               const dayStart = ymdToUtcStart(dayYmd);
                                               const dayEnd = ymdToUtcStart(addDaysYmd(dayYmd, 1));
                                               const { data: dayImages } = await supabase
-                                                .from('vehicle_images')
+                                                .from(VEHICLE_IMAGES_READ)
                                                 .select(await vehicleImageRowColumns())
                                                 .eq('vehicle_id', vehicleId)
                                                 .gte('taken_at', dayStart)

@@ -244,7 +244,8 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                   caption: `${formData.title} - ${file.name}`,
                   timeline_event_id: data.id
                 })
-                .select()
+                // Only the id: a bare select() returns every column, including ai_scan_metadata, which the table stops serving.
+                .select('id')
                 .single();
                 
               if (dbError) throw dbError;
