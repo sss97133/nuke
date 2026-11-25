@@ -503,4 +503,34 @@ BEGIN
 END $$;
 RESET ROLE;
 
+-- gaps read edges (migration 20261124234600): the fold joins the stored edges; output identical (the migration proves it).
+-- The edges apply unscoped rules only (vendor scope comes by organisation key next), so while a scoped rule is active
+-- the fold's output would change and the migration refuses.
+\set gaps_mig `cat supabase/migrations/20261124234600_receipt_line_gaps_read_edges.sql`
+SELECT set_config('test.gaps_mig', :'gaps_mig', false) IS NOT NULL AS loaded;
+DO $$ BEGIN
+  BEGIN
+    EXECUTE current_setting('test.gaps_mig');
+    RAISE EXCEPTION 'FAIL: gaps switched while a scoped rule is active';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE 'receipt_line_gaps changed%' THEN RAISE; END IF;
+  END;
+END $$;
+SELECT public.assert(pg_get_viewdef('public.receipt_line_gaps'::regclass) LIKE '%receipt_line_rule_hit%', 'refused switch left the view');
+DROP TABLE IF EXISTS pg_temp._gaps_before;
+UPDATE public.receipt_line_rules SET status = 'retired', retired_at = now()
+ WHERE status = 'active' AND (scope_vendor_pattern IS NOT NULL OR scope_make IS NOT NULL OR scope_year_min IS NOT NULL OR scope_year_max IS NOT NULL);
+\i supabase/migrations/20261124234600_receipt_line_gaps_read_edges.sql
+\i supabase/migrations/20261124234600_receipt_line_gaps_read_edges.sql
+SELECT public.assert(pg_get_viewdef('public.receipt_line_gaps'::regclass) LIKE '%receipt_line_edges%'
+                     AND pg_get_viewdef('public.receipt_line_gaps'::regclass) NOT LIKE '%receipt_line_rule_hit%', 'gaps read edges');
+SELECT public.assert((SELECT count(*) FROM public.receipt_line_gaps g
+                       WHERE g.operation_rule_id IS DISTINCT FROM (SELECT x.rule_id FROM public.receipt_line_rule_hit('labor_operation', g.description, g.part_number) x LIMIT 1)
+                          OR g.system_rule_id IS DISTINCT FROM (SELECT x.rule_id FROM public.receipt_line_rule_hit('system', g.description, g.part_number) x LIMIT 1)) = 0,
+                     'gaps keys equal the per-line reader');
+INSERT INTO public.receipt_items (id, receipt_id, description) VALUES
+  ('00000000-0000-0000-0000-000000000e02', '00000000-0000-0000-0000-0000000000b1', 'clutch kit');
+SELECT public.assert((SELECT operation_code IS NOT NULL AND gap IS NULL FROM public.receipt_line_gaps
+                       WHERE item_id = '00000000-0000-0000-0000-000000000e02'), 'a landed line reaches the fold through its edge');
+
 \echo 'test_receipt_line_rules: PASS'
