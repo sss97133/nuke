@@ -104,6 +104,7 @@ WITH eligible AS MATERIALIZED (
     'vehicle_id', p_vehicle_id,
     'circuits', coalesce((SELECT jsonb_agg(jsonb_build_object(
       'id', c.id, 'code', c.circuit_code, 'name', c.circuit_name, 'design_status', c.design_status,
+      'section', c.harness_section,
       'gauge_awg', c.wire_gauge_awg, 'colour', c.wire_color, 'wire_type', c.wire_type,
       'legacy_checks_hash', CASE WHEN c.checks IS NOT NULL THEN md5(c.checks::text) END,
       'legacy_check_state', CASE WHEN c.checks IS NULL THEN 'not_checked' ELSE 'unversioned' END)

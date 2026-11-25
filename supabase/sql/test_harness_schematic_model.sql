@@ -5,7 +5,7 @@
 -- Columns added to the real schema after the reshape fixture's historical cutoff.
 ALTER TABLE public.vehicles ADD COLUMN deleted_at timestamptz;
 ALTER TABLE public.vehicle_custom_circuits ADD COLUMN checks jsonb, ADD COLUMN checked_at timestamptz,
-  ADD COLUMN checks_version text;
+  ADD COLUMN checks_version text, ADD COLUMN harness_section text;
 ALTER TABLE public.harness_endpoints ADD COLUMN node_kind text, ADD COLUMN topology_node_id uuid,
   ADD COLUMN part_number text, ADD COLUMN notes text;
 ALTER TABLE public.harness_nets ADD COLUMN protection_pdm_channel_ids uuid[];
