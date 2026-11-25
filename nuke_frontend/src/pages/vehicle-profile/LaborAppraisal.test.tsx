@@ -62,7 +62,7 @@ describe('LaborAppraisalView', () => {
       with_unwitnessed_purchases: { hours_min: 130.5, hours_typical: 174.5, hours_max: 259.5 } } };
     const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={two} />));
     expect(page).toMatch(/Witnessed\s+88\.5 h to 149\.5 h, typical 112\.5 h/);
-    expect(page).toMatch(/With purchases not seen fitted\s+130\.5 h to 259\.5 h, typical 174\.5 h/);
+    expect(page).toMatch(/With work not witnessed\s+130\.5 h to 259\.5 h, typical 174\.5 h/);
     // The reader's rule is its own identifiers: kept in the title attribute, not printed.
     expect(page).not.toContain('Witnessed hours exclude purchases not seen fitted.');
     expect(renderToStaticMarkup(<LaborAppraisalView appraisal={two} />)).toContain('title="Witnessed hours exclude purchases not seen fitted."');
@@ -115,7 +115,7 @@ describe('LaborAppraisalView', () => {
     const a = live214500 as unknown as LaborAppraisal;
     const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={a} />));
     expect(page).toContain('Witnessed');
-    expect(page).toContain('With purchases not seen fitted');
+    expect(page).toContain('With work not witnessed');
     expect(page).toContain('bought; fitted question cannot tell');
     expect(page).not.toMatch(/\d+ not fitted/);
     const allowed = readerNumbers(a);
