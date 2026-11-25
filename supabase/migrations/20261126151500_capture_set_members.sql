@@ -25,17 +25,21 @@
 -- bodies searched for INSERT/UPDATE of the table; capture_set_candidates_revert sets revoked_at only). It now writes
 -- the members of each row it inserts, in the same transaction. Its body is md5-guarded against production.
 -- Backfill: capture_set_members_backfill(p_max_elems) by the cron job capture-set-members-backfill, never in this
--- migration. Each call takes candidates with no member in (run_id, set_key, vehicle_id) order (the unique index, so a
--- set's rows are read together) up to p_max_elems array elements (or the one first row, when it alone is larger),
--- inserts the elements whose photo exists (ON CONFLICT
--- DO NOTHING) and counts the rest as dangling. Pass 1 walks every candidate; pass 2 sweeps candidates that still have
--- no member (a call of the old writer body in flight at deploy). Then it checks agreement and unschedules itself, or
--- fails the job while members and image_ids disagree.
+-- migration. Each call takes candidates that are short (an image_ids element with no member row) in (run_id, set_key,
+-- vehicle_id) order (the unique index, so a set's rows are read together) up to p_max_elems array elements (or the one
+-- first row, when it alone is larger), inserts the elements whose photo exists (ON CONFLICT DO NOTHING) and counts the
+-- rest as dangling. Pass 1 walks every candidate; pass 2 walks again for rows still short (a call of the old writer
+-- body in flight at deploy, or a member lost since). Then it checks agreement and unschedules itself, or fails the job
+-- while members and image_ids disagree. The job yields while auctions close (it joins the jobs of the shared rule row
+-- platform_config 'auction_close_yield', 20261126033500), and it sets no statement_timeout: postgres's 10 s default
+-- holds; a 500-element call reads in well under it (measured by the skeptic: 134 ms for a page on prod).
 -- image_ids stays: both readers above still read it. capture_set_members_agreement() counts the difference
 -- (short_existing and extra must be 0; short_dangling is a photo deleted after its set was written).
 -- After the backfill, the hourly job capture-set-members-agreement runs capture_set_members_check(), which writes that
 -- count as the job's assay row in job_assay_readings (passed, or failed with members_missing / members_not_in_image_ids),
--- so v_job_health shows a drift between the array and the edges.
+-- commits it, then runs capture_set_members_check_raise(), which fails the run when that row reads failed: the row
+-- stays, and the run is red in v_job_health whether or not it reads the assay row. (COMMIT inside a cron command is a
+-- live pattern: pg_cron sends it as one simple query with cron.use_background_workers off, as drain-class-price-queue.)
 -- A revoked candidate (capture_set_candidates_revert sets revoked_at) keeps its members, as it keeps its image_ids;
 -- a reader of members filters on the candidate's revoked_at exactly as readers of the array do.
 --
@@ -127,23 +131,23 @@ END $function$;
 -- missed write or a pending backfill). short_dangling: the photo is gone. extra: a member not in its row's array.
 create or replace function public.capture_set_members_agreement()
 returns jsonb language sql stable security definer set search_path = public, pg_temp as $$
-  with short as materialized (
-    select c.id, x.img
+  with short as (   -- one pass over the short elements; each is looked up in vehicle_images once
+    select count(*) n, count(*) filter (where exists (select 1 from vehicle_images vi where vi.id = x.img)) n_existing
       from capture_set_candidates c cross join lateral unnest(c.image_ids) x(img)
      where not exists (select 1 from capture_set_members m where m.candidate_id = c.id and m.image_id = x.img))
   select jsonb_build_object(
     'candidates', (select count(*) from capture_set_candidates),
     'elements', (select coalesce(sum(cardinality(image_ids)), 0) from capture_set_candidates),
     'members', (select count(*) from capture_set_members),
-    'short_existing', (select count(*) from short s where exists (select 1 from vehicle_images vi where vi.id = s.img)),
-    'short_dangling', (select count(*) from short s where not exists (select 1 from vehicle_images vi where vi.id = s.img)),
+    'short_existing', (select n_existing from short),
+    'short_dangling', (select n - n_existing from short),
     'extra', (select count(*) from capture_set_members m join capture_set_candidates c on c.id = m.candidate_id
                where not (m.image_id = any (c.image_ids))),
     'counted_at', now())
 $$;
 
 -- The backfill: one bounded batch per call; state in platform_config 'capture_set_members_backfill'.
-create or replace function public.capture_set_members_backfill(p_max_elems integer default 1000)
+create or replace function public.capture_set_members_backfill(p_max_elems integer default 500)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   cfg jsonb; pass int; c_run uuid; c_key text; c_veh uuid;
@@ -162,7 +166,8 @@ begin
     select c.id, c.run_id, c.set_key, c.vehicle_id, c.image_ids
       from capture_set_candidates c
      where (c.run_id, c.set_key, c.vehicle_id) > (c_run, c_key, c_veh)
-       and not exists (select 1 from capture_set_members m where m.candidate_id = c.id)
+       and exists (select 1 from unnest(c.image_ids) x(img)
+                    where not exists (select 1 from capture_set_members m where m.candidate_id = c.id and m.image_id = x.img))
      order by c.run_id, c.set_key, c.vehicle_id
      limit 500
   ), b as materialized (
@@ -197,7 +202,7 @@ begin
       cfg := cfg || jsonb_build_object('sweep_dangling_skipped', coalesce((cfg->>'sweep_dangling_skipped')::int, 0) + n_dang);
     end if;
   elsif pass = 1 then
-    -- pass 2 sweeps candidates that still have no member (written by the old writer body while this migration deployed)
+    -- pass 2 walks again for rows still short (written by the old writer body while this migration deployed)
     cfg := cfg || jsonb_build_object('pass', 2, 'cursor', null);
   else
     agree := public.capture_set_members_agreement();
@@ -245,25 +250,51 @@ begin
   return a;
 end $$;
 
+-- The job's second statement, after the reading is committed: a failed reading fails the run.
+create or replace function public.capture_set_members_check_raise()
+returns void language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare r jsonb;
+begin
+  select reading into r from job_assay_readings where jobname = 'capture-set-members-agreement';
+  if r->>'status' = 'failed' then
+    raise exception 'capture_set_members_check: members and image_ids disagree (%): %', r->>'reason', r;
+  end if;
+end $$;
+
 revoke all on function public.capture_set_members_backfill(integer) from public, anon, authenticated;
 revoke all on function public.capture_set_members_agreement() from public, anon, authenticated;
 revoke all on function public.capture_set_members_check() from public, anon, authenticated;
+revoke all on function public.capture_set_members_check_raise() from public, anon, authenticated;
 grant execute on function public.capture_set_members_backfill(integer), public.capture_set_members_agreement(),
-  public.capture_set_members_check() to service_role;
+  public.capture_set_members_check(), public.capture_set_members_check_raise() to service_role;
+
+-- The backfill yields while auctions close: it joins the shared rule row's jobs (20261126033500), which must exist.
+do $yield$
+begin
+  if to_regprocedure('public.auction_close_yield(text)') is null
+     or not exists (select 1 from platform_config where config_key = 'auction_close_yield'
+                                                   and jsonb_typeof(config_value->'jobs') = 'array') then
+    raise exception 'capture_set_members: public.auction_close_yield and its rule row (20261126033500) must exist first';
+  end if;
+  update platform_config
+     set config_value = jsonb_set(config_value, '{jobs}', (config_value->'jobs') || '["capture-set-members-backfill"]'::jsonb),
+         updated_at = now()
+   where config_key = 'auction_close_yield' and not (config_value->'jobs') ? 'capture-set-members-backfill';
+end $yield$;
 
 do $cron$
 begin
   if to_regclass('cron.job') is null then return; end if;
   perform cron.unschedule(jobid) from cron.job where jobname = 'capture-set-members-agreement';
   perform cron.schedule('capture-set-members-agreement', '17 * * * *',
-    $cmd$SET client_min_messages = error; SET statement_timeout = '50s'; SELECT public.capture_set_members_check();$cmd$);
+    $cmd$SET client_min_messages = error; SELECT public.capture_set_members_check(); COMMIT; SELECT public.capture_set_members_check_raise();$cmd$);
   if exists (select 1 from platform_config where config_key = 'capture_set_members_backfill'
                                               and coalesce((config_value->>'done')::boolean, false)) then
     return;
   end if;
   perform cron.unschedule(jobid) from cron.job where jobname = 'capture-set-members-backfill';
-  perform cron.schedule('capture-set-members-backfill', '*/2 * * * *',
-    $cmd$SET client_min_messages = error; SET statement_timeout = '50s'; SET lock_timeout = '5s'; SELECT public.capture_set_members_backfill(1000);$cmd$);
+  perform cron.schedule('capture-set-members-backfill', '* * * * *',
+    $cmd$SET client_min_messages = error; SET lock_timeout = '5s'; SELECT public.capture_set_members_backfill(500) WHERE NOT public.auction_close_yield('capture-set-members-backfill');$cmd$);
 end $cron$;
 
 commit;

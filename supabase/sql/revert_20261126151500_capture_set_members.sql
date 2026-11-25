@@ -1,5 +1,8 @@
 -- Revert 20261126151500_capture_set_members: stop the backfill job, put back production's writer body of 2026-11-25
 -- (md5(prosrc) ce59756228fdd1f6125e1110a78cecf9), drop the backfill, agreement and check functions, the member table and the check's assay row.
+-- LOCKS: DROP TABLE takes ACCESS EXCLUSIVE on capture_set_members and, through its foreign keys, on vehicle_images and
+-- capture_set_candidates, which stops every reader and writer of both until it commits. Run it only in a quiet window
+-- (v_job_health: fewest lots near close), with the lock_timeout below.
 -- The member rows are derived from capture_set_candidates.image_ids, which this migration never changed, so dropping
 -- them loses nothing the array does not hold. Run by hand only, reviewed; never by a job.
 begin;
@@ -43,11 +46,15 @@ BEGIN
 END $function$;
 
 drop function if exists public.capture_set_members_backfill(integer);
+drop function if exists public.capture_set_members_check_raise();
 drop function if exists public.capture_set_members_check();
 drop function if exists public.capture_set_members_agreement();
 drop table if exists public.capture_set_members;
 delete from public.platform_config where config_key = 'capture_set_members_backfill';
 delete from public.job_assay_readings where jobname = 'capture-set-members-agreement';
+update public.platform_config
+   set config_value = jsonb_set(config_value, '{jobs}', (config_value->'jobs') - 'capture-set-members-backfill'), updated_at = now()
+ where config_key = 'auction_close_yield' and jsonb_typeof(config_value->'jobs') = 'array';
 
 do $check$
 begin
