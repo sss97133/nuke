@@ -1,4 +1,5 @@
 import {
+  cachedImagePropertySourceId,
   IMAGE_PROPERTY_VALUES,
   isSupportedImagePropertyKey,
   type ObservationPropertyInput,
@@ -90,4 +91,21 @@ Deno.test("unrelated properties are rejected before registry binding even for va
   assert(!isSupportedImagePropertyKey("condition_grade"), "Unrelated registered properties remain unsupported");
   assert(!isSupportedImagePropertyKey({ key: "image_visible_rust_severity" }), "Typed objects are not keys");
   assert(isSupportedImagePropertyKey("image_visible_rust_severity"), "Expected explicit image key");
+});
+
+Deno.test("a cached image projection carries its source reading as the typed key; nothing else does", () => {
+  const source = "33333333-3333-4333-8333-333333333333";
+  const claim = {
+    extraction_method: "cached_byok_property_projection_v1", property_key: "image_visible_paint_stage", kind: "condition",
+    structured_data: { image_visible_paint_stage: "primer", image_id: imageId, analysis_kind: "image_property_projection",
+      source_observation_id: source.toUpperCase() },
+  };
+  assert(cachedImagePropertySourceId(claim) === source, "projection names its source reading, lower case");
+  assert(cachedImagePropertySourceId({ ...claim, extraction_method: "reviewed_image_analysis_v1" }) === null, "other writers");
+  assert(cachedImagePropertySourceId({ ...claim, property_key: "image_visible_badge_text" }) === null, "other keys");
+  assert(cachedImagePropertySourceId({ ...claim, structured_data: { ...claim.structured_data, analysis_kind: "image_deep_byok" } }) === null,
+    "only the projection kind");
+  assert(cachedImagePropertySourceId({ ...claim, structured_data: { ...claim.structured_data, source_observation_id: "not-a-uuid" } }) === null,
+    "a malformed id is not a key");
+  assert(cachedImagePropertySourceId({ ...claim, structured_data: [] }) === null, "arrays are not rows");
 });

@@ -156,6 +156,7 @@ function applyFixture(options = {}) {
     ingested_at: '2026-05-03T09:00:01.123456Z', source_identifier: first.source_identifier,
     extraction_method: first.extraction_method, agent_model: first.agent_model,
     raw_source_ref: first.raw_source_ref, kind: first.kind, is_superseded: false,
+    source_observation_id: first.structured_data.source_observation_id,
     source: { slug: first.source_slug },
     ...options.row,
   };
@@ -232,6 +233,8 @@ for (const [name, options] of [
   ['wrong source reference', { row: { raw_source_ref: 'different-parent' } }],
   ['wrong kind', { row: { kind: 'specification' } }],
   ['superseded output', { row: { is_superseded: true } }],
+  ['source reading only in jsonb, not the typed key', { row: { source_observation_id: null } }],
+  ['typed key names another reading', { row: { source_observation_id: IDS.witness } }],
 ]) {
   test(`${name} stops the bounded pass with failed persistence`, async () => {
     const { sb, claims, calls } = applyFixture(options);
@@ -444,10 +447,10 @@ import { projectCachedRun, currentReadingIds, readingIsPictureOfPicture, instant
 const VEHICLE = '77777777-7777-4777-8777-777777777777';
 const PROPERTY_IDS = { image_visible_rust_severity: 'aaaaaaaa-0000-4000-8000-000000000001',
   image_visible_paint_stage: 'aaaaaaaa-0000-4000-8000-000000000002', image_visible_assembly_state: 'aaaaaaaa-0000-4000-8000-000000000003' };
-function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0, failReadingsQueryAt = 0 } = {}) {
+function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0, failReadingsQueryAt = 0, failRelinkAt = 0, refuseRelink = () => false } = {}) {
   let n = 0;
   const id = prefix => `${prefix.repeat(8)}-0000-4000-8000-${String(++n).padStart(12, '0')}`;
-  const db = { rows: [], images: new Map(), witnesses: [], calls: { source: 0, invoke: 0, rpc: 0, prior: 0, readings: 0 } };
+  const db = { rows: [], images: new Map(), witnesses: [], calls: { source: 0, invoke: 0, rpc: 0, prior: 0, readings: 0, relink: 0 } };
   db.reading = (ingestedAt, { image = {}, data = {}, ...over } = {}) => {
     const imageId = id('c');
     db.images.set(imageId, { id: imageId, vehicle_id: VEHICLE, is_sensitive: false, is_superseded: false, is_duplicate: false,
@@ -492,7 +495,26 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
     return b;
   };
   db.sb = { from: builder,
-    rpc: (name, args) => ({ abortSignal: async () => { db.calls.rpc++; assert.equal(name, 'observation_is_public'); const answer = isPublic(args.p_data); return answer === 'error' ? { data: null, error: { message: 'made-up' } } : { data: answer, error: null }; } }),
+    rpc: (name, args) => ({ abortSignal: async () => {
+      if (name === 'supersede_untyped_cached_image_properties') {
+        // the database's re-landing: a successor with the typed key, the old row superseded by it
+        if (++db.calls.relink === failRelinkAt) return { data: null, error: { message: 'made-up' } };
+        assert.equal(args.p_vehicle_id, VEHICLE);
+        const untyped = () => db.rows.filter(r => r.vehicle_id === args.p_vehicle_id && r.extraction_method === 'cached_byok_property_projection_v1' &&
+          !r.is_superseded && !r.source_observation_id);
+        const current = r => db.rows.some(p => p.id === r.structured_data.source_observation_id && !p.is_superseded);
+        let succeeded = 0, refused = 0;
+        for (const old of untyped().filter(current)) {
+          if (succeeded >= args.p_limit) break;
+          if (refuseRelink(old)) { refused++; continue; }
+          const successor = { ...old, id: id('5'), source_observation_id: old.structured_data.source_observation_id };
+          db.rows.push(successor); old.is_superseded = true; old.superseded_by = successor.id; succeeded++;
+        }
+        const left = untyped();
+        return { data: { vehicle_id: args.p_vehicle_id, succeeded, refused, held_source_not_current: left.filter(r => !current(r)).length,
+          remaining: left.filter(current).length }, error: null };
+      }
+      db.calls.rpc++; assert.equal(name, 'observation_is_public'); const answer = isPublic(args.p_data); return answer === 'error' ? { data: null, error: { message: 'made-up' } } : { data: answer, error: null }; } }),
     functions: { invoke: async (name, { body }) => {
       assert.equal(name, 'ingest-observation', 'the one-at-a-time route never calls the batch intake');
       if (++db.calls.invoke === failInvokeAt) return { data: null, error: { message: 'made-up 500' } };
@@ -501,7 +523,9 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
       const row = { id: id('f'), vehicle_id: body.vehicle_id, kind: body.kind, is_superseded: false, property_id: PROPERTY_IDS[body.property_key],
         structured_data: body.structured_data, confidence_score: 0.6, observed_at: body.observed_at, ingested_at: '2026-11-11T12:00:00.000000+00:00',
         source_identifier: body.source_identifier, extraction_method: body.extraction_method, agent_model: body.agent_model,
-        raw_source_ref: body.raw_source_ref, source: { slug: body.source_slug } };
+        raw_source_ref: body.raw_source_ref, source: { slug: body.source_slug },
+        // ingest-observation's cachedImagePropertySourceId: the source reading as the typed key
+        source_observation_id: body.extraction_method === 'cached_byok_property_projection_v1' ? body.structured_data.source_observation_id : null };
       db.rows.push(row); db.witnesses.push({ id: id('9'), observation_id: row.id, image_id: body.structured_data.image_id, witness_role: 'derived' });
       return { data: { success: true, observation_id: row.id, duplicate: false }, error: null };
     } } };
@@ -772,4 +796,50 @@ test('project-cached --single with imageIds: the current reading is chosen as th
   assert.deepEqual(pick(null, [row(A, 5, { is_superseded: null })]), [A], 'a null flag is current, as the database counts it');
   assert.deepEqual(pick(null, [row(A, 5, { vehicle_id: '88888888-8888-4888-8888-888888888888' }), row(B, 5, { kind: 'specification' }), row(C, 5, { image_id: 'cccccccc-0000-4000-8000-000000000002' })]), [],
     'another vehicle\'s reading, another kind and another photo are not this photo\'s reading');
+});
+
+test('project-cached --single: rows landed before the typed key are re-landed as successors carrying it, once', async () => {
+  const db = standIn();
+  for (let i = 0; i < 3; i++) db.reading(at(i));
+  await walk(db, { pages: 3, apply: true, single: true });
+  const child = () => db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1');
+  assert.ok(child().every(r => r.source_observation_id === r.structured_data.source_observation_id), 'new rows carry the key');
+  const stale = db.reading(at(9));
+  await walk(db, { pages: 3, apply: true, single: true });
+  // rows written before the key: strip it, as production holds them
+  for (const r of child()) r.source_observation_id = null;
+  stale.is_superseded = true;   // a reading that is no longer current: its children are held, not re-keyed
+  const { receipt, exitCode } = await walk(db, { pages: 3, apply: true, single: true });
+  assert.deepEqual(receipt.typed_source, { succeeded: 9, refused: 0, held_source_not_current: 3, remaining: 0, calls: 1 });
+  assert.deepEqual([receipt.inserted, receipt.already_projected, exitCode], [0, 9, 0], 'the walk itself sends nothing new');
+  const current = child().filter(r => !r.is_superseded);
+  assert.equal(current.filter(r => r.source_observation_id).length, 9);
+  assert.ok(child().filter(r => r.is_superseded && r.superseded_by).every(r => current.some(c => c.id === r.superseded_by)), 'each old row points at its successor');
+  const again = await walk(db, { pages: 3, apply: true, single: true });
+  assert.deepEqual(again.receipt.typed_source, { succeeded: 0, refused: 0, held_source_not_current: 3, remaining: 0, calls: 1 }, 'a second run re-lands nothing');
+  assert.deepEqual([again.receipt.already_projected, again.receipt.already_projected_superseded], [9, 0], 'a re-landed row is not a retracted one');
+});
+
+test('project-cached: the re-landing runs on the vehicle walk only, after an apply, and its failure fails the run', async () => {
+  let db = standIn();
+  db.reading(at(1));
+  await walk(db, { single: true });
+  assert.equal(db.calls.relink, 0, 'a dry run asks nothing');
+  const reading = db.reading(at(2));
+  await walk(db, { apply: true, single: true, imageIds: [reading.structured_data.image_id] });
+  assert.equal(db.calls.relink, 0, 'the one-photo call leaves it to the vehicle walk');
+  db = standIn({ failRelinkAt: 1 });
+  db.reading(at(1));
+  const { receipt, exitCode } = await walk(db, { apply: true, single: true });
+  assert.deepEqual([receipt.inserted, receipt.reason, receipt.failed > 0, exitCode], [3, 'typed_source_relink_failed', true, 1]);
+});
+
+test('project-cached: a row the database refuses to re-land is reported and fails the run; the others land', async () => {
+  const db = standIn({ refuseRelink: row => row.structured_data.property_key === 'image_visible_paint_stage' });
+  db.reading(at(1)); db.reading(at(2));
+  await walk(db, { pages: 2, apply: true, single: true });
+  for (const r of db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1')) r.source_observation_id = null;
+  const { receipt, exitCode } = await walk(db, { pages: 2, apply: true, single: true });
+  assert.deepEqual(receipt.typed_source, { succeeded: 4, refused: 2, held_source_not_current: 0, remaining: 2, calls: 2 });
+  assert.deepEqual([receipt.reason, receipt.failed > 0, exitCode], ['typed_source_refused', true, 1]);
 });

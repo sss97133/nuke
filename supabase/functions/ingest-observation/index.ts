@@ -30,7 +30,7 @@ import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.t
 import { FINANCIAL_EVIDENCE_MODE, financialActor, ingestFinancialEvidence } from "./financialEvidence.ts";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
-import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey, isPhysicalReadingKey } from "./imageProperties.ts";
+import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey, isPhysicalReadingKey, cachedImagePropertySourceId } from "./imageProperties.ts";
 import { prepareComponentEvidence, componentReadingSelector, COMPONENT_PRESENCE_PROPERTY, COMPONENT_READING_METHOD,
   type ComponentEvidenceResult } from "./componentEvidence.ts";
 import { observationContentHash, observationClockMicroseconds } from "../_shared/observationContentHash.ts";
@@ -1253,6 +1253,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     else if (confidenceScore >= 0.85) confidenceLevel = "high";
     else if (confidenceScore < 0.4) confidenceLevel = "low";
 
+    // A cached image property projection's source reading, as the typed key (the database checks it on insert).
+    const cachedImageSourceId = cachedImagePropertySourceId(input);
     // Insert observation
     const { data: observation, error: insertError } = await supabase
       .from("vehicle_observations")
@@ -1267,6 +1269,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
           source_vin_taxonomy_revision_id: input.source_vin_taxonomy_revision_id } : {}),
         ...(archivedSale?.ok && input.source_vehicle_event_id ? { source_vehicle_event_id: input.source_vehicle_event_id } : {}),
         ...(retainedSourceId ? { source_observation_id: retainedSourceId } : {}),
+        ...(cachedImageSourceId && !retainedSourceId && !component ? { source_observation_id: cachedImageSourceId } : {}),
         ...(component ? { component_subject_id: component.subjectId, source_observation_id: component.sourceId,
           observed_at_basis: "source_analysis_time", source_event_time_precision: "unknown", source_event_at: null } : {}),
         vehicle_match_confidence: vehicleId ? vehicleMatchConfidence : null,

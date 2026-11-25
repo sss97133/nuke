@@ -57,6 +57,23 @@ export function isSupportedImagePropertyKey(value: unknown): value is keyof type
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(IMAGE_PROPERTY_VALUES, value);
 }
 
+/**
+ * A cached image property projection (cached_byok_property_projection_v1) names its source deep reading in
+ * structured_data.source_observation_id. The single route writes that id to the typed column
+ * vehicle_observations.source_observation_id; the database (validate_retained_listing_property_source, migration
+ * 20261125211500) refuses the row unless it is the current image_deep_byok reading of the same vehicle and photo whose
+ * value the row carries. Any other input gets null: the column is set only for this projection.
+ */
+export function cachedImagePropertySourceId(input: ObservationPropertyInput & { extraction_method?: unknown }): string | null {
+  if (input.extraction_method !== "cached_byok_property_projection_v1" || !isSupportedImagePropertyKey(input.property_key)) return null;
+  const data = input.structured_data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const fields = data as Record<string, unknown>;
+  if (fields.analysis_kind !== "image_property_projection" || typeof fields.source_observation_id !== "string" ||
+      !UUID.test(fields.source_observation_id)) return null;
+  return fields.source_observation_id.toLowerCase();
+}
+
 /** Single-claim intake only; the cached batch path admits the enum keys above and nothing else. */
 export function isImageReadingKey(value: unknown): value is typeof IMAGE_READING_KEYS[number] {
   return typeof value === "string" && (IMAGE_READING_KEYS as readonly string[]).includes(value);
