@@ -15,7 +15,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { authenticateWriter, requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import {
   buildMilestones,
@@ -39,6 +39,16 @@ Deno.serve(async (req) => {
   // transfer for any vehicle (seed_from_listing) and run the staleness sweep over every milestone.
   const denied = await requireWriteAuth(req, { allowAnonymous: isAuctionSeed, headers: corsHeaders });
   if (denied) return denied;
+  // 2026-11-25: a signed-in account is not enough. Any account could seed a transfer naming itself buyer and seller on
+  // any car (seed_from_listing, which also sets vehicles.current_transfer_id), read any transfer with its access tokens
+  // and contacts (get_transfer), and reroute its contacts (update_contacts); with transfer-advance that completes the
+  // transfer and stamps vehicles.ownership_confirmed_at. The one user caller is the admin transfers dashboard, so past
+  // the auction-seed exception only the service key or an active admin passes.
+  const verdict = await authenticateWriter(req, { allowAnonymous: isAuctionSeed });
+  if (!(verdict.ok && verdict.caller.kind === 'anonymous')) {
+    const notAdmin = await requireAdminOrService(req, { headers: corsHeaders });
+    if (notAdmin) return notAdmin;
+  }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
