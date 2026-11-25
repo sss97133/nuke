@@ -207,6 +207,7 @@ jobs:
           show='objects | {mode, route, sampled_condition_rows, source_rows, eligible_claims, window_limit, pages_walked,
             reached_oldest_row, model_calls, already_projected, already_projected_superseded, released_intent_only_clarification, inserted, duplicates,
             verified, failed, unattempted, reason,
+            typed_source: ((.typed_source // {}) | if type == "object" then with_entries(select((.key | test("^[a-z_]{1,40}$")) and (.value | type) == "number")) else {} end),
             deferred: ((.deferred // {}) | if type == "object" then with_entries(select((.key | test("^[a-z_]{1,40}$")) and (.value | type) == "number")) else {} end)}
             | with_entries(select((.value | type) as $t | $t == "number" or $t == "boolean" or $t == "object" or ($t == "string" and (.value | test("^[a-z_]{1,40}$")))))'
           line="$( { [ -s "$RUNNER_TEMP/receipt" ] && tail -n 1 "$RUNNER_TEMP/receipt" | jq -ce "$show" 2>/dev/null; } || true )"
