@@ -110,4 +110,61 @@ BEGIN
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.model_registry), 'anon still reads no registry row');
 END $$;
 RESET ROLE;
+
+-- facet_witness_independence_v1 (20261124193400): one photo is one witness; unregistered readers are one family;
+-- a conflict has no headline value; a reading names what would establish it. (Disposable PG17 fixtures only.)
+INSERT INTO public.observation_properties VALUES ('40000000-0000-0000-0000-0000000000b7', 'shifter_bracket_marking');
+INSERT INTO public.vehicle_images (id, vehicle_id) VALUES
+ ('5a000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000003'),
+ ('5a000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000003');
+INSERT INTO public.vehicle_observations (vehicle_id, kind, extraction_method, observed_at, structured_data, property_id, agent_model)
+VALUES
+ -- shifter: Claude on one photo, Codex on another: two photos, two families
+ ('10000000-0000-0000-0000-000000000003', 'specification', 'physical_transcription_v1', '2026-11-01T12:00Z',
+  '{"shifter_bracket_marking":"3952632","image_id":"5a000000-0000-0000-0000-000000000007"}', '40000000-0000-0000-0000-0000000000b7', 'claude-opus-5-5'),
+ ('10000000-0000-0000-0000-000000000003', 'specification', 'reviewed_image_analysis_v1', '2026-11-01T12:00Z',
+  '{"shifter_bracket_marking":"3952632","image_id":"5a000000-0000-0000-0000-000000000008"}', '40000000-0000-0000-0000-0000000000b7',
+  'Codex interactive assistant; exact model version not exposed');
+\ir ../migrations/20261124193400_facet_witness_independence.sql
+\ir ../migrations/20261124193400_facet_witness_independence.sql
+
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE item jsonb; d text;
+BEGIN
+  d := pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure);
+  PERFORM public.t_assert((length(d) - length(replace(d, 'facet_witness_independence_v1', ''))) / length('facet_witness_independence_v1') = 1,
+    'independence patched once');
+  item := public.t_item('10000000-0000-0000-0000-000000000003', 'engine', 'engine.current.block_casting');
+  PERFORM public.t_assert(item->>'status' = 'reading' AND item->'agreement' = '{"readings":2,"photos":1,"families":1}'::jsonb
+      AND item->>'needed' LIKE '%second reader family%' AND jsonb_array_length(item->'sources') = 2,
+    format('Opus + Sonnet on one photo: two readings, one photo, one family, both listed, says what establishes it; got %s', item));
+  item := public.t_item('10000000-0000-0000-0000-000000000003', 'transmission', 'transmission.current.case_casting');
+  PERFORM public.t_assert(item->>'status' = 'reading' AND item->'agreement' = '{"readings":2,"photos":1,"families":2}'::jsonb,
+    format('two families on one photo agree, they do not establish; got %s', item));
+  item := public.t_item('10000000-0000-0000-0000-000000000003', 'transmission', 'transmission.current.shifter');
+  PERFORM public.t_assert(item->>'status' = 'established' AND item->>'value' = '3952632' AND item->>'needed' IS NULL,
+    format('two photos read by two families establish; got %s', item));
+  item := public.t_item('10000000-0000-0000-0000-000000000003', 'engine', 'engine.current.engine_code_stamp');
+  PERFORM public.t_assert(item->>'status' = 'reading' AND item->'agreement'->>'photos' = '2' AND item->'agreement'->>'families' = '1',
+    format('two photos by one family stay a reading; got %s', item));
+  item := public.t_item('10000000-0000-0000-0000-000000000003', 'transmission', 'transmission.current.tailhousing_casting');
+  PERFORM public.t_assert(item->>'status' = 'conflict' AND item->'value' = 'null'::jsonb AND item->'normalized' = 'null'::jsonb
+      AND jsonb_array_length(item->'sides') = 2,
+    format('a conflict has no headline value and two sides; got %s', item));
+  PERFORM public.t_assert((SELECT bool_and((s->>'witnesses')::int = 1) FROM jsonb_array_elements(item->'sides') s)
+      AND item#>>'{sides,0,sources,0,reader}' = 'anthropic' AND item#>>'{sides,1,sources,0,reader}' = 'unregistered',
+    format('sides: registered reading first, each with its witness count; got %s', item->'sides'));
+  item := public.t_item('10000000-0000-0000-0000-000000000003', 'transmission', 'transmission.current.id_stamp');
+  PERFORM public.t_assert(item->>'status' = 'reading' AND item->'agreement'->>'families' = '1',
+    format('two unregistered models are one family; got %s', item));
+  item := public.t_item('10000000-0000-0000-0000-000000000003', 'transmission', 'transmission.current.bellhousing_casting');
+  PERFORM public.t_assert(item->>'status' = 'reading', format('no model recorded stays a reading; got %s', item->>'status'));
+  PERFORM public.t_assert(public.reader_lineage('claude-opus-5-5') = 'anthropic' AND public.reader_lineage('model-y') IS NULL
+      AND public.reader_lineage('model-x') IS NULL AND public.reader_lineage(NULL) IS NULL,
+    'an unregistered or walk-in model has no family of its own');
+END $$;
+RESET ROLE;
 \echo facet_reader_lineage: ok
