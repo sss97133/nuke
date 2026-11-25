@@ -27,7 +27,12 @@ export interface LaborSegment extends LaborRange {
   /** witnessed | unwitnessed_purchase: which of the reader's two totals this segment's hours belong to. */
   counts_in?: string | null; counted_in?: string | null;
   witnessed_hours_min?: number | null; witnessed_hours_typical?: number | null; witnessed_hours_max?: number | null;
-  witness_share?: { pieces?: LaborPart[] | null } | null;
+  /** The reader's witness counts for the segment's pieces (from 20261124214500), with the pieces themselves. */
+  witness_share?: {
+    pieces?: LaborPart[] | null; fitted_with_operation?: number | null; fitted_without_operation?: number | null;
+    not_fitted?: number | null; unwitnessed?: number | null; cannot_tell?: number | null; none_raised?: number | null;
+  } | null;
+  witnessed_reason?: string | null;
   reassembly?: { matched?: LaborPart[]; unmatched?: LaborPart[]; matched_count?: number; unmatched_count?: number } | null;
 }
 export interface LaborAppraisal {
@@ -37,7 +42,7 @@ export interface LaborAppraisal {
   totals: (LaborRange & {
     by_grade?: Record<string, LaborRange> | null;
     /** The reader's two totals, side by side: hours witnessed, and hours including purchases not seen fitted. */
-    witnessed?: LaborRange | null; with_unwitnessed_purchases?: LaborRange | null;
+    witnessed?: (LaborRange & { unknown_min_segments?: number | null }) | null; with_unwitnessed_purchases?: LaborRange | null;
     priced_segments?: number | null; unwitnessed_purchase_segments?: number | null; rule?: string | null;
   }) | null;
 }

@@ -1,0 +1,865 @@
+{
+  "as_of": "2026-11-25T02:48:23.903062+00:00",
+  "totals": {
+    "rule": "witnessed adds each priced segment's witnessed hours; with_unwitnessed_purchases adds every priced segment whose grade enters a total (labor_evidence_grade_policy); hours_min/typical/max = with_unwitnessed_purchases; null when nothing is priced",
+    "by_grade": {
+      "shop_paper": {
+        "segments": 1,
+        "hours_max": 50.75,
+        "hours_min": 50.75,
+        "hours_typical": 50.75
+      },
+      "parts_bought": {
+        "segments": 3,
+        "hours_max": 110.0,
+        "hours_min": 42.0,
+        "hours_typical": 62.0
+      },
+      "fitted_in_photos": {
+        "segments": 2,
+        "hours_max": 64,
+        "hours_min": 24,
+        "hours_typical": 38
+      },
+      "photographed_stage": {
+        "segments": 1,
+        "hours_max": 32,
+        "hours_min": 11,
+        "hours_typical": 21
+      },
+      "receipt_part_visible": {
+        "segments": 1,
+        "hours_max": 2.25,
+        "hours_min": 2.25,
+        "hours_typical": 2.25
+      }
+    },
+    "hours_max": 259.00,
+    "hours_min": 130.00,
+    "witnessed": {
+      "hours_max": 259.00,
+      "hours_min": 71.00,
+      "hours_typical": 81.00,
+      "unknown_min_segments": 4
+    },
+    "hours_typical": 174.00,
+    "returned_lines": 3,
+    "priced_segments": 8,
+    "with_unwitnessed_purchases": {
+      "hours_max": 259.00,
+      "hours_min": 130.00,
+      "hours_typical": 174.00
+    },
+    "unwitnessed_purchase_segments": 3
+  },
+  "segments": [
+    {
+      "status": "ok",
+      "segment": "engine",
+      "category": "powertrain",
+      "citation": "stage_transition_labor_map:powertrain none->rebuilt_original; machining paper hours win",
+      "counts_in": "witnessed",
+      "hours_max": 50.75,
+      "hours_min": 50.75,
+      "book_hours": {
+        "hours_max": 50,
+        "hours_min": 20,
+        "hours_typical": 32
+      },
+      "hours_basis": "shop_paper",
+      "paper_hours": 50.75,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "rebuilt_original",
+          "from_stage": "none",
+          "transition_id": "d9b7b1bd-86fa-4393-9592-46529ea7f9f9"
+        }
+      ],
+      "fitted_parts": 0,
+      "hours_typical": 50.75,
+      "witness_share": null,
+      "evidence_count": 20,
+      "evidence_grade": "shop_paper",
+      "range_below_paper": true,
+      "witnessed_hours_max": 50.75,
+      "witnessed_hours_min": 50.75,
+      "witnessed_hours_typical": 50.75
+    },
+    {
+      "status": "no evidence",
+      "segment": "gearbox_rebuild",
+      "category": "powertrain",
+      "citation": "stage_transition_labor_map:powertrain none->trans_rebuild; only on transmission shop paper",
+      "hours_max": null,
+      "hours_min": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "trans_rebuild",
+          "from_stage": "none"
+        }
+      ],
+      "hours_typical": null,
+      "evidence_count": 0,
+      "missing_evidence": [
+        "reconstruction_paper_lines:transmission"
+      ]
+    },
+    {
+      "status": "ok",
+      "segment": "gearbox",
+      "category": "powertrain",
+      "citation": "labor_operations:MECH-TRANS-RR (remove and refit); a rebuild is the gearbox_rebuild segment",
+      "counts_in": "unwitnessed_purchase",
+      "hours_max": 6.0,
+      "hours_min": 6.0,
+      "book_hours": {
+        "hours_max": 6.0,
+        "hours_min": 6.0,
+        "hours_typical": 6.0
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "removed_and_refit",
+          "from_stage": "in_car",
+          "operation_code": "MECH-TRANS-RR"
+        }
+      ],
+      "fitted_parts": 0,
+      "hours_typical": 6.0,
+      "witness_share": null,
+      "evidence_count": 2,
+      "evidence_grade": "parts_bought",
+      "witnessed_reason": "not witnessed",
+      "range_below_paper": false,
+      "witnessed_hours_max": 6.0,
+      "witnessed_hours_min": null,
+      "witnessed_hours_typical": null
+    },
+    {
+      "status": "ok",
+      "segment": "chassis",
+      "category": "chassis",
+      "citation": "stage_transition_labor_map:chassis stock->refreshed",
+      "counts_in": "witnessed",
+      "hours_max": 24,
+      "hours_min": 8,
+      "book_hours": {
+        "hours_max": 24,
+        "hours_min": 8,
+        "hours_typical": 14
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "refreshed",
+          "from_stage": "stock",
+          "transition_id": "301611c9-ece1-461d-af53-5b3dd40ba0f9",
+          "witnessed_hours": {
+            "reason": "fitted, no book hours",
+            "hours_max": 24,
+            "hours_min": null,
+            "hours_typical": null
+          }
+        }
+      ],
+      "fitted_parts": 1,
+      "hours_typical": 14,
+      "witness_share": {
+        "pieces": [
+          {
+            "item_id": "04916c57-1181-4661-9bd0-4e0c66928d3e",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "11ffbaa6-a460-4cb7-8cc1-97d70f41ce4f",
+            "witness": "cannot_tell",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "1df5bb2e-8724-4e44-8fac-bbd536005452",
+            "witness": "cannot_tell",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "36d6e600-99d4-4d25-9a8f-adc0c1812643",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "7846bc39-d593-4d92-8d92-4cbd7f76fb23",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "7b61a6d0-a530-4e82-8d09-d16b2e1d4524",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "8247108b-5775-4e07-9abb-d6a4af1ae8b5",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "87de26c7-1859-4c74-a7af-4e0c71a25fc8",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "88652aef-4993-4faf-9ae6-5ef8ae204a2c",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "a987c886-30aa-4d1a-ae3c-d4b3a637cd47",
+            "witness": "unwitnessed",
+            "operation_code": "MECH-BRAKES-FRONT",
+            "hours": null
+          },
+          {
+            "item_id": "ad55b694-905e-4dd9-86c1-33cd983c07ea",
+            "witness": "unwitnessed",
+            "operation_code": "MECH-BRAKES-FRONT",
+            "hours": null
+          },
+          {
+            "item_id": "b27ae6dc-a759-4531-b2e6-ed42ab72d60a",
+            "witness": "unwitnessed",
+            "operation_code": "MECH-BRAKES-FRONT",
+            "hours": null
+          },
+          {
+            "item_id": "bb0da15e-9849-4205-b21b-0ff38e6d29d3",
+            "witness": "fitted",
+            "operation_code": "MECH-BRAKE-BOOSTER-MC",
+            "hours": null
+          },
+          {
+            "item_id": "c476bf89-3b4e-4b3e-a86d-efe03dad1fbb",
+            "witness": "cannot_tell",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "c6031be8-f076-4b3d-8397-fc3321d850a9",
+            "witness": "unwitnessed",
+            "operation_code": "MECH-BRAKES-FRONT",
+            "hours": null
+          },
+          {
+            "item_id": "f1148383-6b1b-447a-9a8e-ca4a23a3f40c",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          },
+          {
+            "item_id": "f4a9ad4f-a6e2-4113-8c01-496c47d5f150",
+            "witness": "unwitnessed",
+            "operation_code": null,
+            "hours": null
+          }
+        ],
+        "not_fitted": 0,
+        "cannot_tell": 3,
+        "none_raised": 13,
+        "unwitnessed": 13,
+        "fitted_share": 0.059,
+        "evidence_parts": 17,
+        "fitted_with_operation": 0,
+        "fitted_without_operation": 1
+      },
+      "evidence_count": 28,
+      "evidence_grade": "fitted_in_photos",
+      "witnessed_reason": "fitted, no book hours",
+      "range_below_paper": false,
+      "witnessed_hours_max": 24,
+      "witnessed_hours_min": null,
+      "witnessed_hours_typical": null
+    },
+    {
+      "status": "ok",
+      "segment": "electrical",
+      "category": "electrical",
+      "citation": "stage_transition_labor_map:electrical original->rewire",
+      "counts_in": "unwitnessed_purchase",
+      "hours_max": 20,
+      "hours_min": 8,
+      "book_hours": {
+        "hours_max": 20,
+        "hours_min": 8,
+        "hours_typical": 14
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "rewire",
+          "from_stage": "original",
+          "transition_id": "d792619f-c4d9-4576-b005-b3815792de4c",
+          "witnessed_hours": {
+            "reason": "not witnessed",
+            "hours_max": 20,
+            "hours_min": null,
+            "hours_typical": null
+          }
+        }
+      ],
+      "fitted_parts": 0,
+      "hours_typical": 14,
+      "witness_share": {
+        "pieces": [
+          {
+            "item_id": "06a16290-05b1-49c5-8c22-ed9970cb1371",
+            "witness": "unwitnessed",
+            "operation_code": "ELEC-WIRING-HARNESS",
+            "hours": null
+          },
+          {
+            "item_id": "10119a83-2c13-4fbf-b76b-64d81b52a8ab",
+            "witness": "unwitnessed",
+            "operation_code": "ELEC-WIRING-HARNESS",
+            "hours": null
+          },
+          {
+            "item_id": "2c57616b-26ca-4aaf-87a3-4244374a8262",
+            "witness": "cannot_tell",
+            "operation_code": "ELEC-WIRING-HARNESS",
+            "hours": null
+          },
+          {
+            "item_id": "2d675a5c-5e7e-4eea-a471-4506a451f089",
+            "witness": "cannot_tell",
+            "operation_code": "ELEC-WIRING-HARNESS",
+            "hours": null
+          },
+          {
+            "item_id": "4630a89b-23e5-4364-afeb-b67fd7c8a01b",
+            "witness": "unwitnessed",
+            "operation_code": "ELEC-WIRING-HARNESS",
+            "hours": null
+          },
+          {
+            "item_id": "b6442f74-ad2e-42e9-9719-f521ee836997",
+            "witness": "unwitnessed",
+            "operation_code": "ELEC-WIRING-HARNESS",
+            "hours": null
+          },
+          {
+            "item_id": "c0bbae44-6b55-46d5-ac7e-08817f5d714e",
+            "witness": "unwitnessed",
+            "operation_code": "ELEC-WIRING-HARNESS",
+            "hours": null
+          },
+          {
+            "item_id": "f46e2bb5-82be-402e-949b-f53f6fdd4b89",
+            "witness": "unwitnessed",
+            "operation_code": "ELEC-WIRING-HARNESS",
+            "hours": null
+          }
+        ],
+        "not_fitted": 0,
+        "cannot_tell": 2,
+        "none_raised": 6,
+        "unwitnessed": 6,
+        "fitted_share": 0.000,
+        "evidence_parts": 8,
+        "fitted_with_operation": 0,
+        "fitted_without_operation": 0
+      },
+      "evidence_count": 8,
+      "evidence_grade": "parts_bought",
+      "witnessed_reason": "not witnessed",
+      "range_below_paper": false,
+      "witnessed_hours_max": 20,
+      "witnessed_hours_min": null,
+      "witnessed_hours_typical": null
+    },
+    {
+      "status": "ok",
+      "segment": "body_metal",
+      "category": "body",
+      "citation": "stage_transition_labor_map:body panel_* stripped->fabricated per distinct panel; fitted pieces witnessed, unwitnessed pieces with_unwitnessed_purchases only",
+      "counts_in": "unwitnessed_purchase",
+      "hours_max": 84,
+      "hours_min": 28,
+      "book_hours": {
+        "hours_max": 84,
+        "hours_min": 28,
+        "hours_typical": 42
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "mode": "per_piece",
+          "zone": "panel_*",
+          "pieces": [
+            {
+              "item_id": null,
+              "witness": "unwitnessed",
+              "question_state": "cannot_tell"
+            },
+            {
+              "item_id": null,
+              "witness": "unwitnessed",
+              "question_state": "cannot_tell"
+            },
+            {
+              "item_id": null,
+              "witness": "unwitnessed",
+              "question_state": "cannot_tell"
+            },
+            {
+              "item_id": null,
+              "witness": "unwitnessed",
+              "question_state": "cannot_tell"
+            },
+            {
+              "item_id": null,
+              "witness": "unwitnessed",
+              "question_state": "cannot_tell"
+            },
+            {
+              "item_id": null,
+              "witness": "unwitnessed",
+              "question_state": "cannot_tell"
+            },
+            {
+              "item_id": null,
+              "witness": "unwitnessed",
+              "question_state": "cannot_tell"
+            }
+          ],
+          "to_stage": "fabricated",
+          "from_stage": "stripped",
+          "hours_each": {
+            "hours_max": 12,
+            "hours_min": 4,
+            "hours_typical": 6
+          },
+          "fitted_count": 0,
+          "witnessed_hours": {
+            "reason": "not witnessed",
+            "hours_max": 84,
+            "hours_min": null,
+            "hours_typical": null
+          },
+          "not_fitted_count": 0,
+          "unwitnessed_count": 7
+        }
+      ],
+      "fitted_parts": 0,
+      "hours_typical": 42,
+      "witness_share": null,
+      "evidence_count": 7,
+      "evidence_grade": "parts_bought",
+      "witnessed_reason": "not witnessed",
+      "range_below_paper": false,
+      "witnessed_hours_max": 84,
+      "witnessed_hours_min": null,
+      "witnessed_hours_typical": null
+    },
+    {
+      "status": "ok",
+      "segment": "paint",
+      "category": "body",
+      "citation": "stage_transition_labor_map:body paint chain; charge only photographed steps",
+      "counts_in": "witnessed",
+      "hours_max": 32,
+      "hours_min": 11,
+      "stage_steps": [
+        {
+          "status": "unsupported",
+          "to_stage": "primed",
+          "hours_max": null,
+          "hours_min": null,
+          "from_stage": "fabricated",
+          "photo_phase": null,
+          "hours_typical": null
+        },
+        {
+          "images": 2,
+          "status": "supported",
+          "to_stage": "blocked",
+          "hours_max": 24,
+          "hours_min": 8,
+          "from_stage": "primed",
+          "photo_phase": "paint_prep",
+          "hours_typical": 16,
+          "transition_id": "1ffc43ec-a6c7-4918-b97d-039a875a228d"
+        },
+        {
+          "images": 1,
+          "status": "supported",
+          "to_stage": "basecoated",
+          "hours_max": 8,
+          "hours_min": 3,
+          "from_stage": "blocked",
+          "photo_phase": "paint_application",
+          "hours_typical": 5,
+          "transition_id": "08286e0e-01e6-4caf-b4c9-a02da0d81ad4"
+        },
+        {
+          "status": "unsupported",
+          "to_stage": "clearcoated",
+          "hours_max": null,
+          "hours_min": null,
+          "from_stage": "basecoated",
+          "photo_phase": null,
+          "hours_typical": null
+        }
+      ],
+      "hours_typical": 21,
+      "evidence_count": 3,
+      "evidence_grade": "photographed_stage",
+      "unsupported_steps": [
+        {
+          "status": "unsupported",
+          "to_stage": "primed",
+          "from_stage": "fabricated",
+          "photo_phase": null
+        },
+        {
+          "status": "unsupported",
+          "to_stage": "clearcoated",
+          "from_stage": "basecoated",
+          "photo_phase": null
+        }
+      ],
+      "witnessed_hours_max": 32,
+      "witnessed_hours_min": 11,
+      "witnessed_hours_typical": 21
+    },
+    {
+      "status": "ok",
+      "segment": "reassembly",
+      "category": "body",
+      "citation": "labor_operations via receipt_part_visible installed=yes + receipt_line_labor_operation",
+      "counts_in": "witnessed",
+      "hours_max": 2.25,
+      "hours_min": 2.25,
+      "reassembly": {
+        "matched": [
+          {
+            "item_id": "d2c6e7d9-13eb-4705-ac7d-3c2bb658f6bc",
+            "hours": 2.0,
+            "operation_code": "INT-CARPET-RR",
+            "system": "interior",
+            "counted_in": "interior"
+          },
+          {
+            "item_id": "106a15e3-a8ce-4a57-a485-9c697fcca219",
+            "hours": 0.5,
+            "operation_code": "ELEC-TAILLIGHTS",
+            "system": "trim",
+            "counted_in": null
+          },
+          {
+            "item_id": "df461492-d3f7-4005-86e3-7e6734431b4b",
+            "hours": 1.0,
+            "operation_code": "INT-SEATS-RR",
+            "system": "interior",
+            "counted_in": "interior"
+          },
+          {
+            "item_id": "11ebb55c-062e-45dc-9518-bf9e17d312f2",
+            "hours": 1.0,
+            "operation_code": "BODY-REPLACE-HOOD",
+            "system": "body",
+            "counted_in": null
+          },
+          {
+            "item_id": "09515326-8cca-4e49-b9f5-9cdecd71f342",
+            "hours": 4.0,
+            "operation_code": "INT-HEADLINER-RR",
+            "system": "interior",
+            "counted_in": "interior"
+          },
+          {
+            "item_id": "8df8791c-38c8-46d6-ad08-ccde92cd8a28",
+            "hours": 0.75,
+            "operation_code": "TRIM-BUMPERS-REAR",
+            "system": "trim",
+            "counted_in": null
+          },
+          {
+            "item_id": "84f83022-a299-43b9-ba4f-5ac1aed66ea2",
+            "hours": 0,
+            "operation_code": "ELEC-TAILLIGHTS",
+            "system": "trim",
+            "counted_in": null
+          }
+        ],
+        "unmatched": [
+          {
+            "item_id": "f9115b99-f55c-44db-a9a4-9b2362913ca8",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "91f4587b-36af-4adf-8a53-f58ff710b005",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "0ca0418c-9c1f-41e5-9154-fc956f5ec380",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "a20b632a-d08b-4454-82f0-56db4f1f724d",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "4c15537f-f4ba-4d2a-9edf-d4e351b4fe7a",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "39b248e6-f656-4486-b69a-d3c469844867",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "32f382a1-c8b9-4d74-b7d7-d5db088a4855",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "0c73d8c1-94d7-411e-bd1a-cc06d6f3de3f",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "bb0da15e-9849-4205-b21b-0ff38e6d29d3",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "9a3db7d9-a8b6-4c1d-97cb-aeff390c0d53",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "06e4624d-52ff-4694-a0d9-3131d94be8cf",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "b42deb2f-c85e-47a4-8e49-642c3ce0e9d1",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "f1c2803a-8320-41cf-afcf-17260819ad19",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "283b1e61-0c0d-4922-92a7-6871f3e30205",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "2011c539-7295-4d1e-abb4-3623d174921a",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "6adece50-5427-4096-b4ea-5f725cd75145",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "4bba276c-9911-4c95-8b74-786cc62c86d2",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "869af060-45e5-4a5a-bdb2-78529cdaa5bb",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "16532f77-8d1c-4227-8f4b-8a019a93af1a",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "63424077-eed8-46b0-a8e8-76fea96a9342",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "0cace39e-7eb8-474a-9216-905fc967050f",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "c9e3b335-9681-4203-9285-24b1e143d135",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "32d60821-1530-4b5c-add0-995a96c52add",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          },
+          {
+            "item_id": "52564076-e7c4-4bd1-b40f-0240af858613",
+            "hours": null,
+            "system": null,
+            "counted_in": null
+          }
+        ],
+        "matched_count": 7,
+        "unmatched_count": 24
+      },
+      "stage_steps": [
+        {
+          "mode": "per_piece",
+          "zone": "*",
+          "to_stage": "assembled",
+          "from_stage": "clearcoated"
+        }
+      ],
+      "hours_typical": 2.25,
+      "evidence_count": 31,
+      "evidence_grade": "receipt_part_visible",
+      "witnessed_hours_max": 2.25,
+      "witnessed_hours_min": 2.25,
+      "hours_counted_elsewhere": 7.0,
+      "witnessed_hours_typical": 2.25
+    },
+    {
+      "status": "ok",
+      "segment": "interior",
+      "category": "interior",
+      "citation": "stage_transition_labor_map:interior needs_work->recovered",
+      "counts_in": "witnessed",
+      "hours_max": 40,
+      "hours_min": 16,
+      "book_hours": {
+        "hours_max": 40,
+        "hours_min": 16,
+        "hours_typical": 24
+      },
+      "hours_basis": "book",
+      "paper_hours": null,
+      "stage_steps": [
+        {
+          "zone": "*",
+          "to_stage": "recovered",
+          "from_stage": "needs_work",
+          "transition_id": "0af10e95-59f5-46aa-a0fd-2a8289a28db2",
+          "witnessed_hours": {
+            "hours_max": 40,
+            "hours_min": 7.0,
+            "hours_typical": 7.0
+          }
+        }
+      ],
+      "fitted_parts": 3,
+      "hours_typical": 24,
+      "witness_share": {
+        "pieces": [
+          {
+            "item_id": "09515326-8cca-4e49-b9f5-9cdecd71f342",
+            "witness": "fitted",
+            "operation_code": "INT-HEADLINER-RR",
+            "hours": 4.0
+          },
+          {
+            "item_id": "3ed0df7f-cee5-4871-8492-4b52d87beaf2",
+            "witness": "cannot_tell",
+            "operation_code": "INT-DOOR-PANELS",
+            "hours": null
+          },
+          {
+            "item_id": "d2c6e7d9-13eb-4705-ac7d-3c2bb658f6bc",
+            "witness": "fitted",
+            "operation_code": "INT-CARPET-RR",
+            "hours": 2.0
+          },
+          {
+            "item_id": "de202559-1acf-413e-8837-1c901990735f",
+            "witness": "cannot_tell",
+            "operation_code": "INT-CARPET-RR",
+            "hours": null
+          },
+          {
+            "item_id": "df461492-d3f7-4005-86e3-7e6734431b4b",
+            "witness": "fitted",
+            "operation_code": "INT-SEATS-RR",
+            "hours": 1.0
+          },
+          {
+            "item_id": "f3064e37-9842-4620-a910-6d79385bca08",
+            "witness": "cannot_tell",
+            "operation_code": "INT-SEATS-RR",
+            "hours": null
+          }
+        ],
+        "not_fitted": 0,
+        "cannot_tell": 3,
+        "none_raised": 0,
+        "unwitnessed": 0,
+        "fitted_share": 0.500,
+        "evidence_parts": 6,
+        "fitted_with_operation": 3,
+        "fitted_without_operation": 0
+      },
+      "evidence_count": 26,
+      "evidence_grade": "fitted_in_photos",
+      "range_below_paper": false,
+      "witnessed_hours_max": 40,
+      "witnessed_hours_min": 7.0,
+      "witnessed_hours_typical": 7.0
+    }
+  ],
+  "applicable": true,
+  "vehicle_id": "20d21fb0-4651-4469-a0ba-e751309a1e54",
+  "logic_version": "vehicle_labor_appraisal/20261124214500.1"
+}
