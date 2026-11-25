@@ -150,8 +150,9 @@ RESET statement_timeout; RESET lock_timeout;
 SELECT t_assert(t_drift() = 0, 'backfill: every bucket of the last 8 UTC days equals a recount');
 SELECT t_assert((SELECT count(*) FROM public.auction_comment_day_counts WHERE posted_day < (now() AT TIME ZONE 'UTC')::date - 8) = 0,
   'backfill: no bucket older than the complete window is written');
-SELECT t_assert((SELECT count(*) FROM cron.job WHERE jobname = 'auction-comment-day-counts-reconcile' AND schedule = '20 4 * * *') = 1,
-  'job: one nightly reconcile job at 04:20 UTC');
+SELECT t_assert((SELECT count(*) FROM cron.job WHERE jobname = 'auction-comment-day-counts-reconcile' AND schedule = '20 4 * * *'
+    AND command LIKE 'SET client_min_messages = error; SET statement_timeout = ''10s''; SET lock_timeout = ''5s''; SELECT * FROM %') = 1,
+  'job: one nightly reconcile job at 04:20 UTC with the cron prefix, returning one row per corrected bucket');
 SET ROLE anon;
 SELECT t_assert(t_velocity() = 'pub_a=5,pub_c=1', 'after: velocity read from the fold equals the scan (pub_a=5, pub_c=1)');
 SELECT t_assert(NOT has_table_privilege('anon', 'public.auction_comment_day_counts', 'SELECT'), 'anon cannot read the fold table directly');
@@ -183,10 +184,11 @@ UPDATE public.auction_comment_day_counts SET n = 99
 -- and a phantom bucket: a closed day with a count but no comments.
 INSERT INTO public.auction_comment_day_counts (vehicle_id, posted_day, n)
 VALUES ('b0000000-0000-0000-0000-00000000000b', (now() AT TIME ZONE 'UTC')::date - 5, 4);
-SELECT t_assert(public.auction_comment_day_counts_reconcile(8) = 2 AND t_drift() = 0,
-  'reconcile: corrects a wrong closed day and zeroes a phantom one, and reports 2');
-SELECT t_assert(public.auction_comment_day_counts_reconcile(8) = 0, 'reconcile: a second run corrects nothing');
-DO $$ BEGIN PERFORM public.auction_comment_day_counts_reconcile(30); RAISE EXCEPTION 'FAIL: reconcile accepted 30 days';
+SELECT t_assert((SELECT string_agg(n_was || '->' || n_now, ',' ORDER BY n_was) FROM public.auction_comment_day_counts_reconcile(8)) = '4->0,99->1'
+  AND t_drift() = 0,
+  'reconcile: corrects a wrong closed day and zeroes a phantom one, and returns both (99->1, 4->0)');
+SELECT t_assert((SELECT count(*) FROM public.auction_comment_day_counts_reconcile(8)) = 0, 'reconcile: a second run corrects nothing');
+DO $$ BEGIN PERFORM * FROM public.auction_comment_day_counts_reconcile(30); RAISE EXCEPTION 'FAIL: reconcile accepted 30 days';
 EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE 'FAIL%' THEN RAISE; END IF; RAISE NOTICE 'PASS: reconcile refuses a window over 14 days'; END $$;
 
 -- Applying twice changes no count and keeps one job and three triggers.
