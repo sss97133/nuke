@@ -249,4 +249,51 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 
+-- promote: the gate (migration 20261124163200).
+\i supabase/migrations/20261124163200_receipt_line_rule_promote.sql
+DELETE FROM public.receipt_line_rules WHERE rule_id = 'op.600.spoiler-vendor-two';
+INSERT INTO public.labor_operations (code, base_hours) VALUES ('TRIM-WING-RR', 1);
+-- A rule that fills only cited lines is promoted.
+SELECT public.assert(m->>'decision' = 'promoted' AND (m->>'lines_filled')::int = 2, 'spoiler rule: ' || m::text)
+  FROM public.receipt_line_rule_propose('op.700.spoiler', 'labor_operation', 700, '\yspoiler\y', 'TRIM-SPOILER-RR',
+         'test: worklist term spoiler', 'test',
+         ARRAY['00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000c9']::uuid[]) m;
+SELECT public.assert(status = 'active' AND promoted_at IS NOT NULL, 'promoted rule active')
+  FROM public.receipt_line_rules WHERE rule_id = 'op.700.spoiler';
+SELECT public.assert(gap IS NULL, 'gap closed by promotion') FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-0000000000c2';
+-- Too broad: fills a line it did not cite.
+SELECT public.assert(m->>'decision' = 'rejected' AND m->'reasons' ? 'fills_lines_not_in_evidence', 'broad rule: ' || m::text)
+  FROM public.receipt_line_rule_propose('op.710.any', 'labor_operation', 710, '.', 'TRIM-WING-RR', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-0000000000c3']::uuid[]) m;
+SELECT public.assert(status = 'rejected', 'broad rule rejected') FROM public.receipt_line_rules WHERE rule_id = 'op.710.any';
+-- Steals a keyed line (earlier priority over the clutch rule) without superseding it.
+SELECT public.assert(m->>'decision' = 'rejected' AND m->'reasons' ? 'changes_classified_lines', 'stealing rule: ' || m::text)
+  FROM public.receipt_line_rule_propose('op.005.clutch-steal', 'labor_operation', 5, '\y(clutch|wing)\y', 'TRIM-WING-RR', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-0000000000c3']::uuid[]) m;
+-- Fills nothing / no evidence.
+SELECT public.assert(m->'reasons' ? 'fills_no_line' AND m->'reasons' ? 'no_evidence_item_ids', 'empty rule: ' || m::text)
+  FROM public.receipt_line_rule_propose('op.720.none', 'labor_operation', 720, 'zzzz', 'TRIM-WING-RR', 'test', 'test', '{}') m;
+-- Priority taken.
+SELECT public.assert(m->'reasons' ? 'priority_taken', 'priority: ' || m::text)
+  FROM public.receipt_line_rule_propose('op.730.wing', 'labor_operation', 700, '\ywing\y', 'TRIM-WING-RR', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-0000000000c3']::uuid[]) m;
+-- A supersession may change the lines of the rule it replaces, and only those.
+SELECT public.assert(m->>'decision' = 'promoted' AND (m->>'lines_changed')::int = 1, 'supersede: ' || m::text)
+  FROM public.receipt_line_rule_propose('op.131.clutch-wing', 'labor_operation', 131, '\y(clutch kit|wing)\y', 'TRIM-WING-RR',
+         'test', 'test', ARRAY['00000000-0000-0000-0000-0000000000c3']::uuid[],
+         p_supersedes_rule_id => 'op.130.mech-trans-rr') m;
+SELECT public.assert(status = 'retired', 'superseded rule retired') FROM public.receipt_line_rules WHERE rule_id = 'op.130.mech-trans-rr';
+SELECT public.assert(operation_code = 'TRIM-WING-RR', 'superseding rule keys the line')
+  FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-0000000000c1';
+-- Only the service role calls the gate.
+SET ROLE anon;
+DO $$ BEGIN
+  BEGIN
+    PERFORM public.receipt_line_rule_promote('op.700.spoiler');
+    RAISE EXCEPTION 'FAIL: anon ran the gate';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END $$;
+RESET ROLE;
+
 \echo 'test_receipt_line_rules: PASS'
