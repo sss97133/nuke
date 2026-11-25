@@ -2,7 +2,9 @@
 -- Proves 20261125160500_definer_readers_visibility.sql: get_image_deep_analysis and intake_live_state (SECURITY
 -- DEFINER, executable by anon) return a row about a photo only where the photo is shown (gallery-eligible, not
 -- sensitive, on a public undeleted vehicle), to its uploader, or to a caller tied to its vehicle; and name a vehicle
--- only where it is public and undeleted or the caller is tied. service_role keeps every row.
+-- only where it is public and undeleted or the caller is tied. service_role keeps every row. And
+-- 20261125183500_intake_live_state_session_text.sql: a work session's title and summary reach only its author or a tied
+-- viewer, and both limits clamp to 0..100. The 'after' assertions run on both applied in order, as production holds them.
 -- The fixture mirrors production as read on 2026-11-25 (information_schema.columns, pg_constraint, a subset of pg_policies,
 -- role_table_grants, pg_get_functiondef): the columns these bodies and their helpers touch with their types, NOT NULLs,
 -- defaults, checks and foreign keys; the live bodies of vehicle_image_gallery_eligible(vehicle_images_public),
@@ -523,6 +525,11 @@ SELECT t_assert(t_hash('public.intake_live_state(integer,integer)') = 'Sqe+TWssh
 \ir ../migrations/20261125160500_definer_readers_visibility.sql
 \ir ../migrations/20261125160500_definer_readers_visibility.sql
 RESET statement_timeout; RESET lock_timeout;
+SELECT t_assert(t_hash('public.intake_live_state(integer,integer)') = 'oVg08xAqTbIRy7iPEhlbQ78uM+MbecsBGV6YKAWkPyE=',
+  'the 20261125160500 body is the one 20261125183500''s guard expects');
+\ir ../migrations/20261125183500_intake_live_state_session_text.sql
+\ir ../migrations/20261125183500_intake_live_state_session_text.sql
+RESET statement_timeout; RESET lock_timeout;
 
 SELECT t_assert((SELECT bool_and(p.prosecdef) AND bool_and(pg_get_userbyid(p.proowner) = current_user)
     AND bool_and(has_function_privilege('anon', p.oid, 'EXECUTE')) AND bool_and(has_function_privilege('authenticated', p.oid, 'EXECUTE'))
@@ -592,7 +599,10 @@ SELECT t_assert(jsonb_array_length(public.intake_live_state(100000, 100000) -> '
   'after: p_feed_limit clamps to 100 (121 shown frames, asked for 100,000)');
 RESET ROLE;
 
--- Revert restores both production bodies.
+-- The reverts, newest first, restore the 20261125160500 body and then both production bodies.
+\ir revert_20261125183500_intake_live_state_session_text.sql
+SELECT t_assert(t_hash('public.intake_live_state(integer,integer)') = 'oVg08xAqTbIRy7iPEhlbQ78uM+MbecsBGV6YKAWkPyE=',
+  'revert 20261125183500: restores the 20261125160500 body');
 \ir revert_20261125160500_definer_readers_visibility.sql
 SELECT t_assert(t_hash('public.get_image_deep_analysis(uuid)') = '3LWE/TnS8lwWQRuopztBD9HARireMredZGpW1BDMsd0='
   AND t_hash('public.intake_live_state(integer,integer)') = 'Sqe+TWsshVt5lgwtN0YjIebdzO6frcvmI5bjZwnBh5M=',
