@@ -690,6 +690,31 @@ DO $$ BEGIN
 END $$;
 SELECT pg_temp.check_e('after an un-supersede', 8);
 
+-- A car whose select never finishes is skipped after max_car_attempts (3) and reads red; it is not picked every tick.
+DELETE FROM public.retained_projection_verdicts WHERE projection_id = '00000000-0000-0000-0000-00000000e010';
+UPDATE public.retained_projection_backfill_cars SET graded_at = NULL, attempts = 3 WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1';
+UPDATE public.retained_projection_grading_state SET backfill_done = false WHERE id;
+CALL public.retained_projection_grade_tick();
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.retained_projection_verdicts WHERE projection_id = '00000000-0000-0000-0000-00000000e010')
+     OR (SELECT status FROM public.v_retained_projection_backfill) <> 'cars_skipped'
+     OR (SELECT skipped_cars FROM public.v_retained_projection_backfill) <> 1
+     OR (SELECT reading->>'status' FROM public.job_assay_readings WHERE jobname = 'retained-projection-grade') <> 'failed' THEN
+    RAISE EXCEPTION 'FAIL skipped car: %', (SELECT to_jsonb(b) FROM public.v_retained_projection_backfill b); END IF;
+  RAISE NOTICE 'PASS a car at max_car_attempts is skipped, reads cars_skipped (1) and failed in the job''s assay row';
+END $$;
+-- A pick whose select finishes resets the count; the car is graded.
+UPDATE public.retained_projection_backfill_cars SET attempts = 2 WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1';
+UPDATE public.retained_projection_grading_state SET backfill_done = false WHERE id;
+CALL public.retained_projection_grade_tick();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts WHERE projection_id = '00000000-0000-0000-0000-00000000e010')
+     OR (SELECT attempts FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1') <> 0
+     OR (SELECT status FROM public.v_retained_projection_backfill) <> 'done' THEN
+    RAISE EXCEPTION 'FAIL retry under max_car_attempts: %', (SELECT to_jsonb(b) FROM public.v_retained_projection_backfill b); END IF;
+  RAISE NOTICE 'PASS under max_car_attempts the car is picked, its count resets when the select finishes, and it is graded';
+END $$;
+
 \ir revert_20261126063500_retained_projection_verdicts.sql
 DO $$ BEGIN
   IF to_regclass('public.retained_projection_verdicts') IS NOT NULL OR to_regprocedure('public.retained_projection_verdicts_for(uuid[])') IS NOT NULL
