@@ -90,7 +90,7 @@ async function fetchVehicleImagesUncached<T = any>(
   // with approved publication provenance tied to this vehicle's auction event.
   // It preserves the gate for private intake and excludes rejected/unsafe rows;
   // display eligibility does not claim that vision analysis has completed.
-  const source = await vehicleImageGallerySource();
+  const source = await vehicleImageGallerySource(selectClause);
   const columns = await vehicleImageColumnsForViewer(selectClause);
   const fetchPage = (from: number, withCount: boolean) => {
     assertCurrent();

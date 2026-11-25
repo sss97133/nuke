@@ -242,15 +242,16 @@ it('finishes empty or failed record drilldowns and offers a bounded retry', asyn
   expect(container.textContent).toContain('No records returned.');
   expect(container.textContent).not.toContain('Reading recent records');
   await act(async () => panel.click());
-  fixture.results.vehicle_images = { data: null, error: { message: 'private records error' } };
+  fixture.results.vehicle_images_public = { data: null, error: { message: 'private records error' } };
   await act(async () => panel.click());
   expect(container.textContent).toContain('Recent records unavailable.');
   expect(container.textContent).not.toContain('private records error');
   const retry = [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry records')!;
-  fixture.results.vehicle_images = { data: [], error: null };
+  fixture.results.vehicle_images_public = { data: [], error: null };
   await act(async () => retry.click());
   expect(container.textContent).toContain('No records returned.');
-  const request = fixture.requests.find(r => r.table === 'vehicle_images' && r.limit === 100);
+  // The records drilldown reads ai_scan_metadata, so it goes through vehicle_images_public (withheld paths stripped).
+  const request = fixture.requests.find(r => r.table === 'vehicle_images_public' && r.limit === 100);
   expect(request.signal).toBeInstanceOf(AbortSignal);
 });
 

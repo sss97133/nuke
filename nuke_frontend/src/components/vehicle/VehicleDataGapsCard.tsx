@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CollapsibleWidget } from '../ui/CollapsibleWidget';
 import { useImageAnalysis } from '../../hooks/useImageAnalysis';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 type FieldPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -135,7 +136,7 @@ export function VehicleDataGapsCard({
     setImagesLoading(true);
     try {
       const { data, error } = await supabase
-        .from('vehicle_images')
+        .from(VEHICLE_IMAGES_READ)
         .select('id, image_url, thumbnail_url, medium_url, created_at, sensitive_type, is_document, document_category, ai_processing_status, ai_scan_metadata')
         .eq('vehicle_id', vehicleId)
         .order('created_at', { ascending: false })

@@ -1,6 +1,7 @@
 import { ProfileService } from '../../services/profileService';
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 const DatabaseDiagnostic: React.FC = () => {
   const [results, setResults] = useState<any>({});
@@ -28,7 +29,7 @@ const DatabaseDiagnostic: React.FC = () => {
       const queries = [
         { name: 'vehicle_timeline_events', query: supabase.from('vehicle_timeline_events').select('*').eq('user_id', user.id).limit(5) },
         { name: 'timeline_events', query: supabase.from('vehicle_timeline_events').select('*').eq('user_id', user.id).limit(5) },
-        { name: 'vehicle_images', query: supabase.from('vehicle_images').select('*').eq('user_id', user.id).limit(5) },
+        { name: 'vehicle_images', query: supabase.from(VEHICLE_IMAGES_READ).select('*').eq('user_id', user.id).limit(5) },
         { name: 'user_contributions', query: supabase.from('user_contributions').select('*').eq('user_id', user.id).limit(5) },
         { name: 'profiles', query: ProfileService.getProfileRecord(user.id) }
       ];

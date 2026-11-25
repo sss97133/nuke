@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 interface ImageHoverPreviewProps {
   imageUrl: string;
@@ -48,7 +49,7 @@ export const ImageHoverPreview: React.FC<ImageHoverPreviewProps> = ({
       // If we have imageId, fetch from database
       if (imageId) {
         const { data: img, error } = await supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select('id, image_url, medium_url, large_url, created_at, ai_scan_metadata')
           .eq('id', imageId)
           .single();
@@ -86,7 +87,7 @@ export const ImageHoverPreview: React.FC<ImageHoverPreviewProps> = ({
       } else if (vehicleId && imageUrl) {
         // Try to find by URL and vehicle
         const { data: img } = await supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select('id, image_url, medium_url, large_url, created_at, ai_scan_metadata')
           .eq('vehicle_id', vehicleId)
           .eq('image_url', imageUrl)

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import IntakeReadiness from '../components/admin/IntakeReadiness';
+import { VEHICLE_IMAGES_READ } from '../lib/vehicleImageColumns';
 
 const estimate = (value: number | null) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `≈${value.toLocaleString()}` : 'Unmeasured';
 const measuredCount = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : 'Unmeasured';
@@ -75,7 +76,7 @@ export default function SystemStatus() {
     try {
       if (section === 'tier1') {
         const { data, error } = await supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select('id, image_url, ai_processing_status, ai_scan_metadata, created_at')
           .order('created_at', { ascending: false })
           .limit(100).abortSignal(signal);
@@ -219,7 +220,7 @@ export default function SystemStatus() {
       
       // Get recent analyzed images
       const { data: recent } = await supabase
-        .from('vehicle_images')
+        .from(VEHICLE_IMAGES_READ)
         .select('id, ai_processing_completed_at, ai_scan_metadata')
         .eq('ai_processing_status', 'completed')
         .order('ai_processing_completed_at', { ascending: false })

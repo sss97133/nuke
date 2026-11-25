@@ -17,6 +17,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { isBatHosted } from './auctionSequence';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 const OPEN_EVENT = 'nuke:vehicle-photo-open';
 const DAY_EVENT = 'nuke:vehicle-day-open';
@@ -205,7 +206,7 @@ const VehiclePhotoLightbox: React.FC = () => {
     let cancelled = false;
     setAtoms(null);
     supabase
-      .from('vehicle_images')
+      .from(VEHICLE_IMAGES_READ)
       .select('ai_scan_metadata')
       .eq('id', current.id)
       .maybeSingle()
