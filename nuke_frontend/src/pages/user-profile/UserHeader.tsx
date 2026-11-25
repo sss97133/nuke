@@ -198,6 +198,14 @@ const UserHeader: React.FC = () => {
 const vehLabel = (v: any): string =>
   v ? [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle' : 'Vehicle';
 
+/** The order book of a bid's lot, or null when it would open empty: no lot key, or the car is not readable here
+ *  (the embed came back empty) or is deleted. A merged stub's order book reads the stub, so it is unlinked too. */
+export const bidOrderBookHref = (bid: any): string | null => {
+  const v = bid?.auction?.vehicle;
+  if (!bid?.vehicle_id || !bid?.auction_event_id || !v || v.deleted_at || v.merged_into_vehicle_id) return null;
+  return `/stacks/order-book/${bid.vehicle_id}?${new URLSearchParams({ lot: bid.auction_event_id, at: bid.id })}`;
+};
+
 const StatDoorPanel: React.FC<{
   door: 'worked' | 'listings' | 'comments' | 'bids';
   recordedVehicles: number | null;
@@ -258,12 +266,17 @@ const StatDoorPanel: React.FC<{
       {door === 'bids' && (
         <div className="up-stat-door__body">
           <p>Latest 100 captured bid events. This is observed activity, not a lifetime record.</p>
-          {bids.map(bid => bid.vehicle_id && bid.auction_event_id ? (
-            <a key={bid.id} className="up-stat-door__row" href={`/stacks/order-book/${bid.vehicle_id}?${new URLSearchParams({ lot: bid.auction_event_id, at: bid.id })}`}>
-              <span className="up-stat-door__row-main">{vehLabel(bid.auction?.vehicle)}</span>
-              <span className="up-stat-door__row-meta">Source bid {Number(bid.bid_amount).toLocaleString()} · {bid.posted_at ? new Date(bid.posted_at).toLocaleString() : 'Event time unknown'}</span>
-            </a>
-          ) : <div key={bid.id} className="up-stat-door__row"><span className="up-stat-door__row-main">Lot link unresolved</span><span className="up-stat-door__row-meta">Source bid {Number(bid.bid_amount).toLocaleString()} · {bid.posted_at ? new Date(bid.posted_at).toLocaleString() : 'Event time unknown'}</span></div>)}
+          {bids.map(bid => {
+            const href = bidOrderBookHref(bid);
+            const main = !bid.vehicle_id || !bid.auction_event_id ? 'Lot link unresolved' : vehLabel(bid.auction?.vehicle);
+            const meta = `Source bid ${Number(bid.bid_amount).toLocaleString()} · ${bid.posted_at ? new Date(bid.posted_at).toLocaleString() : 'Event time unknown'}`;
+            return href ? (
+              <a key={bid.id} className="up-stat-door__row" href={href}>
+                <span className="up-stat-door__row-main">{main}</span>
+                <span className="up-stat-door__row-meta">{meta}</span>
+              </a>
+            ) : <div key={bid.id} className="up-stat-door__row"><span className="up-stat-door__row-main">{main}</span><span className="up-stat-door__row-meta">{meta}</span></div>;
+          })}
         </div>
       )}
       {door === 'comments' && (
