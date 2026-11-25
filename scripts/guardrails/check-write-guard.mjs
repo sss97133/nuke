@@ -55,21 +55,74 @@ const SERVICE_SCOPED = {
   "deal-jacket-pipeline": "moves a caller-named vehicle_images row onto a car picked from caller text, creates cars, overwrites vehicles.vin/mileage/sale_price/origin_metadata, runs paid extraction (2026-11-25)",
   "forensic-deal-jacket": "stores extractions on a caller-named image and writes vehicles.origin_metadata; runs paid AI (2026-09-29)",
 };
-// A statement of its own at the handler's top level (2-4 spaces in), not a clause inside another condition.
-const STRONG_GATE = /^ {2,4}(?:(?:const|let) (\w+) = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b[^;]*;\s*if \(\1\) return\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b[^\n]*\)\)\s*(?:return\b|\{\s*return\b))/m;
-const BODY_READ = /\b(req|request)\.(json|formData|text)\(|new URL\(\s*(req|request)\.url/;
-// The gate must run before the handler reads anything the caller sent: a call after the body is parsed, or
-// one that only appears in a later branch, does not count.
+// The gate: a statement of its own that returns its refusal (requireOwnerOrService / requireAdminOrService into a
+// const, then `if (x) return`; or `if (!(await isServiceCaller(req))) return`). Group 1 is its indent.
+const STRONG_GATE = /^( *)(?:(?:const|let) (\w+) = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b[^;]*;\s*if \(\2\) return\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b[^\n]*\)\)\s*(?:return\b|\{\s*return\b))/gm;
+const BODY_READ = /\b(req|request)\.(json|formData|text|arrayBuffer|blob|body)\b|new URL\(\s*(req|request)\.url/;
+// What may run before the gate: requireWriteAuth and its refusal, and the OPTIONS preflight return.
+const PRE_GATE_OK = [
+  /^\s*(?:const|let) (\w+) = await requireWriteAuth\([^;]*;\s*if \(\1\) return \1;?/,
+  /^\s*if \((?:req|request)\.method === ["']OPTIONS["']\)\s*(?:\{\s*return [^;]*;\s*\}|return [^;]*;)/,
+];
+// Comments and string contents do not gate anything and must not move braces: blank them, keeping offsets.
+function blank(src, strings = true) {
+  const sp = (m) => m.replace(/[^\n]/g, " ");
+  return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, (m) =>
+    m[0] === "/" ? sp(m) : strings ? m[0] + sp(m.slice(1, -1)) + m[m.length - 1] : m);
+}
+// The handler: Deno.serve's inline function, or the named function Deno.serve is handed (an exported handler
+// gated by `if (import.meta.main) Deno.serve(handler)` counts), in index.ts. Returns [open, close] brace offsets.
+function handlerSpan(src) {
+  let at = -1;
+  const inline = /(?:Deno\.serve|\bserve)\(\s*(?:\{[^}]*\},\s*)?(?:async\s*)?(?:function\s*\w*\s*)?\(\s*(?:req|request|_req)\b/.exec(src);
+  if (inline) at = inline.index + inline[0].length;
+  else {
+    const named = /Deno\.serve\(\s*(?:\{[^}]*\},\s*)?(\w+)\s*\)/.exec(src);
+    if (!named) return null;
+    const def = new RegExp(`(?:function\\s+${named[1]}\\s*\\(|(?:const|let)\\s+${named[1]}\\s*=\\s*(?:async\\s*)?(?:function\\s*)?\\()`).exec(src);
+    if (!def) return null;
+    at = def.index + def[0].length;
+  }
+  // Skip the parameter list (balanced parens), then the body opens at the first "{".
+  let depth = 1, i = at;
+  for (; i < src.length && depth; i++) depth += src[i] === "(" ? 1 : src[i] === ")" ? -1 : 0;
+  const open = src.indexOf("{", i);
+  if (open < 0) return null;
+  depth = 0;
+  for (let j = open; j < src.length; j++) {
+    if (src[j] === "{") depth++;
+    else if (src[j] === "}" && --depth === 0) return [open, j];
+  }
+  return null;
+}
+// The gate must be a statement at the top level of the handler (the indent of its first statement), inside the
+// handler's own span in index.ts, with nothing before it but requireWriteAuth and the OPTIONS return, and before
+// anything reads what the caller sent. A gate in another file, in an unused function, in a branch or after the
+// body is read does not count.
 function gatedBeforeBody(fn) {
-  for (const f of readdirSync(path.join(FN_DIR, fn)).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))) {
-    // Comments do not gate anything: blank them out (keeping offsets) before matching.
-    const src = readFileSync(path.join(FN_DIR, fn, f), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
-      .replace(/(^|[^:"'`])\/\/[^\n]*/g, (m, p) => p + " ".repeat(m.length - p.length));
-    const gate = STRONG_GATE.exec(src);
-    if (!gate) continue;
-    const body = BODY_READ.exec(src);
-    if (!body || gate.index < body.index) return true;
+  const file = path.join(FN_DIR, fn, "index.ts");
+  if (!existsSync(file)) return false;
+  const raw = readFileSync(file, "utf8");
+  const src = blank(raw); // braces and spans: comments and string contents blanked
+  const text = blank(raw, false); // statements: comments blanked, strings kept (same offsets)
+  const span = handlerSpan(src);
+  if (!span) return false;
+  const [open, close] = span;
+  const first = /\S/.exec(src.slice(open + 1));
+  if (!first) return false;
+  const firstAt = open + 1 + first.index;
+  const indent = firstAt - (src.lastIndexOf("\n", firstAt) + 1);
+  for (const g of text.matchAll(STRONG_GATE)) {
+    if (g.index < open || g.index > close || g[1].length !== indent) continue;
+    let pre = text.slice(open + 1, g.index);
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const ok of PRE_GATE_OK) {
+        const m = ok.exec(pre);
+        if (m) { pre = pre.slice(m[0].length); changed = true; }
+      }
+    }
+    return pre.trim() === "" && !BODY_READ.test(text.slice(open, g.index));
   }
   return false;
 }
