@@ -298,3 +298,17 @@ it('a claim says how many independent sources agree, and a lone claim says nothi
   await render(<HeaderTokenItems vehicleId="v-1" dimension="year" items={{ year: [item('year.recorded', 1)] }} />);
   expect(host.textContent).not.toContain('sources agree');
 });
+
+it('an established item says what establishes it, from the reader basis', async () => {
+  const item = (status: FacetItem['status'], basis: FacetItem['basis']): FacetItem => ({ key: 'year.decode', facet: 'decode', value: '1973', status,
+    unit: null, rule: null, equation: null, needed: null, basis,
+    sources: [{ kind: 'observation', label: 'VIN decode', value_label: '1973', observed_at: '2026-01-02T00:00:00Z' }] });
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="year" items={{ year: [item('established',
+    { code: 'vin_decode.listing_text', label: 'VIN decode; VIN from listing text, unwitnessed', vin: 'listing_text' })] }} />);
+  expect(host.textContent).toContain('Established by: VIN decode; VIN from listing text, unwitnessed');
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="year" items={{ year: [item('established',
+    { code: 'independent.claims', label: 'independent listing texts agree; no photo read or paper', sources: 2 })] }} />);
+  expect(host.textContent).toContain('Established by: independent listing texts agree; no photo read or paper · 2 sources');
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="year" items={{ year: [item('claim', null)] }} />);
+  expect(host.textContent).not.toContain('Established by');
+});
