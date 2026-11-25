@@ -643,12 +643,10 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
 
     if (!vehicle) return;
 
-    // Process ALL images (not just first 15) - AI validation will filter out incorrect ones
+    // Process ALL images. No per-image identity check runs here: validate-bat-image was retired (404 live, #4003).
     const imagesToSave = imageUrls;
     
     let savedCount = 0;
-    let validatedCount = 0;
-    let mismatchCount = 0;
     
     for (let i = 0; i < imagesToSave.length; i++) {
       const imageUrl = imagesToSave[i];
@@ -716,79 +714,6 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         }
 
         savedCount++;
-
-        // Validate image IMMEDIATELY (synchronously) as it's being saved
-        // Add rate limiting: 1.5s delay between validations to avoid hitting API limits
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-
-        try {
-          // Add timeout protection (30 seconds max per validation)
-          const validationPromise = supabase.functions.invoke('validate-bat-image', {
-            body: {
-              image_id: insertedImage.id,
-              image_url: imageUrl,
-              vehicle_id: vehicleId,
-              expected_vehicle: {
-                year: vehicle.year,
-                make: vehicle.make,
-                model: vehicle.model
-              }
-            }
-          });
-
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Validation timeout after 30s')), 30000)
-          );
-
-          const { data: validationResult, error: validationError } = await Promise.race([
-            validationPromise,
-            timeoutPromise
-          ]) as any;
-
-          if (validationError) {
-            console.warn(`Validation failed for image ${i + 1}:`, validationError);
-            // Mark for retry later (store in metadata)
-            await supabase
-              .from('vehicle_images')
-              .update({
-                ai_scan_metadata: {
-                  ...insertData.ai_scan_metadata,
-                  validation: {
-                    status: 'failed',
-                    error: validationError.message,
-                    retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // Retry in 5 min
-                  }
-                }
-              })
-              .eq('id', insertedImage.id);
-          } else if (validationResult?.validation) {
-            validatedCount++;
-            if (!validationResult.validation.matches) {
-              mismatchCount++;
-              // Image mismatch detected — tracked via mismatchCount
-            }
-          }
-        } catch (validationErr: any) {
-          console.warn(`Validation error for image ${i + 1}:`, validationErr);
-          // Mark for retry if it's a timeout or rate limit
-          if (validationErr?.message?.includes('timeout') || validationErr?.message?.includes('429')) {
-            await supabase
-              .from('vehicle_images')
-              .update({
-                ai_scan_metadata: {
-                  ...insertData.ai_scan_metadata,
-                  validation: {
-                    status: 'pending_retry',
-                    error: validationErr.message,
-                    retry_at: new Date(Date.now() + 2 * 60 * 1000).toISOString() // Retry in 2 min
-                  }
-                }
-              })
-              .eq('id', insertedImage.id);
-          }
-        }
       } catch (error) {
         console.error(`Error processing image ${i + 1}:`, error);
       }
