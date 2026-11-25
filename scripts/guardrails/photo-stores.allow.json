@@ -60,6 +60,10 @@
     "garage_org_score": {
       "reason": "Score table of the garage organizer; created and dropped 2026-11-04. Not in production. Recorded as history; the migration that creates it is not run.",
       "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: told that recording the already-applied 2026-11-03/04 migrations adds these six photo-keyed tables, he answered \"I approve\". No schema_proposals row was filed."
+    },
+    "capture_set_members": {
+      "reason": "Membership edge, one row per (capture-set candidate, photo): candidate_id -> capture_set_candidates, image_id -> vehicle_images. The keyed form of capture_set_candidates.image_ids (20261126151500). Stores no reading.",
+      "approved": "Owner (Skylar), 2026-11-25, in the lead Claude Code session, asked to approve this table: \"why are u asking me about one table id expect you dont have to ask approval. we need so much data expansion\". No schema_proposals row was filed."
     }
   },
   "functions": {},
