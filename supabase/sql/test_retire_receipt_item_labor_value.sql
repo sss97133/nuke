@@ -1,4 +1,4 @@
--- Disposable PG17: 20261124234500 retires compute_receipt_item_labor_value and its unattached trigger function
+-- Disposable PG17: 20261124234510 retires compute_receipt_item_labor_value and its unattached trigger function
 -- (no role can execute them, the comment says why), refuses while the trigger function is attached, and re-runs.
 -- Run from the repo root in an empty database named dm_refinement_<name>. Synthetic stubs only.
 \set ON_ERROR_STOP on
@@ -13,7 +13,7 @@ GRANT EXECUTE ON FUNCTION public.compute_receipt_item_labor_value(uuid) TO servi
 -- Attached: refused.
 CREATE TABLE public.t (id int);
 CREATE TRIGGER t_trg AFTER INSERT ON public.t FOR EACH ROW EXECUTE FUNCTION public.trg_receipt_item_labor_recompute();
-\set mig `cat supabase/migrations/20261124234500_retire_receipt_item_labor_value.sql`
+\set mig `cat supabase/migrations/20261124234510_retire_receipt_item_labor_value.sql`
 SELECT set_config('test.mig', :'mig', false) IS NOT NULL AS loaded;
 DO $$ BEGIN
   BEGIN
@@ -24,8 +24,8 @@ DO $$ BEGIN
   END;
 END $$;
 DROP TRIGGER t_trg ON public.t;
-\i supabase/migrations/20261124234500_retire_receipt_item_labor_value.sql
-\i supabase/migrations/20261124234500_retire_receipt_item_labor_value.sql
+\i supabase/migrations/20261124234510_retire_receipt_item_labor_value.sql
+\i supabase/migrations/20261124234510_retire_receipt_item_labor_value.sql
 DO $$ BEGIN
   IF has_function_privilege('service_role', 'public.compute_receipt_item_labor_value(uuid)', 'EXECUTE')
      OR has_function_privilege('anon', 'public.compute_receipt_item_labor_value(uuid)', 'EXECUTE')
