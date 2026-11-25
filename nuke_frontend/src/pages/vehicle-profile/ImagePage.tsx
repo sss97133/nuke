@@ -16,6 +16,13 @@ import { supabase } from '../../lib/supabase';
 import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
 import { webSourceUrl, readImageWitnesses } from './hooks/useVehicleImageEvidence';
 
+// The registry columns a viewer may read. notes and trust_factors are internal (free text, strategy keys) and are not
+// granted to end-user roles; select('*') would fail once the grant names columns. species_evidence is public by design
+// (the Sources board shows it through market_sources_read).
+// One string literal, not a concatenation: the client types a select only from a literal type.
+export const OBSERVATION_SOURCE_PUBLIC_COLUMNS =
+  'id, slug, display_name, category, base_url, url_patterns, base_trust_score, supported_observations, requires_auth, rate_limit_per_hour, makes_covered, years_covered, regions_covered, created_at, updated_at, business_id, tier, decay_half_life_days, veracity, consecration, market_slug, species, species_set, species_evidence';
+
 interface ImageRow {
   id: string;
   vehicle_id: string;
@@ -236,7 +243,7 @@ const ImagePageContent: React.FC = () => {
 
           const sourceIds = Array.from(new Set(obsRows.map((r) => r.source_id).filter(Boolean))) as string[];
           if (sourceIds.length > 0) {
-            const srcRes = await supabase.from('observation_sources').select('*').in('id', sourceIds).limit(50).abortSignal(controller.signal);
+            const srcRes = await supabase.from('observation_sources').select(OBSERVATION_SOURCE_PUBLIC_COLUMNS).in('id', sourceIds).limit(50).abortSignal(controller.signal);
             if (srcRes.error) unavailableRelations.push('observation_sources');
             sourceRows = (srcRes.data || []) as Row[];
           }

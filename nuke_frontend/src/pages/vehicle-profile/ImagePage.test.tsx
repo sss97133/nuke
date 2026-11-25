@@ -28,7 +28,7 @@ vi.mock('../../lib/supabase', () => {
   return { supabase: { from, rpc } };
 });
 
-import ImagePage from './ImagePage';
+import ImagePage, { OBSERVATION_SOURCE_PUBLIC_COLUMNS } from './ImagePage';
 const VEHICLE = 'offline-vehicle', IMAGE = 'offline-image', SOURCE = 'https://example.invalid/offline.jpg';
 function id(c: any, key = 'id') { return c.filters.find((f: any) => f[0] === key)?.[1]; }
 function image(extra = {}) { return { id: IMAGE, vehicle_id: VEHICLE, image_url: SOURCE, source: 'offline-source', ...extra }; }
@@ -263,4 +263,16 @@ it('offers retry when only a raw relation read is unavailable', async () => {
   fixture.read.mockImplementation(read);
   await act(async () => retry!.click());
   expect(host.textContent).not.toContain('Read unavailable'); expect(host.textContent).not.toContain('Retry details');
+});
+it('reads the source registry by its viewer columns, never * or the internal ones', async () => {
+  fixture.read.mockImplementation(c => c.table === 'observation_witnesses' && c.selected === '*' ? { data: [{ image_id: IMAGE, observation_id: 'offline-observation' }], error: null }
+    : c.table === 'vehicle_observations' ? { data: [{ id: 'offline-observation', source_id: 'offline-source-id' }], error: null }
+    : c.table === 'observation_sources' ? { data: [{ id: 'offline-source-id', slug: 'offline-source' }], error: null } : read(c));
+  await mount();
+  const reads = fixture.calls.filter(c => c.table === 'observation_sources');
+  expect(reads).toHaveLength(1);
+  expect(reads[0].selected).toBe(OBSERVATION_SOURCE_PUBLIC_COLUMNS);
+  const cols = reads[0].selected.split(',').map((s: string) => s.trim());
+  expect(cols).toHaveLength(24);
+  for (const internal of ['*', 'notes', 'trust_factors']) expect(cols).not.toContain(internal);
 });
