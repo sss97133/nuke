@@ -147,24 +147,22 @@ export function SegmentRows({ segment, names }: { segment: LaborSegment; names?:
   </div>;
 }
 
-/** The stored fold's state in one line, or null when the hours are current (or the read was computed at read time).
- *  Hours that are not fresh are never shown as current: "As of Nov 25, 2026, recomputing". */
+/** The stored fold's state in the reader's words (state.label), or null when it sends none. The page adds only the date
+ *  to 'recomputing': "As of Nov 25, 2026, recomputing", so a stored read is never shown as current. */
 export function foldStateText(appraisal: Appraisal): string | null {
-  const st = appraisal.state;
-  if (!st) return null;
-  if (!st.computed || appraisal.status === 'not_yet_computed') return st.label || 'No hours yet: not yet computed';
-  if (st.fresh) return null;
-  const at = st.computed_at ?? appraisal.as_of;
-  return [at ? `As of ${day(at)}` : null, st.label || 'recomputing'].filter(Boolean).join(', ');
+  const label = appraisal.state?.label;
+  if (!label) return null;
+  if (label !== 'recomputing') return label;
+  const at = appraisal.as_of ?? appraisal.state?.computed_at;
+  return at ? `As of ${day(at)}, ${label}` : label;
 }
-
 
 export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
   const stateLine = foldStateText(appraisal);
   // The stored fold has no read yet: say so, never a zero and never a cold computation on the page.
   if ((appraisal.status === 'not_yet_computed' || appraisal.status === 'recomputing') && !appraisal.segments.length) {
     // A status line like the loading one, not a section: the reader returned no segments to count.
-    return <p role="status" className="vp-labor-status" data-fresh="false">Labor appraisal: {stateLine ?? 'No hours yet: recomputing'}</p>;
+    return stateLine ? <p role="status" className="vp-labor-status" data-fresh="false">Labor appraisal: {stateLine}</p> : null;
   }
   // A segment the reader gives no hours is not printed (no empty rows); the coverage line still counts every segment it returned.
   const priced = appraisal.segments.filter(s => s.hours_typical != null);

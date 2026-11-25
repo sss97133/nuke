@@ -126,8 +126,11 @@ struct LaborAppraisal: Decodable, Equatable {
         var key_current: Bool?
         var queued: Bool?
         var error: String?
-        /// The reader's own words for the state, when it sends them.
+        /// The words to print: nil (print nothing), "recomputing" (printed with as_of), "not yet computed".
         var label: String?
+        /// "stored" (a fresh fold), "computed_now" (computed at read; the stored row's time in stored_at), nil.
+        var basis: String?
+        var stored_at: String?
     }
 }
 
@@ -286,15 +289,12 @@ enum LaborWords {
         names?.bases?[key]?.label.flatMap { $0.isEmpty ? nil : $0 } ?? ItemText.codeText(key)
     }
 
-    /// The stored fold's state in one line, or nil when the hours are current (or the read was computed at read time).
-    /// Hours that are not fresh are never shown as current: "As of Nov 25, 2026, recomputing".
+    /// The stored fold's state in the reader's words (state.label), or nil when it sends none. The page adds only the
+    /// date to "recomputing": "As of Nov 25, 2026, recomputing", so a stored read is never shown as current.
     static func foldState(_ a: LaborAppraisal) -> String? {
-        guard let st = a.state else { return nil }
-        let label = st.label.flatMap { $0.isEmpty ? nil : $0 }
-        if st.computed != true || a.status == "not_yet_computed" { return label ?? "No hours yet: not yet computed" }
-        if st.fresh == true { return nil }
-        return [ProfileClock.day(st.computed_at ?? a.as_of).map { "As of \($0)" }, label ?? "recomputing"]
-            .compactMap { $0 }.joined(separator: ", ")
+        guard let label = a.state?.label, !label.isEmpty else { return nil }
+        guard label == "recomputing" else { return label }
+        return ProfileClock.day(a.as_of ?? a.state?.computed_at).map { "As of \($0), \(label)" } ?? label
     }
 
     /// No stored read yet: the reader returned no segments and says so in its status.
@@ -363,9 +363,11 @@ struct LaborAppraisalContent: View {
     var body: some View {
         if LaborWords.noReadYet(appraisal) {
             // A status line like the loading one, not a section: the reader returned no segments to count.
-            Text("Labor appraisal: " + (LaborWords.foldState(appraisal) ?? "No hours yet: recomputing"))
-                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
-                .accessibilityIdentifier("labor-state")
+            if let line = LaborWords.foldState(appraisal) {
+                Text("Labor appraisal: " + line)
+                    .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
+                    .accessibilityIdentifier("labor-state")
+            }
         } else if appraisal.applicable == true, appraisal.totals?.priced_segments == 0, !appraisal.segments.isEmpty {
             section {
                 stateLine

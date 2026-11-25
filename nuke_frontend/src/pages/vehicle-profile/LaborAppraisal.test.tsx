@@ -131,23 +131,23 @@ describe('LaborAppraisalView', () => {
     expect(page).toContain('Front bucket seat cover, 2 h; 1 more');
     expect(page).not.toMatch(/INT-SEAT|not in catalog/);
   });
-  it('never prints a stored read that is not fresh as current, and says when no read exists yet', () => {
-    const notYet = { vehicle_id: 'v', status: 'not_yet_computed', segments: [], state: { fresh: false, computed: false, error: null } } as unknown as LaborAppraisal;
+  it('prints the reader state label, adds only the date to recomputing, and never a zero', () => {
+    const notYet = { vehicle_id: 'v', status: 'not_yet_computed', segments: [], state: { fresh: false, computed: false, basis: null, label: 'not yet computed', error: null } } as unknown as LaborAppraisal;
     const blank = text(renderToStaticMarkup(<LaborAppraisalView appraisal={notYet} />));
-    expect(blank).toContain('No hours yet: not yet computed');
+    expect(blank).toContain('Labor appraisal: not yet computed');
     expect(blank).not.toMatch(/\b0 h\b/);
-    const recomputingEmpty = { vehicle_id: 'v', status: 'recomputing', segments: [] } as unknown as LaborAppraisal;
-    expect(text(renderToStaticMarkup(<LaborAppraisalView appraisal={recomputingEmpty} />))).toContain('No hours yet: recomputing');
+    const unlabelled = { vehicle_id: 'v', status: 'recomputing', segments: [] } as unknown as LaborAppraisal;
+    expect(renderToStaticMarkup(<LaborAppraisalView appraisal={unlabelled} />)).toBe('');
 
-    const stale = { ...appraisal, state: { fresh: false, computed: true, computed_at: '2026-11-25T18:00:00Z', key_current: true, error: null } };
+    const stale = { ...appraisal, as_of: '2026-11-25T18:00:00Z', state: { fresh: false, computed: true, basis: 'stored', label: 'recomputing', key_current: true, error: null } };
     expect(foldStateText(stale)).toBe('As of Nov 25, 2026, recomputing');
-    const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={stale} />));
-    expect(page).toContain('As of Nov 25, 2026, recomputing');
-    const fresh = { ...appraisal, state: { fresh: true, computed: true, computed_at: '2026-11-25T18:00:00Z' } };
-    expect(foldStateText(fresh)).toBeNull();
-    expect(text(renderToStaticMarkup(<LaborAppraisalView appraisal={fresh} />))).not.toContain('recomputing');
+    expect(text(renderToStaticMarkup(<LaborAppraisalView appraisal={stale} />))).toContain('As of Nov 25, 2026, recomputing');
+    const computedNow = { ...appraisal, state: { fresh: true, computed: true, basis: 'computed_now', label: null, stored_at: '2026-11-24T10:00:00Z' } };
+    expect(foldStateText(computedNow)).toBeNull();
+    expect(text(renderToStaticMarkup(<LaborAppraisalView appraisal={computedNow} />))).not.toContain('recomputing');
+    // Words come from the reader: a not-fresh state with no label prints nothing of the page's own.
+    expect(foldStateText({ ...appraisal, state: { fresh: false, computed: true, label: null } })).toBeNull();
     expect(foldStateText({ ...appraisal, state: undefined })).toBeNull();
-    expect(foldStateText({ ...stale, state: { ...stale.state, label: 'recomputing after new evidence' } })).toBe('As of Nov 25, 2026, recomputing after new evidence');
   });
 
   it('prints the sums by basis in the reader words for each basis, else the basis key', () => {

@@ -112,26 +112,26 @@ final class LaborAppraisalTests: XCTestCase {
 
     private func decode(_ j: String) throws -> LaborAppraisal { try JSONDecoder().decode(LaborAppraisal.self, from: Data(j.utf8)) }
 
-    func testStoredFoldStateNeverPrintsStaleHoursAsCurrent() throws {
+    func testStoredFoldStatePrintsTheReadersLabelOnly() throws {
         let zone = ProfileClock.timeZone
         defer { ProfileClock.timeZone = zone }
         ProfileClock.timeZone = TimeZone(identifier: "UTC")!
-        let notYet = try decode(#"{"vehicle_id":"v","status":"not_yet_computed","segments":[],"state":{"fresh":false,"computed":false,"error":null}}"#)
+        let notYet = try decode(#"{"vehicle_id":"v","status":"not_yet_computed","segments":[],"state":{"fresh":false,"computed":false,"basis":null,"label":"not yet computed","error":null}}"#)
         XCTAssertTrue(LaborWords.noReadYet(notYet))
-        XCTAssertEqual(LaborWords.foldState(notYet), "No hours yet: not yet computed")
-        let recomputing = try decode(#"{"vehicle_id":"v","status":"recomputing","segments":[]}"#)
-        XCTAssertTrue(LaborWords.noReadYet(recomputing))
-        XCTAssertNil(LaborWords.foldState(recomputing))
+        XCTAssertEqual(LaborWords.foldState(notYet), "not yet computed")
+        let unlabelled = try decode(#"{"vehicle_id":"v","status":"recomputing","segments":[]}"#)
+        XCTAssertNil(LaborWords.foldState(unlabelled))
 
         var stale = try appraisal()
-        stale.state = .init(fresh: false, computed: true, computed_at: "2026-11-25T18:00:00.123456+00:00", key_current: true)
-        XCTAssertFalse(LaborWords.noReadYet(stale))
+        stale.as_of = "2026-11-25T18:00:00.123456+00:00"
+        stale.state = .init(fresh: false, computed: true, key_current: true, label: "recomputing", basis: "stored")
         XCTAssertEqual(LaborWords.foldState(stale), "As of Nov 25, 2026, recomputing")
-        stale.state?.label = "recomputing after new evidence"
-        XCTAssertEqual(LaborWords.foldState(stale), "As of Nov 25, 2026, recomputing after new evidence")
-        var fresh = try appraisal()
-        fresh.state = .init(fresh: true, computed: true, computed_at: "2026-11-25T18:00:00+00:00")
-        XCTAssertNil(LaborWords.foldState(fresh))
+        var computedNow = try appraisal()
+        computedNow.state = .init(fresh: true, computed: true, label: nil, basis: "computed_now", stored_at: "2026-11-24T10:00:00+00:00")
+        XCTAssertNil(LaborWords.foldState(computedNow))
+        var unlabelledStale = try appraisal()
+        unlabelledStale.state = .init(fresh: false, computed: true)
+        XCTAssertNil(LaborWords.foldState(unlabelledStale))
         XCTAssertNil(LaborWords.foldState(try appraisal()))
     }
 

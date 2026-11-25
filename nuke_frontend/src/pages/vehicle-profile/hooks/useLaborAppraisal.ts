@@ -65,8 +65,10 @@ export interface LaborFoldState {
   /** true: the hours are current. false with computed true: the last good read, served while the fold recomputes. */
   fresh?: boolean | null; computed?: boolean | null; computed_at?: string | null; evidence_changed_at?: string | null;
   key_current?: boolean | null; queued?: boolean | null; error?: string | null;
-  /** The reader's own words for the state, when it sends them. */
+  /** The words to print: null (print nothing), 'recomputing' (printed with as_of), 'not yet computed'. */
   label?: string | null;
+  /** 'stored' (a fresh fold), 'computed_now' (computed at read; the stored row's time in stored_at), null (not yet computed). */
+  basis?: string | null; stored_at?: string | null;
 }
 export interface LaborNames {
   transitions?: Record<string, { label?: string | null; category?: string | null; from_stage?: string | null; to_stage?: string | null }> | null;
