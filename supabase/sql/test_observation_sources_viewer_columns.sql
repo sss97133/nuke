@@ -1,10 +1,10 @@
--- Contract for 20261126011500_observation_sources_viewer_columns (empty disposable PG17).
+-- Contract for 20261126052500_observation_sources_viewer_columns (empty disposable PG17).
 -- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in an empty disposable PG17 database only (stub tables, not production).
 -- The table holds the live 26 columns, the live policy and the live grants. After the migration: authenticated reads the
 -- 24 viewer columns (rows as before, joins as the pages embed them) and gets 42501 on notes, trust_factors
 -- and select *; anon reads the viewer columns (0 rows, no policy) and nothing else; the guard refuses
 -- an unclassed column; a re-run changes nothing; a grant that lets an internal column through fails the check; the
--- revert restores table-level SELECT.
+-- revert restores table-level SELECT. Watch rows: skipped until the private_column kind is live, then two, once.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF to_regclass('public.observation_sources') IS NOT NULL THEN RAISE EXCEPTION 'Requires an empty disposable database'; END IF;
@@ -68,7 +68,7 @@ END $$;
 -- The guard refuses an unclassed column.
 ALTER TABLE public.observation_sources ADD COLUMN fixture_unclassed text;
 \set ON_ERROR_STOP off
-\ir ../migrations/20261126011500_observation_sources_viewer_columns.sql
+\ir ../migrations/20261126052500_observation_sources_viewer_columns.sql
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF NOT has_table_privilege('authenticated', 'public.observation_sources', 'SELECT') THEN
@@ -78,8 +78,8 @@ DO $$ BEGIN
 END $$;
 ALTER TABLE public.observation_sources DROP COLUMN fixture_unclassed;
 
-\ir ../migrations/20261126011500_observation_sources_viewer_columns.sql
-\ir ../migrations/20261126011500_observation_sources_viewer_columns.sql
+\ir ../migrations/20261126052500_observation_sources_viewer_columns.sql
+\ir ../migrations/20261126052500_observation_sources_viewer_columns.sql
 
 DO $$
 DECLARE c text; v text; bad text := pg_temp.check_withheld();
@@ -107,6 +107,46 @@ BEGIN
   RAISE NOTICE 'PASS anon reads viewer columns (0 rows, no error) and gets 42501 on notes';
 END $$;
 
+-- Watch rows. Applied above with no probe table: skipped. With a probe table whose kind CHECK predates
+-- private_column: still skipped. With the kind live: exactly two rows, and a re-run adds none.
+CREATE TABLE public.private_row_probes (relation text NOT NULL, subject_kind text NOT NULL, subject_column text NOT NULL,
+  row_key text NOT NULL, rank smallint NOT NULL, owner_lane text NOT NULL, note text NOT NULL CHECK (length(btrim(note)) >= 12),
+  audiences text[] NOT NULL DEFAULT '{anon,authenticated}', sample_size int NOT NULL DEFAULT 50, active boolean NOT NULL DEFAULT true,
+  added_at timestamptz NOT NULL DEFAULT now(), reader text NOT NULL DEFAULT '',
+  PRIMARY KEY (relation, subject_kind, subject_column, reader),
+  CONSTRAINT private_row_probes_subject_kind_check CHECK (subject_kind = ANY (ARRAY['image', 'vehicle', 'user', 'flag', 'visibility', 'withheld_column'])));
+\ir ../migrations/20261126052500_observation_sources_viewer_columns.sql
+DO $$ BEGIN
+  IF (SELECT count(*) FROM public.private_row_probes) <> 0 THEN RAISE EXCEPTION 'FAIL watch: rows written before the kind is live'; END IF;
+  RAISE NOTICE 'PASS watch rows skipped while the private_column kind is not live';
+END $$;
+ALTER TABLE public.private_row_probes DROP CONSTRAINT private_row_probes_subject_kind_check;
+ALTER TABLE public.private_row_probes ADD CONSTRAINT private_row_probes_subject_kind_check
+  CHECK (subject_kind = ANY (ARRAY['image', 'vehicle', 'user', 'flag', 'visibility', 'withheld_column', 'private_column']));
+-- With the kind live, a guard refusal writes no watch row (a row would read 'exposed' while nothing narrowed).
+\ir revert_20261126052500_observation_sources_viewer_columns.sql
+ALTER TABLE public.observation_sources ADD COLUMN fixture_unclassed text;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261126052500_observation_sources_viewer_columns.sql
+\set ON_ERROR_STOP on
+DO $$ BEGIN
+  IF (SELECT count(*) FROM public.private_row_probes) <> 0 THEN RAISE EXCEPTION 'FAIL watch: rows written on a guard refusal'; END IF;
+  RAISE NOTICE 'PASS a guard refusal writes no watch row';
+END $$;
+ALTER TABLE public.observation_sources DROP COLUMN fixture_unclassed;
+\ir ../migrations/20261126052500_observation_sources_viewer_columns.sql
+\ir ../migrations/20261126052500_observation_sources_viewer_columns.sql
+DO $$ BEGIN
+  IF (SELECT array_agg(subject_column ORDER BY subject_column) FROM public.private_row_probes
+       WHERE relation = 'observation_sources' AND subject_kind = 'private_column' AND row_key = 'id' AND reader = ''
+         AND audiences = '{anon,authenticated}' AND owner_lane = 'ta-readers') IS DISTINCT FROM ARRAY['notes', 'trust_factors']
+     OR (SELECT count(*) FROM public.private_row_probes) <> 2 THEN
+    RAISE EXCEPTION 'FAIL watch: want exactly the notes and trust_factors rows';
+  END IF;
+  IF pg_temp.check_withheld() IS NOT NULL THEN RAISE EXCEPTION 'FAIL grants after re-run: %', pg_temp.check_withheld(); END IF;
+  RAISE NOTICE 'PASS watch rows: notes and trust_factors, written once over two runs';
+END $$;
+
 -- Mutant: a grant that lets one internal column through must fail the check.
 GRANT SELECT (trust_factors) ON public.observation_sources TO authenticated;
 DO $$ BEGIN
@@ -115,11 +155,12 @@ DO $$ BEGIN
 END $$;
 REVOKE SELECT (trust_factors) ON public.observation_sources FROM authenticated;
 
-\ir revert_20261126011500_observation_sources_viewer_columns.sql
+\ir revert_20261126052500_observation_sources_viewer_columns.sql
 DO $$ BEGIN
   IF NOT has_table_privilege('authenticated', 'public.observation_sources', 'SELECT')
      OR NOT has_table_privilege('anon', 'public.observation_sources', 'SELECT') THEN
     RAISE EXCEPTION 'FAIL revert: table-level SELECT not restored';
   END IF;
-  RAISE NOTICE 'PASS revert restores table-level SELECT';
+  IF (SELECT count(*) FROM public.private_row_probes) <> 0 THEN RAISE EXCEPTION 'FAIL revert: watch rows remain'; END IF;
+  RAISE NOTICE 'PASS revert restores table-level SELECT and removes the watch rows';
 END $$;

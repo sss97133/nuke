@@ -21,7 +21,10 @@
 --
 -- GUARD. Refuses unless the table has exactly the 26 columns read on 2026-11-25. A new column must be classed (viewer
 -- or internal) before this applies, or it would be withheld from every page without anyone deciding so.
--- REVERT: supabase/sql/revert_20261126011500_observation_sources_viewer_columns.sql.
+-- WATCH. Two private_row_probes rows (kind private_column, #3970), one per withheld column, expecting 0 for anon and
+-- authenticated. They are written here, with the narrowing, so the hourly watch never sees them read 'exposed'. If the
+-- kind is not live yet, the rows are skipped with a notice and land with a later migration.
+-- REVERT: supabase/sql/revert_20261126052500_observation_sources_viewer_columns.sql.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
@@ -42,10 +45,25 @@ BEGIN
   REVOKE SELECT ON public.observation_sources FROM anon, authenticated;
   EXECUTE format('GRANT SELECT (%s) ON public.observation_sources TO anon, authenticated',
                  (SELECT string_agg(quote_ident(c), ', ') FROM unnest(viewer) c));
+  -- Watch rows, only after the narrowing above succeeded.
+  IF NOT EXISTS (
+       SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.private_row_probes')
+          AND conname = 'private_row_probes_subject_kind_check'
+          AND position('private_column' IN pg_get_constraintdef(oid)) > 0) THEN
+    RAISE NOTICE 'private_column probe kind not live; watch rows skipped';
+  ELSE
+    INSERT INTO public.private_row_probes (relation, subject_kind, subject_column, row_key, rank, owner_lane, note)
+    VALUES
+      ('observation_sources', 'private_column', 'notes', 'id', 26, 'ta-readers',
+       'Registry free text; not granted to anon or authenticated since 20261126052500.'),
+      ('observation_sources', 'private_column', 'trust_factors', 'id', 26, 'ta-readers',
+       'Registry trust adjustments; not granted to anon or authenticated since 20261126052500.')
+    ON CONFLICT DO NOTHING;
+  END IF;
 END
 $grant$;
 
 COMMENT ON COLUMN public.observation_sources.notes IS
-  'Free text about the source: what it is, its trust reasoning, and the spelling aliases its rows carry elsewhere. Internal: not granted to anon or authenticated (20261126011500).';
+  'Free text about the source: what it is, its trust reasoning, and the spelling aliases its rows carry elsewhere. Internal: not granted to anon or authenticated (20261126052500).';
 COMMENT ON COLUMN public.observation_sources.trust_factors IS
-  'Named adjustments to the base trust, free-shape jsonb (default {}). Internal: not granted to anon or authenticated (20261126011500).';
+  'Named adjustments to the base trust, free-shape jsonb (default {}). Internal: not granted to anon or authenticated (20261126052500).';
