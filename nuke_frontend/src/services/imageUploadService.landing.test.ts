@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // A recorder in place of the client: which bucket and path the bytes go to, and the row that lands after them.
-const calls = vi.hoisted(() => ({ uploads: [] as Array<{ bucket: string; path: string }>, rows: [] as any[], uploadError: null as any, existing: null as any, insertError: null as any, ors: [] as string[] }));
+const calls = vi.hoisted(() => ({ uploads: [] as Array<{ bucket: string; path: string }>, rows: [] as any[], uploadError: null as any, existing: null as any, insertError: null as any, ors: [] as string[], ins: [] as string[][] }));
 const uid = '11111111-1111-4111-8111-111111111111';
 
 vi.mock('../lib/supabase', () => {
@@ -9,6 +9,7 @@ vi.mock('../lib/supabase', () => {
     get: (_t, key) => key === 'then' ? (resolve: any) => resolve(result)
       : key === 'maybeSingle' || key === 'single' ? async () => result
       : key === 'or' ? (arg: string) => { calls.ors.push(arg); return chain(result); }
+      : key === 'in' ? (_col: string, vals: string[]) => { calls.ins.push(vals); return chain(result); }
       : () => chain(result),
   });
   return {
@@ -41,7 +42,7 @@ import { privateStoragePath } from '../lib/privateStorage';
 const photo = () => new File([new Uint8Array([1, 2, 3, 4])], 'IMG 0001.jpg', { type: 'image/jpeg' });
 
 describe('web upload lands where iOS lands', () => {
-  beforeEach(() => { calls.uploads = []; calls.rows = []; calls.uploadError = null; calls.existing = null; calls.insertError = null; calls.ors = []; });
+  beforeEach(() => { calls.uploads = []; calls.rows = []; calls.uploadError = null; calls.existing = null; calls.insertError = null; calls.ors = []; calls.ins = []; });
 
   it('puts a photo in vehicle-photos under the caller\'s own folder, original only, then lands the row', async () => {
     const result = await ImageUploadService.uploadImage('vehicle-1', photo(), 'general');
@@ -91,6 +92,7 @@ describe('web upload lands where iOS lands', () => {
       expect(calls.uploads).toHaveLength(0);
       expect(calls.rows).toHaveLength(0);
       expect(calls.ors[0]).toBe(`user_id.eq.${uid},vehicle_id.eq.vehicle-1`);
+      expect(calls.ins[0]).toHaveLength(1); // uncompressed: the stored bytes are the original, one hash
     }
   });
 

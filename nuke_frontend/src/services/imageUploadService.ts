@@ -235,12 +235,15 @@ export class ImageUploadService {
 
       // Compute hashes up front for dedupe (use original file for stability)
       let fileHash: string | null = null;
+      let originalHash: string | null = null;
       let perceptualHash: string | null = null;
       let differenceHash: string | null = null;
 
       try {
         // The stored bytes' hash, as iOS computes it: it names the object and is the row's file_hash.
         fileHash = await this.computeFileHash(fileToUpload);
+        // Web uploads before #3951 hashed the original file; a compressed upload is checked under both hashes.
+        if (fileToUpload !== file) originalHash = await this.computeFileHash(file);
       } catch (err) {
         console.warn('Failed to compute file hash (non-blocking):', err);
       }
@@ -267,7 +270,7 @@ export class ImageUploadService {
         const { data: exactDup, error: exactErr } = await supabase
           .from('vehicle_images')
           .select('id, image_url, vehicle_id')
-          .eq('file_hash', fileHash)
+          .in('file_hash', originalHash && originalHash !== fileHash ? [fileHash, originalHash] : [fileHash])
           .or(holders.join(','))
           .limit(1)
           .maybeSingle();
