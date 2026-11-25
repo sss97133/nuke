@@ -445,6 +445,17 @@ export function buildEnvelope({ verdict, row, reviewedUrl, sha256, reviewedAt, p
 }
 
 /**
+ * is_external as the stage ledger reads it (image_stage_custody_external, 20261124214000): an external photo, except the
+ * owner's own cached Photos preview (user_id set, source 'iphoto', rendition contract 'photos_cached_preview_v1'), which
+ * is is_external only because the intake cannot claim the original. `row.rendition_contract` is
+ * exif_data.source_rendition.contract.
+ */
+export function custodyExternal(row) {
+  if (row?.is_external !== true) return false;
+  return !(row.user_id != null && row.source === 'iphoto' && row.rendition_contract === 'photos_cached_preview_v1');
+}
+
+/**
  * Why a photo that was claimed must not be read now, or null. Mirrors what the intake itself refuses
  * (reviewedAnalysis.ts, guard_reviewed_image_analysis, project_reviewed_image_analysis) plus what it cannot take (a URL
  * that is not https). `row.deep_stamp` is the photo's ai_scan_metadata.byok_deep_analysis.
@@ -458,7 +469,7 @@ export function eligibilityHold(row) {
   if (row.is_document || row.doc_flag) return 'document';
   if (!['approved', null, undefined].includes(row.vision_gate_status)) return 'gate_not_approved';
   if (['mismatch', 'unrelated'].includes(row.image_vehicle_match_status)) return 'vehicle_mismatch';
-  if (row.is_external) return 'external';
+  if (custodyExternal(row)) return 'external';
   if (!/^https:\/\//.test(row.image_url ?? '')) return 'image_url_not_https';
   // A stamp on the photo is never this reader's: the intake stamps only a reading that is not automatic, and refuses an
   // automatic reading over any stamp object, whatever it holds (guard Rule 2). The photo is read, by someone else. This
@@ -619,7 +630,7 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
   // the row as it is now, immediately before the download: its clock is the compare-and-set token the intake checks
   let row;
   try {
-    const rows = await deps.rest(`vehicle_images?select=id,vehicle_id,image_url,updated_at,is_external,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status,file_name,deep_stamp:ai_scan_metadata->byok_deep_analysis&id=eq.${frame.id}`);
+    const rows = await deps.rest(`vehicle_images?select=id,vehicle_id,image_url,updated_at,user_id,source,rendition_contract:exif_data->source_rendition->>contract,is_external,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status,file_name,deep_stamp:ai_scan_metadata->byok_deep_analysis&id=eq.${frame.id}`);
     row = Array.isArray(rows) ? rows[0] : null;
   } catch { return typed({ intake: { http: 503, error: 'review_source_unavailable' } }); }
   const method = automaticMethod(admits);

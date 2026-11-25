@@ -342,6 +342,13 @@ test('a photo that no longer satisfies the intake is not read', () => {
   // what is not a stamp object does not hold the photo (the intake's rule reads the same: jsonb_typeof = 'object')
   for (const notAStamp of [null, undefined, 'engine_bay', [], 0, false]) assert.equal(eligibilityHold({ ...ok, deep_stamp: notAStamp }), null, JSON.stringify(notAStamp));
   assert.equal(eligibilityHold(null), 'photo_not_found');
+  // the owner's own cached Photos preview is read like any filed photo (image_stage_custody_external, 20261124214000)
+  const preview = { ...ok, is_external: true, user_id: VEHICLE, source: 'iphoto', rendition_contract: 'photos_cached_preview_v1' };
+  assert.equal(eligibilityHold(preview), null);
+  for (const over of [{ user_id: null }, { source: 'user_upload' }, { rendition_contract: null }, { rendition_contract: 'photos_original_v1' }]) {
+    assert.equal(eligibilityHold({ ...preview, ...over }), 'external', JSON.stringify(over));
+  }
+  assert.equal(eligibilityHold({ ...preview, vehicle_id: null }), 'unfiled', 'an unfiled preview is still held');
 });
 
 test('one CLI answer: valid on its own means the grammar, the identity and validateVerdict', () => {
@@ -413,6 +420,8 @@ test('two agreeing reads: the row is snapshotted before the download, both reads
   assert.equal(calls.rest[1], standingReadingQuery(IMAGE));
   assert.equal(standingReadingQuery(IMAGE), `vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${IMAGE}&kind=eq.condition&is_superseded=not.is.true&or=(agent_tier.is.null,agent_tier.neq.subscription automatic)&limit=1`);
   assert.match(calls.rest[0], /select=id,vehicle_id,image_url,updated_at,/);
+  // the columns custodyExternal reads (an owner's cached preview is read like any filed photo)
+  assert.match(calls.rest[0], /,user_id,source,rendition_contract:exif_data->source_rendition->>contract,is_external,/);
   assert.match(calls.rest[0], /id=eq\.10000000-0000-4000-8000-000000000001$/);
   assert.equal(calls.ask.length, 2);
   for (const a of calls.ask) {
