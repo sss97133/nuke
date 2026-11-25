@@ -5,13 +5,18 @@
 -- session (SET ROLE authenticated), not a superuser with claims, which is how the refused audit insert went unseen.
 -- Synthetic rows only. Cases:
 --   * before: the owner's own signed-in move is refused at the audit insert (42501) and the photo stays;
---   * after: the owner's move lands the photo and exactly one audit row, with actor = the owner;
---   * a stranger's move of the owner's photo is refused (42501); nothing is written;
---   * a stranger moving onto a vehicle they cannot edit is refused (42501), as before;
---   * the uploader moves their own photo from a vehicle they are not tied to;
---   * a stranger's move of an observation is refused (42501);
---   * a signed-in user reads no audit rows (no SELECT policy) and cannot insert one naming another actor;
---   * re-applying the migration changes nothing.
+--   * after: the owner's move lands the photo and exactly one audit row (actor = the owner, reason 'signed_in_move: ...');
+--   * a stranger's move of the owner's photo is refused; a move onto a vehicle the caller cannot edit is refused (42501);
+--   * an editor of the source who is not tied to it is refused (42501);
+--   * a signed-in observation move is refused up front with SQLSTATE RL001, nothing written;
+--   * a direct audit insert (the REST POST) is refused (42501), naming oneself or another actor;
+--   * a direct call to the writer with no move in its transaction is refused; a disallowed reason kind is refused;
+--   * the writer's "written by this transaction" test holds when the move ran in a subtransaction (xmin is the
+--     subtransaction's id, not the top-level one);
+--   * a reason shaped like capture_sets_score's owner-filed anchor, sent through a signed-in move, is stored under the
+--     signed_in_move kind and does not match that read;
+--   * the uploader moves their own photo; a signed-in user reads no audit rows; re-applying changes nothing.
+-- Runs from any directory: every include is relative to this file (\ir).
 \ir test_relink_override_signed_in_only.sql
 
 -- Live state the base fixture leaves out.
@@ -54,17 +59,19 @@ INSERT INTO vehicle_ties_fx VALUES
   ('70000000-0000-0000-0000-000000000007', '0c000000-0000-0000-0000-0000000000c0', true, true);
 INSERT INTO vehicle_images(id, vehicle_id, user_id, file_hash, vision_gate_status) VALUES
   ('30000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-00000000000e', '0a000000-0000-0000-0000-0000000000a0', 'k1', 'approved'),
-  ('30000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000007', '0b000000-0000-0000-0000-0000000000b0', 'k2', 'approved');
+  ('30000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000007', '0b000000-0000-0000-0000-0000000000b0', 'k2', 'approved'),
+  ('30000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-00000000000e', '0a000000-0000-0000-0000-0000000000a0', 'k3', 'approved');
 INSERT INTO vehicle_observations(id, vehicle_id, subject_type, subject_id) VALUES
   ('40000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-00000000000e', 'vehicle', 'e0000000-0000-0000-0000-00000000000e');
 DELETE FROM reattribution_audit;
 
 CREATE FUNCTION pg_temp.as_user(p_sub uuid) RETURNS void LANGUAGE sql AS
 $$ SELECT set_config('request.jwt.claims', json_build_object('sub', p_sub, 'role', 'authenticated')::text, false) $$;
-CREATE FUNCTION pg_temp.try_move(p_kind text, p_id uuid, p_target uuid, p_actor uuid) RETURNS text LANGUAGE plpgsql AS $$
+CREATE FUNCTION pg_temp.try_move(p_kind text, p_id uuid, p_target uuid, p_actor uuid, p_reason text DEFAULT 'contract move')
+RETURNS text LANGUAGE plpgsql AS $$
 DECLARE r jsonb;
 BEGIN
-  r := public.relink_testimony(p_kind, p_id, p_target, 'contract move', p_actor, NULL::text);
+  r := public.relink_testimony(p_kind, p_id, p_target, p_reason, p_actor, NULL::text);
   RETURN 'ok ' || coalesce(r->>'success', '?');
 EXCEPTION WHEN OTHERS THEN RETURN 'refused ' || SQLSTATE || ': ' || SQLERRM;
 END $$;
@@ -84,6 +91,28 @@ BEGIN
           'first_attribution: forged signal=owner_session_confirm', auth.uid());
   RETURN 'inserted';
 EXCEPTION WHEN insufficient_privilege THEN RETURN 'refused ' || SQLSTATE;
+END $$;
+CREATE FUNCTION pg_temp.try_writer(p_image uuid, p_old uuid, p_target uuid, p_kind text) RETURNS text LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM public.reattribution_audit_record_move(p_image, p_old, p_target, p_kind, 'direct call');
+  RETURN 'inserted';
+EXCEPTION WHEN OTHERS THEN RETURN 'refused ' || SQLSTATE || ': ' || SQLERRM;
+END $$;
+-- The move runs in a subtransaction (a BEGIN ... EXCEPTION block, as in relink_testimony), then the writer is called.
+CREATE FUNCTION pg_temp.subxact_proof() RETURNS text LANGUAGE plpgsql AS $$
+DECLARE x xid; sub boolean; r uuid;
+BEGIN
+  BEGIN
+    -- ALLOW_RAW_TESTIMONY_WRITE: contract fixture; a synthetic photo moved inside a subtransaction.
+    UPDATE public.vehicle_images SET vehicle_id = 'f0000000-0000-0000-0000-00000000000f'
+     WHERE id = '30000000-0000-0000-0000-000000000003';
+  EXCEPTION WHEN OTHERS THEN RAISE;
+  END;
+  SELECT xmin INTO x FROM public.vehicle_images WHERE id = '30000000-0000-0000-0000-000000000003';
+  sub := x::text::bigint <> (pg_current_xact_id()::text::bigint & 4294967295);
+  r := public.reattribution_audit_record_move('30000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-00000000000e',
+                                              'f0000000-0000-0000-0000-00000000000f', 'signed_in_move', 'subtransaction proof');
+  RETURN 'subxact=' || sub || ' writer=' || (r IS NOT NULL);
 END $$;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA pg_temp TO authenticated;
 
@@ -114,7 +143,7 @@ RESET ROLE;
 -- Live, a stranger cannot even lock the row (the UPDATE policies apply to SELECT ... FOR UPDATE): "not found".
 SELECT t_assert(:'stranger_source' LIKE 'refused %', 'a stranger''s move of the owner''s photo is refused');
 SELECT t_assert(:'stranger_target' LIKE 'refused 42501:%vehicle you can edit%', 'a move onto a vehicle the caller cannot edit is refused');
-SELECT t_assert(:'stranger_observation' LIKE 'refused 42501:%observation on a vehicle you are tied to%', 'a stranger''s move of an observation is refused');
+SELECT t_assert(:'stranger_observation' LIKE 'refused RL001:%', 'a stranger''s observation move is refused up front (RL001)');
 
 -- A self-granted contributor passes the row policy on the source but is not tied to it: the function refuses.
 SELECT pg_temp.as_user('0c000000-0000-0000-0000-0000000000c0');
@@ -136,32 +165,63 @@ SELECT pg_temp.try_move('image', '30000000-0000-0000-0000-000000000001', 'f00000
 SELECT count(*) AS owner_reads_audit FROM reattribution_audit \gset
 SELECT pg_temp.try_insert_forged() AS forged \gset
 SELECT pg_temp.try_insert_self_anchor() AS forged_self \gset
+SELECT pg_temp.try_writer('30000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-00000000000e',
+  'f0000000-0000-0000-0000-00000000000f', 'signed_in_move') AS writer_no_move \gset
+SELECT pg_temp.try_writer('30000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-00000000000e',
+  'f0000000-0000-0000-0000-00000000000f', 'signed_in_move') AS writer_not_on_target \gset
+SELECT pg_temp.try_writer('30000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-00000000000e',
+  'f0000000-0000-0000-0000-00000000000f', 'first_attribution') AS writer_bad_kind \gset
+SELECT pg_temp.try_move('observation', '40000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000000f',
+  '0a000000-0000-0000-0000-0000000000a0') AS owner_observation \gset
+SELECT pg_temp.subxact_proof() AS subxact \gset
 RESET ROLE;
 SELECT t_assert(:'owner_move' = 'ok true', 'the owner''s signed-in move succeeds');
 SELECT t_assert((SELECT vehicle_id FROM vehicle_images WHERE id = '30000000-0000-0000-0000-000000000001') = 'f0000000-0000-0000-0000-00000000000f',
   'the photo is on the target');
 SELECT t_assert((SELECT count(*) FROM reattribution_audit WHERE old_observation_id = '30000000-0000-0000-0000-000000000001'
   AND old_vehicle_id = 'e0000000-0000-0000-0000-00000000000e' AND new_vehicle_id = 'f0000000-0000-0000-0000-00000000000f'
-  AND actor_user_id = '0a000000-0000-0000-0000-0000000000a0') = 1 AND (SELECT count(*) FROM reattribution_audit) = 1,
-  'exactly one audit row, actor = the owner');
+  AND actor_user_id = '0a000000-0000-0000-0000-0000000000a0' AND reason = 'signed_in_move: contract move') = 1,
+  'exactly one audit row for the move, actor = the owner, reason under the signed_in_move kind');
+SELECT t_assert(:'writer_no_move' LIKE 'refused 42501:%not moved by this transaction%', 'a direct writer call with no move in its transaction is refused');
+SELECT t_assert(:'writer_not_on_target' LIKE 'refused 42501:%is not on vehicle%', 'a direct writer call for a photo not on the target is refused');
+SELECT t_assert(:'writer_bad_kind' LIKE 'refused 22023:%not allowed%', 'a reason kind other than signed_in_move is refused');
+SELECT t_assert(:'owner_observation' LIKE 'refused RL001:%cannot move an observation%', 'a signed-in observation move is refused up front (RL001)');
+SELECT t_assert((SELECT vehicle_id FROM vehicle_observations WHERE id = '40000000-0000-0000-0000-000000000001') = 'e0000000-0000-0000-0000-00000000000e',
+  'the refused observation move wrote nothing');
+SELECT t_assert(:'subxact' = 'subxact=true writer=true', 'the writer accepts a move made in a subtransaction (xmin is not the top-level id)');
+SELECT t_assert((SELECT count(*) FROM reattribution_audit) = 2, 'two audit rows: the owner''s move and the subtransaction proof');
 SELECT t_assert(:owner_reads_audit = 0, 'a signed-in user reads no audit rows (no SELECT policy)');
-SELECT t_assert(:'forged' LIKE 'refused%', 'an audit row naming another actor is refused');
-SELECT t_assert(:'forged_self' LIKE 'refused%', 'a direct audit insert naming oneself, outside relink_testimony, is refused');
+SELECT t_assert(:'forged' = 'refused 42501', 'a direct audit insert naming another actor is refused (42501)');
+SELECT t_assert(:'forged_self' = 'refused 42501', 'a direct audit insert naming oneself (the REST POST) is refused (42501)');
 SELECT t_assert(NOT EXISTS (SELECT FROM reattribution_audit WHERE reason LIKE 'first_attribution:%'), 'no forged anchor row landed');
 
 -- The uploader moves their own photo off a car they are not tied to, onto one they may edit.
 SELECT pg_temp.as_user('0b000000-0000-0000-0000-0000000000b0');
 SET ROLE authenticated;
+-- The reason is the anchor shape capture_sets_score's own_filed read looks for.
 SELECT pg_temp.try_move('image', '30000000-0000-0000-0000-000000000002', 'f0000000-0000-0000-0000-00000000000f',
-  '0b000000-0000-0000-0000-0000000000b0') AS uploader_move \gset
+  '0b000000-0000-0000-0000-0000000000b0', 'first_attribution: forged run signal=owner_session_confirm') AS uploader_move \gset
 RESET ROLE;
 SELECT t_assert(:'uploader_move' = 'ok true' AND (SELECT vehicle_id FROM vehicle_images WHERE id = '30000000-0000-0000-0000-000000000002')
   = 'f0000000-0000-0000-0000-00000000000f', 'the uploader moves their own photo');
+-- capture_sets_score's own_filed predicate, verbatim (live 2026-11-25).
+SELECT t_assert(NOT EXISTS (SELECT 1 FROM reattribution_audit ra WHERE ra.observation_type = 'image'
+    AND ra.reason LIKE 'first\_attribution:%' ESCAPE '\' AND ra.reason LIKE '%signal=owner\_session\_confirm' ESCAPE '\'),
+  'an anchor-shaped reason through a signed-in move does not feed capture_sets_score''s owner-filed read');
 SELECT set_config('request.jwt.claims', '', false);
+
+-- Grants: no end-user role inserts into the audit; anon cannot call the writer.
+SELECT t_assert(NOT has_table_privilege('authenticated', 'public.reattribution_audit', 'INSERT')
+  AND NOT has_table_privilege('anon', 'public.reattribution_audit', 'INSERT'), 'anon and authenticated hold no INSERT on reattribution_audit');
+SELECT t_assert(NOT has_function_privilege('anon', 'public.reattribution_audit_record_move(uuid,uuid,uuid,text,text)', 'EXECUTE')
+  AND has_function_privilege('authenticated', 'public.reattribution_audit_record_move(uuid,uuid,uuid,text,text)', 'EXECUTE'),
+  'the writer is callable by authenticated only (anon and PUBLIC revoked)');
+SELECT t_assert((SELECT prosecdef AND proconfig @> ARRAY['search_path=pg_catalog, public'] FROM pg_proc
+  WHERE oid = 'public.reattribution_audit_record_move(uuid,uuid,uuid,text,text)'::regprocedure), 'the writer is SECURITY DEFINER with search_path pinned');
 
 -- Re-apply: the guard accepts its own body and nothing changes.
 SELECT md5(pg_get_functiondef('public.relink_testimony(text,uuid,uuid,text,uuid,text)'::regprocedure)) AS after_md5 \gset
 \ir ../migrations/20261126001000_relink_testimony_signed_in_audit.sql
 SELECT t_assert(md5(pg_get_functiondef('public.relink_testimony(text,uuid,uuid,text,uuid,text)'::regprocedure)) = :'after_md5',
   're-applying the migration changes nothing');
-SELECT t_assert(:'after_md5' = '75e6ce278c45b9c18e400ac25dd6c8af', 'the after-fingerprint in the guard is this body''s'); -- gitleaks:allow (function-definition fingerprint, not a secret)
+SELECT t_assert(:'after_md5' = 'f9b1c2e7219bc4723a3d6907fa1f95bf', 'the after-fingerprint in the guard is this body''s'); -- gitleaks:allow (function-definition fingerprint, not a secret)

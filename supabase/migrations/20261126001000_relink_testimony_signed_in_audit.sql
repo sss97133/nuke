@@ -1,27 +1,40 @@
--- relink_testimony: a signed-in move lands its audit row, and is allowed only from a source the caller may move.
+-- relink_testimony: a signed-in photo move lands its audit row through one checked writer; nothing else can write one.
 --
 -- Why. relink_testimony(text,uuid,uuid,text,uuid,text) is SECURITY INVOKER and ends with INSERT INTO reattribution_audit.
 -- reattribution_audit has row level security on and no policy (live 2026-11-25), so for an end user the audit insert
--- is refused (42501, "new row violates row-level security policy") and the whole move rolls back. Every signed-in move
--- has failed, including the iOS app's photo move (AnalyzedPhotosView -> SupabaseService.relinkImage). Only
--- service-role calls (which bypass row level security) have ever written audit rows.
+-- is refused (42501) and the whole move rolls back: every signed-in move has failed (the iOS photo move, agent-chat's
+-- move_photo with the user's token). Only service-role calls and SECURITY DEFINER writers owned by postgres
+-- (attribute_image_session, device_file_images, device_create_vehicle_profile) have written audit rows.
 --
--- Fixing the insert turns a move that always failed into one that works, so who may move is checked first, in the
--- function, not by the audit policy:
+-- Shape (lead ruling 2026-11-25, after ta-skeptic2 showed an INSERT policy lets any signed-in user POST an audit row,
+-- including the reason shape capture_sets_score reads as an owner-filed anchor):
+--   * No INSERT policy, and INSERT on reattribution_audit is revoked from anon and authenticated. Service role and the
+--     postgres-owned definer writers are unaffected.
+--   * One SECURITY DEFINER writer, reattribution_audit_record_move(image, old vehicle, target, kind, note), search_path
+--     pinned, EXECUTE revoked from PUBLIC and anon. It takes no actor: the actor is auth.uid(). It refuses unless the
+--     move is real in this transaction: the photo row now sits on the target AND that row version was written by the
+--     current transaction. A direct RPC call to it, with no move in its own transaction, lands nothing.
+--     "Written by the current transaction": the row's xmin, widened to a full transaction id with the epoch of
+--     pg_current_xact_id(), has pg_xact_status 'in progress'. Another session's in-progress write is not visible to this
+--     snapshot (we read the committed version instead, whose xmin is committed), so a visible row version whose writer
+--     is still in progress was written by this transaction or one of its subtransactions. relink_testimony's UPDATE runs
+--     inside a BEGIN ... EXCEPTION block, which is a subtransaction, so xmin is the subtransaction's id, not the top-level
+--     one; the contract proves the comparison holds there on PG17.
+--   * The reason is stored as '<kind>: <note>' with kind from an allowed list (signed_in_move only). A stored reason from
+--     a signed-in session therefore never begins 'first_attribution:', which is what capture_sets_score's own_filed read
+--     requires; that read can be fed only by the definer writers and service role.
+-- Who may move (checked in relink_testimony, before any write):
 --   * target: unchanged. The actor is the caller (p_actor_user_id = auth.uid()) and user_can_edit_vehicle(target).
---   * source, new: a photo the caller uploaded (vehicle_images.user_id), or one on a vehicle the caller is tied to
---     (vehicle_viewer_tied: owner, record owner, creator, uploader of the vehicle, or a granted access). An
---     observation: only one on a vehicle the caller is tied to. Anyone else: 42501, nothing written.
---   * service-role calls: unchanged (no auth.role() of authenticated or anon).
--- The audit policy admits a row only with the caller's own id as actor, and only while relink_testimony holds the
--- transaction-local mark nuke.audit_writer = 'relink_testimony' (set just before its insert, cleared after). A direct
--- POST /rest/v1/reattribution_audit carries no mark and is refused, so a signed-in user cannot forge a reason shape that
--- capture_sets_score reads as an owner-filed anchor (ta-skeptic2). PostgREST sets no custom setting from a request, and
--- set_config is not exposed through the API. There is no SELECT policy, so a signed-in user
--- reads no audit rows.
+--   * source photo: one the caller uploaded (vehicle_images.user_id) or one on a vehicle the caller is tied to
+--     (vehicle_viewer_tied). A self-granted contributor role passes the vehicle_images UPDATE policies but not the tie
+--     rule, and is refused (42501).
+--   * an observation: refused for any signed-in session, before any write (SQLSTATE RL001). vehicle_observations is
+--     testimony no user session edits in place; an owner-moved observation is a supersession row through the sanctioned
+--     writer, a separate change.
+--   * service-role calls: unchanged.
 --
 -- Refused when the live definition changed since it was read (md5 of pg_get_functiondef, 2026-11-25, equal to
--- 20261122002500's body). Re-applying is a no-op. No table DDL; one policy; no rows written.
+-- 20261122002500's body). Re-applying is a no-op. No table DDL; no rows written.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
@@ -31,11 +44,60 @@ DECLARE f text;
 BEGIN
   f := md5(pg_get_functiondef('public.relink_testimony(text,uuid,uuid,text,uuid,text)'::regprocedure));
   IF f NOT IN ('95a376b1ed76d9bf2e60edfe8c1ae988', -- gitleaks:allow (function-definition fingerprint read 2026-11-25, not a secret)
-               '75e6ce278c45b9c18e400ac25dd6c8af') THEN -- gitleaks:allow (function-definition fingerprint after this migration, not a secret)
+               'f9b1c2e7219bc4723a3d6907fa1f95bf') THEN -- gitleaks:allow (function-definition fingerprint after this migration, not a secret)
     RAISE EXCEPTION 'relink_testimony(6, text) changed since 2026-11-25 (md5 %); review before replacement', f;
   END IF;
 END
 $guard$;
+
+CREATE OR REPLACE FUNCTION public.reattribution_audit_record_move(
+  p_image_id uuid, p_old_vehicle_id uuid, p_target_vehicle_id uuid, p_kind text, p_note text)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public'
+AS $writer$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_vehicle uuid;
+  v_xmin xid;
+  v_cur bigint;
+  v_full bigint;
+  v_id uuid;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'reattribution_audit_record_move: a signed-in session only' USING ERRCODE = '42501';
+  END IF;
+  IF p_kind IS DISTINCT FROM 'signed_in_move' THEN
+    RAISE EXCEPTION 'reattribution_audit_record_move: reason kind % is not allowed', p_kind USING ERRCODE = '22023';
+  END IF;
+  SELECT i.vehicle_id, i.xmin INTO v_vehicle, v_xmin FROM public.vehicle_images i WHERE i.id = p_image_id;
+  IF NOT FOUND OR v_vehicle IS DISTINCT FROM p_target_vehicle_id THEN
+    RAISE EXCEPTION 'reattribution_audit_record_move: photo % is not on vehicle %', p_image_id, p_target_vehicle_id
+      USING ERRCODE = '42501';
+  END IF;
+  -- Widen the 32-bit xmin to a full id in the current epoch (within 2^31 of the current one), then ask its status.
+  v_cur := pg_current_xact_id()::text::bigint;
+  v_full := ((v_cur >> 32) << 32) | (v_xmin::text::bigint);
+  IF v_full > v_cur + 2147483648 THEN v_full := v_full - 4294967296;
+  ELSIF v_full < v_cur - 2147483648 THEN v_full := v_full + 4294967296;
+  END IF;
+  IF v_full < 3 OR pg_xact_status(v_full::text::xid8) IS DISTINCT FROM 'in progress' THEN
+    RAISE EXCEPTION 'reattribution_audit_record_move: photo % was not moved by this transaction', p_image_id
+      USING ERRCODE = '42501';
+  END IF;
+  INSERT INTO public.reattribution_audit (observation_type, old_observation_id, old_vehicle_id,
+                                          new_observation_id, new_vehicle_id, reason, actor_user_id)
+  VALUES ('image', p_image_id, p_old_vehicle_id, p_image_id, p_target_vehicle_id,
+          p_kind || ': ' || coalesce(p_note, ''), v_uid)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END
+$writer$;
+REVOKE ALL ON FUNCTION public.reattribution_audit_record_move(uuid, uuid, uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.reattribution_audit_record_move(uuid, uuid, uuid, text, text) TO authenticated, service_role;
+COMMENT ON FUNCTION public.reattribution_audit_record_move(uuid, uuid, uuid, text, text) IS
+  'The one writer of a signed-in session''s reattribution_audit row (20261126001000). Actor = auth.uid(); refuses unless the photo now sits on the target and that row version was written by the current transaction; reason stored as <kind>: <note>, kind signed_in_move only. Called by relink_testimony.';
 
 CREATE OR REPLACE FUNCTION public.relink_testimony(p_observation_type text, p_observation_id uuid, p_target_vehicle_id uuid, p_reason text, p_actor_user_id uuid DEFAULT NULL::uuid, p_gate_override_reason text DEFAULT NULL::text)
  RETURNS jsonb
@@ -58,6 +120,7 @@ DECLARE
   v_uid uuid := auth.uid();
   v_image_user uuid;
   v_end_user boolean := coalesce(auth.role(), '') IN ('authenticated', 'anon');
+  v_audit_reason text;
 BEGIN
   -- P3.7 identity check (2026-09-27): the actor is the caller (p_actor_user_id = auth.uid()) and can edit the target vehicle; stays SECURITY INVOKER so RLS still governs the source rows. Only end-user JWTs are judged; service_role and JWT-less sessions are exempt.
   IF coalesce(auth.role(), '') IN ('authenticated', 'anon') THEN
@@ -70,6 +133,12 @@ BEGIN
   END IF;
   IF p_observation_type NOT IN ('image', 'observation') THEN
     RAISE EXCEPTION 'observation_type must be image or observation, got %', p_observation_type;
+  END IF;
+  -- (20261126001000) A signed-in session moves photos only. vehicle_observations is testimony that no user session edits
+  -- in place; an owner-moved observation would be a supersession row through the sanctioned writer.
+  IF v_end_user AND p_observation_type = 'observation' THEN
+    RAISE EXCEPTION 'relink_testimony: a signed-in session cannot move an observation; observations are superseded through the sanctioned writer, not moved'
+      USING ERRCODE = 'RL001';
   END IF;
   IF v_override IS NOT NULL AND p_observation_type <> 'image' THEN
     RAISE EXCEPTION 'relink_testimony: a vision-gate override applies to images only' USING ERRCODE = '22023';
@@ -90,8 +159,8 @@ BEGIN
     END IF;
 
     -- Source side (20261126001000): a signed-in caller moves only a photo they uploaded or one on a vehicle they are
-    -- tied to (vehicle_viewer_tied: owner, record owner, creator, uploader or a granted access). The target side is the
-    -- identity check above (actor = caller, user_can_edit_vehicle on the target).
+    -- tied to (vehicle_viewer_tied: owner, record owner, creator, uploader of the car, or access its owner granted).
+    -- The target side is the identity check above (actor = caller, user_can_edit_vehicle on the target).
     IF v_end_user AND v_image_user IS DISTINCT FROM v_uid
        AND NOT (v_old_vehicle_id IS NOT NULL AND public.vehicle_viewer_tied(v_old_vehicle_id)) THEN
       RAISE EXCEPTION 'relink_testimony: you can move only a photo you uploaded or one on a vehicle you are tied to'
@@ -191,12 +260,6 @@ BEGIN
       RAISE EXCEPTION 'observation % not found', p_observation_id;
     END IF;
 
-    -- Source side: a signed-in caller moves only an observation on a vehicle they are tied to.
-    IF v_end_user AND NOT (v_old_vehicle_id IS NOT NULL AND public.vehicle_viewer_tied(v_old_vehicle_id)) THEN
-      RAISE EXCEPTION 'relink_testimony: you can move only an observation on a vehicle you are tied to'
-        USING ERRCODE = '42501';
-    END IF;
-
     IF v_old_vehicle_id IS NOT DISTINCT FROM p_target_vehicle_id THEN
       RETURN jsonb_build_object('success', true, 'duplicate', true, 'mode', 'already_attributed',
                                 'observation_id', p_observation_id, 'vehicle_id', p_target_vehicle_id,
@@ -227,18 +290,23 @@ BEGIN
             HINT = 'A BEFORE UPDATE trigger (such as the vision gate) or a row policy kept the row where it was.';
   END IF;
 
-  -- The audit policy admits a signed-in row only while this function holds the writer mark (transaction-local).
-  PERFORM set_config('nuke.audit_writer', 'relink_testimony', true);
-  INSERT INTO reattribution_audit (
-    observation_type, old_observation_id, old_vehicle_id,
-    new_observation_id, new_vehicle_id, reason, actor_user_id)
-  VALUES (
-    p_observation_type, p_observation_id, v_old_vehicle_id,
-    p_observation_id, p_target_vehicle_id,
-    p_reason || CASE WHEN v_demoted THEN ' [is_primary demoted: target already has a primary]' ELSE '' END
-             || CASE WHEN v_use_override THEN format(' [vision gate %s overridden: %s]', v_gate, v_override) ELSE '' END,
-    p_actor_user_id);
-  PERFORM set_config('nuke.audit_writer', '', true);
+  v_audit_reason := p_reason || CASE WHEN v_demoted THEN ' [is_primary demoted: target already has a primary]' ELSE '' END
+             || CASE WHEN v_use_override THEN format(' [vision gate %s overridden: %s]', v_gate, v_override) ELSE '' END;
+  IF v_end_user THEN
+    -- A signed-in session holds no INSERT on reattribution_audit. The checked writer records the move it can see this
+    -- transaction made, with the caller as actor and the reason under the signed_in_move kind.
+    PERFORM public.reattribution_audit_record_move(p_observation_id, v_old_vehicle_id, p_target_vehicle_id,
+                                                   'signed_in_move', v_audit_reason);
+  ELSE
+    INSERT INTO reattribution_audit (
+      observation_type, old_observation_id, old_vehicle_id,
+      new_observation_id, new_vehicle_id, reason, actor_user_id)
+    VALUES (
+      p_observation_type, p_observation_id, v_old_vehicle_id,
+      p_observation_id, p_target_vehicle_id,
+      v_audit_reason,
+      p_actor_user_id);
+  END IF;
 
   RETURN jsonb_build_object(
     'success', true,
@@ -255,9 +323,6 @@ $function$
 ;
 
 DROP POLICY IF EXISTS reattribution_audit_actor_insert ON public.reattribution_audit;
-CREATE POLICY reattribution_audit_actor_insert ON public.reattribution_audit
-  FOR INSERT TO authenticated
-  WITH CHECK (actor_user_id = (SELECT auth.uid())
-              AND current_setting('nuke.audit_writer', true) = 'relink_testimony');
+REVOKE INSERT ON public.reattribution_audit FROM anon, authenticated;
 
 COMMIT;
