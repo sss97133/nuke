@@ -16,6 +16,10 @@
   /* The replacement-cost scenario and the per-system cost-basis cards were never approved as part of the car's record
      (owner, 2026-11-19); they stay on screen for now and stay off the printed document. */
   #build-estimates, .vp-component-evidence { display: none !important; }
+  /* The per-claim image-vision listing runs 8 to 9 pages of raw readings on a built car; the Specifications table above
+     it already prints each field with how it is known. The "Work & parts" heading was never approved and stranded alone
+     on a page before the Build record's page break (lead, 2026-11-24). Both stay on screen. */
+  .vp-structured-claims, .vp-receipt-heading, .vp-receipt-intro { display: none !important; }
   /* On screen the two columns are viewport-high scrolling panes; on paper they are one column of the whole page. */
   .vp-columns { display: block !important; position: static !important; height: auto !important; }
   .vp-col-left, .vp-col-right { width: auto !important; height: auto !important; overflow: visible !important; }
