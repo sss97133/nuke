@@ -1,4 +1,4 @@
--- Disposable PG17 contract for 20261125080000_organization_images_read_narrow (organization_images_read_v1).
+-- Disposable PG17 contract for 20261125084500_organization_images_read_narrow (organization_images_read_v1).
 -- Synthetic rows only. The table, its grants and its SELECT policies are copied from live (2026-11-24); reads run under
 -- SET ROLE anon / authenticated so RLS and column privileges are really applied. Asserts counts and errors only:
 --   * anon reads public non-sensitive rows only, never ocr_extracted_data / ai_analysis / ai_description (42501);
@@ -101,8 +101,8 @@ SELECT public.assert((SELECT count(ocr_extracted_data) FROM public.organization_
 SELECT public.assert(public.extract_work_order_data('00000000-0000-0000-0000-0000000000b3') ? 'image_url', 'before: anon gets the internal url');
 RESET ROLE;
 
-\ir ../migrations/20261125080000_organization_images_read_narrow.sql
-\ir ../migrations/20261125080000_organization_images_read_narrow.sql
+\ir ../migrations/20261125084500_organization_images_read_narrow.sql
+\ir ../migrations/20261125084500_organization_images_read_narrow.sql
 
 -- The logged-out profile page's select (OrganizationProfile.tsx, live column list).
 \set profile_select 'SELECT id, organization_id, user_id, image_url, thumbnail_url, medium_url, large_url, category, caption, is_primary, taken_at, latitude, longitude, uploaded_at, created_at, is_sensitive, blur_preview, contains_financial_data, location_name, exif_data FROM public.organization_images'
@@ -158,7 +158,7 @@ SELECT public.assert(NOT has_function_privilege('anon', 'public.extract_work_ord
                      'extract_work_order_data runs as the caller');
 
 -- The revert restores the before state.
-\ir revert_20261125080000_organization_images_read_narrow.sql
+\ir revert_20261125084500_organization_images_read_narrow.sql
 SET ROLE anon; SELECT set_config('test.uid', '', false);
 SELECT public.assert((SELECT count(ocr_extracted_data) FROM public.organization_images) = 4, 'revert: before state restored');
 RESET ROLE;

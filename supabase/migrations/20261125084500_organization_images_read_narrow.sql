@@ -24,7 +24,7 @@
 -- exif_data.location) stay granted because the public organisation profile names them in its select; revoking them
 -- before the page stops selecting them fails the logged-out gallery with 42501 (#2293, 2026-10-19).
 --
--- REVERT. supabase/sql/revert_20261125080000_organization_images_read_narrow.sql.
+-- REVERT. supabase/sql/revert_20261125084500_organization_images_read_narrow.sql.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 

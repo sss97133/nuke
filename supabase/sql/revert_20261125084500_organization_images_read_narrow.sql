@@ -1,4 +1,4 @@
--- Revert 20261125080000_organization_images_read_narrow: restores the two USING (true) SELECT policies, the table-level
+-- Revert 20261125084500_organization_images_read_narrow: restores the two USING (true) SELECT policies, the table-level
 -- SELECT grant, anon UPDATE / DELETE, and extract_work_order_data as SECURITY DEFINER reading the whole row.
 SET lock_timeout = '5s';
 CREATE POLICY "Anyone views org images" ON public.organization_images FOR SELECT USING (true);

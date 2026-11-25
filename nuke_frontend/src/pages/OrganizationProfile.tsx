@@ -172,14 +172,14 @@ async function loadOrganizationImages(organizationId: string) {
     .eq('organization_id', organizationId)
     .order('taken_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
-  if (error || !data || data.length === 0) return { data: data as OrgImage[] | null, error };
+  if (error || !data || data.length === 0) return { data: data as unknown as OrgImage[] | null, error };
   const { data: session } = await supabase.auth.getSession();
-  if (!session?.session) return { data: data as OrgImage[], error: null };
+  if (!session?.session) return { data: data as unknown as OrgImage[], error: null };
   const { data: places } = await supabase.rpc('organization_image_locations', { p_organization_id: organizationId });
-  if (!Array.isArray(places) || places.length === 0) return { data: data as OrgImage[], error: null };
+  if (!Array.isArray(places) || places.length === 0) return { data: data as unknown as OrgImage[], error: null };
   const byId = new Map(places.map((p: any) => [p.id, p]));
   return {
-    data: (data as OrgImage[]).map((img) => {
+    data: (data as unknown as OrgImage[]).map((img) => {
       const p: any = byId.get(img.id);
       return p ? { ...img, latitude: p.latitude, longitude: p.longitude, location_name: p.location_name, exif_data: p.exif_data } : img;
     }),
