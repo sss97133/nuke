@@ -387,4 +387,11 @@ DO $v$ BEGIN
     RAISE EXCEPTION 'revert body differs from the 2026-11-25 live body';
   END IF;
 END $v$;
+-- The migration's rule row and policy-copy row go with its body (config rows, not testimony).
+DELETE FROM public.platform_config WHERE config_key = 'listing_work_plan_read';
+DO $r$ BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    EXECUTE $d$DELETE FROM public.private_row_policy_copies WHERE reader = 'listing_work_plan_read(uuid)' AND relation = 'vehicle_images'$d$;
+  END IF;
+END $r$;
 COMMIT;

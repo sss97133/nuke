@@ -18,7 +18,7 @@
 --      others; the same 500 ids (md5 of the id list equal on 6 of 6 cars compared). A cold cache is what crosses 15 s.
 --
 -- The fix: CREATE OR REPLACE with the live body (2026-11-25 prosrc md5 5795c6f78ba7845c20a1666935930844, identical
--- to 20261019191500) and three edits:
+-- to 20261019191500) and four edits:
 --   a. an image-derived claim is kept only if the photo is shown (its vehicle_images_public row passes
 --      vehicle_image_gallery_eligible), the caller uploaded it, or the caller is tied to its vehicle
 --      (definer_readers_visibility_v1, the shape of 20261125160500); otherwise it counts in the new exclusion
@@ -26,7 +26,13 @@
 --   b. vi.user_id is read for (a).
 --   c. the loop takes condition ids first, in id order, from the (vehicle_id, kind) index (enum compare, not
 --      o.kind::text), and applies observation_is_public and reads the wide columns only for rows in that order until 500
---      pass.
+--      pass, walking at most the first cand_cap ids. cand_cap is the rule row platform_config 'listing_work_plan_read'
+--      .condition_candidate_cap (2,000, bounded 500..8,000 in the body; basis in the row). When fewer than 500 pass and
+--      the car has more candidates than the cap, the excess is counted in exclusions.condition_candidates_beyond_cap and
+--      gaps gets {family: condition, reason: candidate_cap}.
+--   d. each term of the visibility test is COALESCEd to false. Without it a signed-in stranger reading a hidden photo
+--      with user_id NULL got NOT (false OR NULL OR false) = NULL, IF did not exclude, and the claim was returned.
+-- The copy of the vehicle_images read policy is registered in private_row_policy_copies (hash 3af9ebbc..., live).
 -- Signature, return shape, owner, grants and comment unchanged. Callers: web WorkPlanPanel / InspectionCallout /
 -- VehicleWorkCard, iOS WorkPlanDocument; they read claims and exclusions as a map, so a new exclusion key is additive.
 
@@ -65,7 +71,7 @@ DECLARE
   excl jsonb := jsonb_build_object('description_discovery_failure_rows', 0, 'description_discovery_unrecognized_shape_rows', 0,
     'description_discovery_oversized_rows', 0, 'condition_observations_oversized', 0, 'image_claims_excluded_unattributed', 0,
     'image_claims_excluded_image_row_missing', 0, 'image_claims_excluded_sensitive', 0, 'image_claims_excluded_not_shown', 0,
-    'image_observations_attributed_without_damage_statement', 0, 'keyword_matches_excluded_by_rule', 0);
+    'image_observations_attributed_without_damage_statement', 0, 'keyword_matches_excluded_by_rule', 0, 'condition_candidates_beyond_cap', 0);
   r record;
   item jsonb;
   ops jsonb := '[]'::jsonb;
@@ -77,6 +83,10 @@ DECLARE
   rate jsonb;
   disc_rows integer := 0;
   cond_rows integer := 0;
+  -- rule row platform_config 'listing_work_plan_read'.condition_candidate_cap, bounded 500..8000, 2000 when absent
+  cand_cap integer := COALESCE((SELECT LEAST(GREATEST((c.config_value->>'condition_candidate_cap')::integer, 500), 8000)
+    FROM public.platform_config c WHERE c.config_key = 'listing_work_plan_read' AND c.config_value->>'condition_candidate_cap' ~ '^[0-9]{1,6}$'), 2000);
+  cand_total integer;
   identity_blocks boolean;
   tokens text[];
   vyear integer;
@@ -235,17 +245,18 @@ BEGIN
     END LOOP;
   END LOOP;
 
-  -- Claims: condition observations, at most 500 rows by id.
+  -- Claims: condition observations, at most 500 rows by id, from the first cand_cap candidate ids.
   FOR r IN SELECT o.id, o.source_url, o.observed_at, o.ingested_at, o.extraction_method, o.confidence_score,
       CASE WHEN octet_length(o.content_text) <= 32000 THEN o.content_text END AS content_text, octet_length(o.content_text) AS text_bytes,
       CASE WHEN octet_length(o.structured_data::text) <= 64000 THEN o.structured_data END AS data, octet_length(o.structured_data::text) AS data_bytes,
       w.image_id, vi.vehicle_id AS image_vehicle_id, vi.source AS image_source, vi.is_sensitive AS image_is_sensitive, vi.user_id AS image_user_id
     -- ids first, in id order, from the (vehicle_id, kind) index; the public test and the wide columns are read only for
-    -- rows taken in that order until 500 pass (same rows as before, without detoasting every condition row of the car)
+    -- rows taken in that order until 500 pass (same rows as before, without detoasting every condition row of the car),
+    -- and never past the first cand_cap ids (the rest are counted in condition_candidates_beyond_cap)
     FROM (SELECT c.id FROM public.vehicle_observations c
            WHERE c.vehicle_id = v.id AND c.subject_type = 'vehicle' AND c.kind = 'condition'::public.observation_kind
              AND c.is_superseded IS NOT TRUE
-           ORDER BY c.id OFFSET 0) cand
+           ORDER BY c.id LIMIT cand_cap) cand
     JOIN public.vehicle_observations o ON o.id = cand.id AND public.observation_is_public(o.kind, o.structured_data)
     LEFT JOIN LATERAL (SELECT CASE WHEN x ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN x::uuid END AS image_id
       FROM (SELECT COALESCE(o.structured_data->>'witness_image_id', o.structured_data->>'image_id') AS x) s) w ON true
@@ -264,9 +275,10 @@ BEGIN
         IF r.image_id IS NULL OR r.image_vehicle_id IS NULL THEN excl := jsonb_set(excl, '{image_claims_excluded_image_row_missing}', to_jsonb((excl->>'image_claims_excluded_image_row_missing')::int + 1)); EXIT; END IF;
         IF r.image_is_sensitive IS DISTINCT FROM false THEN excl := jsonb_set(excl, '{image_claims_excluded_sensitive}', to_jsonb((excl->>'image_claims_excluded_sensitive')::int + 1)); EXIT; END IF;
         -- definer_readers_visibility_v1: the photo is shown, the caller uploaded it, or the caller is tied (20261125233000)
+        -- each term is COALESCEd: a NULL uploader would make NOT (false OR NULL OR false) NULL, and IF NULL does not exclude
         IF NOT (COALESCE((SELECT public.vehicle_image_gallery_eligible(vip) FROM public.vehicle_images_public vip WHERE vip.id = r.image_id), false)
-            OR ((SELECT auth.uid()) IS NOT NULL AND r.image_user_id = (SELECT auth.uid()))
-            OR public.vehicle_viewer_tied(r.image_vehicle_id)) THEN
+            OR COALESCE((SELECT auth.uid()) IS NOT NULL AND r.image_user_id = (SELECT auth.uid()), false)
+            OR COALESCE(public.vehicle_viewer_tied(r.image_vehicle_id), false)) THEN
           excl := jsonb_set(excl, '{image_claims_excluded_not_shown}', to_jsonb((excl->>'image_claims_excluded_not_shown')::int + 1)); EXIT;
         END IF;
         IF r.image_vehicle_id <> v.id OR NOT (r.image_source = ANY (import_sources)) THEN
@@ -383,6 +395,15 @@ BEGIN
   IF descr IS NULL THEN gaps := gaps || jsonb_build_array(jsonb_build_object('family', 'parent', 'reason', 'listing_text_absent')); END IF;
   IF disc_rows >= 500 THEN gaps := gaps || jsonb_build_array(jsonb_build_object('family', 'discoveries', 'reason', 'row_budget')); END IF;
   IF cond_rows >= 500 THEN gaps := gaps || jsonb_build_array(jsonb_build_object('family', 'condition', 'reason', 'row_budget')); END IF;
+  -- Fewer than 500 passed: count the candidate ids the cap kept out of the walk (an index count, ids only).
+  IF cond_rows < 500 THEN
+    SELECT count(*) INTO cand_total FROM public.vehicle_observations c
+     WHERE c.vehicle_id = v.id AND c.subject_type = 'vehicle' AND c.kind = 'condition'::public.observation_kind AND c.is_superseded IS NOT TRUE;
+    IF cand_total > cand_cap THEN
+      excl := jsonb_set(excl, '{condition_candidates_beyond_cap}', to_jsonb(cand_total - cand_cap));
+      gaps := gaps || jsonb_build_array(jsonb_build_object('family', 'condition', 'reason', 'candidate_cap'));
+    END IF;
+  END IF;
 
   RETURN jsonb_build_object('schema_version', 'buying_plan_v1', 'as_of', statement_timestamp(), 'vehicle_id', v.id, 'state', 'public_current_parent',
     'viewer', public.job_reader_viewer(CASE WHEN auth.uid() IS NULL THEN 'visitor' ELSE 'self' END, '{}', public.viewer_identity_bridge(auth.uid()), false),
@@ -424,7 +445,7 @@ BEGIN
     'keyword_table', jsonb_build_object('schema_version', kw->>'schema_version', 'reviewed_at', kw->>'reviewed_at', 'review_state', kw->>'review_state',
       'sha256_base64', 'xT6BV9h9HQdgnwZijC2xX00yVTn1stSTSYnfNWmwh+E=', 'entries', jsonb_array_length(kw->'entries')),
     'collections', jsonb_build_object('discoveries', jsonb_build_object('fetched_rows', disc_rows, 'cap', 500),
-      'condition', jsonb_build_object('fetched_rows', cond_rows, 'cap', 500), 'parts_terms', jsonb_build_object('read', LEAST(cardinality(terms), 10), 'cap', 10)),
+      'condition', jsonb_build_object('fetched_rows', cond_rows, 'cap', 500, 'candidate_cap', cand_cap), 'parts_terms', jsonb_build_object('read', LEAST(cardinality(terms), 10), 'cap', 10)),
     'gaps', gaps,
     'finding_slot_contract', jsonb_build_object('inspection_type', 'pre_purchase', 'verdict', jsonb_build_array('supports', 'contradicts', 'unknown'),
       'severity', jsonb_build_array('info', 'monitor', 'concern', 'critical')),
@@ -434,10 +455,38 @@ BEGIN
     'interpretation', 'An estimate to inspect, not an estimate to restore. Claims are listing testimony; operations are keyword-table candidates with seed_uncalibrated reference hours; parts are unverified text-fitment matches; the rate is shown as returned. The pre-purchase inspection turns each item into an observation.');
 END $fn$;
 
+-- The candidate cap's rule row. Basis (prod, read-only EXPLAIN ANALYZE of the capped statement, 2026-11-25 03:45 PT):
+-- 1,024 candidates walked to pass 500 on a public car took 4,167 ms cold and 2,938 ms warm (10,484 buffers), i.e. 2.9 to
+-- 4.1 ms per walked row; earlier warm walks measured 1.0 to 1.8 ms. 2,000 walked rows are 2.0 to 8.2 s of anon's 15 s
+-- statement_timeout. A reviewed row change retunes it.
+INSERT INTO public.platform_config (config_key, config_value, description)
+VALUES ('listing_work_plan_read',
+        jsonb_build_object('condition_candidate_cap', 2000,
+          'basis', 'condition walk 1.0-4.1 ms per walked candidate row on prod (read-only EXPLAIN ANALYZE 2026-11-25: 1024 rows 2938 ms warm, 4167 ms cold); 2000 rows = 2.0-8.2 s of anon''s 15 s statement_timeout',
+          'bounds', jsonb_build_array(500, 8000), 'migration', '20261125233000'),
+        'listing_work_plan_read: candidate condition ids walked per call (bounded 500..8000 in the reader; 2000 when absent). Ids past the cap are counted in exclusions.condition_candidates_beyond_cap.')
+ON CONFLICT (config_key) DO NOTHING;
+
+-- The body restates the vehicle_images read policy (shown, uploader, tied); register the copy so the hourly watch
+-- fails when that table's read policies change (hash = private_row_policy_hash('vehicle_images', ...) live 2026-11-25).
+DO $reg$
+BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    EXECUTE $i$INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
+      VALUES ('listing_work_plan_read(uuid)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')',
+              '3af9ebbc1bebf423e3bd1e0b7c45a194', 'ta-policies',
+              '20261125233000 restates the vehicle_images read policy (shown, uploader, tied) for image-derived claims')
+      ON CONFLICT (reader, relation, policy_filter) DO NOTHING$i$;
+  END IF;
+END $reg$;
+
 DO $verify$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE oid = 'public.listing_work_plan_read(uuid)'::regprocedure AND prosecdef
-                   AND prosrc LIKE '%image_claims_excluded_not_shown%' AND prosrc NOT LIKE '%o.kind::text = ''condition''%')
+                   AND prosrc LIKE '%image_claims_excluded_not_shown%' AND prosrc NOT LIKE '%o.kind::text = ''condition''%'
+                   AND prosrc LIKE '%COALESCE(public.vehicle_viewer_tied(r.image_vehicle_id), false)%'
+                   AND prosrc LIKE '%ORDER BY c.id LIMIT cand_cap) cand%')
+     OR NOT EXISTS (SELECT 1 FROM public.platform_config WHERE config_key = 'listing_work_plan_read')
      OR NOT has_function_privilege('anon', 'public.listing_work_plan_read(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'listing_work_plan_read not replaced as expected';
   END IF;
