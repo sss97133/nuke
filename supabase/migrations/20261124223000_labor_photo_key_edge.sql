@@ -14,18 +14,22 @@
 --     paint fabricated -> primed      image_visible_paint_stage {primer}
 --     paint blocked    -> basecoated  image_visible_paint_stage {base}
 --   clear / aged witness nothing (a finished coat shows a car is painted, not that this step was done).
---   labor_evidence_grade_policy gains photo_key_reading (counts_in witnessed, rank 5, below photographed_stage 4).
+--   labor_evidence_grade_policy gains photo_key_reading (rank 5, below photographed_stage 4), counted with unwitnessed
+--   purchases, not witnessed: one photo is one witness and two runs of one model are one reader, and no second reader
+--   family or keyed paper for the material exists to corroborate it (receipt_line_systems has no paint key).
 --   Reader: a step with no reviewed phase frame is supported when >= 1 gallery-eligible, non-sensitive, non-duplicate
 --   image of this vehicle has a non-superseded reading of photo_property_id holding one of photo_values. The step
 --   carries witness (photographed_stage | photo_key_reading), images and observation_ids; the image ids join the
---   segment's evidence_ids; a paint segment with any key-witnessed step is graded photo_key_reading (the weaker grade).
---   Reviewed phase frames still win per step.
+--   segment's evidence_ids; a paint segment priced from keyed readings is graded photo_key_reading. When a reviewed
+--   frame witnesses any step of the segment, keyed-reading steps are listed not_counted and add no hours or evidence
+--   (a model reading never mixes into hand-witnessed hours).
 -- Grain: step (labor_stage_rule_transitions) -> property (observation_properties) by FK; reading -> image by
 -- structured_data.image_id (a jsonb link: debt, the keyed column is vehicle_observations.source_observation_id /
 -- vehicle_images, not set by the projection). Recompute: per read; a keyed reading landing prices the step on the next
 -- read, no agent. Enum values are checked only against observation_properties.description text (no values table).
 -- Dry run against live 2026-11-24: proof 20d21fb0 and Blazer e08bf694 unchanged (no primer/base keyed reading);
--- K1500 5a1deb95 paint 4/6/8 (was unpriced); Mustang 83f6f033 + paint 4/6/8.
+-- K1500 5a1deb95 paint 4/6/8 in with_unwitnessed_purchases (was unpriced), witnessed null/null/8; Mustang 83f6f033
+-- with_unwitnessed_purchases 16/24/40 -> 20/30/48, witnessed null/null/40 -> null/null/48.
 -- Test: supabase/sql/test_vehicle_labor_appraisal_photo_key.sql (PG17).
 --
 -- REVERT. Restore the anchors below in the function; drop the two columns; delete the photo_key_reading policy row.
@@ -56,8 +60,8 @@ UPDATE public.labor_stage_rule_transitions t
    AND t.photo_property_id IS NULL;
 
 INSERT INTO public.labor_evidence_grade_policy (grade, counts_in, rank, meaning)
-VALUES ('photo_key_reading', 'witnessed', 5,
-        'an in-progress stage value is read in a keyed photo reading (observation_properties) of this vehicle; model-read, not hand-reviewed')
+VALUES ('photo_key_reading', 'unwitnessed_purchase', 5,
+        'an in-progress stage value is read in a keyed photo reading (observation_properties) of this vehicle by one model, with no second reader family and no keyed paper for the material: counted with unwitnessed purchases, not witnessed')
 ON CONFLICT (grade) DO NOTHING;
 
 DO $patch$
@@ -74,12 +78,17 @@ $a$;
   r_decl text := $r$  phase_imgs int;
   key_imgs uuid[];  -- labor_photo_key_v1
   key_obs uuid[];
+  key_evid uuid[];
   paint_key_steps int := 0;
+  key_min numeric := 0;
+  key_typ numeric := 0;
+  key_max numeric := 0;
 $r$;
   a_start text := $a$    IF rule.evidence_requirements ? 'paint_chain' THEN
 $a$;
   r_start text := $r$    IF rule.evidence_requirements ? 'paint_chain' THEN
       paint_key_steps := 0;  -- labor_photo_key_v1
+      key_min := 0; key_typ := 0; key_max := 0; key_evid := '{}'::uuid[];
 $r$;
   a_sel text := $a$                                         'photo_phase', t.photo_phase, 'transition_id', m.id) /* labor_edges_v1 */
                       FROM labor_stage_rule_transitions t
@@ -114,6 +123,41 @@ $a$;
         IF (nullif(step_j->>'photo_phase', '') IS NOT NULL AND coalesce(phase_imgs, 0) > 0)
            OR coalesce(cardinality(key_imgs), 0) > 0 THEN
 $r$;
+  a_acc text := $a$          paint_supported_min := paint_supported_min + coalesce(est.hours_min, 0);
+          paint_supported_typ := paint_supported_typ + coalesce(est.hours_typical, 0);
+          paint_supported_max := paint_supported_max + coalesce(est.hours_max, 0);
+$a$;
+  r_acc text := $r$          IF coalesce(phase_imgs, 0) > 0 THEN
+            paint_supported_min := paint_supported_min + coalesce(est.hours_min, 0);
+            paint_supported_typ := paint_supported_typ + coalesce(est.hours_typical, 0);
+            paint_supported_max := paint_supported_max + coalesce(est.hours_max, 0);
+          ELSE  -- labor_photo_key_v1: a keyed reading's step is summed apart
+            key_min := key_min + coalesce(est.hours_min, 0);
+            key_typ := key_typ + coalesce(est.hours_typical, 0);
+            key_max := key_max + coalesce(est.hours_max, 0);
+          END IF;
+$r$;
+  a_end text := $a$      IF paint_supported_min = 0 AND paint_supported_typ = 0 AND paint_supported_max = 0 THEN
+        status := 'no evidence';
+$a$;
+  r_end text := $r$      -- labor_photo_key_v1: keyed readings price the segment only when no reviewed frame witnesses any step of it;
+      -- otherwise their steps are listed as not_counted and their images leave the evidence.
+      IF paint_key_steps > 0 THEN
+        IF paint_supported_min = 0 AND paint_supported_typ = 0 AND paint_supported_max = 0 THEN
+          paint_supported_min := key_min; paint_supported_typ := key_typ; paint_supported_max := key_max;
+        ELSE
+          SELECT jsonb_agg(CASE WHEN y.x->>'witness' = 'photo_key_reading'
+                                THEN y.x || jsonb_build_object('status', 'not_counted', 'reason',
+                                       'a reviewed frame witnesses another step of this segment')
+                                ELSE y.x END ORDER BY y.o)
+            INTO steps_j FROM jsonb_array_elements(steps_j) WITH ORDINALITY y(x, o);
+          SELECT coalesce(array_agg(e), '{}'::uuid[]) INTO evid_ids FROM unnest(evid_ids) e WHERE e <> ALL (key_evid);
+          paint_key_steps := 0;
+        END IF;
+      END IF;
+      IF paint_supported_min = 0 AND paint_supported_typ = 0 AND paint_supported_max = 0 THEN
+        status := 'no evidence';
+$r$;
   a_img text := $a$            'images', phase_imgs,
 $a$;
   r_img text := $r$            'images', CASE WHEN coalesce(phase_imgs, 0) > 0 THEN phase_imgs ELSE cardinality(key_imgs) END,
@@ -128,6 +172,7 @@ $a$;
           IF coalesce(phase_imgs, 0) = 0 THEN  -- labor_photo_key_v1
             paint_key_steps := paint_key_steps + 1;
             evid_ids := coalesce(evid_ids, '{}'::uuid[]) || key_imgs;
+            key_evid := key_evid || key_imgs;
           END IF;
         ELSE
           unsupported_steps := unsupported_steps || jsonb_build_object(
@@ -146,8 +191,8 @@ BEGIN
   IF position('labor_return_rule_v1' IN d) = 0 THEN
     RAISE EXCEPTION 'vehicle_labor_appraisal is not at 20261124222000; rebase this migration';
   END IF;
-  anchors := ARRAY[a_ver, a_decl, a_start, a_sel, a_cond, a_img, a_evid, a_grade];
-  repls := ARRAY[r_ver, r_decl, r_start, r_sel, r_cond, r_img, r_evid, r_grade];
+  anchors := ARRAY[a_ver, a_decl, a_start, a_sel, a_cond, a_acc, a_img, a_evid, a_end, a_grade];
+  repls := ARRAY[r_ver, r_decl, r_start, r_sel, r_cond, r_acc, r_img, r_evid, r_end, r_grade];
   FOR i IN 1 .. array_length(anchors, 1) LOOP
     n := (length(d) - length(replace(d, anchors[i], ''))) / length(anchors[i]);
     IF n <> 1 THEN RAISE EXCEPTION 'labor photo key anchor % drifted: % matches', i, n; END IF;
