@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { markImageValidationRetry } from '../services/imageValidationRetry';
 import { ContentDetector } from '../services/contentDetector';
 import UserReputationBadge from './UserReputationBadge';
 import ExtractionQueueStatus from './ExtractionQueueStatus';
@@ -750,19 +751,11 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           if (validationError) {
             console.warn(`Validation failed for image ${i + 1}:`, validationError);
             // Mark for retry later (store in metadata)
-            await supabase
-              .from('vehicle_images')
-              .update({
-                ai_scan_metadata: {
-                  ...insertData.ai_scan_metadata,
-                  validation: {
-                    status: 'failed',
-                    error: validationError.message,
-                    retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // Retry in 5 min
-                  }
-                }
-              })
-              .eq('id', insertedImage.id);
+            await markImageValidationRetry(insertedImage.id, insertData.ai_scan_metadata, {
+              status: 'failed',
+              error: validationError.message,
+              retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // Retry in 5 min
+            });
           } else if (validationResult?.validation) {
             validatedCount++;
             if (!validationResult.validation.matches) {
@@ -774,19 +767,11 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           console.warn(`Validation error for image ${i + 1}:`, validationErr);
           // Mark for retry if it's a timeout or rate limit
           if (validationErr?.message?.includes('timeout') || validationErr?.message?.includes('429')) {
-            await supabase
-              .from('vehicle_images')
-              .update({
-                ai_scan_metadata: {
-                  ...insertData.ai_scan_metadata,
-                  validation: {
-                    status: 'pending_retry',
-                    error: validationErr.message,
-                    retry_at: new Date(Date.now() + 2 * 60 * 1000).toISOString() // Retry in 2 min
-                  }
-                }
-              })
-              .eq('id', insertedImage.id);
+            await markImageValidationRetry(insertedImage.id, insertData.ai_scan_metadata, {
+              status: 'pending_retry',
+              error: validationErr.message,
+              retry_at: new Date(Date.now() + 2 * 60 * 1000).toISOString() // Retry in 2 min
+            });
           }
         }
       } catch (error) {
