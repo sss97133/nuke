@@ -330,6 +330,11 @@ class OrganizationFromSourceService {
       });
 
     if (error) {
+      // 23505: the link is already on record. The check above misses a link this caller cannot read (the read
+      // policy hides links on cars the caller may not open), so the unique key answers instead.
+      if (error.code === '23505') {
+        return organizationId;
+      }
       console.error(`Error linking vehicle to organization:`, error);
       return null;
     }
