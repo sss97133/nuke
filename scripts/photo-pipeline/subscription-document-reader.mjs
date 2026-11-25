@@ -37,6 +37,10 @@ const model = args.model && args.model !== true ? String(args.model) : DEFAULT_M
 const dry = args['dry-run'] === true;
 // Held receipts whose own paper is re-read after the frames (receipt_reread_worklist, 20261124207000).
 const rereadLimit = args.rereads && args.rereads !== true ? Number(args.rereads) : 10;
+// A local paper is read only with --local-rereads. Under launchd a read of a protected folder (~/Downloads, ~/Documents)
+// blocks in open() on a privacy prompt until someone answers it, which stopped the whole batch on 2026-11-25. Run it from a
+// terminal that has the access; the scheduled batch reads stored papers only.
+const localRereads = args['local-rereads'] === true;
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 
 const TYPES = ['receipt', 'invoice', 'work_order', 'packing_slip', 'order_confirmation', 'estimate', 'statement', 'alignment_report', 'title', 'registration', 'sale_sheet', 'manual', 'shipping_bill', 'other'];
@@ -133,12 +137,12 @@ async function land(f, extraction) {
 // is read from this Mac's disk. A read the OS refuses is reported as local_file_denied, never retried silently.
 async function rereadList() {
   if (!(rereadLimit > 0)) return [];
-  try { return await rest(`receipt_reread_worklist?select=receipt_id,source_kind,source,file_name,reason&user_id=eq.${OWNER}&order=receipt_id&limit=${rereadLimit}`); }
+  try { return await rest(`receipt_reread_worklist?select=receipt_id,source_kind,source,file_name,reason&user_id=eq.${OWNER}${localRereads ? '' : '&source_kind=eq.storage'}&order=receipt_id&limit=${rereadLimit}`); }
   catch (e) { console.error(`reread work list unavailable: ${String(e.message || e).slice(0, 120)}`); return []; }
 }
 async function rereadBytes(w) {
   if (w.source_kind === 'storage') {
-    const r = await fetch(w.source, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } });
+    const r = await fetch(w.source, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }, signal: AbortSignal.timeout(60_000) });
     if (!r.ok) throw Object.assign(new Error(`download ${r.status}`), { cls: 'storage_download_failed' });
     return Buffer.from(await r.arrayBuffer());
   }
@@ -210,8 +214,9 @@ if (!dry) {
   await Promise.all(Array.from({ length: Math.max(1, conc) }, worker));
   // Held receipts: read the receipt's own paper and store the reading beside the old one (receipt_record_reread). The
   // itemise fold (cron :17) then decides again from it; nothing here writes a line.
-  const held = stop ? [] : await rereadList();
-  Object.assign(summary, { rereads: held.length, reread_stored: 0, reread_refused: 0, reread_errors: 0 });
+  const listed = stop ? [] : await rereadList();
+  const held = localRereads ? listed : listed.filter((w) => w.source_kind === 'storage');
+  Object.assign(summary, { rereads: held.length, reread_stored: 0, reread_refused: 0, reread_errors: 0, reread_skipped_local: listed.length - held.length });
   for (const w of held) {
     if (stop) break;
     const own = realpathSync(mkdtempSync(join(dir, 'paper_')));

@@ -140,7 +140,7 @@ test('every read starts lean: no session file, the Read tool scoped to the page\
   }, { extraArgs: ['--model', 'sonnet'] });
 });
 
-test('held receipts: storage and local papers are re-read and stored through the writer; a missing local file is reported', async () => {
+test('held receipts: storage papers, and local papers with --local-rereads, are re-read and stored through the writer; a missing local file is reported', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'reread-local-'));
   const local = join(dir, 'IMG_1.jpeg'); writeFileSync(local, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
   const rows = (url) => [
@@ -158,6 +158,12 @@ test('held receipts: storage and local papers are re-read and stored through the
       for (const c of calls.rereads) { assert.equal(c.p_extraction.document_type, 'receipt'); assert.match(c.p_reader, /subscription$/); }
       assert.ok(calls.queries.some((q) => q.includes('receipt_reread_worklist') && q.includes('user_id=eq.')));
       assert.equal(calls.lands.length, 0, 'a re-read never lands a new receipt through the frame route');
+    }, { rereads: rows, extraArgs: ['--local-rereads'] });
+    await withStandIns([], ({ calls, summary }) => {
+      assert.equal(summary.rereads, 1, 'without --local-rereads only the stored paper is read');
+      assert.equal(summary.reread_skipped_local, 2);
+      assert.deepEqual(calls.rereads.map((c) => c.p_receipt), ['r-storage']);
+      assert.ok(calls.queries.some((q) => q.includes('source_kind=eq.storage')), 'the work list is asked for stored papers only');
     }, { rereads: rows });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
