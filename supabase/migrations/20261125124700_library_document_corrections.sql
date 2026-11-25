@@ -8,8 +8,9 @@
 -- ROWS. library_document_corrections: one row per (document, field) correction, with the old and new value, the
 -- chunk of the same document that shows the true value (basis_chunk_id), a note, and who corrected it. A newer
 -- correction of the same field supersedes the older (superseded_by / superseded_at); nothing is deleted.
--- is_factory_original = true needs the page that carries the document's current publisher correction, and that publisher
--- must name the make of the document's library (reference_libraries.make); false needs no witness.
+-- is_factory_original = true needs the page that carries the document's current publisher correction; that publisher
+-- must match a library_factory_publishers row for the make of the document's library, and the page must match no
+-- library_reprint_markers row (a reprint names the factory on its title page too). false needs no witness.
 -- field 'duplicate_of' is the duplicate edge: duplicate_of_document_id names the survivor; the duplicate stays.
 --
 -- WRITER. library_document_correct(...) is the only writer (no table write grant to any API role). It refuses a
@@ -89,6 +90,43 @@ GRANT SELECT ON public.library_documents_current TO anon, authenticated, service
 COMMENT ON VIEW public.library_documents_current IS
   'library_document_corrections_v1: library_documents with each field''s current cited correction applied, plus duplicate_of (the survivor) and corrected.';
 
+-- Factory witness rules --------------------------------------------------------------------------------------------------
+-- A factory publisher, per make, as its manuals print it (POSIX regex on the upper-cased publisher text). Basis measured
+-- 2026-11-25 on the front pages (page_number <= 6, 1,159 chunks of 235 documents) of service_manual_chunks.
+CREATE TABLE IF NOT EXISTS public.library_factory_publishers (
+  make text NOT NULL,
+  publisher_pattern text NOT NULL CHECK (length(publisher_pattern) >= 6),
+  basis text NOT NULL CHECK (length(btrim(basis)) >= 12),
+  PRIMARY KEY (make, publisher_pattern)
+);
+-- A reprint or aftermarket publisher's mark (POSIX regex on the upper-cased page text).
+CREATE TABLE IF NOT EXISTS public.library_reprint_markers (
+  marker_pattern text PRIMARY KEY CHECK (length(marker_pattern) >= 4),
+  basis text NOT NULL CHECK (length(btrim(basis)) >= 12)
+);
+ALTER TABLE public.library_factory_publishers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.library_reprint_markers ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.library_factory_publishers, public.library_reprint_markers FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.library_factory_publishers, public.library_reprint_markers TO service_role;
+COMMENT ON TABLE public.library_factory_publishers IS
+  'library_document_corrections_v1: the publisher a make''s factory manuals print. is_factory_original = true needs the document''s current publisher correction to match a row for its library''s make.';
+COMMENT ON TABLE public.library_reprint_markers IS
+  'library_document_corrections_v1: a reprint or aftermarket publisher''s mark. is_factory_original = true is refused when the cited page matches one.';
+INSERT INTO public.library_factory_publishers (make, publisher_pattern, basis) VALUES
+  ('Chevrolet', '\mCHEVROLET MOTOR DIVISION\M', 'printed on the front pages of 7 of 235 library documents (2026-11-25)'),
+  ('Chevrolet', '\mGENERAL MOTORS CORPORATION\M', 'printed on the front pages of 18 of 235 library documents (2026-11-25)'),
+  ('GMC', '\mGMC TRUCK (AND|&) COACH\M', 'GMC TRUCK printed on the front pages of 4 of 235 library documents (2026-11-25)'),
+  ('GMC', '\mGENERAL MOTORS CORPORATION\M', 'printed on the front pages of 18 of 235 library documents (2026-11-25)'),
+  ('Pontiac', '\mPONTIAC MOTOR DIVISION\M', 'the division name of Pontiac factory manuals; 0 of 235 front pages print it yet (2026-11-25)'),
+  ('Pontiac', '\mGENERAL MOTORS CORPORATION\M', 'printed on the front pages of 18 of 235 library documents (2026-11-25)')
+ON CONFLICT (make, publisher_pattern) DO NOTHING;
+INSERT INTO public.library_reprint_markers (marker_pattern, basis) VALUES
+  ('\mCHILTON', 'aftermarket publisher; CHILTON|HAYNES|CLYMER|REPRINT on the front pages of 22 of 235 library documents (2026-11-25)'),
+  ('\mHAYNES\M', 'aftermarket publisher; counted with CHILTON (22 of 235 documents, 2026-11-25)'),
+  ('\mCLYMER\M', 'aftermarket publisher; counted with CHILTON (22 of 235 documents, 2026-11-25)'),
+  ('\mREPRINT', 'REPRINT, REPRINTED, REPRINTS; counted with CHILTON (22 of 235 documents, 2026-11-25)')
+ON CONFLICT (marker_pattern) DO NOTHING;
+
 -- The writer --------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.library_document_correct(
   p_document uuid, p_field text, p_new_value jsonb, p_basis_chunk uuid, p_basis_note text, p_corrected_by text,
@@ -139,10 +177,11 @@ BEGIN
       IF w IS NULL THEN
         RAISE EXCEPTION 'library_document_correct: is_factory_original true needs a current publisher correction cited to the same page'; END IF;
       IF NOT EXISTS (SELECT 1 FROM public.reference_libraries rl
-                      WHERE rl.id = d.library_id AND length(btrim(coalesce(rl.make, ''))) > 0
-                        AND position(' ' || btrim(regexp_replace(upper(rl.make), '[^A-Z0-9]+', ' ', 'g')) || ' '
-                                     IN ' ' || regexp_replace(upper(w), '[^A-Z0-9]+', ' ', 'g') || ' ') > 0) THEN
-        RAISE EXCEPTION 'library_document_correct: publisher % does not name the make of the document''s library', w; END IF;
+                       JOIN public.library_factory_publishers fp ON lower(fp.make) = lower(rl.make)
+                      WHERE rl.id = d.library_id AND upper(w) ~ fp.publisher_pattern) THEN
+        RAISE EXCEPTION 'library_document_correct: publisher % is not a factory publisher of the document''s make (library_factory_publishers)', w; END IF;
+      IF EXISTS (SELECT 1 FROM public.library_reprint_markers rm WHERE upper(c.content) ~ rm.marker_pattern) THEN
+        RAISE EXCEPTION 'library_document_correct: the cited page carries a reprint marker (library_reprint_markers)'; END IF;
     END IF;
   ELSIF p_field = 'duplicate_of' THEN
     IF p_duplicate_of IS NULL OR p_duplicate_of = p_document THEN RAISE EXCEPTION 'duplicate_of needs another document'; END IF;

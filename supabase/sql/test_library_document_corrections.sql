@@ -1,4 +1,4 @@
--- Disposable PG17 contract for 20261125124500_library_document_corrections. Synthetic rows only; the five reader
+-- Disposable PG17 contract for 20261125124700_library_document_corrections. Synthetic rows only; the five reader
 -- functions are the live definitions of 2026-11-25.
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
@@ -179,7 +179,8 @@ $function$
 INSERT INTO public.library_documents (id, library_id, title, document_type, is_factory_original) VALUES
   ('d0000000-0000-0000-0000-00000000000a', 'e0000000-0000-0000-0000-00000000000a', '1978 Light Truck Service Manual', 'service_manual', false),
   ('d0000000-0000-0000-0000-00000000000b', 'e0000000-0000-0000-0000-00000000000a', '1978 Light Truck Service Manual', 'service_manual', true),
-  ('d0000000-0000-0000-0000-00000000000c', 'e0000000-0000-0000-0000-00000000000a', 'Other manual', 'service_manual', true);
+  ('d0000000-0000-0000-0000-00000000000c', 'e0000000-0000-0000-0000-00000000000a', 'Other manual', 'service_manual', true),
+  ('d0000000-0000-0000-0000-00000000000d', 'e0000000-0000-0000-0000-00000000000a', 'Pick-up repair manual', 'service_manual', false);
 INSERT INTO public.service_manual_chunks (id, document_id, page_number, content) VALUES
   ('c0000000-0000-0000-0000-0000000000a2', 'd0000000-0000-0000-0000-00000000000a', 2,
    E'FOREWORD This manual has been developed to provide service\ninformation for the Chevrolet motor home chassis.'),
@@ -193,11 +194,13 @@ INSERT INTO public.service_manual_chunks (id, document_id, page_number, content)
    E'SERVICE MANUAL\nCHEVROLET MOTOR DIVISION\nGENERAL MOTORS CORPORATION'),
   ('c0000000-0000-0000-0000-0000000000b1', 'd0000000-0000-0000-0000-00000000000b', 1,
    E'SERVICE MANUAL\nCHEVROLET MOTOR DIVISION\nGENERAL MOTORS CORPORATION'),
+  ('c0000000-0000-0000-0000-0000000000d1', 'd0000000-0000-0000-0000-00000000000d', 1,
+   E'CHILTON''S REPAIR MANUAL\nCHEVROLET GMC PICK-UPS 1970-1986\nCHILTON BOOK COMPANY RADNOR PENNSYLVANIA\nGENERAL MOTORS CORPORATION TRADEMARKS USED UNDER LICENSE'),
   ('c0000000-0000-0000-0000-0000000000c1', 'd0000000-0000-0000-0000-00000000000c', 1,
    E'REPRINTED BY HELM INCORPORATED\nFROM THE CHEVROLET ORIGINAL');
 
-\ir ../migrations/20261125124500_library_document_corrections.sql
-\ir ../migrations/20261125124500_library_document_corrections.sql
+\ir ../migrations/20261125124700_library_document_corrections.sql
+\ir ../migrations/20261125124700_library_document_corrections.sql
 SET client_min_messages = warning;
 
 DO $t$
@@ -205,9 +208,9 @@ DECLARE A uuid := 'd0000000-0000-0000-0000-00000000000a'; B uuid := 'd0000000-00
         C uuid := 'd0000000-0000-0000-0000-00000000000c'; k1 uuid; k2 uuid; n int; ok boolean;
 BEGIN
   -- the view is the table until a correction lands
-  IF (SELECT count(*) FROM public.library_documents_current) <> 3
+  IF (SELECT count(*) FROM public.library_documents_current) <> 4
      OR EXISTS (SELECT 1 FROM public.library_documents_current WHERE corrected OR duplicate_of IS NOT NULL
-                   OR title <> '1978 Light Truck Service Manual' AND id <> C) THEN RAISE EXCEPTION 'view differs before corrections'; END IF;
+                   OR title <> '1978 Light Truck Service Manual' AND id NOT IN (C, 'd0000000-0000-0000-0000-00000000000d')) THEN RAISE EXCEPTION 'view differs before corrections'; END IF;
   IF (SELECT count(*) FROM pg_proc WHERE proname IN ('get_manual_pages_for_field', 'get_vehicle_library_docs', 'get_vehicle_references',
         'search_document_chunks', 'search_service_manual_chunks') AND prosrc LIKE '%library_documents_current ld%') <> 5 THEN
     RAISE EXCEPTION 'not every reader reads the corrected view'; END IF;
@@ -283,6 +286,22 @@ BEGIN
   BEGIN PERFORM public.library_document_correct(C, 'is_factory_original', 'true', 'c0000000-0000-0000-0000-0000000000c1', 'title page prints the reprinter', 'agent:ta-facts');
         RAISE EXCEPTION 'reprint publisher admitted as factory';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM = 'reprint publisher admitted as factory' THEN RAISE; END IF; END;
+  -- skeptic2 01:15: a reprint's title page names the make; a make name is not a factory publisher
+  PERFORM public.library_document_correct('d0000000-0000-0000-0000-00000000000d', 'publisher', '"Chevrolet"', 'c0000000-0000-0000-0000-0000000000d1', 'title page prints the make', 'agent:ta-facts');
+  BEGIN PERFORM public.library_document_correct('d0000000-0000-0000-0000-00000000000d', 'is_factory_original', 'true', 'c0000000-0000-0000-0000-0000000000d1', 'title page prints the make', 'agent:ta-facts');
+        RAISE EXCEPTION 'make name admitted as factory publisher';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM = 'make name admitted as factory publisher' THEN RAISE; END IF;
+    IF SQLERRM NOT LIKE '%not a factory publisher%' THEN RAISE; END IF; END;
+  -- ... and a factory publisher's name printed on a reprint's page (a trademark line) does not make it factory
+  PERFORM public.library_document_correct('d0000000-0000-0000-0000-00000000000d', 'publisher', '"General Motors Corporation"', 'c0000000-0000-0000-0000-0000000000d1', 'trademark line on the title page', 'agent:ta-facts');
+  BEGIN PERFORM public.library_document_correct('d0000000-0000-0000-0000-00000000000d', 'is_factory_original', 'true', 'c0000000-0000-0000-0000-0000000000d1', 'trademark line on the title page', 'agent:ta-facts');
+        RAISE EXCEPTION 'reprint page admitted as factory';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM = 'reprint page admitted as factory' THEN RAISE; END IF;
+    IF SQLERRM NOT LIKE '%reprint marker%' THEN RAISE; END IF; END;
+  IF (SELECT is_factory_original FROM public.library_documents_current WHERE id = 'd0000000-0000-0000-0000-00000000000d') IS NOT FALSE THEN
+    RAISE EXCEPTION 'reprint read as factory'; END IF;
+  IF has_table_privilege('anon', 'public.library_factory_publishers', 'select') OR has_table_privilege('anon', 'public.library_reprint_markers', 'select') THEN
+    RAISE EXCEPTION 'rule tables readable by anon'; END IF;
 
   -- only the writer writes
   IF has_function_privilege('anon', 'public.library_document_correct(uuid,text,jsonb,uuid,text,text,uuid)', 'execute')
