@@ -3,7 +3,8 @@
 --   (-v smig=<path> runs the contract against another body; the mutation runs use it.)
 -- Proves 20261126020000_vehicle_row_read_stub_target.sql: a deleted merged car whose target is not publicly readable
 -- (private, or deleted and unmerged) answers anon, a signed-in stranger and a caller with no claims NULL, exactly like a
--- missing car; a stub into a public car still answers the redirect; insiders and the service role read stubs whole;
+-- missing car; a stub into a public car still answers the redirect; a public live car carrying an unreadable car's id
+-- is projected with that column null; insiders and the service role read stubs whole;
 -- every other answer is byte-identical; the revert restores the prior body. Builds on the 20261125214500 contract.
 \set ON_ERROR_STOP on
 \if :{?smig}
@@ -17,10 +18,15 @@ DO $$ BEGIN
 END $$;
 
 -- Made-up rows in an empty disposable PG17 database, never production.
--- 8888 public, deleted, merged into the private 2222; 9999 public, deleted, merged into the deleted unmerged 3333.
+-- 8888 public, deleted, merged into the private 2222; 9999 public, deleted, merged into the deleted unmerged 3333;
+-- a1a1 public and live, carrying merged_into_vehicle_id = the private 2222; a3a3 the same, carrying the public but deleted
+-- unmerged 3333; a2a2 public and live, carrying the public 1111.
 INSERT INTO public.vehicles (id, is_public, deleted_at, merged_into_vehicle_id, owner_id, uploaded_by, make, model, year) VALUES
   ('88888888-8888-4888-8888-888888888888', true, now(), '22222222-2222-4222-8222-222222222222', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'StubToPrivate', 1967),
-  ('99999999-9999-4999-8999-999999999999', true, now(), '33333333-3333-4333-8333-333333333333', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'StubToDeleted', 1966);
+  ('99999999-9999-4999-8999-999999999999', true, now(), '33333333-3333-4333-8333-333333333333', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'StubToDeleted', 1966),
+  ('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', true, NULL, '22222222-2222-4222-8222-222222222222', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'LiveToPrivate', 1965),
+  ('a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3', true, NULL, '33333333-3333-4333-8333-333333333333', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'LiveToDeleted', 1963),
+  ('a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2', true, NULL, '11111111-1111-4111-8111-111111111111', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'LiveToPublic', 1964);
 
 CREATE FUNCTION pg_temp.capture2(p_phase text) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE c record;
@@ -43,6 +49,8 @@ BEGIN; SELECT pg_temp.capture2('s_before'); COMMIT;
 DO $$ BEGIN
   ASSERT pg_temp.ans('s_before', 'anon', '88888888-8888-4888-8888-888888888888') ->> 'merged_into_vehicle_id' = '22222222-2222-4222-8222-222222222222',
     'the defect reproduces on the live body: anon is handed a private car''s id';
+  ASSERT pg_temp.ans('s_before', 'anon', 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1') ->> 'merged_into_vehicle_id' = '22222222-2222-4222-8222-222222222222',
+    'the live-car half reproduces on the live body: the projection names the private car';
 END $$;
 
 \ir :smig
@@ -69,10 +77,27 @@ BEGIN
   FOREACH k IN ARRAY ARRAY['owner','service'] LOOP
     ASSERT pg_temp.ans('s_after', k, '88888888-8888-4888-8888-888888888888') ->> 'model' = 'StubToPrivate', format('3 %s reads it whole', k);
   END LOOP;
+  -- 3b. A public live car carrying a private car's id is projected with that column null for outsiders; everything else
+  --     in its answer is unchanged. Carrying a public car's id, it is unchanged. Insiders read the id.
+  FOREACH k IN ARRAY ARRAY['anon','stranger','noclaims','contributor'] LOOP
+    ASSERT pg_temp.ans('s_after', k, 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1') -> 'merged_into_vehicle_id' = 'null'::jsonb
+       AND pg_temp.ans('s_after', k, 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1') - 'merged_into_vehicle_id'
+         = pg_temp.ans('s_before', k, 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1') - 'merged_into_vehicle_id',
+      format('3b %s: live car to a private car shows no target', k);
+    ASSERT pg_temp.ans('s_after', k, 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3') -> 'merged_into_vehicle_id' = 'null'::jsonb,
+      format('3b %s: live car to a deleted unmerged car shows no target', k);
+    ASSERT pg_temp.ans('s_after', k, 'a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2') ->> 'merged_into_vehicle_id' = '11111111-1111-4111-8111-111111111111',
+      format('3b %s: live car to a public car keeps its target', k);
+  END LOOP;
+  FOREACH k IN ARRAY ARRAY['owner','service'] LOOP
+    ASSERT pg_temp.ans('s_after', k, 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1') ->> 'merged_into_vehicle_id' = '22222222-2222-4222-8222-222222222222',
+      format('3b %s reads the target', k);
+  END LOOP;
   -- 4. Every other answer is byte-identical.
   SELECT count(*) INTO n FROM public.rd_answers a JOIN public.rd_answers b USING (caller, vehicle)
    WHERE a.phase = 's_after' AND b.phase = 's_before' AND a.r IS DISTINCT FROM b.r
-     AND NOT (a.vehicle IN ('88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999')
+     AND NOT (a.vehicle IN ('88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999',
+                            'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3')
               AND a.caller IN ('anon','stranger','noclaims','contributor'));
   ASSERT n = 0, format('4 %s other answers changed', n);
 END $$;

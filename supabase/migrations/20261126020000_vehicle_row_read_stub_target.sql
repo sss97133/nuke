@@ -7,7 +7,9 @@
 -- #3960); this reader still did.
 --
 -- WHAT. The same body as 20261125214500, plus one test before the redirect: the target must pass
--- vehicle_publicly_readable, or the stub answers NULL, exactly like a missing car. Insiders of the stub and the service
+-- vehicle_publicly_readable, or the stub answers NULL, exactly like a missing car. A public live (undeleted) car whose
+-- merged_into_vehicle_id names a car the public may not open is projected with that column null (prod 2026-11-25,
+-- read-only: 15 of 197 public live cars carrying the column; skeptic2's should-fix). Insiders of the car and the service
 -- role read it whole as before; every other answer is unchanged. The vehicles table still shows merged_into_vehicle_id
 -- on a stub row to anon; that half is a key on the stub (merged_target_public), designed on the board, not here.
 -- Guard: the live body (sha256 cdd2d17f..., 20261125214500), or this one on a re-run.
@@ -66,6 +68,13 @@ BEGIN
     END IF;
     RETURN jsonb_build_object('id', p_vehicle_id, 'merged_into_vehicle_id', v_redirect);
   END IF;
+  -- vehicle_row_read_live_merge_target_v1: a live car can carry merged_into_vehicle_id too; the public row names that
+  -- car only when the public may open it.
+  IF v_row ->> 'merged_into_vehicle_id' IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.vehicles t WHERE t.id = (v_row ->> 'merged_into_vehicle_id')::uuid
+                     AND public.vehicle_publicly_readable(t.is_public, t.deleted_at, t.merged_into_vehicle_id)) THEN
+    v_row := jsonb_set(v_row, '{merged_into_vehicle_id}', 'null'::jsonb);
+  END IF;
   RETURN public.vehicle_row_public_projection(v_row);
 END;
 $function$;
@@ -76,7 +85,8 @@ DECLARE f record;
 BEGIN
   SELECT p.prosecdef, p.provolatile, p.proconfig, pg_get_function_result(p.oid) AS res,
          has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_x,
-         position('vehicle_row_read_deleted_gate_v1' in p.prosrc) > 0 AND position('vehicle_row_read_stub_target_v1' in p.prosrc) > 0 AS marked
+         position('vehicle_row_read_deleted_gate_v1' in p.prosrc) > 0 AND position('vehicle_row_read_stub_target_v1' in p.prosrc) > 0
+           AND position('vehicle_row_read_live_merge_target_v1' in p.prosrc) > 0 AS marked
   INTO f FROM pg_proc p WHERE p.oid = 'public.vehicle_row_read(uuid)'::regprocedure;
   IF NOT (f.prosecdef AND f.provolatile = 's' AND f.proconfig = ARRAY['search_path=public'] AND f.res = 'jsonb'
           AND f.anon_x AND f.marked) THEN
