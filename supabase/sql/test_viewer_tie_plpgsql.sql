@@ -3,8 +3,8 @@
 -- admin, dealer staff, self-granted strangers), installs both functions as the live SQL bodies (the revert file holds
 -- them verbatim), keeps those as old_* copies, applies the migration twice, and asserts:
 --   * both functions are plpgsql, STABLE, SECURITY DEFINER, with the same search_path, and their grants are unchanged;
---   * for every fixture vehicle x every account seen in the fixture (plus none and an unknown one) x role
---     (authenticated, service_role, none), the new functions answer exactly as the SQL bodies did;
+--   * for every fixture vehicle x every account seen in the fixture (plus NULL and an unknown one) x role
+--     (anon, authenticated, service_role, none), the new functions answer exactly as the SQL bodies did;
 --   * the guard refuses a body it has not reviewed; the revert restores the SQL bodies.
 \set ON_ERROR_STOP on
 \ir test_vehicle_access_requires_provenance.sql
@@ -52,12 +52,13 @@ BEGIN
                UNION SELECT created_by_user_id FROM public.vehicles UNION SELECT user_id FROM public.vehicle_user_permissions
                UNION SELECT granted_by FROM public.vehicle_user_permissions UNION SELECT user_id FROM public.ownership_verifications
                UNION SELECT user_id FROM public.vehicle_contributors UNION SELECT user_id FROM public.organization_contributors
-               UNION SELECT user_id FROM public.admin_users UNION SELECT '00000000-0000-0000-0000-00000000beef'::uuid) s
+               UNION SELECT user_id FROM public.admin_users UNION SELECT '00000000-0000-0000-0000-00000000beef'::uuid
+               UNION SELECT NULL::uuid) s
     LOOP
       IF public.vehicle_user_has_access(v, u) IS DISTINCT FROM public.old_user_has_access(v, u) THEN
         RAISE EXCEPTION 'contract failed: vehicle_user_has_access(%, %) changed', v, u; END IF;
       IF public.vehicle_user_has_access(v, u) THEN pos_access := pos_access + 1; END IF;
-      FOREACH rl IN ARRAY ARRAY['authenticated', 'service_role', ''] LOOP
+      FOREACH rl IN ARRAY ARRAY['anon', 'authenticated', 'service_role', ''] LOOP
         PERFORM set_config('test.auth_role', rl, true), set_config('test.auth_uid', coalesce(u::text, ''), true);
         IF public.vehicle_viewer_tied(v) IS DISTINCT FROM public.old_viewer_tied(v) THEN
           RAISE EXCEPTION 'contract failed: vehicle_viewer_tied(%) as % / % changed', v, rl, u; END IF;
