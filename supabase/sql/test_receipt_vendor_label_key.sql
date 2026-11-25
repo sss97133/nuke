@@ -11,13 +11,16 @@ RESET ROLE;
 SELECT set_config('test.role', '', false), set_config('test.uid', '', false);
 
 ALTER TABLE public.receipts ADD COLUMN IF NOT EXISTS vendor_organization_id uuid REFERENCES public.organizations(id);
-INSERT INTO public.organizations VALUES ('00000000-0000-0000-0000-00000000e002', 'Corner Garage LLC', true);
+-- As live (2026-11-24): the keyed organisations carry their name in business_name, with name NULL.
+ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS business_name text;
+INSERT INTO public.organizations (id, name, is_public, business_name) VALUES ('00000000-0000-0000-0000-00000000e002', NULL, true, 'Corner Garage LLC');
 -- The body shop receipt is keyed to its organisation; the garage invoice (vendor string a person's name) is keyed to the
 -- garage the alias review resolved; the marketplace receipt has no key.
 UPDATE public.receipts SET vendor_organization_id = '00000000-0000-0000-0000-00000000e001' WHERE id = '00000000-0000-0000-0000-0000000000c1';
 UPDATE public.receipts SET vendor_organization_id = '00000000-0000-0000-0000-00000000e002' WHERE id = '00000000-0000-0000-0000-0000000000b2';
 
 \ir ../migrations/20261124213500_receipt_vendor_label_key.sql
+\ir ../migrations/20261124215000_receipt_vendor_label_business_name.sql
 
 -- Logged out.
 SELECT set_config('test.role', 'anon', false), set_config('test.uid', '', false);
@@ -69,5 +72,6 @@ SELECT public.assert(position('receipt_vendor_label' IN pg_get_functiondef('publ
                      AND position('receipt_vendor_for_viewer' IN pg_get_viewdef('public.receipts_public_summary'::regclass)) > 0,
                      'revert restores v1');
 \ir ../migrations/20261124213500_receipt_vendor_label_key.sql
+\ir ../migrations/20261124215000_receipt_vendor_label_business_name.sql
 
 SELECT 'test_receipt_vendor_label_key: ok';
