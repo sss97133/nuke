@@ -11,18 +11,19 @@
 \ir test_vehicle_labor_appraisal_names.sql
 
 -- Inputs the fold signals on, as stubs where the reader fixture has none.
--- guardrail-allow(center-key-fk): receipts.vehicle_id: synthetic fixture table in a disposable test database
--- guardrail-allow(center-key-fk): receipt_items.receipt_id: synthetic fixture table in a disposable test database
--- guardrail-allow(center-key-fk): receipt_vehicle_links.receipt_id: synthetic fixture table in a disposable test database
--- guardrail-allow(center-key-fk): receipt_vehicle_links.vehicle_id: synthetic fixture table in a disposable test database
--- guardrail-allow(center-key-fk): model_fold_work.vehicle_id: synthetic fixture table in a disposable test database
--- guardrail-allow(center-key-fk): model_fold_signal.vehicle_id: synthetic fixture table in a disposable test database
--- guardrail-allow(center-key-fk): vehicle_facet_grade_folds.vehicle_id: synthetic fixture table in a disposable test database
+-- Foreign keys as production has them (pg_constraint, read 2026-11-25): receipt_items.receipt_id and
+-- receipt_vehicle_links.receipt_id -> receipts, receipt_vehicle_links.vehicle_id and vehicle_facet_grade_folds.vehicle_id
+-- -> vehicles. The columns below have none in production:
+-- guardrail-allow(center-key-fk): receipts.vehicle_id: no foreign key in production (pg_constraint 2026-11-25)
+-- guardrail-allow(center-key-fk): model_fold_work.vehicle_id: no foreign key in production (pg_constraint 2026-11-25)
+-- guardrail-allow(center-key-fk): model_fold_signal.vehicle_id: no foreign key in production (pg_constraint 2026-11-25)
 CREATE TABLE IF NOT EXISTS public.receipts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid);
-CREATE TABLE IF NOT EXISTS public.receipt_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_id uuid);
-CREATE TABLE IF NOT EXISTS public.receipt_vehicle_links (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_id uuid,
-  vehicle_id uuid, retired_at timestamptz);
--- guardrail-allow(center-key-fk): vehicle_observations.id: synthetic fixture table in a disposable test database
+CREATE TABLE IF NOT EXISTS public.receipt_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  receipt_id uuid REFERENCES public.receipts(id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS public.receipt_vehicle_links (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  receipt_id uuid REFERENCES public.receipts(id) ON DELETE CASCADE,
+  vehicle_id uuid REFERENCES public.vehicles(id) ON DELETE SET NULL, retired_at timestamptz);
+-- guardrail-allow(center-key-fk): vehicle_observations.id: the table's own primary key, not a reference (fixture stub)
 CREATE TABLE IF NOT EXISTS public.vehicle_observations (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
 ALTER TABLE public.vehicle_observations ADD COLUMN IF NOT EXISTS vehicle_id uuid,
   ADD COLUMN IF NOT EXISTS property_id uuid, ADD COLUMN IF NOT EXISTS is_superseded boolean DEFAULT false;
@@ -37,7 +38,8 @@ CREATE TABLE public.model_fold_work (vehicle_id uuid PRIMARY KEY, state text DEF
 CREATE TABLE public.model_fold_signal (id bigserial PRIMARY KEY, vehicle_id uuid, reason text, origin_id uuid, priority smallint,
   at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS public.image_privacy_rules (rule_key text PRIMARY KEY);
-CREATE TABLE public.vehicle_facet_grade_folds (vehicle_id uuid PRIMARY KEY, evidence_changed_at timestamptz);
+CREATE TABLE public.vehicle_facet_grade_folds (vehicle_id uuid PRIMARY KEY REFERENCES public.vehicles(id) ON DELETE CASCADE,
+  evidence_changed_at timestamptz);
 CREATE FUNCTION public.model_fold_config() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"sweep_pending_cap": 1000, "settle_seconds": 300}'::jsonb $$;
 CREATE FUNCTION public.model_fold_signals_on() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 CREATE FUNCTION public.model_fold_signal_priority(p_id uuid, p_make text, p_model text, p_vin text, p_year integer, p_max integer)
