@@ -24,7 +24,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const FN_DIR = path.join(REPO, "supabase/functions");
+// CHECK_WRITE_GUARD_FN_DIR points the check at a fixture tree (check-write-guard.test.mjs); production never sets it.
+const FN_DIR = process.env.CHECK_WRITE_GUARD_FN_DIR || path.join(REPO, "supabase/functions");
 
 // Functions that write but are allowed to skip requireWriteAuth, with the reason.
 // Adding a name here is a decision, not a convenience: say what refuses the anonymous caller.
@@ -55,7 +56,7 @@ const SERVICE_SCOPED = {
   "forensic-deal-jacket": "stores extractions on a caller-named image and writes vehicles.origin_metadata; runs paid AI (2026-09-29)",
 };
 // A statement of its own at the handler's top level (2-4 spaces in), not a clause inside another condition.
-const STRONG_GATE = /^ {2,4}(?:(?:const|let) \w+ = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b)/m;
+const STRONG_GATE = /^ {2,4}(?:(?:const|let) (\w+) = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b[^;]*;\s*if \(\1\) return\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b[^\n]*\)\)\s*(?:return\b|\{\s*return\b))/m;
 const BODY_READ = /\b(req|request)\.(json|formData|text)\(|new URL\(\s*(req|request)\.url/;
 // The gate must run before the handler reads anything the caller sent: a call after the body is parsed, or
 // one that only appears in a later branch, does not count.
@@ -171,7 +172,10 @@ console.log(
 );
 for (const fn of stale) console.log(`  note: allowlist entry '${fn}' has no function directory (stale)`);
 for (const fn of idle) console.log(`  note: allowlist entry '${fn}' no longer writes (drop it)`);
-for (const fn of scopedStale) console.log(`  note: service-scoped entry '${fn}' has no function directory (stale)`);
+if (scopedStale.length) {
+  // A rename would otherwise drop the function out of the check without anyone noticing.
+  console.error(`\n✗ service-scoped entr${scopedStale.length === 1 ? "y has" : "ies have"} no function directory: ${scopedStale.join(", ")} (rename the entry with the function)`);
+}
 if (scopedOpen.length) {
   console.error(`\n✗ ${scopedOpen.length} service-scoped function(s) admit any signed-in caller:`);
   for (const fn of scopedOpen) console.error(`  ${fn}  (${SERVICE_SCOPED[fn]})`);
@@ -187,5 +191,5 @@ if (unguarded.length) {
   for (const [fn, i] of unguarded) console.error(`  ${fn}  (${i.reasons.join("; ")})`);
   console.error("\nAdd `const denied = await requireWriteAuth(req); if (denied) return denied;` as the first statement of the handler\n(import from ../_shared/writeGuard.ts), or allowlist it in scripts/guardrails/check-write-guard.mjs with the auth that refuses anonymous callers.");
 }
-if (unguarded.length || preflightRuns.length || scopedOpen.length) process.exit(1);
+if (unguarded.length || preflightRuns.length || scopedOpen.length || scopedStale.length) process.exit(1);
 console.log("✓ every writing function refuses anonymous callers");

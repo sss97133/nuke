@@ -64,7 +64,9 @@ jobs:
 
       - name: Edge writers refuse anonymous callers; service-scoped writers refuse signed-in strangers
         # The same check supabase-deploy runs before deploying, here so a regression fails the pull request.
-        run: node scripts/guardrails/check-write-guard.mjs
+        run: |
+          node --test scripts/guardrails/check-write-guard.test.mjs
+          node scripts/guardrails/check-write-guard.mjs
 
       - name: Reviewed photo intake replay and source custody
         run: |
