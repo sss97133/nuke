@@ -33,7 +33,9 @@
 -- (get_image_deep_analysis VOLATILE, intake_live_state STABLE), SECURITY DEFINER, search_path ('' and public) and
 -- grants (CREATE OR REPLACE keeps grants). analyzed_last_30m stays a fleet-wide count (a number, no row about a
 -- photo). fleet totals still count every approved upload of a listed vehicle. A session with no request claims (cron,
--- psql) is treated as anon: shown rows only.
+-- psql) is treated as anon: shown rows only. A session's title and summary go only to its author or a tied viewer
+-- (work_sessions' RLS gives anon nothing); others get a public car's session with both null. p_feed_limit and
+-- p_sessions_limit are clamped to 0..100 (the page asks for 30), so a caller cannot walk every frame.
 --
 -- GUARD. One DO block: it refuses unless each live body is the one read 2026-11-25 (sha256 of prosrc) or already
 -- carries this version's marker, so a concurrent rewrite is never overwritten, and a refused body changes nothing.
@@ -182,7 +184,7 @@ select jsonb_build_object(
          or ((select auth.uid()) is not null and c.user_id = (select auth.uid()))
          or public.vehicle_viewer_tied(c.vehicle_id)
       order by c.last_rerun_at desc, c.id
-      limit p_feed_limit
+      limit least(greatest(coalesce(p_feed_limit, 24), 0), 100)
       ) k
       join vehicle_images fi on fi.id = k.id
     ) t
@@ -197,14 +199,18 @@ select jsonb_build_object(
         'vehicle_id', s.vehicle_id,
         'vehicle_name', nullif(trim(concat_ws(' ', v.year::text, v.make, v.model)), ''),
         'session_date', s.session_date,
-        'title', s.title,
+        'title', case when s.readable then s.title end,
         'image_count', s.image_count,
-        'summary', left(coalesce(s.work_description, ''), 220),
+        'summary', case when s.readable then left(coalesce(s.work_description, ''), 220) end,
         'created_at', s.created_at
       ) order by s.created_at desc)
     from (
+      -- readable: work_sessions' own SELECT policies give its text only to its author or a viewer of the vehicle;
+      -- anyone else gets the session's existence on a public car, never its title or description
       select ws.id, ws.vehicle_id, ws.session_date, ws.title, ws.image_count,
-             ws.work_description, ws.created_at
+             ws.work_description, ws.created_at,
+             (((select auth.uid()) is not null and ws.user_id = (select auth.uid()))
+               or public.vehicle_viewer_tied(ws.vehicle_id)) as readable
       from work_sessions ws
       where (ws.created_at at time zone 'America/Los_Angeles')::date
           = (now() at time zone 'America/Los_Angeles')::date
@@ -215,7 +221,7 @@ select jsonb_build_object(
           or ((select auth.uid()) is not null and ws.user_id = (select auth.uid()))
           or public.vehicle_viewer_tied(ws.vehicle_id))
       order by ws.created_at desc
-      limit p_sessions_limit
+      limit least(greatest(coalesce(p_sessions_limit, 30), 0), 100)
     ) s
     left join vehicles v on v.id = s.vehicle_id
       and ((v.is_public = true and v.deleted_at is null) or public.vehicle_viewer_tied(v.id))

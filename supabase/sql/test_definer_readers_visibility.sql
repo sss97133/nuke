@@ -429,8 +429,13 @@ CREATE FUNCTION public.t_fleet() RETURNS text LANGUAGE sql AS
 $$ SELECT coalesce(string_agg(coalesce(e ->> 'vehicle_name', '?'), ',' ORDER BY e ->> 'vehicle_name'), '')
      FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'fleet') e $$;
 CREATE FUNCTION public.t_sessions() RETURNS text LANGUAGE sql AS
-$$ SELECT coalesce(string_agg((e ->> 'title') || ':' || coalesce(e ->> 'vehicle_name', '-'), ',' ORDER BY e ->> 'title'), '')
-     FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'sessions_today') e $$;
+$$ SELECT coalesce(string_agg(l, ',' ORDER BY l), '') FROM (
+     SELECT coalesce(e ->> 'title', '(hidden)') || ':' || coalesce(e ->> 'vehicle_name', '-') AS l
+     FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'sessions_today') e) s $$;
+-- Sessions whose title or summary text reaches the caller.
+CREATE FUNCTION public.t_session_text() RETURNS bigint LANGUAGE sql AS
+$$ SELECT count(*) FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'sessions_today') e
+   WHERE e ->> 'title' IS NOT NULL OR e ->> 'summary' IS NOT NULL $$;
 -- Every vehicle name anywhere in the reply (fleet, feed, sessions).
 CREATE FUNCTION public.t_names() RETURNS text LANGUAGE sql AS
 $$ SELECT coalesce(string_agg(DISTINCT n, ',' ORDER BY n), '') FROM (
@@ -440,7 +445,7 @@ $$ SELECT coalesce(string_agg(DISTINCT n, ',' ORDER BY n), '') FROM (
    WHERE n IS NOT NULL $$;
 GRANT SELECT ON public.t_ids TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.t_assert(boolean, text), public.t_claims(text), public.t_analysis(), public.t_feed(int),
-  public.t_fleet(), public.t_sessions(), public.t_names() TO anon, authenticated, service_role;
+  public.t_fleet(), public.t_sessions(), public.t_session_text(), public.t_names() TO anon, authenticated, service_role;
 
 SELECT t_assert(t_hash('public.get_image_deep_analysis(uuid)') = '3LWE/TnS8lwWQRuopztBD9HARireMredZGpW1BDMsd0='
   AND t_hash('public.intake_live_state(integer,integer)') = 'Sqe+TWsshVt5lgwtN0YjIebdzO6frcvmI5bjZwnBh5M=',
@@ -535,7 +540,11 @@ SELECT t_assert(t_analysis() = 'shown_a',
 SELECT t_assert(t_feed(30) = 'shown_a', 'after: anon feed is the shown photo only');
 SELECT t_assert(t_feed(1) = 'shown_a', 'after: anon feed tests before LIMIT (limit 1 still finds the older shown photo)');
 SELECT t_assert(t_fleet() = 'A', 'after: anon fleet is car A only');
-SELECT t_assert(t_sessions() = 's_a:A', 'after: anon sessions are those on the public car only');
+SELECT t_assert(t_sessions() = '(hidden):A' AND t_session_text() = 0,
+  'after: anon gets only the public car''s session, with title and summary null (work_sessions RLS gives anon no row)');
+SELECT t_assert(jsonb_array_length(public.intake_live_state(-5, -5) -> 'feed') = 0
+  AND jsonb_array_length(public.intake_live_state(-5, -5) -> 'sessions_today') = 0,
+  'after: a negative limit clamps to 0 (the old body raised LIMIT must not be negative)');
 SELECT t_assert(t_names() = 'A', 'after: no non-public or deleted vehicle is named anywhere in the reply to anon');
 SELECT t_assert((public.intake_live_state(30, 30) ->> 'analyzed_last_30m')::int = 1, 'after: analyzed_last_30m stays a fleet-wide count');
 RESET ROLE;
@@ -550,14 +559,15 @@ RESET ROLE;
 
 -- u2: a signed-in stranger reads only what anon reads.
 SET ROLE authenticated; SELECT t_claims('00000000-0000-0000-0000-000000000002');
-SELECT t_assert(t_analysis() = 'shown_a' AND t_feed(30) = 'shown_a' AND t_fleet() = 'A' AND t_sessions() = 's_a:A' AND t_names() = 'A',
-  'after: u2 (stranger) reads what anon reads');
+SELECT t_assert(t_analysis() = 'shown_a' AND t_feed(30) = 'shown_a' AND t_fleet() = 'A' AND t_sessions() = '(hidden):A'
+    AND t_session_text() = 0 AND t_names() = 'A',
+  'after: u2 (stranger) reads what anon reads, no session text');
 RESET ROLE;
 
 -- u3: uploaded photog_b on the private car B and plate_a on A; authored s_b3 on B; not tied to either car.
 SET ROLE authenticated; SELECT t_claims('00000000-0000-0000-0000-000000000003');
 SELECT t_assert(t_analysis() = 'photog_b,plate_a,shown_a', 'after: u3 (uploader) reads its own two photos and the shown one');
-SELECT t_assert(t_feed(30) = 'photog_b,plate_a,shown_a' AND t_fleet() = 'A' AND t_sessions() = 's_a:A,s_b3:-' AND t_names() = 'A',
+SELECT t_assert(t_feed(30) = 'photog_b,plate_a,shown_a' AND t_fleet() = 'A' AND t_sessions() = '(hidden):A,s_b3:-' AND t_names() = 'A',
   'after: u3 gets its photos and session on B without B being named');
 RESET ROLE;
 
@@ -572,9 +582,20 @@ SELECT t_assert(t_analysis() = 'deleted_c,dup_a,photog_b,plate_a,private_b,sensi
   'after: service_role reads all 8 analyses and the whole fleet');
 RESET ROLE;
 
+-- The limits clamp at 100: 120 more shown frames on A, and anon asks for 100,000.
+INSERT INTO public.vehicle_images (vehicle_id, user_id, image_url, vision_gate_status, ai_scan_metadata, last_rerun_at)
+SELECT 'a0000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-000000000001', 'https://x.invalid/c' || g || '.jpg', 'approved',
+       '{"byok_deep_analysis":{"narrative_one_line":"clamp"}}', now() - interval '1 day' - g * interval '1 minute'
+FROM generate_series(1, 120) g;
+SET ROLE anon; SELECT t_claims('');
+SELECT t_assert(jsonb_array_length(public.intake_live_state(100000, 100000) -> 'feed') = 100,
+  'after: p_feed_limit clamps to 100 (121 shown frames, asked for 100,000)');
+RESET ROLE;
+
 -- Revert restores both production bodies.
 \ir revert_20261125160500_definer_readers_visibility.sql
 SELECT t_assert(t_hash('public.get_image_deep_analysis(uuid)') = '3LWE/TnS8lwWQRuopztBD9HARireMredZGpW1BDMsd0='
   AND t_hash('public.intake_live_state(integer,integer)') = 'Sqe+TWsshVt5lgwtN0YjIebdzO6frcvmI5bjZwnBh5M=',
   'revert: both bodies are production''s again');
-SELECT t_assert((SELECT count(*) FROM public.vehicle_images) = 8 AND (SELECT count(*) FROM public.work_sessions) = 4, 'no row changed');
+SELECT t_assert((SELECT count(*) FROM public.vehicle_images) = 128 AND (SELECT count(*) FROM public.work_sessions) = 4,
+  'no row changed by the readers (8 seeded + 120 clamp frames)');
