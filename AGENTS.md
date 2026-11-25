@@ -26,6 +26,24 @@ vocabulary, the open cases, the compass). Before you make
 a new function, table or folder, check `docs/ledger/CAPABILITY_MAP.md`
 (`node scripts/guardrails/check-capability-before-mint.mjs "<name>"`) and extend what already exists.
 
+## The working language
+
+Owner rule, 2026-11-24: "only solve code thru the languages we are writing for"; "i need keyed rows i need folds i
+need edges all working in perfect unison". The system is written in SQL, so its problems are stated and solved there.
+- State a defect, a design or a handoff as the rows involved: table and grain, keys, foreign keys into the center
+  (`vehicles`, `vehicle_images`, `vehicle_observations`, `vehicle_events`), clocks, the writer, the fold, the reader,
+  and what recomputes when a row lands. Give the SQL or the schema, then the prose.
+- A fix is a constraint, a rule row, a trigger, a fold or a scheduled job, with a test. A paragraph, a prompt, a doc
+  line or a hand run that makes one vehicle look right is not a fix.
+- A value is promoted only through its witnesses. Everything lands; a text mention lands as a claim. A fact, a set
+  membership or a priced segment is established only by keyed witness rows of the classes its rule row names (a photo
+  reading, a cited document page, shop paper, a VIN decode), and a property that can hold one value per vehicle and
+  slot shows a conflict, not two values. Readers return counts by grade.
+- Report every surface as three gauges: edges, keys and folds, each with rows per 24 hours and the newest timestamp,
+  beside the population. If they move without an agent, the pipeline behind them works; if one is flat, that is the
+  defect, whatever the upstream jobs report.
+- A link held in text or jsonb is a debt: name the existing keyed table it should point at before adding a column.
+
 ## Reading the system
 
 The documents have different jobs. Use the relevant entry point instead of treating every file as
