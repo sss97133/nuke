@@ -16,6 +16,12 @@ export const VEHICLE_PRIVATE_COLUMNS = ['purchase_price', 'purchase_date', 'purc
 // Kept apart from the money so each list reads true, and scanned by privateMoney.test.ts the same way.
 export const VEHICLE_OWNER_PII_COLUMNS = ['owner_name', 'owner_contact'] as const;
 
+// A car's plate identifies it on the road. It is not granted to anon (migration 20261125152500) and is being revoked
+// from authenticated; until then, and after, no web read names it: owners and tied viewers read it through
+// vehicle_plates_read (or the whole row through vehicle_row_read), which return it to no one else. Scanned by
+// privateMoney.test.ts the same way.
+export const VEHICLE_PLATE_COLUMNS = ['license_plate'] as const;
+
 // A transfer's party access tokens are the party credential, and inbox_email and the parties' emails and phones are
 // personal contact. None are granted to anon or authenticated (migration
 // 20261014190000_transfer_party_credentials_owner_only): a read that names one, or selects '*' on the table, fails
