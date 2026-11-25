@@ -89,7 +89,7 @@ CREATE FUNCTION pg_temp.states() RETURNS text LANGUAGE sql AS $$
     FROM public.vendor_organization_proposals WHERE retired_at IS NULL $$;
 SELECT public.assert(pg_temp.states() =
   'alpha parts:promoted:exact_name+printed_domain+printed_phone,beta shop:held_one_witness:exact_name,'
-  'delta person:held_private_organization:exact_name+printed_phone,epsilon tire:promoted:exact_name+printed_phone,'
+  'delta person:held_unpublished_organization:exact_name+printed_phone,epsilon tire:promoted:exact_name+printed_phone,'
   'gamma supply:held_ambiguous:exact_name,gamma supply:held_ambiguous:exact_name,omega design:no_organisation_in_register:,'
   'zeta garage:held_no_supply_kind:exact_name+printed_phone', 'states: ' || coalesce(pg_temp.states(), 'none'));
 SELECT public.assert((SELECT proposed_supply_kinds FROM public.vendor_organization_proposals WHERE vendor_key = 'alpha parts' AND retired_at IS NULL)

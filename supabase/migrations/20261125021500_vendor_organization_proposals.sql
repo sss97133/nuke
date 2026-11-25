@@ -21,7 +21,8 @@
 --     retired_at. Subjects: vendor keys with a live linked receipt that has no organisation, plus every alias of a gap
 --     vendor. A row is retired and replaced when its witnesses, candidates, kinds or state change.
 --   States, first match: no_organisation_in_register, held_ambiguous (more than one candidate),
---     held_private_organization (is_public false: a private person or a hidden record never becomes a seller label),
+--     held_unpublished_organization (is_public false: not published; often create_organization_batch's staging default,
+--     not a privacy choice, so a later publication or label rule can release it),
 --     held_one_witness, held_no_supply_kind, ready, then promoted.
 --   proposed_supply_kinds: a reviewed vendor keeps its reviewed kinds; any other key takes up to 6 kinds from its own
 --     receipt lines through receipt_line_edges.system_key -> supply_category_kinds (existing rule rows). With no
@@ -68,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.vendor_organization_proposals (
   receipts int NOT NULL,
   linked_receipts int NOT NULL,
   proposed_supply_kinds text[],
-  state text NOT NULL CHECK (state IN ('no_organisation_in_register', 'held_ambiguous', 'held_private_organization',
+  state text NOT NULL CHECK (state IN ('no_organisation_in_register', 'held_ambiguous', 'held_unpublished_organization',
                                        'held_one_witness', 'held_no_supply_kind', 'ready', 'promoted')),
   run_id text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -164,7 +165,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $du
   SELECT r.vk, r.vendor_slug, r.org_id, r.kinds, r.cands, r.n, r.n_linked, r.sk,
          CASE WHEN r.org_id IS NULL THEN 'no_organisation_in_register'
               WHEN gate.uniq AND r.cands > 1 THEN 'held_ambiguous'
-              WHEN gate.pub AND NOT r.is_public THEN 'held_private_organization'
+              WHEN gate.pub AND NOT r.is_public THEN 'held_unpublished_organization'
               WHEN cardinality(r.kinds) < gate.min_w THEN 'held_one_witness'
               WHEN coalesce(cardinality(r.sk), 0) < gate.min_k THEN 'held_no_supply_kind'
               ELSE 'ready' END
