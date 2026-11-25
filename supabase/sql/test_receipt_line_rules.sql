@@ -571,6 +571,23 @@ SELECT public.assert(prosrc LIKE '%receipt_line_edges%' AND (length(prosrc) - le
                      'reconstruction reads edges, patched once') FROM pg_proc WHERE proname = 'vehicle_build_reconstruction';
 SELECT public.assert(public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1') = :'before_patch'::jsonb,
                      'reconstruction output unchanged');
+-- It reads the edge, not the text (ta-skeptic2, #3903): with an item's edges removed the reader shows no key for it,
+-- though the text classifiers still find one.
+BEGIN;
+CREATE TEMP TABLE _probe AS
+SELECT e.receipt_item_id AS item_id
+  FROM public.receipt_line_edges e
+  JOIN public.receipt_items i ON i.id = e.receipt_item_id
+  JOIN public.receipt_vehicle_links rl ON rl.receipt_id = i.receipt_id AND rl.vehicle_id = '00000000-0000-0000-0000-0000000000a1'
+ WHERE e.classifier = 'system' AND public.receipt_line_system(i.description) IS NOT NULL
+   AND EXISTS (SELECT 1 FROM public.receipt_line_edges o WHERE o.receipt_item_id = e.receipt_item_id AND o.classifier = 'labor_operation')
+ LIMIT 1;
+SELECT public.assert((SELECT count(*) FROM _probe) = 1, 'probe item with a system and an operation edge');
+DELETE FROM public.receipt_line_edges WHERE receipt_item_id = (SELECT item_id FROM _probe) AND classifier IN ('system', 'labor_operation');
+SELECT public.assert((SELECT count(*) FROM jsonb_array_elements(public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1')) x
+                        WHERE x->>'item' = (SELECT item_id::text FROM _probe) AND x->>'system' = 'unplaced' AND x->>'op' IS NULL) = 1,
+                     'reader follows the edge, not the text');
+ROLLBACK;
 -- A drifted anchor is refused.
 CREATE OR REPLACE FUNCTION public.vehicle_build_reconstruction(p_vehicle_id uuid) RETURNS jsonb
 LANGUAGE sql STABLE AS $f$ SELECT '{}'::jsonb $f$;
