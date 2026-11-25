@@ -73,6 +73,17 @@ jobs:
       - name: Deploy diff base skips runs replaced while pending
         run: node --test scripts/ci/deploy-base.test.mjs
 
+      - name: Migration version not claimed by an earlier open PR
+        # migration-versions-vs-main.sh (in verify.sh) sees main only; two open PRs holding one version collide when
+        # both merge. The later PR fails and renumbers. GraphQL only (one query per 50 open PRs).
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          node --test scripts/ci/migration-versions-vs-open-prs.test.mjs
+          node scripts/ci/migration-versions-vs-open-prs.mjs
+
       - name: No new photo reader or photo table
         # Owner direction 2026-11-10 (docs/ledger/theory/data-machine.md, "Image analysis is the model asking"):
         # a reading is keyed through the registry and ingest-observation; no reader gets a table of its own.
