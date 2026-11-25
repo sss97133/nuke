@@ -40,16 +40,28 @@ GRANT EXECUTE ON FUNCTION public.vehicle_viewer_tied(uuid) TO anon, authenticate
 -- Live columns and live column grants (has_column_privilege read 2026-11-25) for the columns this fixture carries.
 ALTER TABLE public.vehicles ADD COLUMN owner_name text, ADD COLUMN license_plate text,
   ADD COLUMN purchase_price numeric(10,2), ADD COLUMN purchase_location text,
-  ADD COLUMN color_source text, ADD COLUMN currency_source text;
+  ADD COLUMN color_source text, ADD COLUMN currency_source text,
+  -- Sibling gates, one live column each: mileage_normalized is not a column, while its _source and _confidence are
+  -- denied to anon and authenticated; vin_source_image_id is granted (test 12 revokes it from anon).
+  ADD COLUMN mileage_normalized_source text, ADD COLUMN mileage_normalized_confidence text,
+  ADD COLUMN vin text, ADD COLUMN vin_source_image_id uuid;
 REVOKE ALL ON public.vehicles FROM anon, authenticated;
 GRANT SELECT (id,is_public,user_id,owner_id,uploaded_by,color,deleted_at,listing_kind,engine_type,created_by_user_id,
-  color_source) ON public.vehicles TO anon, authenticated;
+  color_source,vin,vin_source_image_id) ON public.vehicles TO anon, authenticated;
 GRANT SELECT (license_plate) ON public.vehicles TO authenticated;
 GRANT SELECT ON public.vehicles TO service_role;
 
 UPDATE public.vehicles SET owner_name = 'fixture owner', license_plate = 'FIXTURE1', purchase_price = 1,
   purchase_location = 'fixture place', color = coalesce(color, 'fixture color'),
-  color_source = 'fixture color source', currency_source = 'fixture currency source'
+  color_source = 'fixture color source', currency_source = 'fixture currency source',
+  mileage_normalized_source = 'fixture mileage source', mileage_normalized_confidence = '0.9',
+  vin = 'FIXTUREVIN0000001',
+  -- a photo every caller may see, so only the column grant decides whether source_image_url is returned
+  vin_source_image_id = (SELECT i.id FROM public.vehicle_images i WHERE i.vehicle_id = '11111111-1111-1111-1111-111111111111'
+    AND i.source = 'user_upload' AND nullif(btrim(i.image_url), '') IS NOT NULL AND i.is_sensitive IS NOT TRUE
+    AND i.is_superseded IS NOT TRUE AND i.is_duplicate IS NOT TRUE AND i.is_document IS NOT TRUE
+    AND (i.vision_gate_status IS NULL OR i.vision_gate_status = 'approved')
+    AND coalesce(i.image_vehicle_match_status, '') NOT IN ('mismatch', 'unrelated') ORDER BY i.id LIMIT 1)
 WHERE id IN ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222',
              '99999999-9999-9999-9999-999999999999');
 INSERT INTO public.vehicles (id, is_public, deleted_at, owner_id, owner_name, color)
@@ -186,7 +198,7 @@ CREATE TABLE public.wc_fields AS
   UNION SELECT unnest(ARRAY['year','make','model','vin','color','mileage','engine_type','location','trim','currency',
     'owner_name','license_plate','purchase_price','purchase_location','color_source','currency_source',
     'image_visible_rust_severity','image_visible_paint_stage','image_visible_assembly_state',
-    'seller_name','fixture_doc_field','fixture_plate_photo','fixture_statement',
+    'seller_name','fixture_doc_field','fixture_plate_photo','fixture_statement','mileage_normalized',
     'x''); drop table public.vehicles; --','Owner_Name','']);
 -- The owner viewer is tied to 1111 only; on 2222 it is a signed-in stranger.
 CREATE TABLE public.wc_viewers(viewer text PRIMARY KEY, role_name text, auth_role text, uid text);
@@ -298,8 +310,9 @@ BEGIN
              AND NOT has_column_privilege(CASE WHEN v.role_name = 'authenticated' THEN 'authenticated' ELSE 'anon' END,
                'public.vehicles'::regclass, t.attnum, 'SELECT')))))
      AND a.field NOT IN ('seller_name','fixture_doc_field','fixture_plate_photo','fixture_statement')
-     AND NOT (a.field = 'currency' AND NOT (v.viewer = 'service' OR (v.viewer = 'owner' AND a.vehicle = pub))
-       AND a.p - 'inline_source' = b.p - 'inline_source' AND a.p->'inline_source' = 'null'::jsonb);
+     AND NOT (a.field IN ('currency','mileage_normalized') AND NOT (v.viewer = 'service' OR (v.viewer = 'owner' AND a.vehicle = pub))
+       AND a.p - 'inline_source' - 'inline_confidence' = b.p - 'inline_source' - 'inline_confidence'
+       AND a.p->'inline_source' = 'null'::jsonb AND a.p->'inline_confidence' = 'null'::jsonb);
   ASSERT n >= 400, format('8 answers %s', n);
   ASSERT d = 0, format('8 %s answers changed that were not a withheld column or sibling', d);
   RAISE NOTICE 'PASS 1-8: % answers per phase, 5 callers', n;
@@ -338,6 +351,26 @@ BEGIN
   ASSERT d = 0, format('11 %s non-column answers carry a value', d);
   RAISE NOTICE 'PASS 10-11';
 
+  -- 12. Each sibling column is gated on its own grant, separately. mileage_normalized is not a column; its _source
+  -- and _confidence are denied to anon and authenticated (live), so only privileged callers read them.
+  r := pg_temp.ask('anon', pub, 'mileage_normalized');
+  ASSERT r->'inline_source' = 'null'::jsonb, '12 anon mileage_normalized_source';
+  ASSERT r->'inline_confidence' = 'null'::jsonb, '12 anon mileage_normalized_confidence';
+  r := pg_temp.ask('untied', pub, 'mileage_normalized');
+  ASSERT r->'inline_source' = 'null'::jsonb, '12 stranger mileage_normalized_source';
+  ASSERT r->'inline_confidence' = 'null'::jsonb, '12 stranger mileage_normalized_confidence';
+  r := pg_temp.ask('owner', pub, 'mileage_normalized');
+  ASSERT r->>'inline_source' = 'fixture mileage source', '12 owner mileage_normalized_source';
+  ASSERT r->>'inline_confidence' = '0.9', '12 owner mileage_normalized_confidence';
+  ASSERT pg_temp.ask('service', pub, 'mileage_normalized')->>'inline_confidence' = '0.9', '12 service mileage_normalized_confidence';
+  -- The prior body returned both to anon, so the cases bite.
+  ASSERT (SELECT p->>'inline_confidence' = '0.9' AND p->>'inline_source' = 'fixture mileage source' FROM public.wc_answers
+          WHERE phase = 'before' AND viewer = 'anon' AND vehicle = pub AND field = 'mileage_normalized'),
+    '12 prior body leaked mileage_normalized siblings to anon';
+  -- vin_source_image_id granted: anon reads the cited photo (the REVOKE half is below).
+  ASSERT pg_temp.ask('anon', pub, 'vin')->>'source_image_url' IS NOT NULL, '12 anon vin source image (granted)';
+  RAISE NOTICE 'PASS 12 (a)';
+
 END $$;
 
 -- 9. A REVOKE closes the path with no function change; the GRANT reopens it.
@@ -365,4 +398,27 @@ DO $$ BEGIN
   ASSERT (SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc
           WHERE oid = 'public.get_field_provenance(uuid,text)'::regprocedure) = (SELECT body_sha FROM wc_body), '9 function unchanged';
 END $$;
+
+-- 12 (b). The _source_image_id sibling on its own: revoke vin_source_image_id from anon; vin's value stays, its cited
+-- photo goes; the owner still reads it. Then re-grant.
+REVOKE SELECT (vin_source_image_id) ON public.vehicles FROM anon;
+BEGIN;
+SELECT set_config('test.auth_role','anon',true), set_config('test.auth_uid','',true);
+SET LOCAL ROLE anon;
+DO $$ DECLARE r jsonb := public.get_field_provenance('11111111-1111-1111-1111-111111111111','vin');
+BEGIN
+  ASSERT r->>'value' = 'FIXTUREVIN0000001', '12 anon vin value (granted)';
+  ASSERT r->'source_image_url' = 'null'::jsonb, '12 anon vin_source_image_id revoked';
+END $$;
+COMMIT;
+BEGIN;
+SELECT set_config('test.auth_role','authenticated',true), set_config('test.auth_uid','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',true);
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+  ASSERT public.get_field_provenance('11111111-1111-1111-1111-111111111111','vin')->>'source_image_url' IS NOT NULL,
+    '12 owner vin source image while revoked from anon';
+END $$;
+COMMIT;
+GRANT SELECT (vin_source_image_id) ON public.vehicles TO anon;
+SELECT 'PASS 12 (b)' AS result;
 SELECT 'PASS: get_field_provenance withholds columns the caller cannot select' AS result;
