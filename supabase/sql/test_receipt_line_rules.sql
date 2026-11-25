@@ -534,3 +534,52 @@ SELECT public.assert((SELECT operation_code IS NOT NULL AND gap IS NULL FROM pub
                        WHERE item_id = '00000000-0000-0000-0000-000000000e02'), 'a landed line reaches the fold through its edge');
 
 \echo 'test_receipt_line_rules: PASS'
+
+-- build reconstruction reads edges (migration 20261124234700): the two classifier expressions are edited in place in
+-- the live body. A stub body holding both anchors stands in for the reader here.
+CREATE OR REPLACE FUNCTION public.vehicle_build_reconstruction(p_vehicle_id uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $f$
+  WITH v AS (SELECT p_vehicle_id AS id, 1973 AS year),
+  l AS (
+    SELECT k.item_id,
+           coalesce(public.receipt_line_system(k.description), 'unplaced') AS system_key,
+           (SELECT o.code FROM public.labor_operations o, v
+             WHERE o.code = public.receipt_line_labor_operation(k.description)) AS op_code
+      FROM (SELECT i.id AS item_id, i.description FROM public.receipt_items i
+              JOIN public.receipt_vehicle_links rl ON rl.receipt_id = i.receipt_id AND rl.vehicle_id = p_vehicle_id
+            UNION ALL SELECT NULL::uuid, 'clutch kit') k)
+  SELECT jsonb_agg(jsonb_build_object('item', item_id, 'system', system_key, 'op', op_code) ORDER BY item_id NULLS FIRST, system_key) FROM l
+$f$;
+SELECT public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1') AS before_patch \gset
+-- Refused while a scoped rule is active.
+INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, system_key, scope_make, status, source,
+                                       proposed_by_agent_key, promoted_at)
+VALUES ('sys.990.scoped-test', 'system', 990, '\yzzscope\y', 'body', 'Pontiac', 'active', 'test fixture', 'test', now());
+\set recon_mig `cat supabase/migrations/20261124234700_build_reconstruction_read_edges.sql`
+SELECT set_config('test.recon_mig', :'recon_mig', false) IS NOT NULL AS loaded;
+DO $$ BEGIN
+  BEGIN
+    EXECUTE current_setting('test.recon_mig');
+    RAISE EXCEPTION 'FAIL: reconstruction switched while a scoped rule is active';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE 'an active rule is scoped%' THEN RAISE; END IF;
+  END;
+END $$;
+UPDATE public.receipt_line_rules SET status = 'retired', retired_at = now() WHERE rule_id = 'sys.990.scoped-test';
+\i supabase/migrations/20261124234700_build_reconstruction_read_edges.sql
+\i supabase/migrations/20261124234700_build_reconstruction_read_edges.sql
+SELECT public.assert(prosrc LIKE '%receipt_line_edges%' AND (length(prosrc) - length(replace(prosrc, 'build_reconstruction_edges_v1', ''))) / 29 = 1,
+                     'reconstruction reads edges, patched once') FROM pg_proc WHERE proname = 'vehicle_build_reconstruction';
+SELECT public.assert(public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1') = :'before_patch'::jsonb,
+                     'reconstruction output unchanged');
+-- A drifted anchor is refused.
+CREATE OR REPLACE FUNCTION public.vehicle_build_reconstruction(p_vehicle_id uuid) RETURNS jsonb
+LANGUAGE sql STABLE AS $f$ SELECT '{}'::jsonb $f$;
+DO $$ BEGIN
+  BEGIN
+    EXECUTE current_setting('test.recon_mig');
+    RAISE EXCEPTION 'FAIL: drifted anchor accepted';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE 'build reconstruction anchor drifted%' THEN RAISE; END IF;
+  END;
+END $$;
