@@ -42,19 +42,21 @@ CREATE TYPE public.content_redaction_level AS ENUM ('none', 'partial', 'full');
 
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean DEFAULT true, deleted_at timestamptz,
   user_id uuid, owner_id uuid, uploaded_by uuid, created_by_user_id uuid);
-CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid, user_id uuid, documented_by_user_id uuid,
+CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles(id), user_id uuid, documented_by_user_id uuid,
   image_url text, source text, is_document boolean, is_duplicate boolean, is_superseded boolean, is_sensitive boolean,
   image_vehicle_match_status text, vision_gate_status public.vision_gate_status, is_external boolean, is_approved boolean,
   approval_status public.content_approval_status, verification_status text, redaction_level public.content_redaction_level,
   exif_data jsonb, latitude double precision);
+-- guardrail-allow(center-key-fk): image_descriptions.vehicle_id: mirrors production, which holds no foreign key on it (a lagging
+-- stamp; this policy reads the photo's vehicle instead). Keying it is the photo-reading family's debt, not this fixture's.
 CREATE TABLE public.image_descriptions (id uuid PRIMARY KEY, image_id uuid NOT NULL REFERENCES public.vehicle_images(id) ON DELETE CASCADE,
   vehicle_id uuid, description text NOT NULL, description_type text NOT NULL DEFAULT 'classifier_v2', source text NOT NULL DEFAULT 'test');
 CREATE INDEX idx_image_descriptions_image ON public.image_descriptions (image_id);
 CREATE TABLE public.admin_users (user_id uuid, is_active boolean);
-CREATE TABLE public.ownership_verifications (vehicle_id uuid, user_id uuid, status text);
-CREATE TABLE public.vehicle_user_permissions (vehicle_id uuid, user_id uuid, is_active boolean, role text, granted_by uuid);
-CREATE TABLE public.vehicle_contributors (vehicle_id uuid, user_id uuid, status text, role text);
-CREATE TABLE public.organization_vehicles (organization_id uuid, vehicle_id uuid, relationship_type text, status text, linked_by_user_id uuid);
+CREATE TABLE public.ownership_verifications (vehicle_id uuid REFERENCES public.vehicles(id), user_id uuid, status text);
+CREATE TABLE public.vehicle_user_permissions (vehicle_id uuid REFERENCES public.vehicles(id), user_id uuid, is_active boolean, role text, granted_by uuid);
+CREATE TABLE public.vehicle_contributors (vehicle_id uuid REFERENCES public.vehicles(id), user_id uuid, status text, role text);
+CREATE TABLE public.organization_vehicles (organization_id uuid, vehicle_id uuid REFERENCES public.vehicles(id), relationship_type text, status text, linked_by_user_id uuid);
 CREATE TABLE public.organization_contributors (organization_id uuid, user_id uuid, status text, role text);
 
 CREATE VIEW public.vehicle_images_public WITH (security_invoker = true) AS
