@@ -27,12 +27,39 @@
 SET lock_timeout = '3s';
 SET statement_timeout = '30s';
 
+-- Policy copies (private_row_policy_copies, 20261125204500): a definer reader that restates vehicles' read policies has
+-- its policy hash recorded; adding this policy changes that hash. A copy row whose recorded hash was current just
+-- before is re-recorded just after (this policy restricts anon only and no copy restates an anon branch); any other
+-- row is left for the watch to report.
+CREATE TEMP TABLE _vehicles_copy_before AS SELECT NULL::text AS reader, NULL::text AS policy_filter, NULL::text AS h LIMIT 0;
+DO $b$ BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    INSERT INTO _vehicles_copy_before
+    SELECT c.reader, c.policy_filter, (SELECT policy_hash FROM public.private_row_policy_hash('vehicles', c.policy_filter))
+      FROM public.private_row_policy_copies c WHERE c.relation = 'vehicles';
+  END IF;
+END $b$;
+
 DO $p$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicles'
                     AND policyname = 'vehicles_anon_public_only') THEN
     CREATE POLICY vehicles_anon_public_only ON public.vehicles AS RESTRICTIVE FOR SELECT TO anon USING (is_public = true);
   END IF;
 END $p$;
+
+DO $a$ BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    UPDATE public.private_row_policy_copies c
+       SET recorded_hash = (SELECT policy_hash FROM public.private_row_policy_hash('vehicles', c.policy_filter)),
+           recorded_at = now(),
+           note = c.note || ' [re-recorded by 20261125174100: vehicles_anon_public_only added, anon only]'
+      FROM _vehicles_copy_before b
+     WHERE c.relation = 'vehicles' AND c.reader = b.reader AND c.policy_filter = b.policy_filter
+       AND c.recorded_hash = b.h
+       AND b.h IS DISTINCT FROM (SELECT policy_hash FROM public.private_row_policy_hash('vehicles', c.policy_filter));
+  END IF;
+END $a$;
+DROP TABLE _vehicles_copy_before;
 COMMENT ON POLICY vehicles_anon_public_only ON public.vehicles IS
 'Logged-out readers see public vehicles only (what the permissive policies already admit for anon); with the anon role''s constraint_exclusion = on it lets the planner answer a request for non-public rows empty without a scan. Migration 20261125174100.';
 

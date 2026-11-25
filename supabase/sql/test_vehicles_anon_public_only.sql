@@ -50,9 +50,41 @@ INSERT INTO viewers (role, claims, filter) VALUES
   ('authenticated', '{"role":"authenticated","sub":"30000000-0000-0000-0000-000000000009"}', 'true');
 BEGIN; UPDATE viewers SET before = pg_temp.seen(role, claims, filter); COMMIT;
 
+-- policy copies (20261125204500's table and hash, as deployed): a vehicles copy whose hash is current is re-recorded
+-- by the migration and again by the revert; a copy that had already drifted is left for the watch
+CREATE TABLE IF NOT EXISTS public.private_row_policy_copies (
+  reader text NOT NULL, relation text NOT NULL, policy_filter text NOT NULL, recorded_hash text NOT NULL,
+  owner_lane text NOT NULL, note text NOT NULL, recorded_at timestamptz NOT NULL DEFAULT now(),
+  active boolean NOT NULL DEFAULT true, PRIMARY KEY (reader, relation, policy_filter));
+CREATE OR REPLACE FUNCTION public.private_row_policy_hash(p_relation text, p_policy_filter text)
+RETURNS TABLE (policy_hash text, policies int) LANGUAGE plpgsql STABLE SET search_path = pg_catalog, public AS $h$
+BEGIN
+  RETURN QUERY EXECUTE format(
+    'SELECT md5(string_agg(p.policyname || '':'' || p.permissive || '':'' || p.cmd || '':'' || p.roles::text || '':'' || coalesce(p.qual, ''''),
+                           ''|'' ORDER BY p.policyname)), count(*)::int
+       FROM pg_catalog.pg_policies p WHERE p.schemaname = ''public'' AND p.tablename = %L AND (%s)', p_relation, p_policy_filter);
+END $h$;
+INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
+SELECT 'vehicle_plates_read(uuid[])', 'vehicles', 'p.cmd IN (''SELECT'', ''ALL'')', h.policy_hash, 'test', 'current'
+  FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')') h
+UNION ALL
+SELECT 'stale_reader(uuid)', 'vehicles', 'p.cmd IN (''SELECT'', ''ALL'')', md5('drifted'), 'test', 'stale';
+CREATE TEMP TABLE copy_hash_before AS SELECT policy_hash FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')');
+
 \ir ../migrations/20261125174100_vehicles_anon_public_only.sql
 \ir ../migrations/20261125174100_vehicles_anon_public_only.sql
 RESET lock_timeout; RESET statement_timeout;
+
+DO $$ DECLARE live text; BEGIN
+  SELECT policy_hash INTO live FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')');
+  IF live = (SELECT policy_hash FROM copy_hash_before) THEN RAISE EXCEPTION 'fixture: vehicles hash did not change'; END IF;
+  IF (SELECT recorded_hash FROM public.private_row_policy_copies WHERE reader = 'vehicle_plates_read(uuid[])') <> live THEN
+    RAISE EXCEPTION 'current vehicles copy not re-recorded'; END IF;
+  IF (SELECT recorded_hash FROM public.private_row_policy_copies WHERE reader = 'stale_reader(uuid)') <> md5('drifted') THEN
+    RAISE EXCEPTION 'drifted vehicles copy was re-recorded'; END IF;
+  IF (SELECT count(*) FROM public.private_row_policy_copies WHERE note LIKE '%re-recorded by 20261125174100%' AND note NOT LIKE '%20261125174100%20261125174100%') <> 1 THEN
+    RAISE EXCEPTION 'second apply re-recorded twice or not at all'; END IF;
+END $$;
 
 DO $$ DECLARE s text[]; plan text; BEGIN
   SELECT setconfig INTO s FROM pg_db_role_setting WHERE setrole = 'anon'::regrole AND setdatabase = 0;
@@ -94,5 +126,11 @@ DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'vehicles_anon_public_only') THEN RAISE EXCEPTION 'revert left the policy'; END IF;
   IF EXISTS (SELECT 1 FROM pg_db_role_setting, unnest(setconfig) c WHERE setrole = 'anon'::regrole AND c LIKE 'constraint_exclusion=%') THEN
     RAISE EXCEPTION 'revert left the role setting'; END IF;
+END $$;
+DO $$ BEGIN
+  IF (SELECT recorded_hash FROM public.private_row_policy_copies WHERE reader = 'vehicle_plates_read(uuid[])')
+     <> (SELECT policy_hash FROM copy_hash_before) THEN RAISE EXCEPTION 'revert did not re-record the copy back'; END IF;
+  IF (SELECT recorded_hash FROM public.private_row_policy_copies WHERE reader = 'stale_reader(uuid)') <> md5('drifted') THEN
+    RAISE EXCEPTION 'revert re-recorded the drifted copy'; END IF;
 END $$;
 \echo vehicles_anon_public_only: ok
