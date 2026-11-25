@@ -23,7 +23,10 @@
 --      vin_plant_char (data_set_candidates_v1); every other key is refused until its consumer is measured;
 --   4. on the cars the rule chooses (the first 50 public cars by id of that make, inside the year range, whose VIN
 --      matches a live or the proposed vin_format row of the make), data_set_candidates_v1 run before and after the
---      insert fills at least one row and removes none, except rows of the rule it supersedes.
+--      insert fills at least one candidate (a new row, or a label where the row had none), removes no row and changes
+--      no established label, unless the proposal names the rule it supersedes. Rows are compared by identity
+--      (set_kind, set_key, member, vehicle, basis): the reader emits a VIN cohort row for every format match and a
+--      decode rule only labels it, so a rule for an existing format shows as labelled, never as removed + filled.
 -- The measure is stored on the proposal either way. vehicle_decode_rule_propose(...) inserts and runs the gate.
 -- Contract: supabase/sql/test_decode_rule_proposals_gate.sql.
 SET lock_timeout = '5s';
@@ -98,7 +101,7 @@ DECLARE
   reasons text[] := '{}';
   win_at int;
   cars uuid[];
-  n_before int := 0; n_filled int := 0; n_removed int := 0;
+  n_before int := 0; n_filled int := 0; n_removed int := 0; n_labelled int := 0; n_changed int := 0;
   new_id uuid;
   measure jsonb;
   measured_keys constant text[] := ARRAY['vin_format', 'vin_series_char', 'vin_body_code', 'vin_engine_char', 'vin_plant_char'];
@@ -165,10 +168,28 @@ BEGIN
           IF NOT FOUND THEN reasons := array_append(reasons, ('superseded_rule_not_current')::text); END IF;
         END IF;
         INSERT INTO _dr_after SELECT * FROM public.data_set_candidates_v1(cars);
-        SELECT count(*) INTO n_filled FROM (SELECT * FROM _dr_after EXCEPT ALL SELECT * FROM _dr_before) x;
-        SELECT count(*) INTO n_removed FROM (SELECT * FROM _dr_before EXCEPT ALL SELECT * FROM _dr_after) x;
-        IF n_filled < 1 THEN reasons := array_append(reasons, ('fills_nothing')::text); END IF;
+        -- a candidate row's identity is (set_kind, set_key, member, vehicle, basis); a rule row changes the set of
+        -- identities (a new format) or the label a decode rule gives an identity (NULL -> label is a fill; label -> other
+        -- label is a change of an established decode)
+        SELECT count(*) INTO n_filled FROM (
+          SELECT set_kind, set_key, member_type, member_id, vehicle_id, basis_type, basis_id FROM _dr_after
+          EXCEPT SELECT set_kind, set_key, member_type, member_id, vehicle_id, basis_type, basis_id FROM _dr_before) x;
+        SELECT count(*) INTO n_removed FROM (
+          SELECT set_kind, set_key, member_type, member_id, vehicle_id, basis_type, basis_id FROM _dr_before
+          EXCEPT SELECT set_kind, set_key, member_type, member_id, vehicle_id, basis_type, basis_id FROM _dr_after) x;
+        SELECT count(*) FILTER (WHERE b.set_label IS NULL AND a.set_label IS NOT NULL),
+               count(*) FILTER (WHERE b.set_label IS NOT NULL AND a.set_label IS DISTINCT FROM b.set_label)
+          INTO n_labelled, n_changed
+          FROM (SELECT DISTINCT * FROM _dr_before) b
+          JOIN (SELECT DISTINCT * FROM _dr_after) a
+            ON (a.set_kind, a.set_key, a.member_type, a.member_id, a.vehicle_id, a.basis_type)
+               IS NOT DISTINCT FROM (b.set_kind, b.set_key, b.member_type, b.member_id, b.vehicle_id, b.basis_type)
+           AND a.basis_id IS NOT DISTINCT FROM b.basis_id;
+        n_filled := n_filled + n_labelled;
+        IF n_filled < 1 AND NOT (p.supersedes_rule_id IS NOT NULL AND n_changed > 0) THEN
+          reasons := array_append(reasons, ('fills_nothing')::text); END IF;
         IF n_removed > 0 AND p.supersedes_rule_id IS NULL THEN reasons := array_append(reasons, ('removes_existing_candidates')::text); END IF;
+        IF n_changed > 0 AND p.supersedes_rule_id IS NULL THEN reasons := array_append(reasons, ('changes_established_labels')::text); END IF;
         IF cardinality(reasons) > 0 THEN RAISE EXCEPTION USING ERRCODE = 'P0R01', MESSAGE = 'rejected'; END IF;
       EXCEPTION
         WHEN SQLSTATE 'P0R01' THEN new_id := NULL;
@@ -179,7 +200,8 @@ BEGIN
 
   measure := jsonb_build_object('reasons', to_jsonb(reasons), 'cars_compared', coalesce(cardinality(cars), 0),
                                 'car_ids', to_jsonb(cars), 'candidate_rows_before', n_before, 'filled', n_filled,
-                                'removed', n_removed, 'window_at', win_at, 'measured_at', now());
+                                'labelled', n_labelled, 'removed', n_removed, 'changed', n_changed, 'window_at', win_at,
+                                'measured_at', now());
   IF cardinality(reasons) = 0 AND new_id IS NOT NULL THEN
     UPDATE public.vehicle_decode_rule_proposals SET status = 'active', promoted_rule_id = new_id, decided_at = now(),
            promotion_measure = measure WHERE id = p_id;

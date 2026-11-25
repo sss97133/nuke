@@ -1,6 +1,7 @@
 -- Disposable PG17 contract for 20261125120000_decode_rule_proposals_gate. Synthetic rows only.
 -- The reader is a stub with the live data_set_candidates_v1 signature that decodes a VIN by the make's vin_format row
--- (the first by code) and the make's vin_series_char rows, so the gate's before/after measure moves only through rule rows.
+-- (the first by code): one vin_series row per format match, labelled by the make's current vin_series_char rows, as the
+-- live reader emits a cohort row per format match and rules only label it.
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
 DO $r$ BEGIN
@@ -51,12 +52,13 @@ LANGUAGE sql STABLE AS $f$
                                         AND lower(f.make) = lower(v.make) AND v.vin ~ (f.value ->> 'regex')
      WHERE v.id = ANY (p)
      ORDER BY v.id, f.code)
-  SELECT 'series', r.value ->> 'series', NULL::text, NULL::jsonb, 'vehicle', z.id, z.id, 'decode', r.id, NULL::jsonb,
-         1::numeric, 'stub'
+  SELECT 'vin_series', z.mk || ':' || substr(z.vin, (z.sp ->> 0)::int, (z.sp ->> 1)::int),
+         (SELECT string_agg(DISTINCT r.value ->> 'series', '|') FROM public.vehicle_decode_rules r
+           WHERE r.rule_key = 'vin_series_char' AND r.superseded_at IS NULL AND lower(r.make) = z.mk
+             AND r.code = substr(z.vin, (z.sp ->> 0)::int, (z.sp ->> 1)::int)
+             AND z.year BETWEEN coalesce(r.year_min, 0) AND coalesce(r.year_max, 9999)),
+         NULL::jsonb, 'vehicle', z.id, z.id, 'vin', NULL::uuid, NULL::jsonb, 1::numeric, 'stub'
     FROM fmt z
-    JOIN public.vehicle_decode_rules r ON r.rule_key = 'vin_series_char' AND r.superseded_at IS NULL AND lower(r.make) = z.mk
-                                      AND r.code = substr(z.vin, (z.sp ->> 0)::int, (z.sp ->> 1)::int)
-                                      AND z.year BETWEEN coalesce(r.year_min, 0) AND coalesce(r.year_max, 9999)
 $f$;
 
 -- fixtures: two factory documents (one not original), chunks, cars, a live Testmake vin_format row from a web page
@@ -100,8 +102,8 @@ BEGIN
   r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, 'K', 1973, 1980, '{"series": "K4"}',
          'four-wheel drive', 'c0000000-0000-0000-0000-000000000001', 'test');
   IF r ->> 'status' <> 'active' THEN RAISE EXCEPTION 'supported proposal not active: %', r; END IF;
-  IF (r ->> 'filled')::int <> 2 OR (r ->> 'removed')::int <> 0 OR (r ->> 'cars_compared')::int <> 3 THEN
-    RAISE EXCEPTION 'measure wrong (expect 2 filled of 3 public cars): %', r; END IF;
+  IF (r ->> 'filled')::int <> 2 OR (r ->> 'labelled')::int <> 2 OR (r ->> 'removed')::int <> 0 OR (r ->> 'cars_compared')::int <> 3 THEN
+    RAISE EXCEPTION 'measure wrong (expect 2 labelled of 3 public cars, none removed): %', r; END IF;
   k_rule := (r ->> 'rule_id')::uuid;
   IF NOT EXISTS (SELECT 1 FROM public.vehicle_decode_rules WHERE id = k_rule AND citation_class = 'factory_document'
                    AND citation_url IS NULL AND citation_chunk_id = 'c0000000-0000-0000-0000-000000000001' AND citation_page = 12) THEN
@@ -147,9 +149,14 @@ BEGIN
   -- 8. a named supersede: the K rule re-cited from another page with a corrected value replaces it
   r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, 'K', 1973, 1980, '{"series": "K-4WD"}',
          'four wheel drive', 'c0000000-0000-0000-0000-000000000004', 'test', '{}'::jsonb, k_rule);
-  IF r ->> 'status' <> 'active' OR (r ->> 'removed')::int <> 2 THEN RAISE EXCEPTION 'named supersede refused: %', r; END IF;
+  IF r ->> 'status' <> 'active' OR (r ->> 'changed')::int <> 2 OR (r ->> 'removed')::int <> 0 THEN RAISE EXCEPTION 'named supersede refused: %', r; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.vehicle_decode_rules WHERE id = k_rule AND superseded_by = (r ->> 'rule_id')::uuid
                    AND superseded_at IS NOT NULL) THEN RAISE EXCEPTION 'old rule not superseded by the new one'; END IF;
+
+  -- 8b. a second current rule for K with another value, no supersede named: it would relabel established rows
+  r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, 'K', 1973, 1980, '{"series": "K-other"}',
+         'four-wheel drive', 'c0000000-0000-0000-0000-000000000001', 'test');
+  IF r ->> 'status' <> 'rejected' OR NOT (r -> 'reasons') ? 'changes_established_labels' THEN RAISE EXCEPTION 'relabel admitted: %', r; END IF;
 
   -- 9. a decided proposal cannot be promoted again
   BEGIN

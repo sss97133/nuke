@@ -69,7 +69,7 @@ async function main(argv) {
         out.items++;
         if (dry) { console.log(JSON.stringify({ chunk: c.id, page: c.page_number, rule_key: it.rule_key, code: it.code })); continue; }
         const res = await db.rpc('vehicle_decode_rule_propose', {
-          p_rule_key: it.rule_key, p_make: make, p_model: null, p_code: it.code.trim(), p_year_min: years[0], p_year_max: years[1],
+          p_rule_key: it.rule_key, p_make: make, p_model: null, p_code: it.code.trim().toUpperCase(), p_year_min: years[0], p_year_max: years[1],
           p_value: it.value, p_value_text: it.value_text.trim(), p_citation_chunk_id: c.id, p_proposer: `propose-from-chunks:${r.model ?? 'cli'}`,
         });
         if (res.status === 'active') out.active++; else out.rejected++;
