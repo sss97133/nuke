@@ -78,7 +78,18 @@ SELECT t_assert(public.write_as(:E, format('UPDATE public.vehicles SET status = 
     'active', 'e1000000-0000-0000-0000-0000000000e1')) = 'written',
   'after: a client update of another column on a merged row is accepted');
 SELECT t_assert(public.write_as(:E, format('UPDATE public.vehicles SET merged_into_vehicle_id = NULL WHERE id = %L',
-    'e1000000-0000-0000-0000-0000000000e1')) = 'written', 'after: clearing the pointer is accepted (unmerge_vehicle sets NULL)');
+    'e1000000-0000-0000-0000-0000000000e1')) = 'refused', 'after: a client update that clears the pointer is refused');
+SELECT t_assert((SELECT merged_into_vehicle_id FROM public.vehicles WHERE id = 'e1000000-0000-0000-0000-0000000000e1') = :P,
+  'the refused clear left the pointer in place');
+-- An invoker writer shaped like unmerge_vehicle: refused when a signed-in user calls it, passes as a system role.
+CREATE FUNCTION public.fixture_unmerge(p_dup uuid) RETURNS void LANGUAGE sql SET search_path TO 'public' AS
+$f$ UPDATE public.vehicles SET merged_into_vehicle_id = NULL, deleted_at = NULL WHERE id = p_dup $f$;
+GRANT EXECUTE ON FUNCTION public.fixture_unmerge(uuid) TO authenticated;
+SELECT t_assert(public.write_as(:E, format('SELECT public.fixture_unmerge(%L)', 'e1000000-0000-0000-0000-0000000000e1')) = 'refused',
+  'after: an invoker unmerge called by a signed-in user is refused');
+SELECT public.fixture_unmerge('e1000000-0000-0000-0000-0000000000e1');
+SELECT t_assert((SELECT merged_into_vehicle_id FROM public.vehicles WHERE id = 'e1000000-0000-0000-0000-0000000000e1') IS NULL,
+  'the invoker unmerge run by a system role clears the pointer');
 SELECT t_assert(public.gate_as(:E, :P) = 'refused_not_associated', 'after: the stub cleared, the stranger is refused again');
 
 -- A merge writer: SECURITY DEFINER, owned by the migration role, called by a signed-in user.
