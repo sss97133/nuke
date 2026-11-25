@@ -1,0 +1,1692 @@
+{
+ "account_deletion_requests": [
+  "user_id"
+ ],
+ "account_link_claims": [
+  "reviewed_by_user_id",
+  "user_id"
+ ],
+ "accounting_access_grants": [
+  "owner_id"
+ ],
+ "admin_notifications": [
+  "user_id"
+ ],
+ "admin_users": [
+  "user_id"
+ ],
+ "agent_registry": [
+  "owner_user_id"
+ ],
+ "ai_angle_classifications_audit": [
+  "image_id"
+ ],
+ "ai_credit_ledger": [
+  "user_id"
+ ],
+ "ai_scan_sessions": [
+  "image_ids"
+ ],
+ "ai_work_assessments": [
+  "image_id"
+ ],
+ "album_sync_map": [
+  "user_id"
+ ],
+ "analysis_events": [
+  "image_id",
+  "user_id"
+ ],
+ "api_keys": [
+  "user_id"
+ ],
+ "api_usage_logs": [
+  "user_id"
+ ],
+ "app_events": [
+  "user_id"
+ ],
+ "archive_imports": [
+  "historian_user_id"
+ ],
+ "artifact_dispatch_log": [
+  "image_id"
+ ],
+ "assets": [
+  "owner_id"
+ ],
+ "auction_comments": [
+  "author_bat_user_id"
+ ],
+ "auction_listing_images": [
+  "receipt_id"
+ ],
+ "auto_filing_audit_queue": [
+  "image_id"
+ ],
+ "backup_20261102_capture_relay_default_vehicle": [
+  "user_id"
+ ],
+ "backup_20261102_failed_requeue": [
+  "user_id"
+ ],
+ "backup_20261102_fb_misfile": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261102_garage_fix_vup": [
+  "user_id"
+ ],
+ "backup_20261102_vehicle_images_failed_owner": [
+  "user_id"
+ ],
+ "backup_20261103_merge_repoint": [
+  "image_id"
+ ],
+ "backup_20261103_pf_vehicle_identifiers": [
+  "source_image_id"
+ ],
+ "backup_20261103_pf_vehicles": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_20261103_pq_images_rn": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261103_pq_vehicles": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_20261104_b1_images": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261104_c001": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261104_c004_personal": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261104_d102_audit": [
+  "image_id"
+ ],
+ "backup_20261104_g1": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261104_gold66_backfill": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261104_gold66_images": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261104_mach1_images": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261104_mustang_images": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261104_mustang_vehicles": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_20261104_work_sessions_pending": [
+  "end_image_id",
+  "start_image_id",
+  "user_id"
+ ],
+ "backup_20261105_b001": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261105_b002": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261105_b003": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261105_b004": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261105_b005": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261105_b006": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261105_b007": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261105_b008": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261106_b009": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261106_b010": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261106_b011": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261106_b012": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261106_b013": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261106_b014": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261109_exact_copy_43": [
+  "user_id"
+ ],
+ "backup_20261109_firebird_rwork_evidence": [
+  "image_ids",
+  "user_id"
+ ],
+ "backup_20261109_firebird_rwork_judgments": [
+  "user_id"
+ ],
+ "backup_20261109_gate_audit_a4055d31": [
+  "image_id"
+ ],
+ "backup_20261109_gate_audit_r2_5c63ad29": [
+  "image_id"
+ ],
+ "backup_20261109_k2500premerge_images": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261109_ov01_timeline_events": [
+  "user_id"
+ ],
+ "backup_20261109_ov01_vehicle_images": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "backup_20261109_ov01_vehicle_observations": [
+  "citation_document_id",
+  "citation_secure_document_id",
+  "submitted_by_user_id"
+ ],
+ "backup_20261109_ov01_work_sessions": [
+  "end_image_id",
+  "start_image_id",
+  "user_id"
+ ],
+ "backup_20261109_ov03_evidence_judgment_requests": [
+  "user_id"
+ ],
+ "backup_20261109_ov03_receipt_work_evidence": [
+  "image_ids",
+  "user_id"
+ ],
+ "backup_20261109_ov04_ejr": [
+  "user_id"
+ ],
+ "backup_20261109_ov04_gde": [
+  "image_ids",
+  "user_id"
+ ],
+ "backup_20261109_privacy_person_20190924": [
+  "user_id"
+ ],
+ "backup_20261109_replan_backoff_queue": [
+  "user_id"
+ ],
+ "backup_20261109_supersede_chunks": [
+  "user_id"
+ ],
+ "backup_bj_attachment_fix_20261023": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_bhc_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_bon_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_bon_v2_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_fix400sa_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_fx2_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_hbcur_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_idfix_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_nosale_v1_20261023_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_nosale_v2_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_nosale_v3_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_nosale_v4_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_nosale_v5_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_rm10_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_rm26_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_rm26_v2_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_rm38_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_cz_web_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_fx_sale_v1_20261023_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_fx_sale_v2_20261023_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_idmm_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_mas_unk_v1_20261024_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_vmc_t2_merge_v1_20261101_seq92_status": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_vmc_t2_merge_v1_20261101_veh": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "backup_ymerge_unmerge_20261023": [
+  "visible_to_user_ids"
+ ],
+ "bak_rvl_amount_check_20261024": [
+  "receipt_id",
+  "user_id"
+ ],
+ "bak_rvl_amount_recovery_20261024": [
+  "receipt_id",
+  "user_id"
+ ],
+ "bak_rvl_document_kind2_20261024": [
+  "receipt_id",
+  "user_id"
+ ],
+ "bak_rvl_document_kind_20261024": [
+  "receipt_id",
+  "user_id"
+ ],
+ "bak_rvl_dup_downstream_20261024": [
+  "receipt_id",
+  "user_id"
+ ],
+ "bak_rvl_ocr_local_20261024": [
+  "receipt_id",
+  "user_id"
+ ],
+ "bak_rvl_vendor_recheck_20261024": [
+  "receipt_id",
+  "user_id"
+ ],
+ "bak_vehicle_image_listing_links_dups_20261103": [
+  "image_id",
+  "kept_image_id"
+ ],
+ "bak_vehicle_images_dupflag_20261103": [
+  "image_id",
+  "kept_image_id"
+ ],
+ "bak_vi_dupflag_older_20261103": [
+  "image_id",
+  "kept_image_id"
+ ],
+ "bak_vil_dups_older_20261103": [
+  "image_id",
+  "kept_image_id"
+ ],
+ "bat_bids": [
+  "bat_user_id"
+ ],
+ "bat_listings": [
+  "buyer_bat_user_id",
+  "seller_bat_user_id"
+ ],
+ "bat_users": [
+  "n_zero_user_id"
+ ],
+ "bets": [
+  "user_id"
+ ],
+ "betting_transactions": [
+  "user_id"
+ ],
+ "betting_wallets": [
+  "user_id"
+ ],
+ "books_gate_runs": [
+  "owner_id"
+ ],
+ "build_activity_patterns": [
+  "user_id"
+ ],
+ "build_research_links": [
+  "user_id"
+ ],
+ "business_ownership": [
+  "owner_id"
+ ],
+ "business_related_persons": [
+  "user_id"
+ ],
+ "business_user_roles": [
+  "user_id"
+ ],
+ "buyer_agency_agreements": [
+  "user_id"
+ ],
+ "capture_analysis_events": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_clock_backfill_log": [
+  "image_id"
+ ],
+ "capture_document_pages": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_exact_copy_log": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_junk_placeholder_log": [
+  "image_ids",
+  "user_id"
+ ],
+ "capture_landing_chunks": [
+  "user_id"
+ ],
+ "capture_landing_config": [
+  "user_id"
+ ],
+ "capture_landing_gate_expire_log": [
+  "user_id"
+ ],
+ "capture_landing_gate_extend_log": [
+  "image_ids",
+  "user_id"
+ ],
+ "capture_landing_sets": [
+  "image_ids"
+ ],
+ "capture_landing_supersede_log": [
+  "image_ids",
+  "user_id"
+ ],
+ "capture_landing_visual_evidence_redecide_log": [
+  "user_id"
+ ],
+ "capture_left_out_to_review_log": [
+  "image_ids",
+  "user_id"
+ ],
+ "capture_non_vehicle_log": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_non_vehicle_vehicle_to_review_log": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_privacy_promote_exclude": [
+  "image_id"
+ ],
+ "capture_privacy_promote_log": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_refused_day_to_review_log": [
+  "image_ids",
+  "user_id"
+ ],
+ "capture_relay_default_vehicle": [
+  "user_id"
+ ],
+ "capture_replan_vehicle_log": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_rescan_requests": [
+  "user_id"
+ ],
+ "capture_review_reopen_uncovered_log": [
+  "image_ids",
+  "user_id"
+ ],
+ "capture_session_admit_log": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_set_candidates": [
+  "image_ids",
+  "user_id"
+ ],
+ "capture_set_links": [
+  "image_id"
+ ],
+ "capture_set_rescore_queue": [
+  "user_id"
+ ],
+ "capture_set_review": [
+  "image_ids",
+  "user_id"
+ ],
+ "capture_set_unfiled": [
+  "image_id"
+ ],
+ "capture_skips": [
+  "user_id"
+ ],
+ "capture_typ_from_local_observation_log": [
+  "image_id",
+  "user_id"
+ ],
+ "capture_upload_status": [
+  "image_id",
+  "user_id"
+ ],
+ "cash_transactions": [
+  "user_id"
+ ],
+ "catalog_sources": [
+  "pdf_document_id"
+ ],
+ "claimed_metrics": [
+  "user_id"
+ ],
+ "clarification_requests": [
+  "user_id"
+ ],
+ "component_assembly_map": [
+  "reference_document_id"
+ ],
+ "component_conditions": [
+  "image_id"
+ ],
+ "component_drawings": [
+  "document_id"
+ ],
+ "component_identifications": [
+  "image_id"
+ ],
+ "consumable_usage_evidence": [
+  "derived_from_image_id"
+ ],
+ "contact_messages": [
+  "author_user_id"
+ ],
+ "contact_requests": [
+  "recipient_user_id",
+  "requester_user_id",
+  "responded_by_user_id"
+ ],
+ "contractor_work_contributions": [
+  "contractor_user_id",
+  "source_image_id"
+ ],
+ "contribution_submissions": [
+  "image_ids",
+  "responsible_party_user_id"
+ ],
+ "contributor_intake_reevaluations": [
+  "image_id"
+ ],
+ "contributors": [
+  "user_id"
+ ],
+ "credential_access_log": [
+  "user_id"
+ ],
+ "data_provider_trust": [
+  "user_id"
+ ],
+ "data_validations": [
+  "source_document_id"
+ ],
+ "deal_jacket_parties": [
+  "user_id"
+ ],
+ "deal_ownership": [
+  "owner_id"
+ ],
+ "derivation_queue": [
+  "user_id"
+ ],
+ "device_attributions": [
+  "ghost_user_id",
+  "image_id",
+  "uploaded_by_user_id"
+ ],
+ "discovered_vehicles": [
+  "user_id"
+ ],
+ "document_batches": [
+  "label_image_id",
+  "user_id"
+ ],
+ "document_coverage_targets": [
+  "user_id"
+ ],
+ "document_evidence": [
+  "image_ids",
+  "user_id"
+ ],
+ "document_extractions": [
+  "document_id"
+ ],
+ "document_ocr_queue": [
+  "deal_document_id"
+ ],
+ "document_pages": [
+  "document_id"
+ ],
+ "documents": [
+  "uploaded_by"
+ ],
+ "ds_credit_transactions": [
+  "user_id"
+ ],
+ "ds_deals": [
+  "user_id"
+ ],
+ "ds_document_pages": [
+  "user_id"
+ ],
+ "duplicate_notifications": [
+  "user_id"
+ ],
+ "ebay_deletion_requests": [
+  "ebay_user_id"
+ ],
+ "equipment": [
+  "declared_by_user_id"
+ ],
+ "equipment_usage_evidence": [
+  "derived_from_image_id"
+ ],
+ "evidence_account_entities": [
+  "user_id"
+ ],
+ "evidence_decisions": [
+  "result_image_id",
+  "user_id"
+ ],
+ "evidence_judgment_requests": [
+  "user_id"
+ ],
+ "evidence_links": [
+  "user_id"
+ ],
+ "evidence_runs": [
+  "user_id"
+ ],
+ "external_identities": [
+  "claimed_by_user_id",
+  "user_id"
+ ],
+ "extraction_attempts": [
+  "user_id"
+ ],
+ "facility_reservation_cancellations": [
+  "signer_user_id"
+ ],
+ "facility_reservation_confirmations": [
+  "signer_user_id"
+ ],
+ "facility_reservations": [
+  "requested_by_user_id"
+ ],
+ "fb_marketplace_sellers": [
+  "fb_user_id"
+ ],
+ "feed_signals": [
+  "user_id"
+ ],
+ "field_evidence": [
+  "document_id"
+ ],
+ "financial_deal_estimates": [
+  "owner_id"
+ ],
+ "financial_deals": [
+  "owner_id"
+ ],
+ "financial_document_extractions": [
+  "document_id",
+  "owner_id"
+ ],
+ "financial_document_lines": [
+  "document_id",
+  "owner_id"
+ ],
+ "financial_document_links": [
+  "document_id",
+  "owner_id",
+  "related_document_id"
+ ],
+ "financial_documents": [
+  "owner_id"
+ ],
+ "financial_operator_entities": [
+  "owner_id"
+ ],
+ "financial_payment_allocations": [
+  "document_id",
+  "owner_id"
+ ],
+ "financial_payments": [
+  "evidence_document_id",
+  "owner_id"
+ ],
+ "financial_review_queue": [
+  "document_id",
+  "owner_id"
+ ],
+ "financial_use_statements": [
+  "bank_document_id",
+  "claim_document_id",
+  "document_id",
+  "owner_id"
+ ],
+ "financial_use_witnesses": [
+  "document_id",
+  "image_id",
+  "receipt_id"
+ ],
+ "financial_vehicle_uses": [
+  "invoice_document_id",
+  "receipt_id"
+ ],
+ "garage_derivation_evidence": [
+  "image_ids",
+  "user_id"
+ ],
+ "ghost_users": [
+  "claimed_by_user_id"
+ ],
+ "harness_build_events": [
+  "actor_user_id"
+ ],
+ "harness_designs": [
+  "user_id"
+ ],
+ "identifier_exposures": [
+  "image_id"
+ ],
+ "identifier_read_queue": [
+  "image_id"
+ ],
+ "identity_claim_stats": [
+  "claimed_by_user_id"
+ ],
+ "image_analysis_records": [
+  "image_id"
+ ],
+ "image_angle_observations": [
+  "image_id"
+ ],
+ "image_angle_spectrum": [
+  "image_id"
+ ],
+ "image_attribution_review": [
+  "image_id"
+ ],
+ "image_camera_position": [
+  "image_id"
+ ],
+ "image_capture_time_claims": [
+  "image_id",
+  "user_id"
+ ],
+ "image_condition_observations": [
+  "image_id"
+ ],
+ "image_coordinate_observations": [
+  "image_id"
+ ],
+ "image_descriptions": [
+  "image_id"
+ ],
+ "image_forensic_metadata": [
+  "image_id"
+ ],
+ "image_observations": [
+  "image_id"
+ ],
+ "image_pose_observations": [
+  "image_id"
+ ],
+ "image_question_answers": [
+  "image_id"
+ ],
+ "image_set_members": [
+  "image_id"
+ ],
+ "image_sets": [
+  "source_capture_id",
+  "user_id"
+ ],
+ "image_spatial_metadata": [
+  "image_id"
+ ],
+ "image_stage_receipts": [
+  "image_id"
+ ],
+ "image_stage_work": [
+  "image_id"
+ ],
+ "image_tags": [
+  "image_id",
+  "related_image_ids"
+ ],
+ "image_text_reads": [
+  "image_id",
+  "user_id"
+ ],
+ "image_vehicle_candidates": [
+  "image_id",
+  "user_id"
+ ],
+ "image_vehicle_mismatches": [
+  "image_id"
+ ],
+ "image_work_extractions": [
+  "image_id"
+ ],
+ "ingestion_ledger": [
+  "user_id"
+ ],
+ "instagram_deletion_requests": [
+  "ig_user_id"
+ ],
+ "knowledge_gaps": [
+  "resolved_by_document_id"
+ ],
+ "library_documents": [
+  "uploaded_by"
+ ],
+ "library_inventory": [
+  "user_id"
+ ],
+ "library_inventory_census": [
+  "user_id"
+ ],
+ "line_items": [
+  "receipt_id",
+  "user_id"
+ ],
+ "listing_exports": [
+  "user_id"
+ ],
+ "location_collaborations": [
+  "granted_by_user_id"
+ ],
+ "mailbox_access_keys": [
+  "user_id"
+ ],
+ "market_fund_holdings": [
+  "user_id"
+ ],
+ "market_orders": [
+  "user_id"
+ ],
+ "missing_context_reports": [
+  "image_id"
+ ],
+ "monitored_auctions": [
+  "proxy_bid_user_ids",
+  "watching_user_ids"
+ ],
+ "notification_preferences": [
+  "user_id"
+ ],
+ "notifications": [
+  "user_id"
+ ],
+ "nuke_production_credits": [
+  "owner_id",
+  "user_id"
+ ],
+ "oauth_authorization_codes": [
+  "user_id"
+ ],
+ "oauth_login_sessions": [
+  "user_id"
+ ],
+ "oauth_state_tracker": [
+  "user_id"
+ ],
+ "observation_witnesses": [
+  "added_by_user_id",
+  "image_id"
+ ],
+ "org_audit_log": [
+  "actor_user_id"
+ ],
+ "organization_contributors": [
+  "user_id"
+ ],
+ "organization_external_profiles": [
+  "claimed_by_user_id"
+ ],
+ "organization_images": [
+  "user_id"
+ ],
+ "organization_ownership_verifications": [
+  "user_id"
+ ],
+ "organization_vehicle_notifications": [
+  "assigned_to_user_id",
+  "created_by_user_id"
+ ],
+ "organization_vehicles": [
+  "flagged_by_user_id",
+  "linked_by_user_id"
+ ],
+ "organization_verified_claimants": [
+  "user_id"
+ ],
+ "organizations": [
+  "uploaded_by"
+ ],
+ "owner_delegated_signs": [
+  "owner_user_id"
+ ],
+ "ownership_claim_flags": [
+  "user_id"
+ ],
+ "ownership_role_rederivation_backup": [
+  "user_id"
+ ],
+ "ownership_transfers": [
+  "from_user_id",
+  "to_user_id"
+ ],
+ "ownership_verifications": [
+  "user_id"
+ ],
+ "paint_quality_assessments": [
+  "image_id"
+ ],
+ "paperwork_page_evidence": [
+  "document_id",
+  "uploaded_by"
+ ],
+ "parent_company": [
+  "owner_user_id"
+ ],
+ "part_alternatives": [
+  "approved_by_user_id"
+ ],
+ "part_observation_evidence": [
+  "derived_from_image_id"
+ ],
+ "partnership_ad_permissions": [
+  "ig_user_id"
+ ],
+ "patient_zero_image_pool": [
+  "vehicle_image_id"
+ ],
+ "patient_zero_queue": [
+  "vehicle_image_id"
+ ],
+ "payment_events": [
+  "user_id"
+ ],
+ "pending_claims": [
+  "submitted_by_user_id"
+ ],
+ "pending_vehicle_assignments": [
+  "reviewed_by_user_id",
+  "suggested_by_user_id"
+ ],
+ "person_identity_links": [
+  "owner_id"
+ ],
+ "photo_analysis_yield_daily": [
+  "user_id"
+ ],
+ "photo_analysis_yield_snapshot": [
+  "image_id",
+  "user_id"
+ ],
+ "photo_analysis_yield_snapshot_baseline": [
+  "image_id",
+  "user_id"
+ ],
+ "photo_analysis_yield_snapshot_phase2": [
+  "image_id",
+  "user_id"
+ ],
+ "photo_evidence_unwind_log": [
+  "image_id"
+ ],
+ "photo_extracted_fields": [
+  "image_id",
+  "user_id"
+ ],
+ "photo_filing_audit": [
+  "image_id"
+ ],
+ "photo_gate_unfile_log": [
+  "image_id",
+  "user_id"
+ ],
+ "photo_gate_unfile_older_targets": [
+  "image_id"
+ ],
+ "photo_gate_unfile_targets": [
+  "image_id"
+ ],
+ "photo_inbox": [
+  "user_id"
+ ],
+ "photo_land_progress": [
+  "image_id"
+ ],
+ "photo_land_targets": [
+  "image_id"
+ ],
+ "photo_pipeline_retry_state": [
+  "image_id"
+ ],
+ "photo_requeue_log": [
+  "image_id"
+ ],
+ "photo_sync_items": [
+  "user_id",
+  "vehicle_image_id"
+ ],
+ "photo_sync_log": [
+  "user_id"
+ ],
+ "photo_sync_state": [
+  "user_id"
+ ],
+ "photo_text_lines": [
+  "image_id",
+  "user_id"
+ ],
+ "photo_vehicle_mismatch_observation": [
+  "image_id"
+ ],
+ "pii_audit_log": [
+  "user_id"
+ ],
+ "platform_credentials": [
+  "user_id"
+ ],
+ "platform_expenses": [
+  "receipt_id"
+ ],
+ "platform_submission_templates": [
+  "user_id"
+ ],
+ "private_work_projections": [
+  "actor_user_id",
+  "financial_document_id",
+  "owner_id"
+ ],
+ "production_files": [
+  "owner_id"
+ ],
+ "profile_achievements": [
+  "user_id"
+ ],
+ "profile_activity": [
+  "user_id"
+ ],
+ "profile_completion": [
+  "user_id"
+ ],
+ "profile_image_insights": [
+  "image_ids",
+  "user_id"
+ ],
+ "profile_stats": [
+  "user_id"
+ ],
+ "profiles": [
+  "primary_id_document_id",
+  "verification_document_ids"
+ ],
+ "properties": [
+  "owner_user_id"
+ ],
+ "provider_availability": [
+  "user_id"
+ ],
+ "provider_record_confirmations": [
+  "user_id"
+ ],
+ "provider_service_area": [
+  "user_id"
+ ],
+ "provider_vouches": [
+  "signer_user_id",
+  "subject_user_id",
+  "voucher_user_id",
+  "withdrawn_by_user_id"
+ ],
+ "publication_issues": [
+  "cover_image_id"
+ ],
+ "publishing_communications": [
+  "owner_id"
+ ],
+ "publishing_contacts": [
+  "owner_id"
+ ],
+ "publishing_relationships": [
+  "owner_id"
+ ],
+ "qb_transactions": [
+  "correlated_photo_ids"
+ ],
+ "reattribution_audit": [
+  "actor_user_id"
+ ],
+ "receipt_itemisation_outcomes": [
+  "receipt_id",
+  "sibling_receipt_id"
+ ],
+ "receipt_items": [
+  "receipt_id"
+ ],
+ "receipt_line_rules": [
+  "proposed_by_user_id"
+ ],
+ "receipt_relations": [
+  "receipt_id",
+  "related_receipt_id"
+ ],
+ "receipt_vehicle_links": [
+  "receipt_id",
+  "user_id"
+ ],
+ "receipts": [
+  "source_document_id",
+  "user_id"
+ ],
+ "relationship_automation_log": [
+  "user_id"
+ ],
+ "research_requests": [
+  "triggered_by_user_id"
+ ],
+ "role_change_requests": [
+  "user_id"
+ ],
+ "rpo_code_sources": [
+  "source_spid_image_id"
+ ],
+ "scene_micro_atom_evidence": [
+  "derived_from_image_id"
+ ],
+ "schema_proposal_reviews": [
+  "reviewer_user_id"
+ ],
+ "schema_proposals": [
+  "claimed_by_user_id",
+  "proposed_by_user_id"
+ ],
+ "search_analytics": [
+  "user_id"
+ ],
+ "secure_documents": [
+  "user_id"
+ ],
+ "security_audit_log": [
+  "user_id"
+ ],
+ "service_executions": [
+  "user_id"
+ ],
+ "service_manual_chunks": [
+  "document_id"
+ ],
+ "shop_licenses": [
+  "document_id"
+ ],
+ "shop_priority_settings": [
+  "user_id"
+ ],
+ "shops_archived_20260129": [
+  "owner_user_id"
+ ],
+ "sms_verification_submissions": [
+  "user_id"
+ ],
+ "stripe_connect_accounts": [
+  "user_id"
+ ],
+ "suppliers": [
+  "user_id"
+ ],
+ "surface_observations": [
+  "vehicle_image_id"
+ ],
+ "taste_intent_signals": [
+  "user_id"
+ ],
+ "technician_phone_links": [
+  "user_id"
+ ],
+ "technician_work_evidence": [
+  "derived_from_image_id"
+ ],
+ "technicians": [
+  "user_id"
+ ],
+ "telegram_message_log": [
+  "user_id"
+ ],
+ "telegram_tasks": [
+  "user_id"
+ ],
+ "timeline_event_comments": [
+  "user_id"
+ ],
+ "timeline_events": [
+  "user_id"
+ ],
+ "tool_inventory": [
+  "owner_id",
+  "receipt_image_id"
+ ],
+ "tool_receipt_documents": [
+  "user_id"
+ ],
+ "tool_transactions": [
+  "user_id"
+ ],
+ "tracked_devices": [
+  "user_id"
+ ],
+ "transfer_milestones": [
+  "completed_by_user_id"
+ ],
+ "upload_batches": [
+  "user_id"
+ ],
+ "url_inbox": [
+  "source_user_id"
+ ],
+ "usage_metrics": [
+  "user_id"
+ ],
+ "user_addresses": [
+  "user_id"
+ ],
+ "user_ai_providers": [
+  "user_id"
+ ],
+ "user_analysis_settings": [
+  "user_id"
+ ],
+ "user_cash_balances": [
+  "user_id"
+ ],
+ "user_comments": [
+  "user_id"
+ ],
+ "user_consents": [
+  "user_id"
+ ],
+ "user_contributions": [
+  "user_id"
+ ],
+ "user_day_vehicle_context": [
+  "user_id"
+ ],
+ "user_emails": [
+  "user_id"
+ ],
+ "user_external_profiles": [
+  "user_id"
+ ],
+ "user_gallery_items": [
+  "user_id"
+ ],
+ "user_image_counts": [
+  "user_id"
+ ],
+ "user_image_deep_reads": [
+  "image_id",
+  "user_id"
+ ],
+ "user_interactions": [
+  "user_id"
+ ],
+ "user_labor_rates": [
+  "user_id"
+ ],
+ "user_notifications": [
+  "from_user_id",
+  "image_id",
+  "user_id"
+ ],
+ "user_observations": [
+  "user_id"
+ ],
+ "user_phones": [
+  "user_id"
+ ],
+ "user_preferences": [
+  "user_id"
+ ],
+ "user_presence": [
+  "user_id"
+ ],
+ "user_profiles": [
+  "user_id"
+ ],
+ "user_ratings": [
+  "user_id"
+ ],
+ "user_roles": [
+  "user_id"
+ ],
+ "user_sites": [
+  "user_id"
+ ],
+ "user_sync_preferences": [
+  "user_id"
+ ],
+ "user_tools": [
+  "receipt_ids",
+  "user_id"
+ ],
+ "user_vehicle_discoveries": [
+  "user_id"
+ ],
+ "user_vehicle_links": [
+  "user_id"
+ ],
+ "user_vehicle_preferences": [
+  "user_id"
+ ],
+ "vault_sms_sessions": [
+  "user_id"
+ ],
+ "vehicle_agent_messages": [
+  "from_user_id",
+  "session_user_id"
+ ],
+ "vehicle_agents": [
+  "owner_user_id"
+ ],
+ "vehicle_change_claim_support": [
+  "user_id"
+ ],
+ "vehicle_change_claims": [
+  "user_id"
+ ],
+ "vehicle_comments": [
+  "user_id"
+ ],
+ "vehicle_contributor_roles": [
+  "user_id"
+ ],
+ "vehicle_contributors": [
+  "user_id"
+ ],
+ "vehicle_data_history": [
+  "correction_user_id",
+  "old_value_user_id"
+ ],
+ "vehicle_dedup_decisions": [
+  "user_id"
+ ],
+ "vehicle_documents": [
+  "source_document_id",
+  "uploaded_by"
+ ],
+ "vehicle_field_sources": [
+  "evidence_document_id",
+  "source_image_id",
+  "user_id"
+ ],
+ "vehicle_hero_fingerprints": [
+  "image_id"
+ ],
+ "vehicle_identifier_observations": [
+  "image_id",
+  "user_id"
+ ],
+ "vehicle_identifiers": [
+  "source_image_id"
+ ],
+ "vehicle_image_angles": [
+  "image_id"
+ ],
+ "vehicle_image_attribution_queue": [
+  "image_id"
+ ],
+ "vehicle_image_byte_mismatches": [
+  "canonical_image_id",
+  "image_id",
+  "user_id"
+ ],
+ "vehicle_image_classifications": [
+  "image_id"
+ ],
+ "vehicle_image_comments": [
+  "image_id",
+  "user_id"
+ ],
+ "vehicle_image_gate_changes": [
+  "image_id"
+ ],
+ "vehicle_image_listing_links": [
+  "image_id"
+ ],
+ "vehicle_image_nonvehicle_flags": [
+  "image_id"
+ ],
+ "vehicle_images": [
+  "documented_by_user_id",
+  "ghost_user_id",
+  "user_id"
+ ],
+ "vehicle_listing_documents": [
+  "image_id"
+ ],
+ "vehicle_merge_proposals": [
+  "visible_to_user_ids"
+ ],
+ "vehicle_observations": [
+  "citation_document_id",
+  "citation_secure_document_id",
+  "submitted_by_user_id"
+ ],
+ "vehicle_price_observations": [
+  "document_id",
+  "user_id"
+ ],
+ "vehicle_profile_quality_run": [
+  "owner_id"
+ ],
+ "vehicle_profile_quality_vehicle": [
+  "owner_id"
+ ],
+ "vehicle_relationship_verifications": [
+  "proof_document_id",
+  "requested_by_user_id",
+  "reviewed_by_user_id"
+ ],
+ "vehicle_spend_lines": [
+  "receipt_id"
+ ],
+ "vehicle_spid_data": [
+  "image_id"
+ ],
+ "vehicle_split_proposal": [
+  "image_ids"
+ ],
+ "vehicle_statement_links": [
+  "speaker_user_id"
+ ],
+ "vehicle_taxonomy_recompute_queue": [
+  "last_receipt_id"
+ ],
+ "vehicle_user_permissions": [
+  "user_id"
+ ],
+ "vehicle_user_relationships": [
+  "user_id"
+ ],
+ "vehicle_views": [
+  "user_id"
+ ],
+ "vehicles": [
+  "created_by_user_id",
+  "owner_id",
+  "uploaded_by",
+  "user_id",
+  "vin_source_image_id"
+ ],
+ "vin_validations": [
+  "user_id"
+ ],
+ "work_20261103_landing_imgs": [
+  "user_id"
+ ],
+ "work_20261103_strip": [
+  "image_ids"
+ ],
+ "work_money_ingest_runs": [
+  "owner_id"
+ ],
+ "work_money_staging": [
+  "owner_id"
+ ],
+ "work_order_assignments": [
+  "accepted_by_user_id",
+  "cosigner_user_id"
+ ],
+ "work_order_completion_acceptances": [
+  "signer_user_id"
+ ],
+ "work_order_completion_attestations": [
+  "signer_user_id"
+ ],
+ "work_order_evidence_attachments": [
+  "attached_by_user_id"
+ ],
+ "work_order_evidence_images": [
+  "image_id"
+ ],
+ "work_order_invoices": [
+  "issuer_user_id"
+ ],
+ "work_order_payment_witnesses": [
+  "witness_user_id"
+ ],
+ "work_order_processor_payments": [
+  "payer_user_id"
+ ],
+ "work_order_quote_acceptances": [
+  "signer_user_id"
+ ],
+ "work_order_quotes": [
+  "quoting_user_id"
+ ],
+ "work_order_resource_attestations": [
+  "attestor_user_id"
+ ],
+ "work_order_resource_fulfillments": [
+  "supplier_user_id"
+ ],
+ "work_order_scalar_corrections": [
+  "actor_user_id"
+ ],
+ "work_order_work_starts": [
+  "signer_user_id"
+ ],
+ "work_organization_matches": [
+  "approved_by_user_id"
+ ],
+ "work_session_parts": [
+  "receipt_image_id"
+ ],
+ "work_sessions": [
+  "end_image_id",
+  "start_image_id",
+  "user_id"
+ ]
+}
