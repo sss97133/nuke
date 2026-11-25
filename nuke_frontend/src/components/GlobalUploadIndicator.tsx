@@ -2,7 +2,7 @@
 // Shows upload progress in bottom-right corner like Dropbox
 
 import React, { useState, useEffect } from 'react';
-import { uploadQueue } from '../services/globalUploadQueue';
+import { uploadQueue, uploadEndStateWords, UPLOAD_TAB_CLOSE_LIMIT } from '../services/globalUploadQueue';
 
 const GlobalUploadIndicator: React.FC = () => {
   const [queue, setQueue] = useState<any[]>([]);
@@ -16,11 +16,21 @@ const GlobalUploadIndicator: React.FC = () => {
     return unsubscribe;
   }, []);
 
+  const waiting = queue.some(item => item.status === 'pending' || item.status === 'uploading');
+  useEffect(() => {
+    if (!waiting) return;
+    // The browser's own leave-page prompt while an upload is still on its way.
+    const hold = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', hold);
+    return () => window.removeEventListener('beforeunload', hold);
+  }, [waiting]);
+
   // Filter active uploads
   const activeUploads = queue.filter(item => 
     item.status === 'pending' || item.status === 'uploading'
   );
   const completedCount = queue.filter(item => item.status === 'completed').length;
+  const duplicateCount = queue.filter(item => item.status === 'duplicate').length;
   const failedCount = queue.filter(item => item.status === 'failed').length;
 
   // Hide if no items
@@ -122,13 +132,18 @@ const GlobalUploadIndicator: React.FC = () => {
               <div key={item.id} style={{ padding: '2px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>{(item.file?.name || 'Unknown file').substring(0, 25)}...</span>
-                  <span>{item.status === 'completed' ? '✓' : 
-                         item.status === 'failed' ? 'X' : 
+                  <span>{item.status === 'completed' ? '✓' :
+                         item.status === 'duplicate' ? '=' :
+                         item.status === 'failed' ? 'X' :
                          `${item.progress}%`}</span>
                 </div>
+                {uploadEndStateWords(item) && (
+                  <div data-upload-state={item.status} style={{ color: 'var(--text-secondary)' }}>{uploadEndStateWords(item)}</div>
+                )}
               </div>
             ))}
           </div>
+          {waiting && <div role="note" style={{ marginTop: '4px', padding: '2px' }}>{UPLOAD_TAB_CLOSE_LIMIT}</div>}
           <div style={{ 
             marginTop: '4px',
             padding: '2px',
@@ -136,7 +151,7 @@ const GlobalUploadIndicator: React.FC = () => {
             justifyContent: 'space-between',
             fontSize: '9px'
           }}>
-            <span>{completedCount} done, {failedCount} failed</span>
+            <span>{completedCount} landed, {duplicateCount} already uploaded, {failedCount} refused</span>
             <button
               onClick={(e) => {
                 e.stopPropagation();

@@ -17,15 +17,35 @@ import toast from 'react-hot-toast';
 import { ImageUploadService } from './imageUploadService';
 import { supabase } from '../lib/supabase';
 
+/** The one line a person reads for an item that finished. */
+export function uploadEndStateWords(item: { status: string; error?: string; note?: string }): string | null {
+  if (item.status === 'completed') return 'Landed';
+  if (item.status === 'duplicate') return item.note || 'Already uploaded; left where it is';
+  if (item.status === 'failed') return `Refused: ${item.error || 'no reason given'}`;
+  return null;
+}
+
+/** What a tab close does to the queue: items wait in this browser's storage and resume when the site reopens here. */
+export const UPLOAD_TAB_CLOSE_LIMIT =
+  'Waiting uploads are kept in this browser and resume when nuke.ag is open here again. A private window or cleared site data loses them.';
+
+export function isUploadEnded(status: string): boolean {
+  return status === 'completed' || status === 'duplicate' || status === 'failed';
+}
+
 interface UploadItem {
   id: string;
   /** null = personal library ("photo inbox") — server pipeline resolves the vehicle */
   vehicleId: string | null;
   vehicleName: string;
   file: File;
-  status: 'pending' | 'uploading' | 'completed' | 'failed';
+  /** Three end states: completed (the row landed), duplicate (the same bytes already have a row; nothing written or
+   *  re-filed), failed (refused, with the reason in error). */
+  status: 'pending' | 'uploading' | 'completed' | 'duplicate' | 'failed';
   progress: number;
   error?: string;
+  /** For a duplicate: where the existing row is, in the upload service's words. */
+  note?: string;
   fingerprint: string; // Unique identifier: filename + size + lastModified
   addedAt: number; // Timestamp when added to queue
   attempts: number; // Upload attempts (for retry backoff)
@@ -366,8 +386,23 @@ class GlobalUploadQueue {
         'general'
       );
 
+      if (result.outcome === 'refused') {
+        // A refusal is an answer, not a dropped connection: shown with its reason, not retried.
+        item.status = 'failed';
+        item.error = result.error || 'Upload refused';
+        void this.persistItem(item);
+        return;
+      }
       if (!result.success) {
         throw new Error(result.error || 'Upload failed');
+      }
+      if (result.outcome === 'duplicate') {
+        item.status = 'duplicate';
+        item.note = result.message;
+        item.progress = 100;
+        this.uploadedFingerprints.add(item.fingerprint);
+        void this.unpersistItem(item.id);
+        return;
       }
 
       item.progress = 75;
@@ -414,7 +449,7 @@ class GlobalUploadQueue {
       this.notifyListeners();
       
       // Remove completed/failed items after 30 seconds (longer to see success/failure)
-      if (item.status === 'completed' || item.status === 'failed') {
+      if (isUploadEnded(item.status)) {
         setTimeout(() => {
           this.removeItem(item.id);
         }, 30000);
@@ -435,13 +470,11 @@ class GlobalUploadQueue {
   // Clear completed items
   clearCompleted() {
     this.queue.forEach(item => {
-      if (item.status === 'completed' || item.status === 'failed') {
+      if (isUploadEnded(item.status)) {
         void this.unpersistItem(item.id);
       }
     });
-    this.queue = this.queue.filter(item =>
-      item.status !== 'completed' && item.status !== 'failed'
-    );
+    this.queue = this.queue.filter(item => !isUploadEnded(item.status));
     this.notifyListeners();
   }
 

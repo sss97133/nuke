@@ -8,6 +8,8 @@ import { extractImageMetadata } from '../utils/imageMetadata';
 import { TimelineEventService } from './timelineEventService';
 import { DocumentTypeDetector } from './documentTypeDetector';
 import { ImageDuplicateLinker } from './imageDuplicateLinker';
+import { webImageRow } from '../lib/webImageRow';
+import { signPrivateStorageUrl } from '../lib/privateStorage';
 import { PHOTO_BUCKET, PAPER_BUCKET, objectName, photoObjectPath, paperObjectPath, uploadOwnObject, bucketForStoragePath } from '../lib/ownStorage';
 
 export interface ImageUploadResult {
@@ -16,6 +18,8 @@ export interface ImageUploadResult {
   imageUrl?: string;
   duplicateOf?: string;
   duplicateType?: 'exact' | 'perceptual';
+  /** The end state: the row landed, the same bytes already have a row (nothing written or re-filed), or refused. */
+  outcome?: 'landed' | 'duplicate' | 'refused';
   message?: string;
   error?: string;
 }
@@ -255,38 +259,30 @@ export class ImageUploadService {
       let duplicateOf: string | null = null;
       let duplicateType: 'exact' | 'perceptual' | null = null;
 
-      // Exact duplicates per vehicle (or personal library)
+      // The same bytes already have a row: the uploader's own (on any car, or unfiled) or one on the picked car. That row
+      // keeps its filing; the web writes nothing and does not re-file it, and says so.
       if (fileHash) {
-        try {
-          const exactQuery = supabase
-            .from('vehicle_images')
-            .select('id, image_url, vehicle_id')
-            .eq('file_hash', fileHash)
-            .limit(1);
-
-          if (vehicleId) {
-            exactQuery.eq('vehicle_id', vehicleId);
-          } else {
-            exactQuery.is('vehicle_id', null).eq('user_id', user.id);
-          }
-
-          const { data: exactDup, error: exactErr } = await exactQuery.maybeSingle();
-          if (exactErr && exactErr.code !== 'PGRST116') {
-            console.warn('Exact duplicate check failed (non-blocking):', exactErr);
-          } else if (exactDup) {
-            duplicateOf = exactDup.id;
-            duplicateType = 'exact';
-            return {
-              success: true,
-              imageId: exactDup.id,
-              imageUrl: exactDup.image_url,
-              duplicateOf: exactDup.id,
-              duplicateType: 'exact',
-              message: 'Exact duplicate detected; reusing existing image'
-            };
-          }
-        } catch (err) {
-          console.warn('Exact duplicate check failed (non-blocking):', err);
+        const holders = [`user_id.eq.${user.id}`];
+        if (vehicleId && vehicleId !== 'title-scan-temp') holders.push(`vehicle_id.eq.${vehicleId}`);
+        const { data: exactDup, error: exactErr } = await supabase
+          .from('vehicle_images')
+          .select('id, image_url, vehicle_id')
+          .eq('file_hash', fileHash)
+          .or(holders.join(','))
+          .limit(1)
+          .maybeSingle();
+        if (exactErr && exactErr.code !== 'PGRST116') {
+          console.warn('Exact duplicate check failed (the insert still refuses a same-car twin):', exactErr);
+        } else if (exactDup) {
+          return {
+            success: true,
+            outcome: 'duplicate',
+            imageId: exactDup.id,
+            imageUrl: exactDup.image_url || undefined,
+            duplicateOf: exactDup.id,
+            duplicateType: 'exact',
+            message: exactDup.vehicle_id ? 'Already uploaded: these bytes are on a vehicle; left where they are' : 'Already uploaded: these bytes are in your unfiled photos; left there',
+          };
         }
       }
 
@@ -381,28 +377,29 @@ export class ImageUploadService {
       // One landing rule with iOS (lib/ownStorage): a photo to vehicle-photos users/<uid>/capture-relay/<sha256>/<name>,
       // a paper to the private user-documents bucket. Only the original goes up; the image renderer makes the sizes.
       if (!fileHash) {
-        return { success: false, error: 'Upload refused: the file could not be hashed, so it has no storage name' };
+        return { success: false, outcome: 'refused', error: 'Upload refused: the file could not be hashed, so it has no storage name' };
       }
       const isPaper = isDocument || vehicleId === 'title-scan-temp';
       const bucket = isPaper ? PAPER_BUCKET : PHOTO_BUCKET;
       const storagePath = isPaper ? paperObjectPath(user.id, fileHash, file.name) : photoObjectPath(user.id, fileHash, file.name);
       const refused = await uploadOwnObject(bucket, storagePath, fileToUpload, fileToUpload.type || undefined);
       if (refused) {
-        return { success: false, error: `Upload refused by storage: ${refused}` };
+        return { success: false, outcome: 'refused', error: `Upload refused by storage: ${refused}` };
       }
 
-      // A paper is private: its row carries the storage path and no public URL ('' is the iOS metadata sentinel the
-      // image_url NOT NULL column accepts); it is read back by signed URL.
-      const urlData = { publicUrl: isPaper ? '' : supabase.storage.from(PHOTO_BUCKET).getPublicUrl(storagePath).data.publicUrl };
-      const variants: any = isPaper ? null : { full: urlData.publicUrl };
+      // A paper is private: its row carries the object's storage URL in the private bucket, which opens for nobody until
+      // a reader signs it (lib/privateStorage signPrivateStorageUrl, the rule every private-document reader uses).
+      const urlData = { publicUrl: supabase.storage.from(bucket).getPublicUrl(storagePath).data.publicUrl };
+      const readBack = async () => (isPaper ? await signPrivateStorageUrl(urlData.publicUrl, 600) : urlData.publicUrl) || undefined;
 
       // Skip database insert for title scanning temp uploads
       if (vehicleId === 'title-scan-temp') {
         console.log('Skipping database insert for title scan temp upload');
         return {
           success: true,
+          outcome: 'landed',
           imageId: 'temp-' + uniqueId,
-          imageUrl: urlData.publicUrl || undefined
+          imageUrl: await readBack()
         };
       }
 
@@ -485,49 +482,59 @@ export class ImageUploadService {
       const latitude = locationWithAddress?.latitude || metadata.location?.latitude;
       const longitude = locationWithAddress?.longitude || metadata.location?.longitude;
 
-      const { data: dbResult, error: dbError } = await supabase
-        .from('vehicle_images')
-        .insert({
-          vehicle_id: vehicleId || null, // Nullable for personal library
-          user_id: user.id,
-          image_url: urlData.publicUrl,
-          file_name: fileName,
-          filename: file.name, // Store original filename for duplicate detection
-          storage_path: storagePath,
-          category: category,
-          file_size: fileToUpload.size, // Use compressed file size
-          mime_type: fileToUpload.type,
-          file_hash: fileHash,
-          perceptual_hash: perceptualHash,
+      // The iOS row (lib/webImageRow, checked against the Swift struct) plus the web form's columns. A picked car is
+      // kept: the pick at submit is the uploader's Sign, recorded in exif_data.filing with the uploader's id.
+      const row = webImageRow({
+        userId: user.id,
+        vehicleId: vehicleId || null,
+        publicUrl: urlData.publicUrl,
+        storagePath,
+        fileName,
+        originalFilename: file.name,
+        fileSize: fileToUpload.size,
+        mimeType: fileToUpload.type,
+        fileHash,
+        latitude: latitude || null,
+        longitude: longitude || null,
+        takenAt: photoDate ? photoDate.toISOString() : null, // Real capture signal only; null when unknown
+        exif: exifPayload,
+        cameraMake: metadata.camera?.make ?? null,
+        cameraModel: metadata.camera?.model ?? null,
+        isPaper,
+        // A paper has no public URL for the photo pipeline to fetch: it is held ('skipped'), as iOS holds a
+        // metadata-only row, until a reader signs its URL.
+        aiProcessingStatus: duplicateOf ? 'duplicate_skipped' : isPaper ? 'skipped' : 'pending',
+        web: {
+          category,
+          perceptualHash,
           dhash: differenceHash,
-          duplicate_of: duplicateOf,
-          is_duplicate: Boolean(duplicateOf),
-          is_primary: count === 0 && !isDocument, // First image becomes primary (not documents)
-          is_sensitive: false, // Required field
-          taken_at: photoDate ? photoDate.toISOString() : null, // Real capture signal only; null when unknown
-          latitude: latitude || null, // Store at top level for easier querying
-          longitude: longitude || null, // Store at top level for easier querying
-          variants: variants, // Store all variant URLs
-          exif_data: exifPayload,
-          is_document: isDocument,
-          document_category: documentCategory,
-          document_classification: isDocument ? JSON.stringify({
+          duplicateOf,
+          isPrimary: count === 0 && !isDocument, // First image becomes primary (not documents)
+          isDocument,
+          documentCategory,
+          documentClassification: isDocument ? JSON.stringify({
             type: docDetection.type,
             confidence: docDetection.confidence,
             reasoning: docDetection.reasoning,
             detected_at: new Date().toISOString()
           }) : null,
-          // A paper has no public URL for the photo pipeline to fetch: it is held ('skipped'), as iOS holds a
-          // metadata-only row, until a reader signs its URL.
-          ai_processing_status: duplicateOf ? 'duplicate_skipped' : isPaper ? 'skipped' : 'pending',
-          organization_status: vehicleId ? 'organized' : 'unorganized' // Auto-organized if linked to vehicle
-        })
+        },
+        nowIso: new Date().toISOString(),
+      });
+
+      const { data: dbResult, error: dbError } = await supabase
+        .from('vehicle_images')
+        .insert(row)
         .select('id')
         .single();
 
+      if (dbError?.code === '23505') {
+        // The picked car already holds these bytes (one row per car and hash): nothing new, nothing moved.
+        return { success: true, outcome: 'duplicate', message: 'Already on this vehicle: the same bytes have a row there' };
+      }
       if (dbError) {
         // The object stays: its path is its bytes, so a retry lands the row on the same object (iOS does the same).
-        return { success: false, error: `Database error: ${dbError.message}` };
+        return { success: false, outcome: 'refused', error: `Database error: ${dbError.message}` };
       }
 
       // ✅ PHOTOS ARE NOT EVENTS
@@ -614,8 +621,9 @@ export class ImageUploadService {
 
       return {
         success: true,
+        outcome: 'landed',
         imageId: dbResult.id,
-        imageUrl: urlData.publicUrl || undefined
+        imageUrl: await readBack()
       };
 
     } catch (error: any) {
