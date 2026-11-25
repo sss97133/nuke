@@ -263,7 +263,7 @@ async function applyImagePropertyClaimsLegacy(sb, claims, { runMs = 60000 } = {}
       }
       const id = result.data.observation_id;
       const row = await sb.from('vehicle_observations')
-        .select('id,vehicle_id,property_id,structured_data,confidence_score,observed_at,ingested_at,source_identifier,extraction_method,agent_model,raw_source_ref,kind,is_superseded,source:observation_sources!source_id(slug)')
+        .select('id,vehicle_id,property_id,structured_data,confidence_score,observed_at,ingested_at,source_identifier,extraction_method,agent_model,raw_source_ref,kind,is_superseded,source_observation_id,source:observation_sources!source_id(slug)')
         .eq('id', id).maybeSingle().abortSignal(AbortSignal.timeout(timeout()));
       const witness = await sb.from('observation_witnesses').select('id')
         .eq('observation_id', id).eq('image_id', claim.structured_data.image_id)
@@ -277,6 +277,8 @@ async function applyImagePropertyClaimsLegacy(sb, claims, { runMs = 60000 } = {}
           row.data.source?.slug !== claim.source_slug || row.data.source_identifier !== claim.source_identifier ||
           row.data.extraction_method !== claim.extraction_method || row.data.agent_model !== claim.agent_model ||
           row.data.raw_source_ref !== claim.raw_source_ref ||
+          // the source reading as the typed key, not only inside structured_data (migration 20261125211500)
+          row.data.source_observation_id !== claim.structured_data.source_observation_id ||
           eventTime === null || ingestTime === null || expectedEventTime === null ||
           eventTime !== expectedEventTime || ingestTime < eventTime ||
           row.data.vehicle_id !== claim.vehicle_id ||
@@ -296,6 +298,8 @@ async function applyImagePropertyClaimsLegacy(sb, claims, { runMs = 60000 } = {}
   return receipt;
 }
 
+export const TYPED_SOURCE_SLICE = 200;   // rows a call to supersede_untyped_cached_image_properties re-lands (its limit is 1..500)
+export const TYPED_SOURCE_CALLS = 25;    // calls a walk makes: 5,000 rows, more than any vehicle holds (proof vehicle 776, 2026-11-25)
 export const SINGLE_SLICE = 20;   // claims per call on the one-at-a-time route: each call has its own 60 s budget
 const SOURCE_COLUMNS = 'id,vehicle_id,kind,is_superseded,observed_at,ingested_at,agent_model,agent_tier,extraction_method,confidence,confidence_score,structured_data';
 const IMAGE_COLUMNS = 'id,vehicle_id,is_sensitive,is_superseded,is_duplicate,is_document,vision_gate_status,image_vehicle_match_status';
@@ -421,7 +425,9 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
         if (prior.error || !Array.isArray(prior.data)) { failed = true; break; }
         for (const row of prior.data) {
           const key = `${row.source_observation_id}:${row.property_key}`;
-          have.set(key, have.get(key) === true || row.is_superseded === true);
+          // true when the claim has a current row; a key whose every row is superseded was retracted (a row re-landed with
+          // its typed key leaves a superseded original beside a current successor, which is not a retraction)
+          have.set(key, have.get(key) === true || row.is_superseded !== true);
         }
       }
       if (failed) { stop('prior_rows_unavailable'); break; }
@@ -429,7 +435,7 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
         const key = `${claim.structured_data.source_observation_id}:${claim.property_key}`;
         if (!have.has(key)) return true;
         held.already_projected++;
-        if (have.get(key)) held.already_projected_superseded++;
+        if (!have.get(key)) held.already_projected_superseded++;
         return false;
       });
     }
@@ -449,6 +455,27 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     const tail = result.data[result.data.length - 1];
     cursor = { at: tail.ingested_at, id: tail.id };
   }
+  // Rows this projection landed before its source reading became a typed key (migration 20261125211500) are re-landed by the
+  // database as successors carrying the key, the old row superseded by its successor. Vehicle walk only, after the walk.
+  let typedSource = null;
+  if (apply && !imageIds && !reason) {
+    typedSource = { succeeded: 0, refused: 0, held_source_not_current: 0, remaining: null, calls: 0 };
+    while (typedSource.calls < TYPED_SOURCE_CALLS) {
+      let out;
+      try { out = await sb.rpc('supersede_untyped_cached_image_properties', { p_vehicle_id: vehicleId, p_limit: TYPED_SOURCE_SLICE }).abortSignal(AbortSignal.timeout(40000)); }
+      catch { out = { error: true }; }
+      typedSource.calls++;
+      const d = out?.data;
+      if (!out || out.error || !Number.isSafeInteger(d?.succeeded) || !Number.isSafeInteger(d?.remaining) ||
+          !Number.isSafeInteger(d?.held_source_not_current)) { landed.failed++; reason = 'typed_source_relink_failed'; break; }
+      // succeeded sums over calls; refused, held and remaining are what the last call saw
+      typedSource.succeeded += d.succeeded; typedSource.refused = Number.isSafeInteger(d.refused) ? d.refused : 0;
+      typedSource.held_source_not_current = d.held_source_not_current; typedSource.remaining = d.remaining;
+      if (d.succeeded === 0 || d.remaining === 0) break;
+    }
+    // a row the database refused to re-land is a failure the run reports, not a silent remainder
+    if (!reason && typedSource.refused > 0) { landed.failed++; reason = 'typed_source_refused'; }
+  }
   const summed = single || pages > 1;
   // imageIds: the readings this call judged current for the named photos (ids only), so its caller can say which reading
   // its answer is about
@@ -457,8 +484,10 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     ...counts, window_limit: limit, window_before: before, pages_walked: walked, reached_oldest_row: reachedOldest,
     full_history_verified: false, model_calls: 0, deferred, ...(single ? held : {}),
     ...(apply && !summed ? last : {}),
+    ...(typedSource ? { typed_source: typedSource } : {}),
     ...(apply && summed ? { ...landed, ...(reason ? { reason } : {}) } : {}),
+    ...(apply && !summed && reason?.startsWith('typed_source_') ? { failed: (last.failed || 0) + 1, reason } : {}),
     ...(!apply && reason ? { failed: landed.failed, reason } : {}) };
-  const nothing = apply && counts.eligible_claims === 0 && held.already_projected === 0;
+  const nothing = apply && counts.eligible_claims === 0 && held.already_projected === 0 && !(typedSource?.succeeded > 0);
   return { receipt, exitCode: receipt.failed > 0 || nothing ? 1 : 0 };
 }

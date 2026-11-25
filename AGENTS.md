@@ -255,6 +255,10 @@ machine-layer delivery does not close the unfinished renderer or estimate work.
     role `owner` only when the vehicle record names the speaker. The page reads it with `vehicle_statements(vehicle_id)`:
     words and amounts only for tied viewers, anon sees role, kind, date and "amount private". Never copy a statement or its
     amount into this repository.
+  - Cached image property projections (from `20261125211500`): a row names its source reading in the typed
+    `source_observation_id`, checked on insert by `validate_retained_listing_property_source`; never set in place. Rows
+    landed before that key are re-landed as keyed successors only by `supersede_untyped_cached_image_properties`
+    (service role), which `project-cached` calls after its vehicle walk.
   - No raw INSERT, UPDATE or DELETE on testimony tables.
   - No `DISABLE TRIGGER`.
   - No `statement_timeout = 0`.
