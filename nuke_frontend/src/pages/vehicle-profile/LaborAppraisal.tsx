@@ -120,7 +120,7 @@ export function SegmentRows({ segment, names }: { segment: LaborSegment; names?:
   const r = segment.reassembly;
   const known = [
     segment.evidence_grade ? `Evidence: ${codeText(segment.evidence_grade)}` : 'Ungraded by the reader',
-    segment.counts_in === 'unwitnessed' || segment.counts_in === 'unwitnessed_purchase' ? 'counted with purchases not seen fitted' : null,
+    segment.counts_in === 'unwitnessed' || segment.counts_in === 'unwitnessed_purchase' ? 'counted with work not witnessed' : null,
     segment.hours_basis ? `hours from ${codeText(segment.hours_basis)}` : null,
     segment.paper_hours != null ? `${h(segment.paper_hours)} on shop paper` : null,
     segment.book_hours ? `book range ${rangeText(segment.book_hours)}` : null,
@@ -163,7 +163,7 @@ export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
     <Text role="caption" as="p">Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.</Text>
     {appraisal.totals?.witnessed && withPurchases && <div title={appraisal.totals?.rule ?? undefined}><Rows title="Hours, two totals side by side">
       <Row label="Witnessed" role="measure">{witnessedTotal ?? 'none established'}{witnessedUnknownText(appraisal.totals?.witnessed)}</Row>
-      <Row label="With purchases not seen fitted" role="measure">{withPurchases}</Row>
+      <Row label="With work not witnessed" role="measure">{withPurchases}</Row>
     </Rows></div>}
     {byGrade.length > 0 && <Rows title="Hours by evidence grade">
       {byGrade.map(([grade, range]) => <Row key={grade} label={codeText(grade)} role="measure">{rangeText(range) ?? 'No hours'}</Row>)}

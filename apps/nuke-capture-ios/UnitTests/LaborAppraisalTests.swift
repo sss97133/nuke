@@ -68,7 +68,7 @@ final class LaborAppraisalTests: XCTestCase {
         XCTAssertEqual(LaborWords.witness(a.segments[2]), "2 bought; fitted question cannot tell")
         XCTAssertEqual(LaborWords.witnessedHours(a.segments[1]), "Witnessed: fitted, no book hours; minimum unknown, at most 24 h")
         XCTAssertNil(LaborWords.witnessedHours(a.segments[0]), "witnessed hours equal to the segment's are not repeated")
-        XCTAssertTrue(LaborWords.lines(a.segments[2])[0].contains("counted with purchases not seen fitted"))
+        XCTAssertTrue(LaborWords.lines(a.segments[2])[0].contains("counted with work not witnessed"))
     }
 
     func testPartsAreNamedByCatalogPartAndTheRestCounted() throws {
