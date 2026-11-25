@@ -5,13 +5,68 @@
 -- car with the redirect only ({"vehicle": {"id", "merged_into_vehicle_id"}}), for a deleted unmerged car exactly as for a
 -- missing one (NULL), and for a stub whose target the caller may not read exactly as missing too; insiders and the service role read both whole as before; every other answer is byte-identical;
 -- vehicle_publicly_readable is the one predicate (same body as 20261125214500's). Builds on the 20261125221500 contract
--- (which runs 20261125220000's first) and its fixture.
+-- (which runs 20261125220000's first) and its fixture, then 20261126034500's edit of this reader (production's body).
 \set ON_ERROR_STOP on
 \if :{?dmig}
 \else
   \set dmig ../migrations/20261125225500_profile_deleted_redirect.sql
 \endif
 \ir test_profile_external_listings_columns.sql
+
+-- The live state since 20261126034500 (#3971, live 2026-11-25 05:25 PT): organization_vehicle_link_grants and the linker
+-- stamp trigger it checks (live definitions and ACL), and that migration's anchored edit of this reader's organization-member
+-- test, run here verbatim for this reader only. The resulting body is asserted equal to production's.
+CREATE OR REPLACE FUNCTION public.stamp_organization_vehicle_linker()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+BEGIN
+  IF coalesce(auth.role(), '') NOT IN ('authenticated', 'anon') THEN RETURN NEW; END IF;
+  IF TG_OP = 'INSERT' THEN
+    NEW.linked_by_user_id := auth.uid();
+  ELSIF (NEW.vehicle_id, NEW.organization_id, NEW.relationship_type, NEW.status, NEW.linked_by_user_id)
+        IS DISTINCT FROM (OLD.vehicle_id, OLD.organization_id, OLD.relationship_type, OLD.status, OLD.linked_by_user_id) THEN
+    NEW.linked_by_user_id := auth.uid();
+  END IF;
+  RETURN NEW;
+END $function$
+;
+CREATE TRIGGER trg_stamp_organization_vehicle_linker BEFORE INSERT OR UPDATE ON public.organization_vehicles FOR EACH ROW EXECUTE FUNCTION stamp_organization_vehicle_linker();
+CREATE OR REPLACE FUNCTION public.organization_vehicle_link_grants(p_vehicle_id uuid, p_linker uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+  SELECT EXISTS (
+           SELECT 1 FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
+           WHERE t.tgrelid = 'public.organization_vehicles'::regclass
+             AND t.tgname = 'trg_stamp_organization_vehicle_linker'
+             AND t.tgenabled IN ('O', 'A') AND (t.tgtype & 23) = 23
+             AND p.pronamespace = 'public'::regnamespace AND p.proname = 'stamp_organization_vehicle_linker'
+             AND md5(p.prosrc) = '9e8299a8e5024d4404e03d55ced96413') -- gitleaks:allow (function-body fingerprint, not a secret)
+     AND (p_linker IS NULL
+          OR EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = p_vehicle_id
+                       AND p_linker IN (v.uploaded_by, v.user_id, v.owner_id, v.created_by_user_id))
+          OR public.vehicle_user_has_access(p_vehicle_id, p_linker))
+$function$;
+REVOKE ALL ON FUNCTION public.organization_vehicle_link_grants(uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.organization_vehicle_link_grants(uuid, uuid) TO authenticated, service_role;
+DO $readers$
+DECLARE d text := pg_get_functiondef('public.get_vehicle_profile_data(uuid)'::regprocedure); n int;
+  a text := E'      AND oc.user_id = v_uid\n      AND oc.status = ''active''\n  );';
+  r text := E'      AND oc.user_id = v_uid\n      AND oc.status = ''active''\n      AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) /* org_link_reads_tied_linker_v1 */\n  );';
+BEGIN
+  n := (length(d) - length(replace(d, a, ''))) / length(a);
+  ASSERT n = 1, format('20261126034500 anchor found %s times', n);
+  EXECUTE replace(d, a, r);
+END $readers$;
+DO $$ BEGIN
+  ASSERT (SELECT encode(sha256(convert_to(prosrc, 'UTF8')), 'hex') FROM pg_proc
+          WHERE oid = 'public.get_vehicle_profile_data(uuid)'::regprocedure)
+       = '9c14f2dd77870a7bd21113c80934bcec2629f647d7de915555e6d571c6d10c31', 'fixture reader body equals production since 20261126034500'; -- gitleaks:allow (function-body fingerprint, not a secret)
+END $$;
 
 -- Fixture rows in an empty disposable PG17 database, never production.
 -- 3333 public and deleted (owner bbbb); 6666 public, deleted, merged into 1111 (a stub; contributor dddd tied);
@@ -113,5 +168,8 @@ DO $$ BEGIN
     '5 EXECUTE stays with PUBLIC (the vehicles policies of 20261125225000 call it for every role)';
   ASSERT position('vehicle_publicly_readable(v.is_public, v.deleted_at, v.merged_into_vehicle_id)' in
           (SELECT prosrc FROM pg_proc WHERE oid = 'public.get_vehicle_profile_data(uuid)'::regprocedure)) > 0, '5 the reader calls it';
+  ASSERT position('AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id)' in
+          (SELECT prosrc FROM pg_proc WHERE oid = 'public.get_vehicle_profile_data(uuid)'::regprocedure)) > 0,
+    '5 the organization-member test keeps 20261126034500''s organization_vehicle_link_grants line';
 END $$;
 SELECT 'PASS: get_vehicle_profile_data answers a deleted car as missing and a deleted stub as a redirect' AS result;

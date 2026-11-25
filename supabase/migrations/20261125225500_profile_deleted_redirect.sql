@@ -13,9 +13,10 @@
 -- when its target is publicly readable; a stub whose target is not (prod 2026-11-25, 8 of 256 pk slices: 280 of 1,050
 -- public stubs, 26.7%, about 9.0k for the table, every one a private target) and a deleted car that was not merged answer
 -- NULL, exactly like a missing one. The page's fallback select (loadVehicleData.ts, PUBLIC_ROW_OR) applies the same rule. Insiders and the service role are
--- unchanged. Built on 20261125221500: the guard accepts only that body (or this one on a re-run).
+-- unchanged. Built on 20261126034500 (#3971, live): the guard accepts only that body (or this one on a re-run); the
+-- organization-member test keeps its organization_vehicle_link_grants line.
 -- CONTRACT: supabase/sql/test_profile_deleted_redirect.sql (PG17). REVERSAL:
--- supabase/sql/revert_20261125225500_profile_deleted_redirect.sql (the 20261125221500 body).
+-- supabase/sql/revert_20261125225500_profile_deleted_redirect.sql (the 20261126034500 body).
 BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
@@ -25,9 +26,9 @@ DECLARE s text;
 BEGIN
   SELECT encode(sha256(convert_to(p.prosrc, 'UTF8')), 'hex') INTO s
   FROM pg_proc p WHERE p.oid = 'public.get_vehicle_profile_data(uuid)'::regprocedure;
-  IF s IS DISTINCT FROM '8de209c9b0536fba4eeb3470970519683bf7cfdb041dfba3943d2f785554d6e8'
+  IF s IS DISTINCT FROM '9c14f2dd77870a7bd21113c80934bcec2629f647d7de915555e6d571c6d10c31' -- gitleaks:allow (function-body fingerprint, not a secret)
      AND position('profile_deleted_redirect_v1' in pg_get_functiondef('public.get_vehicle_profile_data(uuid)'::regprocedure)) = 0 THEN
-    RAISE EXCEPTION 'get_vehicle_profile_data is not the 20261125221500 body (sha256 %); deploy that first or review', s;
+    RAISE EXCEPTION 'get_vehicle_profile_data is not the 20261126034500 body (sha256 %); deploy that first or review', s;
   END IF;
 END $guard$;
 
@@ -98,6 +99,7 @@ BEGIN
     WHERE ov.vehicle_id = p_vehicle_id
       AND oc.user_id = v_uid
       AND oc.status = 'active'
+      AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) /* org_link_reads_tied_linker_v1 */
   );
 
   SELECT json_build_object(

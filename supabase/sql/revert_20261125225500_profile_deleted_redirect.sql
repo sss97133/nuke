@@ -1,5 +1,5 @@
--- REVERT of 20261125225500_profile_deleted_redirect.sql: restores the get_vehicle_profile_data body of 20261125221500
--- (sha256 of prosrc 8de209c9b0536fba4eeb3470970519683bf7cfdb041dfba3943d2f785554d6e8), which opens a deleted public car
+-- REVERT of 20261125225500_profile_deleted_redirect.sql: restores the get_vehicle_profile_data body of 20261126034500
+-- (sha256 of prosrc 9c14f2dd77870a7bd21113c80934bcec2629f647d7de915555e6d571c6d10c31), which opens a deleted public car -- gitleaks:allow (function-body fingerprint, not a secret)
 -- to anyone. vehicle_publicly_readable stays (vehicle_row_read uses it). Apply only through a migration that copies it.
 BEGIN;
 SET LOCAL statement_timeout = '30s';
@@ -42,6 +42,7 @@ BEGIN
     WHERE ov.vehicle_id = p_vehicle_id
       AND oc.user_id = v_uid
       AND oc.status = 'active'
+      AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) /* org_link_reads_tied_linker_v1 */
   );
 
   SELECT json_build_object(
