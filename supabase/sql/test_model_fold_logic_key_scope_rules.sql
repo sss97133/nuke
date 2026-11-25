@@ -1,4 +1,4 @@
--- Disposable PG17 contract for 20261125111500_model_fold_logic_key_scope_rules. Synthetic rows only.
+-- Disposable PG17 contract for 20261125112500_model_fold_logic_key_scope_rules. Synthetic rows only.
 -- Runs the live model_fold_logic_key (2026-11-25) and asserts: the key is unchanged by the migration while every rule row
 -- is Pontiac or make NULL; a rule for a make no scope uses does not move it; a Pontiac or make-NULL rule does; adding a
 -- scope for a make brings that make's rows in; a replay changes nothing.
@@ -84,8 +84,8 @@ INSERT INTO public.vehicle_decode_rules (rule_key, make, code, value, citation_u
 CREATE TEMP TABLE k (step text PRIMARY KEY, key text);
 INSERT INTO k VALUES ('before', public.model_fold_logic_key());
 
-\ir ../migrations/20261125111500_model_fold_logic_key_scope_rules.sql
-\ir ../migrations/20261125111500_model_fold_logic_key_scope_rules.sql
+\ir ../migrations/20261125112500_model_fold_logic_key_scope_rules.sql
+\ir ../migrations/20261125112500_model_fold_logic_key_scope_rules.sql
 SET client_min_messages = warning;
 
 DO $t$
