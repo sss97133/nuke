@@ -44,6 +44,9 @@ CREATE TABLE public.model_fold_work (vehicle_id uuid PRIMARY KEY REFERENCES publ
   attempts int NOT NULL DEFAULT 0, updated_at timestamptz);
 CREATE FUNCTION public.model_fold_config() RETURNS jsonb LANGUAGE sql STABLE AS $f$
   SELECT jsonb_build_object('sweep_pending_cap', coalesce((SELECT (config_value->>'cap')::int FROM public.platform_config WHERE config_key = 'test_cap'), 4)) $f$;
+CREATE TABLE public.model_fold_signal (id bigserial PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles (id), reason text,
+  origin_id uuid, at timestamptz NOT NULL DEFAULT now());
+CREATE FUNCTION public.model_fold_signals_on() RETURNS boolean LANGUAGE sql STABLE AS $f$ SELECT true $f$;
 CREATE FUNCTION public.vehicle_user_has_access(p_vehicle uuid, p_user uuid) RETURNS boolean LANGUAGE sql STABLE AS $f$ SELECT false $f$;
 -- live definition (2026-11-25)
 CREATE FUNCTION public.data_set_can_read_vehicle(p_vehicle uuid) RETURNS boolean LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -214,6 +217,33 @@ DO $$ DECLARE d text; r jsonb; n int; BEGIN
   RAISE NOTICE 'gauge %', public.vehicle_facet_grades_gauge();
 END $$;
 
+-- Rule version 1 (overlay_may_raise false): the fold keeps or lowers the logged-out grade, never raises it.
+DO $$ DECLARE rises int; j jsonb; BEGIN
+  IF (SELECT overlay_may_raise FROM public.establishment_rules WHERE rule_key = 'default') THEN
+    RAISE EXCEPTION 'overlay_may_raise must start false'; END IF;
+  SET LOCAL ROLE anon;
+  CREATE TEMP TABLE _after AS SELECT v AS car, k, s FROM unnest(ARRAY['00000000-0000-0000-0000-0000000000a1',
+    '00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000d1']::uuid[]) v, jsonb_each_text(pg_temp.st(v)) e(k, s);
+  PERFORM set_config('nuke.facet_grades', 'raw', true);
+  CREATE TEMP TABLE _raw AS SELECT v AS car, k, s FROM unnest(ARRAY['00000000-0000-0000-0000-0000000000a1',
+    '00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000d1']::uuid[]) v, jsonb_each_text(pg_temp.st(v)) e(k, s);
+  PERFORM set_config('nuke.facet_grades', '', true);
+  RESET ROLE;
+  SELECT count(*) INTO rises FROM _after a JOIN _raw r USING (car, k)
+   WHERE ('{"missing": 0, "conflict": 0, "claim": 1, "reading": 2, "established": 3}'::jsonb->>a.s)::int
+       > ('{"missing": 0, "conflict": 0, "claim": 1, "reading": 2, "established": 3}'::jsonb->>r.s)::int;
+  IF rises <> 0 THEN RAISE EXCEPTION 'the fold raised % grades under rule version 1', rises; END IF;
+  SET LOCAL ROLE anon; j := pg_temp.doc('00000000-0000-0000-0000-0000000000a1', 'year.recorded'); RESET ROLE;
+  IF j->>'status' <> 'claim' OR (j->>'private_witnesses')::int <> 1 OR j ? 'value_private' THEN RAISE EXCEPTION 'v1 A year: %', j; END IF;
+  SET LOCAL ROLE anon; j := pg_temp.doc('00000000-0000-0000-0000-0000000000a1', 'make.recorded'); RESET ROLE;
+  IF j->>'status' <> 'missing' OR j->'value' <> 'null'::jsonb OR (j->>'private_witnesses')::int <> 1 THEN RAISE EXCEPTION 'v1 A make: %', j; END IF;
+  SET LOCAL ROLE anon; j := pg_temp.doc('00000000-0000-0000-0000-0000000000b1', 'model.recorded'); RESET ROLE;
+  IF j->>'status' <> 'conflict' OR j::text LIKE '%Trans Am%' THEN RAISE EXCEPTION 'v1 B model (lowering is allowed): %', j; END IF;
+  DROP TABLE _after; DROP TABLE _raw;
+END $$;
+-- The rule row flips (the two-axis rule ships): the fold may raise.
+UPDATE public.establishment_rules SET overlay_may_raise = true;
+
 -- Parity: every item of every public car has the same status for anon and the service role.
 DO $$ DECLARE v uuid; a jsonb; s jsonb; BEGIN
   FOREACH v IN ARRAY ARRAY['00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1']::uuid[] LOOP
@@ -258,6 +288,34 @@ DO $$ DECLARE j jsonb; BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
+
+-- Stale: the hidden decode of A is replaced. The fold row is stamped and not read; the car is queued to fold again.
+DO $$ DECLARE j jsonb; BEGIN
+  SET LOCAL ROLE anon; j := pg_temp.doc('00000000-0000-0000-0000-0000000000a1', 'year.recorded'); RESET ROLE;
+  IF j->>'status' <> 'established' THEN RAISE EXCEPTION 'A year before the change: %', j; END IF;
+END $$;
+UPDATE public.vehicle_field_evidence SET value_text = '1979'
+ WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a1' AND item_key = 'year.recorded';
+DO $$ DECLARE j jsonb; BEGIN
+  IF (SELECT evidence_changed_at FROM public.vehicle_facet_grade_folds WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a1') IS NULL THEN
+    RAISE EXCEPTION 'fold row not stamped'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a1'
+                   AND reason = 'vehicle_field_evidence_update') THEN RAISE EXCEPTION 'car not queued to fold again'; END IF;
+  SET LOCAL ROLE anon; j := pg_temp.doc('00000000-0000-0000-0000-0000000000a1', 'year.recorded'); RESET ROLE;
+  IF j->>'status' <> 'claim' OR j ? 'private_witnesses' THEN RAISE EXCEPTION 'A year after its hidden decode changed: %', j; END IF;
+  -- folded again: the conflict is now the car's grade, the hidden value still unnamed
+  PERFORM public.vehicle_facet_grades_fold('00000000-0000-0000-0000-0000000000a1');
+  SET LOCAL ROLE anon; j := pg_temp.doc('00000000-0000-0000-0000-0000000000a1', 'year.recorded'); RESET ROLE;
+  IF j->>'status' <> 'conflict' OR j::text LIKE '%1979%' THEN RAISE EXCEPTION 'A year after the refold: %', j; END IF;
+END $$;
+-- Stale by the vehicle fold's own queue: B is dirty after its fold, so its row is not read.
+INSERT INTO public.model_fold_work (vehicle_id, state, priority, dirty_at, first_dirty_at, next_attempt_at)
+VALUES ('00000000-0000-0000-0000-0000000000b1', 'pending', 1, clock_timestamp(), now(), now())
+ON CONFLICT (vehicle_id) DO UPDATE SET state = 'pending', dirty_at = clock_timestamp();
+DO $$ DECLARE j jsonb; BEGIN
+  SET LOCAL ROLE anon; j := pg_temp.doc('00000000-0000-0000-0000-0000000000b1', 'model.recorded'); RESET ROLE;
+  IF j->>'status' <> 'claim' OR j ? 'private_witnesses' THEN RAISE EXCEPTION 'B read a fold older than its queue row: %', j; END IF;
+END $$;
 
 -- Stale: D gains a public value that disagrees after its fold; the caller sees as many witnesses, so its doc stands.
 INSERT INTO public.listing_claims (vehicle_id, item_key, value) VALUES ('00000000-0000-0000-0000-0000000000d1', 'year.recorded', '1979');

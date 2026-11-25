@@ -28,15 +28,30 @@
 --   fold's normalized value equals the caller's (else the fold is stale and the caller's doc stands); a private item
 --   keeps the caller's status and gains the count, since a grade beside a visible value would tell the private value.
 --   Sources stay as the caller's row policies return them.
+-- NEVER RAISE UNTIL THE RULE SHIPS (lead ruling 2026-11-25, after ta-skeptic). establishment_rules.overlay_may_raise,
+--   false on the live row (rule version 1): the overlay may keep or lower a caller's grade (rank missing = conflict <
+--   claim < reading < established) and add the count, never raise it. Under version 1 one hidden nhtsa decode claim plus a
+--   listing claim would raise 9 items to established on the 3 cars; with the flag false the dry run raises 0. The flag
+--   flips with the rule row (the two-axis rule), not with a code edit.
+-- STALE FOLD. A fold row is not used when its car's evidence changed after it: vehicle_facet_grade_folds.evidence_changed_at
+--   is stamped by a statement trigger on vehicle_field_evidence (which also queues a model_fold_signal for the car, in or
+--   out of the fold's make scope), and a car whose model_fold_work row is pending or leased with dirty_at after the fold
+--   is skipped too (every table the model fold signals). The caller's own grade stands until the car folds again.
 -- NOT CHANGED. The receipt branch keeps its party gate: 0 paper rows in field_evidence map to a facet field (all are
 --   spend:* fields, 2026-11-25), so no grade moves on it today.
 -- EVERY CAR (lap 2, a later migration): vehicle_facet_grades_in_scope returns true for every public car and the seed
 --   cursor walks vehicles; at ~0.3 s a fold and the tick's spare budget that is ~40k cars a day, ~30 days for ~1.16M.
 --   When every public car has a current fold row the reader drops the caller-status path.
 -- REVERT. Redefine vehicle_facet_items and model_fold_one without the text between facet_grades_fold_v1 and
---   facet_grades_fold_v1_end, unschedule vehicle-facet-grades-seed; the tables can stay (nothing else reads them).
+--   facet_grades_fold_v1_end, unschedule vehicle-facet-grades-seed, drop the three vehicle_facet_grades_changed_*
+--   triggers; the tables and the rule column can stay (nothing else reads them).
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
+
+-- 0. The rule row says whether the folded grade may raise a caller's grade ---------------------------------------------
+ALTER TABLE public.establishment_rules ADD COLUMN IF NOT EXISTS overlay_may_raise boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN public.establishment_rules.overlay_may_raise IS
+  'facet_grades_fold_v1: may the grade folded over every witness raise the grade a caller computes from the witnesses it can see. False until the two-axis rule ships (lead ruling 2026-11-25): keep or lower only.';
 
 -- 1. Which item values may leave the fold -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.vehicle_facet_item_rules (
@@ -109,11 +124,13 @@ CREATE TABLE IF NOT EXISTS public.vehicle_facet_grade_folds (
   unregistered text[] NOT NULL DEFAULT '{}',
   ms integer,
   error text,
-  folded_at timestamptz NOT NULL DEFAULT now()
+  folded_at timestamptz NOT NULL DEFAULT now(),
+  evidence_changed_at timestamptz
 );
+ALTER TABLE public.vehicle_facet_grade_folds ADD COLUMN IF NOT EXISTS evidence_changed_at timestamptz;
 CREATE INDEX IF NOT EXISTS vehicle_facet_grade_folds_folded_at_idx ON public.vehicle_facet_grade_folds (folded_at);
 COMMENT ON TABLE public.vehicle_facet_grade_folds IS
-  'facet_grades_fold_v1: the last fold of each vehicle (logic key, items written, items with no vehicle_facet_item_rules row, ms, error).';
+  'facet_grades_fold_v1: the last fold of each vehicle (logic key, items written, items with no vehicle_facet_item_rules row, ms, error); folded_at is when its read began; evidence_changed_at is stamped when a private source of the car changes, and a row stamped after its fold is not read.';
 ALTER TABLE public.vehicle_facet_grade_folds ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.vehicle_facet_grade_folds FROM anon, authenticated;
 GRANT ALL ON public.vehicle_facet_grade_folds TO service_role;
@@ -188,7 +205,7 @@ BEGIN
        AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_rows) x WHERE x->>'item_key' = g.item_key);
     INSERT INTO public.vehicle_facet_grades AS g (vehicle_id, item_key, status, value, normalized, n_witnesses, by_class, basis,
                                                   logic_key, folded_at)
-    SELECT p_vehicle_id, x.item_key, x.status, x.value, x.normalized, x.n_witnesses, x.by_class, x.basis, k, now()
+    SELECT p_vehicle_id, x.item_key, x.status, x.value, x.normalized, x.n_witnesses, x.by_class, x.basis, k, t0
     FROM jsonb_to_recordset(v_rows) AS x(item_key text, status text, value jsonb, normalized text, n_witnesses int,
                                          by_class jsonb, basis jsonb)
     ON CONFLICT (vehicle_id, item_key) DO UPDATE SET
@@ -201,30 +218,39 @@ BEGIN
   END;
   INSERT INTO public.vehicle_facet_grade_folds AS f (vehicle_id, logic_key, items, unregistered, ms, error, folded_at)
   VALUES (p_vehicle_id, coalesce(k, ''), n, coalesce(v_unreg, '{}'),
-          (extract(epoch FROM clock_timestamp() - t0) * 1000)::int, left(err, 500), now())
+          (extract(epoch FROM clock_timestamp() - t0) * 1000)::int, left(err, 500), t0)
   ON CONFLICT (vehicle_id) DO UPDATE SET
     logic_key = excluded.logic_key,
     items = CASE WHEN excluded.error IS NULL THEN excluded.items ELSE f.items END,
     unregistered = CASE WHEN excluded.error IS NULL THEN excluded.unregistered ELSE f.unregistered END,
-    ms = excluded.ms, error = excluded.error, folded_at = excluded.folded_at;
+    ms = excluded.ms, error = excluded.error,
+    folded_at = CASE WHEN excluded.error IS NULL THEN excluded.folded_at ELSE f.folded_at END;
   RETURN jsonb_build_object('items', n, 'unregistered', v_unreg, 'error', err,
                             'ms', (extract(epoch FROM clock_timestamp() - t0) * 1000)::int);
 END $$;
 
--- The folded grades a caller may use: only for a car the caller may read, only under the current logic key, the value
--- only for a publishable item (the rule as it stands at read time). NULL while the fold itself is reading.
+-- The folded grades a caller may use: only for a car the caller may read, only under the current logic key, only when
+-- no evidence of the car changed after the fold, the value only for a publishable item (the rule as it stands at read
+-- time), with the rule row's overlay_may_raise. NULL while the fold itself is reading.
 CREATE OR REPLACE FUNCTION public.vehicle_facet_grades_read(p_vehicle_id uuid)
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT CASE WHEN coalesce(current_setting('nuke.facet_grades', true), '') = 'raw' THEN NULL
               WHEN NOT public.data_set_can_read_vehicle(p_vehicle_id) THEN NULL
               ELSE (SELECT jsonb_object_agg(g.item_key, jsonb_build_object(
                              'status', g.status, 'n', g.n_witnesses, 'by_class', g.by_class, 'basis', g.basis,
-                             'publishable', r.value_publishable,
+                             'publishable', r.value_publishable, 'may_raise', er.overlay_may_raise,
                              'value', CASE WHEN r.value_publishable THEN g.value END,
                              'normalized', CASE WHEN r.value_publishable THEN g.normalized END))
-                    FROM public.vehicle_facet_grades g
+                    FROM public.vehicle_facet_grade_folds f
+                    JOIN public.vehicle_facet_grades g ON g.vehicle_id = f.vehicle_id
                     JOIN public.vehicle_facet_item_rules r ON r.item_key = g.item_key
-                    WHERE g.vehicle_id = p_vehicle_id AND g.logic_key = public.vehicle_facet_grades_logic_key()) END
+                    JOIN public.establishment_rules er ON er.rule_key = 'default'
+                                                      AND g.logic_key = 'establishment_rules/' || er.rule_key || '/' || er.rule_version
+                    WHERE f.vehicle_id = p_vehicle_id AND f.error IS NULL
+                      AND (f.evidence_changed_at IS NULL OR f.evidence_changed_at < f.folded_at)
+                      AND NOT EXISTS (SELECT 1 FROM public.model_fold_work w
+                                       WHERE w.vehicle_id = f.vehicle_id AND w.state IN ('pending', 'leased')
+                                         AND w.dirty_at > f.folded_at)) END
 $$;
 
 -- One item: the caller's doc with the fold's grade laid over it (see the header).
@@ -232,6 +258,7 @@ CREATE OR REPLACE FUNCTION public.vehicle_facet_grade_overlay(p_doc jsonb, p_fol
 RETURNS jsonb LANGUAGE plpgsql IMMUTABLE SET search_path = public, pg_temp AS $$
 DECLARE
   vis_n int; priv int; fs text; pub boolean; has_val boolean; vis_norm text; d jsonb;
+  rank_of constant jsonb := '{"missing": 0, "conflict": 0, "claim": 1, "reading": 2, "established": 3}';
 BEGIN
   IF p_doc IS NULL OR p_fold IS NULL OR jsonb_typeof(p_fold) <> 'object' OR jsonb_typeof(p_doc) <> 'object' THEN
     RETURN p_doc;
@@ -246,6 +273,11 @@ BEGIN
   has_val := coalesce(p_doc->>'status', 'missing') <> 'missing';
   vis_norm := coalesce(p_doc->>'normalized', p_doc->>'value');
   d := p_doc || jsonb_build_object('private_witnesses', priv);
+  -- The rule row decides whether the fold may raise the caller's grade; until then it keeps or lowers it.
+  IF NOT coalesce((p_fold->>'may_raise')::boolean, false)
+     AND coalesce((rank_of->>fs)::int, 0) > coalesce((rank_of->>coalesce(p_doc->>'status', 'missing'))::int, 0) THEN
+    RETURN d;
+  END IF;
   IF NOT has_val THEN
     d := d || jsonb_build_object('status', fs,
                                  'value', CASE WHEN pub AND fs <> 'conflict' THEN p_fold->'value' END,
@@ -350,6 +382,42 @@ GRANT EXECUTE ON FUNCTION public.vehicle_facet_grades_fold(uuid), public.vehicle
   public.vehicle_facet_grades_in_scope(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.vehicle_facet_grades_read(uuid), public.vehicle_facet_grade_overlay(jsonb, jsonb),
   public.vehicle_facet_grades_logic_key(), public.vehicle_facet_grades_gauge() TO anon, authenticated, service_role;
+
+-- 3b. A private source of a car changed: its fold row stops being read, and the car is queued to fold again -----------
+CREATE OR REPLACE FUNCTION public.vehicle_facet_grades_evidence_changed()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_ids uuid[];
+BEGIN
+  IF tg_op = 'INSERT' THEN
+    SELECT array_agg(DISTINCT n.vehicle_id) INTO v_ids FROM new_rows n WHERE n.vehicle_id IS NOT NULL;
+  ELSIF tg_op = 'DELETE' THEN
+    SELECT array_agg(DISTINCT o.vehicle_id) INTO v_ids FROM old_rows o WHERE o.vehicle_id IS NOT NULL;
+  ELSE
+    SELECT array_agg(DISTINCT x) INTO v_ids
+      FROM (SELECT o.vehicle_id AS x FROM old_rows o UNION SELECT n.vehicle_id FROM new_rows n) z WHERE x IS NOT NULL;
+  END IF;
+  IF v_ids IS NULL THEN RETURN NULL; END IF;
+  UPDATE public.vehicle_facet_grade_folds SET evidence_changed_at = clock_timestamp() WHERE vehicle_id = ANY (v_ids);
+  BEGIN
+    IF public.model_fold_signals_on() THEN
+      INSERT INTO public.model_fold_signal (vehicle_id, reason)
+      SELECT v.id, 'vehicle_field_evidence_' || lower(tg_op) FROM public.vehicles v WHERE v.id = ANY (v_ids);
+    END IF;
+  EXCEPTION WHEN others THEN
+    RAISE WARNING 'facet grade refold signal skipped: %', sqlerrm;
+  END;
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION public.vehicle_facet_grades_evidence_changed() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS vehicle_facet_grades_changed_ins ON public.vehicle_field_evidence;
+DROP TRIGGER IF EXISTS vehicle_facet_grades_changed_upd ON public.vehicle_field_evidence;
+DROP TRIGGER IF EXISTS vehicle_facet_grades_changed_del ON public.vehicle_field_evidence;
+CREATE TRIGGER vehicle_facet_grades_changed_ins AFTER INSERT ON public.vehicle_field_evidence
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.vehicle_facet_grades_evidence_changed();
+CREATE TRIGGER vehicle_facet_grades_changed_upd AFTER UPDATE ON public.vehicle_field_evidence
+  REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.vehicle_facet_grades_evidence_changed();
+CREATE TRIGGER vehicle_facet_grades_changed_del AFTER DELETE ON public.vehicle_field_evidence
+  REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public.vehicle_facet_grades_evidence_changed();
 
 -- 4. The reader lays the fold over each item ---------------------------------------------------------------------------
 DO $patch$
