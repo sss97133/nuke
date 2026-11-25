@@ -133,11 +133,7 @@ END $$;
 DO $$
 DECLARE p text; ok boolean;
 BEGIN
-  -- The last four are skeptic2's probes: negative lookarounds the joined fast path would read across a leaf edge
-  -- ({"a":"x","b":"PRIVATEdata"}, {"a":"call 555-1234","b":"y"}, {a:'first leaf',b:'TOKENabc'}, ['SECRET123','later']).
-  FOREACH p IN ARRAY ARRAY['(', '.*', 'a*', '', '\Ax\d', 'x\d\Z', '(?<!.)PRIVATE\w+', '\d{3}-\d{4}(?!.)',
-                           '(?<!.)TOKEN\w+', 'SECRET\d{3}(?!\s)', 'x\d(?![^0-9])', 'x\d(?!\D)', 'x\d(?![[:space:]])',
-                           'x\d(?![\n])', 'x\d(?!(.))', 'x\d(?![0-9])(?!.)'] LOOP
+  FOREACH p IN ARRAY ARRAY['(', '.*', 'a*', '', '\Ax\d', 'x\d\Z'] LOOP
     ok := false;
     BEGIN
       INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
@@ -299,4 +295,63 @@ BEGIN
   ASSERT w -> 'origin_metadata' ->> 'a' = '[contact through Nuke]' AND w ->> 'description' NOT LIKE '%555-0180%', '13 answer';
 END $$;
 ROLLBACK;
+-- Corpus for the equivalence runs: contact text, tokens and keys in the first leaf, a later leaf, at leaf starts and
+-- ends, beside URLs, nested in arrays and objects, and values with nothing to change.
+CREATE TABLE public.om_corpus (n int PRIMARY KEY, j jsonb NOT NULL);
+INSERT INTO public.om_corpus VALUES
+  (1, '{"a": "first leaf", "b": "SECRET-42"}'), (2, '{"b": "SECRET-42"}'), (3, '["SECRET123", "later leaf"]'),
+  (4, '["later leaf", "SECRET123"]'), (5, '{"a": "x", "b": "PRIVATEdata"}'), (6, '{"a": "call 555-1234", "b": "y"}'),
+  (7, '{"a": "first leaf", "b": "TOKENabc"}'), (8, '{"a": "call 702-555-1234", "b": "5 cars"}'),
+  (9, '{"a": "5 cars", "b": "702-555-1234"}'), (10, '{"x": {"y": ["no", {"z": "mail s@t.invalid now"}]}}'),
+  (11, '{"seller_phone": "702-555-0100", "k": "v"}'), (12, '{"a": {"Party_Type": "Private Party: 702 555 0101"}}'),
+  (13, '{"party_type": null, "note": "nothing here"}'), (14, '{"u": "https://h.invalid/7025550160", "t": "fine"}'),
+  (15, '{"a": "see https://h.invalid/x 702-555-0190 or s@t.invalid"}'), (16, '{"chassis_number": "702-555-0102", "phone_number": "702-555-0103"}'),
+  (17, '[]'), (18, '{}'), (19, '{"n": 7025550104, "b": true}'), (20, '{"a": "line one\nSECRET-7\nline three"}'),
+  (21, '{"a": "702-555-0105", "b": "x"}'), (22, '[["a"], ["b", "SECRET-9"]]'), (23, '{"Cell_Number": "x 702.555.0106"}');
+
+-- 14. Every rule flagged joined_prefilter_safe, read from the table: with that rule alone enabled, and with all flagged
+--     rules together, the fast path's answer equals the leaf-by-leaf walk on every corpus value. A rule flagged without
+--     this holding fails here.
+BEGIN;
+DO $$
+DECLARE r record; c record; rules jsonb; bad text[] := '{}'; flagged int := 0;
+BEGIN
+  FOR r IN SELECT rule_key FROM public.contact_redaction_rules WHERE joined_prefilter_safe UNION ALL SELECT '*all flagged*' LOOP
+    UPDATE public.contact_redaction_rules SET enabled = (CASE WHEN r.rule_key = '*all flagged*' THEN joined_prefilter_safe
+                                                              ELSE rule_key = r.rule_key END);
+    SELECT jsonb_agg(jsonb_build_object('action', x.action, 'key_regex', x.key_regex, 'pattern', x.pattern,
+             'replacement', x.replacement, 'skip_url_leaves', x.skip_url_leaves, 'skip_key_regex', x.skip_key_regex,
+             'never_skip_key_regex', x.never_skip_key_regex) ORDER BY x.ordinal)
+      INTO rules FROM public.contact_redaction_rules x WHERE x.enabled;
+    IF r.rule_key <> '*all flagged*' THEN flagged := flagged + 1; END IF;
+    FOR c IN SELECT * FROM public.om_corpus ORDER BY n LOOP
+      IF public.jsonb_redact_contact(c.j) IS DISTINCT FROM public.jsonb_redact_contact_leaves(c.j, rules) THEN
+        bad := bad || format('%s on corpus %s', r.rule_key, c.n);
+      END IF;
+    END LOOP;
+  END LOOP;
+  ASSERT flagged >= 3, format('14 the three seeded rules are flagged (%s)', flagged);
+  ASSERT cardinality(bad) = 0, format('14 joined answer differs from the walk: %s', bad);
+END $$;
+ROLLBACK;
+
+-- 15. A new rule is exact by default: joined_prefilter_safe defaults to false, and such a rule is applied leaf by leaf,
+--     so skeptic2's probes (embedded (?s), negative lookarounds at leaf edges) redact a later leaf as the walk does.
+BEGIN;
+INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
+  VALUES ('probe_s', 'redact', '(?s)^SECRET-\d+', '[gone]', false, 41, 'contract case: unproven rule', '2026-11-25'),
+         ('probe_lb', 'redact', '(?<!.)PRIVATE\w+', '[gone]', false, 42, 'contract case: unproven rule', '2026-11-25'),
+         ('probe_la', 'redact', '\d{3}-\d{4}(?!.)', '[gone]', false, 43, 'contract case: unproven rule', '2026-11-25'),
+         ('probe_tok', 'redact', '(?<!.)TOKEN\w+', '[gone]', false, 44, 'contract case: unproven rule', '2026-11-25'),
+         ('probe_sp', 'redact', 'SECRET\d{3}(?!\s)', '[gone]', false, 45, 'contract case: unproven rule', '2026-11-25');
+DO $$ BEGIN
+  ASSERT NOT (SELECT bool_or(joined_prefilter_safe) FROM public.contact_redaction_rules WHERE rule_key LIKE 'probe_%'),
+    '15 the flag defaults to false';
+  ASSERT public.jsonb_redact_contact('{"a": "first leaf", "b": "SECRET-42"}') = '{"a": "first leaf", "b": "[gone]"}', '15 (?s)^ on a later leaf';
+  ASSERT public.jsonb_redact_contact('{"a": "x", "b": "PRIVATEdata"}') = '{"a": "x", "b": "[gone]"}', '15 (?<!.) on a later leaf';
+  ASSERT public.jsonb_redact_contact('{"a": "first leaf", "b": "TOKENabc"}') = '{"a": "first leaf", "b": "[gone]"}', '15 (?<!.) token';
+  ASSERT public.jsonb_redact_contact('["SECRET123", "later leaf"]') = '["[gone]", "later leaf"]', '15 (?!\s) at a leaf end';
+END $$;
+ROLLBACK;
+
 SELECT 'PASS: the public projection redacts origin_metadata leaf by leaf with contact rule rows' AS result;
