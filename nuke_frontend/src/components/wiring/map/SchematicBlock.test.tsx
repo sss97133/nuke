@@ -12,7 +12,7 @@ import { SchematicBlock } from './SchematicBlock';
 
 const vehicleId = 'vehicle-fixture';
 const segment = (id: string, from: string, to: string, length: number): PhysicalSegment => ({
-  id, circuit_id: 'c110', from_termination_id: from, to_termination_id: to,
+  id, net_id: 'net-fixture', circuit_id: 'c110', design_status: 'decided', from_termination_id: from, to_termination_id: to,
   gauge_awg: 22, circuit_gauge_awg: 22, colour: 'yellow/red', keyed_part_number: null,
   planned_length_ft: length, measured_length_ft: null, link_state: 'linked',
   specification_state: 'incomplete', legacy_check_state: 'unversioned',
@@ -20,19 +20,20 @@ const segment = (id: string, from: string, to: string, length: number): Physical
 function fixture(): PhysicalHarnessModel {
   return { contract_version: 1, vehicle_id: vehicleId, snapshot_hash: 'fixture-snapshot',
     snapshot_kind: 'current_read_not_published_revision',
+    nets: [{ id: 'net-fixture' }],
     circuits: [{ id: 'c110', code: '110', name: 'Coolant temperature', section: 'engine', design_status: 'decided' }],
     endpoints: [
-      { id: 'ecu', code: 'M130-B', name: 'Engine controller' },
-      { id: 'cab', code: 'FIREWALL-CABIN', name: 'Firewall cabin half' },
-      { id: 'bay', code: 'FIREWALL-ENGINE', name: 'Firewall engine half' },
-      { id: 'sensor', code: 'CLT-ECU', name: 'Coolant temperature sensor' },
+      { id: 'ecu', code: 'M130-B', name: 'Engine controller', node_kind: 'terminals' },
+      { id: 'cab', code: 'FIREWALL-CABIN', name: 'Firewall cabin half', node_kind: 'terminals' },
+      { id: 'bay', code: 'FIREWALL-ENGINE', name: 'Firewall engine half', node_kind: 'terminals' },
+      { id: 'sensor', code: 'CLT-ECU', name: 'Coolant temperature sensor', node_kind: 'terminals' },
     ],
     // Deliberately shuffled: display must use keys, never a positional sort.
     terminations: [
-      { id: 't4', circuit_id: 'c110', endpoint_id: 'sensor', cavity: '1' },
-      { id: 't2', circuit_id: 'c110', endpoint_id: 'cab', cavity: 'A' },
-      { id: 't1', circuit_id: 'c110', endpoint_id: 'ecu', cavity: 'B04' },
-      { id: 't3', circuit_id: 'c110', endpoint_id: 'bay', cavity: 'A' },
+      { id: 't4', circuit_id: 'c110', endpoint_id: 'sensor', cavity: '1', cavity_layout_id: null },
+      { id: 't2', circuit_id: 'c110', endpoint_id: 'cab', cavity: 'A', cavity_layout_id: null },
+      { id: 't1', circuit_id: 'c110', endpoint_id: 'ecu', cavity: 'B04', cavity_layout_id: null },
+      { id: 't3', circuit_id: 'c110', endpoint_id: 'bay', cavity: 'A', cavity_layout_id: null },
     ],
     segments: [segment('piece-cabin', 't1', 't2', 1.09), segment('piece-engine', 't3', 't4', 3.54)],
     connector_matings: [{ from_endpoint_id: 'cab', to_endpoint_id: 'bay' }],
@@ -48,9 +49,9 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
-async function render(id = vehicleId) {
+async function render(id = vehicleId, isOwner = false) {
   await act(async () => root.render(<SchematicBlock cw={COLORWAYS.paper} vehicleId={id}
-    section="engine" sel="w:110" rel={rel} isOwner={false} onSelect={onSelect} />));
+    section="engine" sel="w:110" rel={rel} isOwner={isOwner} onSelect={onSelect} />));
 }
 it('draws exactly the two keyed physical pieces, retaining a separate connector mate', async () => {
   await render();
@@ -85,6 +86,33 @@ it('omits concepts for public readers and never creates a cable from a mating pa
   expect(physicalSchematicPieces(model, 'engine', true)).toHaveLength(2);
   model.segments = [];
   expect(physicalSchematicPieces(model, 'engine', true)).toEqual([]);
+});
+it('retains candidate and rejected segment qualification independently of its decided circuit', async () => {
+  model.segments[0].design_status = 'candidate'; model.segments[1].design_status = 'contradicted';
+  expect(physicalSchematicPieces(model, 'engine', false)).toHaveLength(0);
+  await render(vehicleId, true);
+  expect(host.textContent).toContain('Candidate segment'); expect(host.textContent).toContain('Rejected segment');
+  expect(host.querySelector('[data-segment-id="piece-engine"] path:last-child')?.getAttribute('stroke-dasharray')).toBe('5 3');
+});
+it('normalizes annotated cavities for selection without discarding the original annotation', async () => {
+  model.terminations.find(t => t.id === 't4')!.cavity = '1 — pin order OPEN until confirmed';
+  await render();
+  const row = host.querySelector('[data-termination-ids="t4"]')!;
+  await act(async () => row.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(onSelect).toHaveBeenCalledWith('p:CLT-ECU|1');
+  expect(host.textContent).toContain('pin order OPEN until confirmed');
+});
+it('joins shared pins only through the existing endpoint/cavity and current net identity', async () => {
+  model.circuits.push({ ...model.circuits[0], id: 'c2', code: 'GROUND-2' });
+  model.terminations.push({ ...model.terminations.find(t => t.id === 't1')!, id: 't5', circuit_id: 'c2' });
+  model.segments.push({ ...segment('branch', 't5', '', 2), circuit_id: 'c2', to_termination_id: null, link_state: 'incomplete' });
+  await render();
+  expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(3);
+  expect(host.querySelectorAll('[data-endpoint-id="ecu"] [data-electrical-node]')).toHaveLength(1);
+  expect(host.querySelector('[data-endpoint-id="ecu"] [data-termination-ids]')?.getAttribute('data-termination-ids')).toBe('t1,t5');
+  model.nets.push({ id: 'different-net' }); model.segments[2].net_id = 'different-net';
+  const pieces = physicalSchematicPieces(model, 'engine', false);
+  expect(pieces[0].from?.nodeKey).not.toBe(pieces[2].from?.nodeKey);
 });
 it('rejects wrong-vehicle and incompatible snapshots', () => {
   expect(() => readPhysicalHarnessModel(model, 'another-vehicle')).toThrow();

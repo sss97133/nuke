@@ -10,7 +10,7 @@ import { publicName } from './useWorkspaceSelection';
 import { physicalSchematicPieces, physicalPieceLabel, type SchematicPiece } from './physicalHarnessModel';
 import { usePhysicalHarnessModel } from './usePhysicalHarnessModel';
 
-interface Row { key: string; code: string; cav: string; wires: string[]; y: number; dev: string }
+interface Row { key: string; code: string; cav: string; wires: string[]; terminationIds: string[]; y: number; dev: string }
 interface Place { col: number; x: number; y: number; w: number; h: number; rows: Row[] }
 const PASS = /^(FIREWALL-|SPL-|RAIL-)|PASS/;
 const ROW = 17, HDR = 34, GAP = 22, BW = [236, 168, 236], LANE = 6;
@@ -20,10 +20,11 @@ function layout(pieces: SchematicPiece[]) {
   const score = new Map<string, number>();
   pieces.forEach(p => [p.from, p.to].forEach((h, i) => {
     if (!h) return;
-    const dev = h.endpointId, k = h.id;
+    const dev = h.endpointId, k = h.nodeKey;
     const m = rows.get(dev) ?? new Map<string, Row>(); rows.set(dev, m);
-    const r = m.get(k) ?? { key: k, code: h.code, cav: h.cavity ?? '', wires: [], y: 0, dev }; m.set(k, r);
+    const r = m.get(k) ?? { key: k, code: h.code, cav: h.cavity ?? '', wires: [], terminationIds: [], y: 0, dev }; m.set(k, r);
     if (!r.wires.includes(p.code)) r.wires.push(p.code);
+    if (!r.terminationIds.includes(h.id)) r.terminationIds.push(h.id);
     if (!PASS.test(h.code)) score.set(dev, (score.get(dev) ?? 0) + (i === 0 ? 1 : -1));
   }));
   const cols: string[][] = [[], [], []];
@@ -46,7 +47,7 @@ function layout(pieces: SchematicPiece[]) {
     pieces.filter(p => p.from?.endpointId === dev || p.to?.endpointId === dev).forEach(piece => {
       [piece.from, piece.to].forEach(h => {
         if (!h || h.endpointId === dev) return;
-        const rr = place.get(h.endpointId)?.rows.find(x => x.key === h.id);
+        const rr = place.get(h.endpointId)?.rows.find(x => x.key === h.nodeKey);
         if (rr) ys.push(rr.y);
       });
     });
@@ -59,8 +60,8 @@ function layout(pieces: SchematicPiece[]) {
   const has1 = cols[1].length > 0;
   const hops: { wc: string; piece: SchematicPiece; a: Row; b: Row | null; d: string; lo: number; hi: number }[] = [];
   pieces.forEach(piece => {
-    const a = piece.from ? place.get(piece.from.endpointId)?.rows.find(r => r.key === piece.from!.id) : null;
-    const b = piece.to ? place.get(piece.to.endpointId)?.rows.find(r => r.key === piece.to!.id) : null;
+    const a = piece.from ? place.get(piece.from.endpointId)?.rows.find(r => r.key === piece.from!.nodeKey) : null;
+    const b = piece.to ? place.get(piece.to.endpointId)?.rows.find(r => r.key === piece.to!.nodeKey) : null;
     if (a || b) hops.push({ wc: piece.code, piece, a: (a ?? b)!, b: a ? b ?? null : null, d: '', lo: 0, hi: 0 });
   });
   const chA: typeof hops = [], chB: typeof hops = [], chC: typeof hops = [], over: typeof hops = [];
@@ -137,15 +138,15 @@ export function SchematicBlock({ cw, vehicleId, section, sel, rel, isOwner, onSe
           <g key={h.piece.id} data-segment-id={h.piece.id} role="button" tabIndex={0} aria-label={physicalPieceLabel(h.piece)}
             onClick={() => onSelect('w:' + h.wc)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect('w:' + h.wc); } }} style={{ cursor: 'pointer' }}>
             <path d={h.d} fill="none" stroke="transparent" strokeWidth={9} />
-            <path d={h.d} fill="none" stroke={h.piece.segment.specification_state === 'conflict' ? cw.danger : wcls(h.wc)} strokeWidth={has && (sel === 'w:' + h.wc) ? 2.4 : has && rel.wires.has(h.wc) ? 1.8 : 1}
-              strokeDasharray={h.piece.circuit.design_status === 'concept' ? '5 3' : undefined}><title>{physicalPieceLabel(h.piece)}</title></path>
+            <path d={h.d} fill="none" stroke={h.piece.segment.specification_state === 'conflict' || h.piece.segment.design_status === 'contradicted' ? cw.danger : wcls(h.wc)} strokeWidth={has && (sel === 'w:' + h.wc) ? 2.4 : has && rel.wires.has(h.wc) ? 1.8 : 1}
+              strokeDasharray={h.piece.circuit.design_status !== 'decided' || h.piece.segment.design_status !== 'decided' ? '5 3' : undefined}><title>{physicalPieceLabel(h.piece)}</title></path>
           </g>
         ))}
         {[...L.place.entries()].map(([dev, p]) => {
           const codes = [...new Set(p.rows.map(r => r.code))];
           const lit = has && codes.some(c => rel.nodes.has(c));
           return (
-            <g key={dev} opacity={has && !lit ? 0.45 : 1}>
+            <g key={dev} data-endpoint-id={dev} opacity={has && !lit ? 0.45 : 1}>
               <rect x={p.x} y={p.y} width={p.w} height={p.h} fill={cw.surface} stroke={lit ? cw.accent : cw.faceStroke} strokeWidth={lit ? 2 : 1.2} />
               <line x1={p.x} y1={p.y + HDR - 4} x2={p.x + p.w} y2={p.y + HDR - 4} stroke={cw.faceStroke} />
               <text x={p.x + 7} y={p.y + 14} fontFamily={cw.fontBody} fontSize={11} fontWeight={700} fill={cw.ink} style={{ cursor: 'pointer' }}
@@ -154,7 +155,7 @@ export function SchematicBlock({ cw, vehicleId, section, sel, rel, isOwner, onSe
               {p.rows.map(r => {
                 const key = r.code + '|' + r.cav, on = selPin === key, rl = has && r.wires.some(w => rel.wires.has(w));
                 return (
-                  <g key={r.key} onClick={() => onSelect('p:' + key)} style={{ cursor: 'pointer' }}>
+                  <g key={r.key} data-electrical-node={r.key} data-termination-ids={r.terminationIds.join(',')} onClick={() => onSelect('p:' + key)} style={{ cursor: 'pointer' }}>
                     <rect x={p.x + 1} y={r.y - ROW / 2} width={p.w - 2} height={ROW} fill={on ? cw.accent : rl ? `${cw.accent}22` : 'transparent'} />
                     <text x={p.x + 7} y={r.y + 3.5} fontFamily={cw.fontMono} fontSize={10.5} fill={on ? cw.onAccent : cw.ink}>{(r.cav || '—').slice(0, 9)}</text>
                     <text x={p.x + 72} y={r.y + 3.5} fontFamily={cw.fontMono} fontSize={10} fill={on ? cw.onAccent : cw.inkMuted}>{r.wires.join(' ').slice(0, p.w > 200 ? 26 : 14)}</text>
