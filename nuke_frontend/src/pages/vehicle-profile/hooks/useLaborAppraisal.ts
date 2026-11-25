@@ -34,7 +34,10 @@ export function useLaborAppraisal(vehicleId: string) {
   const { user, loading: authLoading } = useAuthContext();
   return useQuery({
     queryKey: ['vehicle-labor-appraisal', vehicleId, user?.id ?? 'anonymous'],
-    enabled: !!vehicleId && !authLoading, staleTime: 300_000, retry: false,
+    enabled: !!vehicleId && !authLoading, staleTime: 300_000,
+    // The reader takes 3 s alone and 12 s or more while the print reads every section; one slow answer must not
+    // print as "could not load". Retries keep isFetching up, so the print waits for them.
+    retry: 2, retryDelay: (attempt) => 1_500 * 2 ** attempt,
     queryFn: async ({ signal }) => {
       const { data, error } = await bounded(requestSignal => supabase.rpc('vehicle_labor_appraisal', { p_vehicle_id: vehicleId })
         .abortSignal(requestSignal), signal);
