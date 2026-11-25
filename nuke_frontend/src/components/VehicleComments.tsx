@@ -751,11 +751,12 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           if (validationError) {
             console.warn(`Validation failed for image ${i + 1}:`, validationError);
             // Mark for retry later (store in metadata)
-            await markImageValidationRetry(insertedImage.id, insertData.ai_scan_metadata, {
+            const markError = await markImageValidationRetry(insertedImage.id, insertData.ai_scan_metadata, {
               status: 'failed',
               error: validationError.message,
               retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // Retry in 5 min
             });
+            if (markError) console.warn(`Could not mark image ${i + 1} for validation retry:`, markError);
           } else if (validationResult?.validation) {
             validatedCount++;
             if (!validationResult.validation.matches) {
@@ -767,11 +768,12 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           console.warn(`Validation error for image ${i + 1}:`, validationErr);
           // Mark for retry if it's a timeout or rate limit
           if (validationErr?.message?.includes('timeout') || validationErr?.message?.includes('429')) {
-            await markImageValidationRetry(insertedImage.id, insertData.ai_scan_metadata, {
+            const markError = await markImageValidationRetry(insertedImage.id, insertData.ai_scan_metadata, {
               status: 'pending_retry',
               error: validationErr.message,
               retry_at: new Date(Date.now() + 2 * 60 * 1000).toISOString() // Retry in 2 min
             });
+            if (markError) console.warn(`Could not mark image ${i + 1} for validation retry:`, markError);
           }
         }
       } catch (error) {
