@@ -77,7 +77,7 @@ EXCEPTION WHEN OTHERS THEN RETURN 'refused ' || SQLSTATE || ': ' || SQLERRM;
 END $$;
 CREATE FUNCTION pg_temp.try_insert_forged() RETURNS text LANGUAGE plpgsql AS $$
 BEGIN
-  -- ALLOW_RAW_TESTIMONY_WRITE: contract fixture; proves the policy refuses a row naming another actor.
+  -- ALLOW_RAW_TESTIMONY_WRITE: contract fixture; proves a direct insert naming another actor is refused.
   INSERT INTO public.reattribution_audit(observation_type, old_observation_id, new_observation_id, reason, actor_user_id)
   VALUES ('image', gen_random_uuid(), gen_random_uuid(), 'forged', '05000000-0000-0000-0000-000000000050');
   RETURN 'inserted';
@@ -218,6 +218,12 @@ SELECT t_assert(NOT has_function_privilege('anon', 'public.reattribution_audit_r
   'the writer is callable by authenticated only (anon and PUBLIC revoked)');
 SELECT t_assert((SELECT prosecdef AND proconfig @> ARRAY['search_path=pg_catalog, public'] FROM pg_proc
   WHERE oid = 'public.reattribution_audit_record_move(uuid,uuid,uuid,text,text)'::regprocedure), 'the writer is SECURITY DEFINER with search_path pinned');
+SELECT t_assert(NOT has_table_privilege('authenticated', 'public.reattribution_reason_kinds', 'INSERT,UPDATE,DELETE')
+  AND NOT has_table_privilege('anon', 'public.reattribution_reason_kinds', 'INSERT,UPDATE,DELETE')
+  AND (SELECT array_agg(kind) FROM public.reattribution_reason_kinds WHERE signed_in) = ARRAY['signed_in_move'],
+  'the allowed-kind key holds signed_in_move only, and no end-user role can write it');
+SELECT t_assert((SELECT count(*) FROM pg_constraint WHERE conrelid = 'public.reattribution_reason_kinds'::regclass AND contype = 'c'
+  AND pg_get_constraintdef(oid) LIKE '%first_attribution%') = 1, 'the key refuses the kind first_attribution');
 
 -- Re-apply: the guard accepts its own body and nothing changes.
 SELECT md5(pg_get_functiondef('public.relink_testimony(text,uuid,uuid,text,uuid,text)'::regprocedure)) AS after_md5 \gset

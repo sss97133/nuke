@@ -20,7 +20,8 @@
 --     is still in progress was written by this transaction or one of its subtransactions. relink_testimony's UPDATE runs
 --     inside a BEGIN ... EXCEPTION block, which is a subtransaction, so xmin is the subtransaction's id, not the top-level
 --     one; the contract proves the comparison holds there on PG17.
---   * The reason is stored as '<kind>: <note>' with kind from an allowed list (signed_in_move only). A stored reason from
+--   * The reason is stored as '<kind>: <note>' with kind a row of the key reattribution_reason_kinds (signed_in = true; one row,
+--     signed_in_move; no end-user grant on the key, and its CHECK refuses the kind first_attribution). A stored reason from
 --     a signed-in session therefore never begins 'first_attribution:', which is what capture_sets_score's own_filed read
 --     requires; that read can be fed only by the definer writers and service role.
 -- Who may move (checked in relink_testimony, before any write):
@@ -34,7 +35,8 @@
 --   * service-role calls: unchanged.
 --
 -- Refused when the live definition changed since it was read (md5 of pg_get_functiondef, 2026-11-25, equal to
--- 20261122002500's body). Re-applying is a no-op. No table DDL; no rows written.
+-- 20261122002500's body). Re-applying is a no-op. One new key table (reattribution_reason_kinds, one row); no other
+-- table DDL; no locks on existing tables beyond the REVOKE's catalog update.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
@@ -49,6 +51,21 @@ BEGIN
   END IF;
 END
 $guard$;
+
+-- The allowed reason kinds of a signed-in audit row. Written only here (no end-user grant); a kind can never be
+-- first_attribution, the prefix capture_sets_score and attribute_testimony read as an anchor.
+CREATE TABLE IF NOT EXISTS public.reattribution_reason_kinds (
+  kind text PRIMARY KEY CHECK (kind ~ '^[a-z][a-z_]*$' AND kind <> 'first_attribution'),
+  signed_in boolean NOT NULL,
+  note text NOT NULL
+);
+ALTER TABLE public.reattribution_reason_kinds ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.reattribution_reason_kinds FROM anon, authenticated;
+COMMENT ON TABLE public.reattribution_reason_kinds IS
+  'Allowed kinds of a reattribution_audit reason written by reattribution_audit_record_move (20261126001000). signed_in = a signed-in session may write it. Stored reason = <kind>: <note>.';
+INSERT INTO public.reattribution_reason_kinds (kind, signed_in, note)
+VALUES ('signed_in_move', true, 'a photo moved by a signed-in session through relink_testimony')
+ON CONFLICT (kind) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.reattribution_audit_record_move(
   p_image_id uuid, p_old_vehicle_id uuid, p_target_vehicle_id uuid, p_kind text, p_note text)
@@ -68,7 +85,7 @@ BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'reattribution_audit_record_move: a signed-in session only' USING ERRCODE = '42501';
   END IF;
-  IF p_kind IS DISTINCT FROM 'signed_in_move' THEN
+  IF NOT EXISTS (SELECT 1 FROM public.reattribution_reason_kinds k WHERE k.kind = p_kind AND k.signed_in) THEN
     RAISE EXCEPTION 'reattribution_audit_record_move: reason kind % is not allowed', p_kind USING ERRCODE = '22023';
   END IF;
   SELECT i.vehicle_id, i.xmin INTO v_vehicle, v_xmin FROM public.vehicle_images i WHERE i.id = p_image_id;
@@ -97,7 +114,7 @@ $writer$;
 REVOKE ALL ON FUNCTION public.reattribution_audit_record_move(uuid, uuid, uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.reattribution_audit_record_move(uuid, uuid, uuid, text, text) TO authenticated, service_role;
 COMMENT ON FUNCTION public.reattribution_audit_record_move(uuid, uuid, uuid, text, text) IS
-  'The one writer of a signed-in session''s reattribution_audit row (20261126001000). Actor = auth.uid(); refuses unless the photo now sits on the target and that row version was written by the current transaction; reason stored as <kind>: <note>, kind signed_in_move only. Called by relink_testimony.';
+  'The one writer of a signed-in session''s reattribution_audit row (20261126001000). Actor = auth.uid(); refuses unless the photo now sits on the target and that row version was written by the current transaction; reason stored as <kind>: <note>, kind a signed_in row of reattribution_reason_kinds. Called by relink_testimony.';
 
 CREATE OR REPLACE FUNCTION public.relink_testimony(p_observation_type text, p_observation_id uuid, p_target_vehicle_id uuid, p_reason text, p_actor_user_id uuid DEFAULT NULL::uuid, p_gate_override_reason text DEFAULT NULL::text)
  RETURNS jsonb
