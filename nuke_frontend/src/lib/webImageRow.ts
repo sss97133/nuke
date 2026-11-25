@@ -9,7 +9,10 @@
 export const WEB_IMAGE_SOURCE = 'user_upload_web';
 
 /** How a filed row came to be on its car: the uploader picked the car in the upload dialog at submit (a Sign-tier act),
- *  recorded with the uploader's id. A row the system files later carries its own basis through its own writer. */
+ *  recorded with the uploader's id. A row the system files later carries its own basis through its own writer.
+ *  TEMPORARY: exif_data.filing is a jsonb stash, not a key. Its keyed home (one filing-basis row per image, written by
+ *  the web, the filer and album sync) is designed in issue #3954; this stash is one of its backfill sources
+ *  and is removed from here once that writer exists. */
 export const UPLOADER_PICK_BASIS = 'uploader_pick_at_upload';
 
 export interface WebImageRowInput {
