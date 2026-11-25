@@ -93,6 +93,8 @@ BEGIN
  EXECUTE d;
 END $batch_key$;
 
+-- guardrail-allow(testimony-write): supersede_untyped_cached_image_properties: a supersession writer. The successor keeps the row's identity (source_identifier), which ingest-observation cannot re-land (unique_observation would answer duplicate with the untyped row), and the in-place key is refused by validate_retained_listing_property_source; it writes a successor and supersedes, never changes a value.
+
 -- The source reading a projection row names, as a uuid (NULL when it names none or a malformed one).
 CREATE FUNCTION public.cached_image_projection_parent_id(p_data jsonb)
 RETURNS uuid LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path TO ''
@@ -115,6 +117,9 @@ DECLARE
   done integer := 0;
   held integer := 0;
   remaining integer := 0;
+  refused integer := 0;
+  refusals jsonb := '{}';
+  candidate uuid;
 BEGIN
   IF auth.role() IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'supersede_untyped_cached_image_properties: service role only' USING ERRCODE='42501';
@@ -122,8 +127,8 @@ BEGIN
   IF p_vehicle_id IS NULL OR p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 500 THEN
     RAISE EXCEPTION 'supersede_untyped_cached_image_properties: one vehicle, limit 1..500' USING ERRCODE='22023';
   END IF;
-  FOR c IN
-    SELECT o.* FROM public.vehicle_observations o
+  FOR candidate IN
+    SELECT o.id FROM public.vehicle_observations o
      WHERE o.vehicle_id = p_vehicle_id AND o.is_superseded = false
        AND o.property_id IN (SELECT r.id FROM public.observation_properties r WHERE r.property_key IN
          ('image_visible_rust_severity','image_visible_paint_stage','image_visible_assembly_state'))
@@ -131,21 +136,31 @@ BEGIN
        -- a child whose reading is no longer current is not re-keyed: retracting it is the reading successor's work
        AND EXISTS (SELECT 1 FROM public.vehicle_observations p
                     WHERE p.id = public.cached_image_projection_parent_id(o.structured_data) AND p.is_superseded IS NOT TRUE)
-     ORDER BY o.id LIMIT p_limit
-     FOR UPDATE OF o SKIP LOCKED
+     ORDER BY o.id
   LOOP
-    successor := gen_random_uuid();
-    INSERT INTO public.vehicle_observations
-    SELECT (jsonb_populate_record(NULL::public.vehicle_observations, to_jsonb(c) || jsonb_build_object(
-      'id', successor, 'ingested_at', now(),
-      'content_hash', encode(sha256(convert_to(c.content_hash||':typed_source_v1','UTF8')),'hex'),
-      'source_observation_id', c.structured_data->>'source_observation_id',
-      'is_superseded', false, 'superseded_by', NULL, 'superseded_at', NULL, 'lineage_chain', NULL))).*;
-    UPDATE public.vehicle_observations
-       SET is_superseded = true, superseded_by = successor, superseded_at = now(),
-           lineage_chain = array_append(coalesce(lineage_chain, ARRAY[]::uuid[]), successor)
-     WHERE id = c.id;
-    done := done + 1;
+    EXIT WHEN done >= p_limit;
+    -- one row at a time: a row another writer holds is passed over, and a row the guard refuses is counted and left
+    -- (its refusal does not undo the others, and the next call goes on past it)
+    SELECT * INTO c FROM public.vehicle_observations
+     WHERE id = candidate AND is_superseded = false AND source_observation_id IS NULL FOR UPDATE SKIP LOCKED;
+    CONTINUE WHEN NOT FOUND;
+    BEGIN
+      successor := gen_random_uuid();
+      INSERT INTO public.vehicle_observations
+      SELECT (jsonb_populate_record(NULL::public.vehicle_observations, to_jsonb(c) || jsonb_build_object(
+        'id', successor, 'ingested_at', now(),
+        'content_hash', encode(sha256(convert_to(c.content_hash||':typed_source_v1','UTF8')),'hex'),
+        'source_observation_id', c.structured_data->>'source_observation_id',
+        'is_superseded', false, 'superseded_by', NULL, 'superseded_at', NULL, 'lineage_chain', NULL))).*;
+      UPDATE public.vehicle_observations
+         SET is_superseded = true, superseded_by = successor, superseded_at = now(),
+             lineage_chain = array_append(coalesce(lineage_chain, ARRAY[]::uuid[]), successor)
+       WHERE id = c.id;
+      done := done + 1;
+    EXCEPTION WHEN check_violation OR foreign_key_violation OR unique_violation THEN
+      refused := refused + 1;
+      refusals := jsonb_set(refusals, ARRAY[SQLSTATE], to_jsonb(coalesce((refusals->>SQLSTATE)::int, 0) + 1));
+    END;
   END LOOP;
   -- left after this call: rows still to re-land (source current) and rows held (source superseded or missing)
   SELECT count(*) FILTER (WHERE p.id IS NOT NULL), count(*) FILTER (WHERE p.id IS NULL) INTO remaining, held
@@ -156,15 +171,15 @@ BEGIN
      AND o.property_id IN (SELECT r.id FROM public.observation_properties r WHERE r.property_key IN
        ('image_visible_rust_severity','image_visible_paint_stage','image_visible_assembly_state'))
      AND o.extraction_method = 'cached_byok_property_projection_v1' AND o.source_observation_id IS NULL;
-  RETURN jsonb_build_object('vehicle_id', p_vehicle_id, 'succeeded', done, 'held_source_not_current', held,
-    'remaining', remaining);
+  RETURN jsonb_build_object('vehicle_id', p_vehicle_id, 'succeeded', done, 'refused', refused, 'refused_by_sqlstate', refusals,
+    'held_source_not_current', held, 'remaining', remaining);
 END
 $function$;
 
 REVOKE ALL ON FUNCTION public.supersede_untyped_cached_image_properties(uuid, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.supersede_untyped_cached_image_properties(uuid, integer) TO service_role;
 COMMENT ON FUNCTION public.supersede_untyped_cached_image_properties(uuid, integer) IS
- 'Re-lands one vehicle''s current cached image property projections (cached_byok_property_projection_v1) that lack the typed source_observation_id: a successor identical but for that column, a new ingested_at and content_hash sha256(old || '':typed_source_v1''), and the old row superseded by it. Rows whose source reading is superseded or missing are left and counted held_source_not_current; remaining counts the rows still to re-land after the call. Service role only; at most p_limit (1..500) rows a call; returns succeeded, held_source_not_current, remaining. Caller: scripts/deep-image-analysis-byok.mjs project-cached.';
+ 'Re-lands one vehicle''s current cached image property projections (cached_byok_property_projection_v1) that lack the typed source_observation_id: a successor identical but for that column, a new ingested_at and content_hash sha256(old || '':typed_source_v1''), and the old row superseded by it. Rows whose source reading is superseded or missing are left and counted held_source_not_current; remaining counts the rows still to re-land after the call. One row at a time: a row the guard refuses is left and counted by SQLSTATE (refused, refused_by_sqlstate) without undoing the others. Service role only; at most p_limit (1..500) successors a call; returns succeeded, refused, refused_by_sqlstate, held_source_not_current, remaining. Caller: scripts/deep-image-analysis-byok.mjs project-cached.';
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;

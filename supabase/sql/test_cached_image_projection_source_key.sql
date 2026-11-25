@@ -169,8 +169,10 @@ DO $$ BEGIN
  EXCEPTION WHEN check_violation THEN IF SQLERRM <> 'retained source links are assigned only on insert' THEN RAISE; END IF; END;
 END $$;
 
--- 3. the re-landing
-DO $$ DECLARE out jsonb; before_ids uuid[]; BEGIN
+-- 3. the re-landing. One more untyped row first: a value its reading does not hold (the reading says assembled), which
+-- the guard refuses as a successor; it must be counted and passed over, not stall the vehicle or undo the others.
+CREATE TEMP TABLE bad AS SELECT pg_temp.land('55555555-5555-4555-8555-000000000002','image_visible_assembly_state','stripped',false) AS id;
+DO $$ DECLARE out jsonb; before_ids uuid[]; total integer := 0; BEGIN
  BEGIN PERFORM public.supersede_untyped_cached_image_properties('11111111-1111-4111-8111-111111111111',10);
   RAISE EXCEPTION '3a: only the service role re-lands';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
@@ -182,11 +184,17 @@ DO $$ DECLARE out jsonb; before_ids uuid[]; BEGIN
   WHERE extraction_method='cached_byok_property_projection_v1' AND source_observation_id IS NULL AND NOT is_superseded;
  PERFORM set_config('test.role','service_role',true);
  out := public.supersede_untyped_cached_image_properties('11111111-1111-4111-8111-111111111111',2);
- IF out->>'succeeded' <> '2' OR out->>'remaining' <> '2' OR out->>'held_source_not_current' <> '1' THEN RAISE EXCEPTION '3c: %', out; END IF;
+ IF out->>'succeeded' <> '2' OR out->>'held_source_not_current' <> '1' THEN RAISE EXCEPTION '3c: %', out; END IF;
+ total := (out->>'succeeded')::int;
  out := public.supersede_untyped_cached_image_properties('11111111-1111-4111-8111-111111111111',10);
- IF out->>'succeeded' <> '2' OR out->>'remaining' <> '0' OR out->>'held_source_not_current' <> '1' THEN RAISE EXCEPTION '3d: %', out; END IF;
+ total := total + (out->>'succeeded')::int;
+ IF total <> 4 OR out->>'remaining' <> '1' OR out->>'refused' <> '1' OR out->'refused_by_sqlstate' <> '{"23514": 1}'
+  OR out->>'held_source_not_current' <> '1' THEN RAISE EXCEPTION '3d: four re-landed, the bad row refused and left: % (total %)', out, total; END IF;
  out := public.supersede_untyped_cached_image_properties('11111111-1111-4111-8111-111111111111',10);
- IF out->>'succeeded' <> '0' THEN RAISE EXCEPTION '3e: a second call re-lands nothing: %', out; END IF;
+ IF out->>'succeeded' <> '0' OR out->>'refused' <> '1' OR out->>'remaining' <> '1' THEN RAISE EXCEPTION '3e: a second call re-lands nothing: %', out; END IF;
+ IF NOT EXISTS (SELECT 1 FROM public.vehicle_observations o JOIN bad b ON b.id=o.id WHERE NOT o.is_superseded AND o.source_observation_id IS NULL)
+ THEN RAISE EXCEPTION '3e2: the refused row stays as it was'; END IF;
+ before_ids := array(SELECT x FROM unnest(before_ids) x WHERE x NOT IN (SELECT id FROM bad));
  -- every old row of a current reading is superseded by a successor identical but for the key, clock and hash
  IF EXISTS (SELECT 1 FROM public.vehicle_observations o
    LEFT JOIN public.vehicle_observations s ON s.id=o.superseded_by
@@ -243,7 +251,7 @@ DO $$ DECLARE r jsonb; c jsonb; first_id uuid; succ uuid; BEGIN
  SELECT (c->>'vehicle_id')::uuid,(c->>'observed_at')::timestamptz,'22222222-2222-4222-8222-222222222222',c->>'source_identifier','condition',c->>'content_hash',
    c->'structured_data','medium',0.6,c->>'agent_model',c->>'extraction_method',c->>'raw_source_ref','33333333-3333-4333-8333-000000000002',true;
  r := public.supersede_untyped_cached_image_properties('11111111-1111-4111-8111-111111111111',10);
- IF r->>'succeeded' <> '1' THEN RAISE EXCEPTION '4c: %', r; END IF;
+ IF r->>'succeeded' <> '1' OR r->>'refused' <> '1' THEN RAISE EXCEPTION '4c: %', r; END IF;
  SELECT id INTO succ FROM public.vehicle_observations WHERE source_identifier=c->>'source_identifier' AND NOT is_superseded;
  r := public.ingest_cached_image_property_batch(jsonb_build_array(c));
  IF r->>'inserted' <> '0' OR r->>'duplicates' <> '1' OR (r->'results'->0->>'observation_id')::uuid IS DISTINCT FROM succ

@@ -447,7 +447,7 @@ import { projectCachedRun, currentReadingIds, readingIsPictureOfPicture, instant
 const VEHICLE = '77777777-7777-4777-8777-777777777777';
 const PROPERTY_IDS = { image_visible_rust_severity: 'aaaaaaaa-0000-4000-8000-000000000001',
   image_visible_paint_stage: 'aaaaaaaa-0000-4000-8000-000000000002', image_visible_assembly_state: 'aaaaaaaa-0000-4000-8000-000000000003' };
-function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0, failReadingsQueryAt = 0, failRelinkAt = 0 } = {}) {
+function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0, failReadingsQueryAt = 0, failRelinkAt = 0, refuseRelink = () => false } = {}) {
   let n = 0;
   const id = prefix => `${prefix.repeat(8)}-0000-4000-8000-${String(++n).padStart(12, '0')}`;
   const db = { rows: [], images: new Map(), witnesses: [], calls: { source: 0, invoke: 0, rpc: 0, prior: 0, readings: 0, relink: 0 } };
@@ -503,13 +503,15 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
         const untyped = () => db.rows.filter(r => r.vehicle_id === args.p_vehicle_id && r.extraction_method === 'cached_byok_property_projection_v1' &&
           !r.is_superseded && !r.source_observation_id);
         const current = r => db.rows.some(p => p.id === r.structured_data.source_observation_id && !p.is_superseded);
-        let succeeded = 0;
-        for (const old of untyped().filter(current).slice(0, args.p_limit)) {
+        let succeeded = 0, refused = 0;
+        for (const old of untyped().filter(current)) {
+          if (succeeded >= args.p_limit) break;
+          if (refuseRelink(old)) { refused++; continue; }
           const successor = { ...old, id: id('5'), source_observation_id: old.structured_data.source_observation_id };
           db.rows.push(successor); old.is_superseded = true; old.superseded_by = successor.id; succeeded++;
         }
         const left = untyped();
-        return { data: { vehicle_id: args.p_vehicle_id, succeeded, held_source_not_current: left.filter(r => !current(r)).length,
+        return { data: { vehicle_id: args.p_vehicle_id, succeeded, refused, held_source_not_current: left.filter(r => !current(r)).length,
           remaining: left.filter(current).length }, error: null };
       }
       db.calls.rpc++; assert.equal(name, 'observation_is_public'); const answer = isPublic(args.p_data); return answer === 'error' ? { data: null, error: { message: 'made-up' } } : { data: answer, error: null }; } }),
@@ -808,13 +810,14 @@ test('project-cached --single: rows landed before the typed key are re-landed as
   for (const r of child()) r.source_observation_id = null;
   stale.is_superseded = true;   // a reading that is no longer current: its children are held, not re-keyed
   const { receipt, exitCode } = await walk(db, { pages: 3, apply: true, single: true });
-  assert.deepEqual(receipt.typed_source, { succeeded: 9, held_source_not_current: 3, remaining: 0, calls: 1 });
+  assert.deepEqual(receipt.typed_source, { succeeded: 9, refused: 0, held_source_not_current: 3, remaining: 0, calls: 1 });
   assert.deepEqual([receipt.inserted, receipt.already_projected, exitCode], [0, 9, 0], 'the walk itself sends nothing new');
   const current = child().filter(r => !r.is_superseded);
   assert.equal(current.filter(r => r.source_observation_id).length, 9);
   assert.ok(child().filter(r => r.is_superseded && r.superseded_by).every(r => current.some(c => c.id === r.superseded_by)), 'each old row points at its successor');
   const again = await walk(db, { pages: 3, apply: true, single: true });
-  assert.deepEqual(again.receipt.typed_source, { succeeded: 0, held_source_not_current: 3, remaining: 0, calls: 1 }, 'a second run re-lands nothing');
+  assert.deepEqual(again.receipt.typed_source, { succeeded: 0, refused: 0, held_source_not_current: 3, remaining: 0, calls: 1 }, 'a second run re-lands nothing');
+  assert.deepEqual([again.receipt.already_projected, again.receipt.already_projected_superseded], [9, 0], 'a re-landed row is not a retracted one');
 });
 
 test('project-cached: the re-landing runs on the vehicle walk only, after an apply, and its failure fails the run', async () => {
@@ -829,4 +832,14 @@ test('project-cached: the re-landing runs on the vehicle walk only, after an app
   db.reading(at(1));
   const { receipt, exitCode } = await walk(db, { apply: true, single: true });
   assert.deepEqual([receipt.inserted, receipt.reason, receipt.failed > 0, exitCode], [3, 'typed_source_relink_failed', true, 1]);
+});
+
+test('project-cached: a row the database refuses to re-land is reported and fails the run; the others land', async () => {
+  const db = standIn({ refuseRelink: row => row.structured_data.property_key === 'image_visible_paint_stage' });
+  db.reading(at(1)); db.reading(at(2));
+  await walk(db, { pages: 2, apply: true, single: true });
+  for (const r of db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1')) r.source_observation_id = null;
+  const { receipt, exitCode } = await walk(db, { pages: 2, apply: true, single: true });
+  assert.deepEqual(receipt.typed_source, { succeeded: 4, refused: 2, held_source_not_current: 0, remaining: 2, calls: 2 });
+  assert.deepEqual([receipt.reason, receipt.failed > 0, exitCode], ['typed_source_refused', true, 1]);
 });

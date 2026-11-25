@@ -425,7 +425,9 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
         if (prior.error || !Array.isArray(prior.data)) { failed = true; break; }
         for (const row of prior.data) {
           const key = `${row.source_observation_id}:${row.property_key}`;
-          have.set(key, have.get(key) === true || row.is_superseded === true);
+          // true when the claim has a current row; a key whose every row is superseded was retracted (a row re-landed with
+          // its typed key leaves a superseded original beside a current successor, which is not a retraction)
+          have.set(key, have.get(key) === true || row.is_superseded !== true);
         }
       }
       if (failed) { stop('prior_rows_unavailable'); break; }
@@ -433,7 +435,7 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
         const key = `${claim.structured_data.source_observation_id}:${claim.property_key}`;
         if (!have.has(key)) return true;
         held.already_projected++;
-        if (have.get(key)) held.already_projected_superseded++;
+        if (!have.get(key)) held.already_projected_superseded++;
         return false;
       });
     }
@@ -457,7 +459,7 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
   // database as successors carrying the key, the old row superseded by its successor. Vehicle walk only, after the walk.
   let typedSource = null;
   if (apply && !imageIds && !reason) {
-    typedSource = { succeeded: 0, held_source_not_current: 0, remaining: null, calls: 0 };
+    typedSource = { succeeded: 0, refused: 0, held_source_not_current: 0, remaining: null, calls: 0 };
     while (typedSource.calls < TYPED_SOURCE_CALLS) {
       let out;
       try { out = await sb.rpc('supersede_untyped_cached_image_properties', { p_vehicle_id: vehicleId, p_limit: TYPED_SOURCE_SLICE }).abortSignal(AbortSignal.timeout(40000)); }
@@ -466,11 +468,13 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
       const d = out?.data;
       if (!out || out.error || !Number.isSafeInteger(d?.succeeded) || !Number.isSafeInteger(d?.remaining) ||
           !Number.isSafeInteger(d?.held_source_not_current)) { landed.failed++; reason = 'typed_source_relink_failed'; break; }
-      // succeeded sums over calls; held and remaining are what is left after the last call
-      typedSource.succeeded += d.succeeded;
+      // succeeded sums over calls; refused, held and remaining are what the last call saw
+      typedSource.succeeded += d.succeeded; typedSource.refused = Number.isSafeInteger(d.refused) ? d.refused : 0;
       typedSource.held_source_not_current = d.held_source_not_current; typedSource.remaining = d.remaining;
       if (d.succeeded === 0 || d.remaining === 0) break;
     }
+    // a row the database refused to re-land is a failure the run reports, not a silent remainder
+    if (!reason && typedSource.refused > 0) { landed.failed++; reason = 'typed_source_refused'; }
   }
   const summed = single || pages > 1;
   // imageIds: the readings this call judged current for the named photos (ids only), so its caller can say which reading
@@ -482,7 +486,7 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     ...(apply && !summed ? last : {}),
     ...(typedSource ? { typed_source: typedSource } : {}),
     ...(apply && summed ? { ...landed, ...(reason ? { reason } : {}) } : {}),
-    ...(apply && !summed && reason === 'typed_source_relink_failed' ? { failed: (last.failed || 0) + 1, reason } : {}),
+    ...(apply && !summed && reason?.startsWith('typed_source_') ? { failed: (last.failed || 0) + 1, reason } : {}),
     ...(!apply && reason ? { failed: landed.failed, reason } : {}) };
   const nothing = apply && counts.eligible_claims === 0 && held.already_projected === 0 && !(typedSource?.succeeded > 0);
   return { receipt, exitCode: receipt.failed > 0 || nothing ? 1 : 0 };
