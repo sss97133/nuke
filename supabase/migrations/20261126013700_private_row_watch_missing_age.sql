@@ -15,6 +15,9 @@
 --      reader absent; a copy's reader by to_regprocedure). Any such row fails the watch:
 --      'private rows: exposed N of M probed, not assessed K, missing too long J: ...'. The result carries
 --      missing_too_long (labels) and missing_after_hours.
+--   3. private_row_policy_copies gains first_recorded_at (set once, backfilled from recorded_at): the age clock. A
+--      re-record step (#3911, #3955 and any later policy migration) moves recorded_at on every copy current at that
+--      moment, including one whose reader is absent, which would restart its 72 h each time (ta-skeptic2 on #3962).
 -- The watch is replaced whole, guarded: only over the body 20261125235500 left (md5 7feabcc0..., computed on PG17 from
 -- that migration's text, the text production executes) or this one.
 --
@@ -29,6 +32,13 @@ DO $o$ BEGIN
     RAISE EXCEPTION 'private_row_watch_missing_age: deploy after 20261125204500 and 20261125235500';
   END IF;
 END $o$;
+
+ALTER TABLE public.private_row_policy_copies ADD COLUMN IF NOT EXISTS first_recorded_at timestamptz;
+UPDATE public.private_row_policy_copies SET first_recorded_at = recorded_at WHERE first_recorded_at IS NULL;
+ALTER TABLE public.private_row_policy_copies ALTER COLUMN first_recorded_at SET DEFAULT now(),
+  ALTER COLUMN first_recorded_at SET NOT NULL;
+COMMENT ON COLUMN public.private_row_policy_copies.first_recorded_at IS
+  'When the copy was first registered; never moved by a re-record. The watch ages a copy whose reader is absent from it (20261126013700).';
 
 UPDATE public.platform_config
    SET config_value = config_value || '{"missing_after_hours": 72}'::jsonb,
@@ -76,7 +86,7 @@ BEGIN
     UNION
     SELECT c.reader || ' policy copy of ' || c.relation
       FROM public.private_row_policy_copies c
-     WHERE c.active AND c.recorded_at < now() - make_interval(hours => missing_h)
+     WHERE c.active AND c.first_recorded_at < now() - make_interval(hours => missing_h)
        AND to_regprocedure('public.' || c.reader) IS NULL) s;
   n := (r->>'exposed_relations')::int;
   line := format('exposed %s of %s probed, not assessed %s', n, m, k)

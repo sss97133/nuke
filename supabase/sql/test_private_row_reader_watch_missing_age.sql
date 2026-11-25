@@ -37,7 +37,7 @@ BEGIN
   -- a missing probe and a missing copy past 72 h fail the watch by name; a present probe past 72 h does not
   UPDATE public.private_row_probes SET added_at = now() - interval '100 hours' WHERE relation IN ('image_tags');
   UPDATE public.private_row_probes SET added_at = now() - interval '100 hours' WHERE reader = 'get_field_provenance';
-  UPDATE public.private_row_policy_copies SET recorded_at = now() - interval '100 hours'
+  UPDATE public.private_row_policy_copies SET first_recorded_at = now() - interval '100 hours'
    WHERE reader IN ('vehicle_plates_read(uuid[])', 'get_field_provenance(uuid,text)');  -- the second is inactive
   BEGIN
     PERFORM public.private_row_exposure_watch();
@@ -51,6 +51,23 @@ BEGIN
       RAISE EXCEPTION 'FAIL: message %', msg;
     END IF;
   END;
+
+  -- a re-record (recorded_at = now(), as #3955 does) does not restart the clock of a copy whose reader is absent
+  UPDATE public.private_row_policy_copies SET recorded_at = now() WHERE reader = 'vehicle_plates_read(uuid[])';
+  BEGIN
+    PERFORM public.private_row_exposure_watch();
+    RAISE EXCEPTION 'FAIL: a re-record restarted the age (watch green)';
+  EXCEPTION WHEN raise_exception THEN
+    GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT;
+    IF msg LIKE 'FAIL:%' THEN RAISE; END IF;
+    IF msg NOT LIKE '%vehicle_plates_read(uuid[]) policy copy of vehicles%' THEN
+      RAISE EXCEPTION 'FAIL: a re-record restarted the age: %', msg;
+    END IF;
+  END;
+  -- a copy registered now carries first_recorded_at now (the default), so it is young
+  IF (SELECT count(*) FROM public.private_row_policy_copies WHERE first_recorded_at IS NULL) <> 0 THEN
+    RAISE EXCEPTION 'FAIL: first_recorded_at not backfilled';
+  END IF;
 
   -- the config row moves the age
   UPDATE public.platform_config SET config_value = config_value || '{"missing_after_hours": 200}' WHERE config_key = 'private_row_watch';
