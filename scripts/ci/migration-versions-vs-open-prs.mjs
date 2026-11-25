@@ -4,17 +4,19 @@
 // it collide once both merge, and lanes kept picking the same round minute (2026-11-25: #3962 took #3957's
 // 20261126001000, #3959 and #3960 both held 20261125221500).
 //
-// Who fails: the later PR (higher number) holding a version an earlier open PR adds. The earlier claim stands, so a
-// re-run of the earlier PR passes; the later one renumbers. A collision with a later PR is printed as a warning. The
-// same file path in two PRs (a stacked branch) is not a collision. A PR checked before an earlier PR pushed the same
-// version stays green until its next run; migration-versions-vs-main.sh catches that once the earlier one merges.
+// Who fails: the PR being checked, on any collision. The check runs on a push, so the PR checked is the one that
+// pushed the version last, and it renumbers; the other PR's earlier run stays green. A collision with a lower-numbered
+// PR and one with a higher-numbered PR both fail (a warning let a PR push into a version a later-numbered green PR
+// already held, and both stay green until one re-runs). If both re-run while they collide, both are red until one
+// renumbers: a collision never merges green. The same file path in two PRs (a stacked branch) is not a collision.
 // One GraphQL query per 50 open PRs (files read with them; a PR with more than 100 files pages its own files), so the
 // REST quota the deploy reads share is not touched.
 //
 //   GH_TOKEN=... PR=<number> GITHUB_REPOSITORY=owner/name node scripts/ci/migration-versions-vs-open-prs.mjs
 // Exit 0: no collision. Exit 1: collision (::error:: lines) or the API could not be read.
 
-export const MIGRATION_RE = /^supabase\/migrations\/(\d{14})_[^/]+\.sql$/;
+// Any digit run: main holds 313 eight-digit versions (20241203_...) beside the fourteen-digit ones.
+export const MIGRATION_RE = /^supabase\/migrations\/(\d+)_[^/]+\.sql$/;
 
 /** Versions a PR adds: files added (or renamed into place) directly under supabase/migrations/. */
 export function addedVersions(files) {
@@ -30,21 +32,19 @@ export function addedVersions(files) {
 /** Collisions for PR `self` among `prs` ([{number, title, files:[{path, changeType}]}]). */
 export function collisions(self, prs) {
   const me = prs.find((p) => p.number === self);
-  if (!me) return { errors: [], warnings: [], mine: new Map() };
+  if (!me) return { errors: [], mine: new Map() };
   const mine = addedVersions(me.files);
   const errors = [];
-  const warnings = [];
   for (const p of prs) {
     if (p.number === self) continue;
     const theirs = addedVersions(p.files);
     for (const [v, path] of mine) {
       // The same file in both is a stacked branch carrying its parent's migration, not a second claim.
       if (!theirs.has(v) || theirs.get(v) === path) continue;
-      const line = { version: v, mine: path, other: p.number, theirs: theirs.get(v) };
-      (p.number < self ? errors : warnings).push(line);
+      errors.push({ version: v, mine: path, other: p.number, theirs: theirs.get(v), later: p.number > self });
     }
   }
-  return { errors, warnings, mine };
+  return { errors, mine };
 }
 
 const PRS_QUERY = `query($owner: String!, $name: String!, $after: String) {
@@ -114,12 +114,9 @@ export async function main(env = process.env, gql = null, log = console) {
     log.error(`::error::could not read open pull requests: ${e.message}`);
     return 1;
   }
-  const { errors, warnings, mine } = collisions(self, prs);
-  for (const w of warnings) {
-    log.log(`::warning::${w.mine} shares version ${w.version} with later PR #${w.other} (${w.theirs}); that PR must renumber`);
-  }
+  const { errors, mine } = collisions(self, prs);
   for (const e of errors) {
-    log.error(`::error::${e.mine} shares version ${e.version} with earlier open PR #${e.other} (${e.theirs}); renumber this migration (pick an odd minute; check the board and open PRs first)`);
+    log.error(`::error::${e.mine} shares version ${e.version} with open PR #${e.other} (${e.theirs}); renumber this migration (pick an odd minute; check the board and open PRs first)`);
   }
   if (errors.length) return 1;
   log.log(`migration versions unique against ${prs.length - 1} other open PRs (${mine.size} added here)`);

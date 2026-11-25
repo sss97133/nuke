@@ -73,9 +73,9 @@ jobs:
       - name: Deploy diff base skips runs replaced while pending
         run: node --test scripts/ci/deploy-base.test.mjs
 
-      - name: Migration version not claimed by an earlier open PR
+      - name: Migration version not claimed by another open PR
         # migration-versions-vs-main.sh (in verify.sh) sees main only; two open PRs holding one version collide when
-        # both merge. The later PR fails and renumbers. GraphQL only (one query per 50 open PRs).
+        # both merge. The PR checked (the last to push the version) fails and renumbers. GraphQL only (one query per 50 open PRs).
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
