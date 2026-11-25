@@ -1,3 +1,4 @@
+-- guardrail-allow(center-key-fk): vehicle_ties_fx.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
 -- Isolated PostgreSQL 17 contract for 20261126001000_relink_testimony_signed_in_audit.sql.
 -- It first runs test_relink_override_signed_in_only.sql, which builds the live fixture and leaves relink_testimony at the
 -- live body (md5 95a376b1ed76d9bf2e60edfe8c1ae988). Then it adds what the live database has and that fixture does not:

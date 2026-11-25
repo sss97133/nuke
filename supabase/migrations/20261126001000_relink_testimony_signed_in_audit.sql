@@ -143,6 +143,8 @@ GRANT EXECUTE ON FUNCTION public.reattribution_audit_record_move(uuid, uuid, uui
 COMMENT ON FUNCTION public.reattribution_audit_record_move(uuid, uuid, uuid, text, text) IS
   'The one writer of a signed-in session''s reattribution_audit row (20261126001000). Actor = auth.uid(); refuses unless the photo now sits on the target and that row version was written by the current transaction; reason stored as <kind>: <note>, kind a signed_in row of reattribution_reason_kinds. Called by relink_testimony.';
 
+-- guardrail-allow(testimony-write): relink_testimony: the live sanctioned relink writer, redefined with its own two UPDATEs
+--   unchanged; this migration only adds the signed-in refusal, the source check and the audit writer call
 CREATE OR REPLACE FUNCTION public.relink_testimony(p_observation_type text, p_observation_id uuid, p_target_vehicle_id uuid, p_reason text, p_actor_user_id uuid DEFAULT NULL::uuid, p_gate_override_reason text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
