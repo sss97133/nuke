@@ -236,13 +236,21 @@ BEGIN
   PERFORM pg_temp.ok('no reader role: derived from the source', (r->>'ok')::boolean AND r->>'speaker_role' = 'owner_seller');
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL,
          '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"I"}');
-  PERFORM pg_temp.ok('a one-letter subject resolves to no key', r->'reasons' ? 'stated_subject_unresolved' AND r->'speaker_role' = 'null'::jsonb);
+  PERFORM pg_temp.ok('a one-letter subject resolves to no key: held, no role', r->>'disposition' = 'held'
+    AND r->'held_reasons' = '["stated_subject_unresolved"]'::jsonb AND r->'reasons' = '[]'::jsonb AND r->'speaker_role' = 'null'::jsonb);
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL,
          '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"I had"}');
-  PERFORM pg_temp.ok('I had resolves to no key (ta-skeptic2 probe): ' || r::text, r->'reasons' ? 'stated_subject_unresolved' AND r->>'disposition' = 'refused');
+  PERFORM pg_temp.ok('I had resolves to no key (ta-skeptic2 probe): held, not the other car: ' || r::text,
+    r->'held_reasons' ? 'stated_subject_unresolved' AND r->>'disposition' = 'held' AND r->'speaker_role' = 'null'::jsonb
+    AND r->'stated_subject_key' = 'null'::jsonb);
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL,
          '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"2500 hours"}');
-  PERFORM pg_temp.ok('2500 hours resolves to no key (ta-skeptic2 probe): ' || r::text, r->'reasons' ? 'stated_subject_unresolved');
+  PERFORM pg_temp.ok('2500 hours resolves to no key (ta-skeptic2 probe): held: ' || r::text,
+    r->'held_reasons' ? 'stated_subject_unresolved' AND r->>'disposition' = 'held');
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000002',
+         'Did the LS3 swap last spring, it took me about 40 hours total', 40, NULL, task_q || '{"labor_stated_subject":"Did the"}');
+  PERFORM pg_temp.ok('a seller with an unresolved subject is held too (which car is unknown): ' || r::text,
+    r->>'disposition' = 'held' AND r->'held_reasons' = '["stated_subject_unresolved"]'::jsonb);
   PERFORM pg_temp.ok('generic model words count only as written with a capital', public.labor_stated_subject_key('my car') IS NULL
     AND public.labor_stated_subject_key('the truck') IS NULL AND public.labor_stated_subject_key('a very long job') IS NULL);
   PERFORM pg_temp.ok('a model alone resolves', public.labor_stated_subject_key('my GTO') ->> 'kind' = 'canonical_models');
@@ -254,7 +262,7 @@ BEGIN
   PERFORM pg_temp.ok('a subject cut inside a word refused', r->'reasons' ? 'stated_subject_not_in_quote');
   r := public.reported_labor_statement_check('auction_comments', ac, 'I had 2500 hours in my 1970 Pontiac GTO without the paint', 2500, NULL,
          '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"without the paint"}');
-  PERFORM pg_temp.ok('a subject with no key refused', r->'reasons' ? 'stated_subject_unresolved');
+  PERFORM pg_temp.ok('a subject with no key held', r->'held_reasons' ? 'stated_subject_unresolved' AND r->>'disposition' = 'held');
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL, ok_q || '{"labor_stated_subject":"1973 Pontiac Firebird"}');
   PERFORM pg_temp.ok('stated subject not in the quote refused', r->'reasons' ? 'stated_subject_not_in_quote');
   r := public.reported_labor_statement_check('vehicles', v1, repeat('I put 1,200 hours into it. ', 12), 1200, NULL, ok_q);

@@ -38,16 +38,17 @@
 --   reported_labor_statement_check(source_table, source_row_id, quote, low, high, qualifiers) -> jsonb
 --     {ok, disposition, reasons[], held_reasons[], contract, quote_hash, text_md5, page_vehicle_id, speaker_role,
 --     speaker_role_null_reason, speaker_role_basis, speaker_role_read, stated_subject_key}.
---     disposition refused (any reason; nothing lands), held (well formed, but no work word in the figure's sentence:
---     held_reasons no_labor_context; it lands, admits nothing and reaches no baseline) or admitted (ok true).
+--     disposition refused (any reason; nothing lands), held (well formed, but no work word in the figure's sentence or a
+--     stated subject that names no key: held_reasons no_labor_context / stated_subject_unresolved; it lands, admits
+--     nothing and reaches no baseline) or admitted (ok true).
 --     Same source rules as gate A (schema_proposal_witness_sources: allowed table, row exists, not generated) and the
 --     same quote rule row (min_quote_chars, term_pattern, figure_required, whole-token verbatim), plus: quote <= 300
 --     chars; no exclude_pattern match touching the quote; low is the first figure of a figure_term_pattern match and
 --     high, when given, the same match's second (never any number in the sentence); qualifiers only the 6 labor keys
 --     and labor_system_key_null_reason; scope, statement_kind and time_basis required, listed and admitted; for task a
 --     system key or a null reason, never both; neither for whole_build; stated_subject <= 80 chars, a whole-token run
---     of the quote holding no hour figure that resolves through labor_stated_subject_key, else
---     stated_subject_unresolved. Figures, time phrases and the work word are read on the row text at the quote's span
+--     of the quote holding no hour figure that resolves through labor_stated_subject_key; a subject that resolves to
+--     nothing is held (held_reasons stated_subject_unresolved), never admitted as commenter_other_car. Figures, time phrases and the work word are read on the row text at the quote's span
 --     (a trimmed quote cannot cut a figure or a time phrase). Thousands separators are read as printed.
 --     speaker_role is derived from the source row: auction_comments.is_seller and build_posts author = build_threads
 --     author give owner_seller; vehicles.description names no author (description_source: null or source_imported),
@@ -412,8 +413,10 @@ BEGIN
   ELSIF q ->> 'labor_scope' = 'whole_build' AND (q ? 'labor_system_key' OR q ? 'labor_system_key_null_reason') THEN
     reasons := reasons || 'system_key_on_whole_build'::text;
   END IF;
-  -- labor_stated_subject names the other car: a whole-token run of the quote that resolves to a make or model key
-  -- (labor_stated_subject_key) and holds no hour figure. 'I had' and '2500 hours' resolve to nothing.
+  -- labor_stated_subject names the other car: a whole-token run of the quote (else refused: the reader's text is not
+  -- verbatim) that resolves to a make or model key (labor_stated_subject_key) and holds no hour figure. A subject that
+  -- resolves to nothing ('I had', '2500 hours') is NULL with held reason stated_subject_unresolved: the statement lands
+  -- held, never as commenter_other_car (lead ruling 2026-11-25).
   IF q ? 'labor_stated_subject' THEN
     subj := CASE WHEN jsonb_typeof(q -> 'labor_stated_subject') = 'string' THEN q ->> 'labor_stated_subject' END;
     pos := CASE WHEN subj IS NULL OR p_quote IS NULL THEN 0 ELSE position(subj IN p_quote) END;
@@ -423,7 +426,7 @@ BEGIN
     ELSE
       subj_key := public.labor_stated_subject_key(subj);
       IF subj_key IS NULL OR (qr.figure_term_pattern IS NOT NULL AND subj ~* qr.figure_term_pattern) THEN
-        reasons := reasons || 'stated_subject_unresolved'::text;
+        held := held || 'stated_subject_unresolved'::text;
         subj_key := NULL;
       END IF;
     END IF;
@@ -463,9 +466,9 @@ BEGIN
   -- the figure's sentence; it lands, admits nothing and reaches no baseline (lead ruling 2026-11-25). admitted: counts.
   IF cardinality(reasons) > 0 THEN
     disposition := 'refused';
-  ELSIF NOT ctx THEN
+  ELSIF NOT ctx OR cardinality(held) > 0 THEN
     disposition := 'held';
-    held := held || 'no_labor_context'::text;
+    IF NOT ctx THEN held := 'no_labor_context'::text || held; END IF;
   ELSE
     disposition := 'admitted';
   END IF;
