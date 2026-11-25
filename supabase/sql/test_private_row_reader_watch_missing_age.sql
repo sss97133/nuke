@@ -83,6 +83,30 @@ BEGIN
   IF jsonb_array_length(r->'missing_too_long') <> 0 THEN RAISE EXCEPTION 'FAIL: inactive rows listed %', r->'missing_too_long'; END IF;
 END $$;
 
+-- a private_column probe (20261126014900) whose column is gone ages into the list as relation.column. That kind lands in
+-- its own migration, so here the CHECK is widened on the fixture and the assay stubbed to an empty reading: this case
+-- tests only the watch's own catalog test.
+ALTER TABLE public.private_row_probes DROP CONSTRAINT private_row_probes_subject_kind_check;
+CREATE OR REPLACE FUNCTION public.assay_private_row_exposure() RETURNS jsonb LANGUAGE sql AS $f$
+  SELECT '{"exposed_relations": 0, "exposed": [], "relations": [], "not_assessed": [], "timed_out": [], "budget_ms": 20000, "ms": 0}'::jsonb $f$;
+INSERT INTO public.private_row_probes (rank, relation, row_key, subject_kind, subject_column, owner_lane, note, added_at)
+VALUES (40, 'vehicles', 'id', 'private_column', 'renamed_away', 'test', 'a column renamed after the probe was written',
+        now() - interval '100 hours'),
+       (41, 'vehicles', 'id', 'private_column', 'owner_name', 'test', 'a column that is present', now() - interval '100 hours');
+DO $$
+DECLARE msg text;
+BEGIN
+  PERFORM public.private_row_exposure_watch();
+  RAISE EXCEPTION 'FAIL: watch green with a private_column probe missing its column past the age';
+EXCEPTION WHEN raise_exception THEN
+  GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT;
+  IF msg LIKE 'FAIL:%' THEN RAISE; END IF;
+  IF msg NOT LIKE '%missing too long 1: missing over 72 h: vehicles.renamed_away' THEN
+    RAISE EXCEPTION 'FAIL: message %', msg;
+  END IF;
+END $$;
+UPDATE public.private_row_probes SET active = false WHERE subject_kind = 'private_column';
+
 -- the replacement refuses a body it does not know
 CREATE OR REPLACE FUNCTION public.private_row_exposure_watch() RETURNS jsonb LANGUAGE sql AS $f$ SELECT '{}'::jsonb $f$;
 \set ON_ERROR_STOP off

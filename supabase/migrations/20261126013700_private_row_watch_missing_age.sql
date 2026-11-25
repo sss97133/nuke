@@ -75,12 +75,17 @@ BEGIN
                                      THEN (c.config_value->>'missing_after_hours')::int END
                            FROM public.platform_config c WHERE c.config_key = 'private_row_watch'), 72);
   SELECT string_agg(lbl, ', ' ORDER BY lbl), count(*) INTO stale, j FROM (
-    SELECT DISTINCT CASE WHEN p.reader = '' THEN p.relation ELSE p.reader || '()' END AS lbl
+    SELECT DISTINCT CASE WHEN p.subject_kind = 'private_column' THEN p.relation || '.' || p.subject_column
+                         WHEN p.reader = '' THEN p.relation ELSE p.reader || '()' END AS lbl
       FROM public.private_row_probes p
      WHERE p.active AND p.added_at < now() - make_interval(hours => missing_h)
        AND (NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
                          WHERE a.attrelid = to_regclass(format('public.%I', p.relation)) AND a.attname = p.row_key
                            AND NOT a.attisdropped)
+            -- a private_column probe (20261126014900) whose column is gone, renamed for instance, as the assay reads it
+            OR (p.subject_kind = 'private_column' AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_attribute a
+                         WHERE a.attrelid = to_regclass(format('public.%I', p.relation)) AND a.attname = p.subject_column
+                           AND NOT a.attisdropped))
             OR (p.reader <> '' AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc f
                                                 WHERE f.pronamespace = 'public'::regnamespace AND f.proname = p.reader)))
     UNION
