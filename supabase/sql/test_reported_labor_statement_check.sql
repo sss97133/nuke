@@ -70,14 +70,15 @@ BEGIN
     (r->>'ok')::boolean AND r->>'page_vehicle_id' = v1::text AND r->>'speaker_role' = 'owner_seller');
   r := public.reported_labor_statement_check('build_posts', '32000000-0000-0000-0000-000000000002',
          'My own motor took about 80 hrs of evenings to rebuild', 80, NULL, task_q);
-  PERFORM pg_temp.ok('another member''s post: role unknown whatever the reader said: ' || r::text,
-    (r->>'ok')::boolean AND r->>'speaker_role' = 'unknown' AND r->>'speaker_role_read' = 'owner_seller');
+  PERFORM pg_temp.ok('another member''s post: role unknown whatever the reader said, refused until unknown is ratified: ' || r::text,
+    r->'reasons' = '["speaker_role_unratified"]'::jsonb AND r->>'speaker_role' = 'unknown' AND r->>'speaker_role_read' = 'owner_seller');
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL,
          '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"1970 Pontiac GTO"}');
   PERFORM pg_temp.ok('comment about another car: accepted, commenter_other_car from the quote, page car is not the subject: ' || r::text,
     (r->>'ok')::boolean AND r->>'speaker_role' = 'commenter_other_car' AND r->>'page_vehicle_id' = v1::text);
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL, ok_q);
-  PERFORM pg_temp.ok('a non-seller commenter read as owner_seller is unknown', (r->>'ok')::boolean AND r->>'speaker_role' = 'unknown');
+  PERFORM pg_temp.ok('a non-seller commenter read as owner_seller is unknown, and waits',
+    r->'reasons' = '["speaker_role_unratified"]'::jsonb AND r->>'speaker_role' = 'unknown');
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 1970, NULL, ok_q);
   PERFORM pg_temp.ok('the model year is not the hours (2500 hours in my 1970 GTO)', r->'reasons' ? 'low_not_at_term');
   r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000002',
@@ -124,7 +125,37 @@ BEGIN
   r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key":"unplaced"}');
   PERFORM pg_temp.ok('unplaced refused as a system', r->'reasons' ? 'qualifier_value_unknown:labor_system_key');
   r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key":"tires"}');
-  PERFORM pg_temp.ok('tires accepted as a system: ' || r::text, (r->>'ok')::boolean);
+  PERFORM pg_temp.ok('tires accepted as a system (the ratified text names it): ' || r::text, (r->>'ok')::boolean);
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key":"hardware"}');
+  PERFORM pg_temp.ok('hardware (key table only) waits for the superseding proposal: ' || r::text,
+    r->'reasons' = '["qualifier_value_unratified:labor_system_key"]'::jsonb);
+  PERFORM pg_temp.ok('hardware cites the open superseding proposal, tires and engine the ratified one', (
+    SELECT bool_and(CASE l.value WHEN 'hardware' THEN p.status = 'open' ELSE p.status = 'approved' END)
+      FROM public.labor_statement_values l JOIN public.schema_proposals p ON p.id = l.proposal_id
+     WHERE l.property_key = 'labor_system_key' AND l.value IN ('hardware', 'tires', 'engine')));
+  -- ratification of the two superseding proposals (fixture: what an extended gate would do)
+  UPDATE public.schema_proposals p SET status = 'approved'
+    FROM public.observation_properties o
+   WHERE o.property_key IN ('labor_system_key', 'labor_speaker_role') AND p.proposal_type = 'modify_property'
+     AND p.supersedes_proposal_id = o.proposed_by_proposal_id AND p.status = 'open';
+  UPDATE public.schema_proposals p SET status = 'superseded'
+    FROM public.observation_properties o
+   WHERE o.property_key IN ('labor_system_key', 'labor_speaker_role') AND p.id = o.proposed_by_proposal_id;
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key":"hardware"}');
+  PERFORM pg_temp.ok('after ratification hardware admits: ' || r::text, (r->>'ok')::boolean);
+  r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key":"engine"}');
+  PERFORM pg_temp.ok('a key ratified before still admits once its proposal is superseded by a ratified one: ' || r::text, (r->>'ok')::boolean);
+  r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL, ok_q);
+  PERFORM pg_temp.ok('after ratification speaker unknown admits: ' || r::text, (r->>'ok')::boolean AND r->>'speaker_role' = 'unknown');
+  r := public.reported_labor_statement_check('vehicles', v1, q1, 1200, NULL, ok_q);
+  PERFORM pg_temp.ok('owner_seller still admits after its proposal is superseded: ' || r::text, (r->>'ok')::boolean);
+  UPDATE public.schema_proposals p SET status = 'open'
+    FROM public.observation_properties o
+   WHERE o.property_key IN ('labor_system_key', 'labor_speaker_role') AND p.proposal_type = 'modify_property'
+     AND p.supersedes_proposal_id = o.proposed_by_proposal_id;
+  UPDATE public.schema_proposals p SET status = 'approved'
+    FROM public.observation_properties o
+   WHERE o.property_key IN ('labor_system_key', 'labor_speaker_role') AND p.id = o.proposed_by_proposal_id;
   r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, (task_q - 'labor_system_key') || '{"labor_system_key_null_reason":"names_no_one_system"}');
   PERFORM pg_temp.ok('task with a null system and its reason accepted: ' || r::text, (r->>'ok')::boolean);
   r := public.reported_labor_statement_check('build_posts', bp, q2, 40, 60, task_q || '{"labor_system_key_null_reason":"names_no_one_system"}');

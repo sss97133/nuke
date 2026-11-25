@@ -15,28 +15,41 @@
 --     ratified labor_system_key text (proposal f1e80fb0): its values are receipt_line_systems.system_key, not a list
 --     in prose; 'unplaced' is not a system but a NULL system with a reason (labor_statement_null_reasons). Lead
 --     ruling 2026-11-25. It is filed, not ratified: it waits for its gate.
+--   schema_proposals + one modify_property row (open) superseding the ratified labor_speaker_role text: the role is
+--     derived from the source row, never the reader, and 'unknown' is added for a speaker the source cannot establish
+--     (lead ruling 2026-11-25).
+--   schema_proposal_quote_rules (labor row) + figure_term_pattern, exclude_pattern, exclude_basis: the figure recorded
+--     is the number directly before the hour term; time-left / time-since phrasing is refused (ta-skeptic2 2026-11-25).
 --   labor_statement_values (property_key FK observation_properties, value, proposal_id FK schema_proposals,
 --     system_key FK receipt_line_systems): 13 values of the 4 prose enum keys, each a whole token of its ratified
 --     key's 'Allowed values:' text (labor_scope 2, labor_speaker_role 4, labor_statement_kind 3, labor_time_basis
---     4), plus one row per receipt_line_systems key for labor_system_key with system_key = value (19 after tires),
---     citing the superseding proposal. A system key added later is admitted to statements by its own row here.
+--     4), speaker_role 'unknown' citing its open superseding proposal, and one row per receipt_line_systems key for
+--     labor_system_key with system_key = value: a key the ratified text names cites the ratified proposal, any
+--     other (hardware, supplies) cites the open superseding one.
+--   labor_statement_value_admitted(key, value): a value admits a statement only while its proposal is approved, or
+--     was and is superseded by an approved one. A ruling is not a ratification (ta-skeptic2 must-fix 4): hardware,
+--     supplies and speaker 'unknown' are listed and wait.
 --   labor_statement_null_reasons (property_key FK observation_properties, reason, basis): why a key is absent. One
 --     row: labor_system_key / names_no_one_system (the ratified text's 'a job that names no one system: teardown,
 --     detailing, general').
 --   reported_labor_statement_check(source_table, source_row_id, quote, low, high, qualifiers) -> jsonb
---     {ok, reasons[], quote_hash, text_md5, source_vehicle_id, contract}. Same source rules as gate A
---     (schema_proposal_witness_sources: allowed table, row exists, not generated) and the same quote rule row
---     (schema_proposal_quote_rules 'labor': min_quote_chars, term_pattern, figure_required, whole-token verbatim),
---     plus: quote <= 300 chars; low > 0 and printed in the quote; high >= low and printed; qualifiers only the 6
---     labor keys and labor_system_key_null_reason; scope, speaker_role, statement_kind and time_basis required and
---     in labor_statement_values; for task a system key (a labor_statement_values row, so a receipt_line_systems key)
---     or a null reason, never both; neither for whole_build; stated_subject <= 80 chars and inside the quote.
---     Thousands separators are read as printed ('1,000' is 1000).
---     source_vehicle_id is the car the source row is about (auction_comments.vehicle_id; build_posts ->
---     build_threads.vehicle_id; vehicles.id). The writer puts it in structured_data and lands the observation
---     with vehicle_id NULL: proj_disposition marks a car in_progress on any work_record row and
---     vehicle_build_log_public prints every work_record on a public car, so a commenter's hours about another car
---     must not sit on this car's row (board 01:24 PT). The baseline fold reaches the car through the source key.
+--     {ok, reasons[], contract, quote_hash, text_md5, page_vehicle_id, speaker_role, speaker_role_basis,
+--     speaker_role_read}. Same source rules as gate A (schema_proposal_witness_sources: allowed table, row exists,
+--     not generated) and the same quote rule row (schema_proposal_quote_rules 'labor': min_quote_chars, term_pattern,
+--     figure_required, whole-token verbatim), plus: quote <= 300 chars; no exclude_pattern match; low is the first
+--     figure of a figure_term_pattern match and high, when given, the same match's second (never any number in the
+--     sentence); qualifiers only the 6 labor keys and labor_system_key_null_reason; scope, statement_kind and
+--     time_basis required, listed and admitted; for task a system key or a null reason, never both; neither for
+--     whole_build; stated_subject <= 80 chars and inside the quote. Thousands separators are read as printed.
+--     speaker_role is derived from the source row: auction_comments.is_seller, build_posts author = build_threads
+--     author, and vehicles.description (the listing text) give owner_seller; a quote naming another car
+--     (labor_stated_subject) gives commenter_other_car; anything else is 'unknown'. The reader's role is returned
+--     as speaker_role_read and decides nothing.
+--     page_vehicle_id is the car of the page the statement appeared on (auction_comments.vehicle_id; build_posts ->
+--     build_threads.vehicle_id; vehicles.id). It is never the subject: hours reach a vehicle only through a subject
+--     edge with its own evidence. The writer lands the observation with vehicle_id NULL: proj_disposition marks a
+--     car in_progress on any work_record row and vehicle_build_log_public prints every work_record on a public car,
+--     so a commenter's hours about another car must not sit on this car's row (board 01:24 PT).
 -- Test: supabase/sql/test_reported_labor_statement_check.sql (PG17, chained after the gate A test).
 
 SET lock_timeout = '5s';
@@ -155,8 +168,13 @@ SELECT 'labor_speaker_role', 'unknown', p.id
  WHERE o.property_key = 'labor_speaker_role'
 ON CONFLICT (property_key, value) DO NOTHING;
 
+-- A key the ratified text names cites the ratified proposal; any other key cites the open superseding proposal and
+-- admits nothing until that proposal is ratified (skeptic2 must-fix 4, 2026-11-25: a ruling is not a ratification).
 INSERT INTO public.labor_statement_values (property_key, value, proposal_id, system_key)
-SELECT 'labor_system_key', s.system_key, p.id, s.system_key
+SELECT 'labor_system_key', s.system_key,
+       CASE WHEN coalesce(substring(o.description FROM 'Allowed values:(.*)$'), '') ~ ('\m' || s.system_key || '\M')
+            THEN o.proposed_by_proposal_id ELSE p.id END,
+       s.system_key
   FROM public.receipt_line_systems s
   JOIN public.observation_properties o ON o.property_key = 'labor_system_key'
   JOIN public.schema_proposals p ON p.proposal_type = 'modify_property' AND p.supersedes_proposal_id = o.proposed_by_proposal_id
@@ -176,15 +194,30 @@ BEGIN
   SELECT string_agg(l.property_key || '.' || l.value, ', ') INTO bad
     FROM public.labor_statement_values l
     JOIN public.observation_properties o ON o.property_key = l.property_key
-   WHERE l.system_key IS NULL
-     AND NOT (o.proposed_by_proposal_id = l.proposal_id
+   WHERE NOT (o.proposed_by_proposal_id = l.proposal_id
               AND coalesce(substring(o.description FROM 'Allowed values:(.*)$'), '') ~ ('\m' || l.value || '\M'))
      AND NOT EXISTS (SELECT 1 FROM public.schema_proposals p WHERE p.id = l.proposal_id AND p.proposal_type = 'modify_property'
-                        AND p.supersedes_proposal_id = o.proposed_by_proposal_id AND p.payload -> 'adds_values' ? l.value);
+                        AND p.supersedes_proposal_id = o.proposed_by_proposal_id
+                        AND (p.payload -> 'adds_values' ? l.value
+                             OR (l.system_key IS NOT NULL AND p.payload ->> 'values_from' = 'receipt_line_systems.system_key')));
   IF bad IS NOT NULL THEN
     RAISE EXCEPTION 'reported_labor_hours_v1: values not in their ratified key''s Allowed values text: %', bad;
   END IF;
 END $guard$;
+
+-- A value admits a statement only while its proposal is ratified (approved), or was ratified and then superseded by a
+-- ratified proposal. Values citing an open proposal are listed and wait.
+CREATE OR REPLACE FUNCTION public.labor_statement_value_admitted(p_property_key text, p_value text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
+  SELECT EXISTS (
+    SELECT 1 FROM public.labor_statement_values l JOIN public.schema_proposals p ON p.id = l.proposal_id
+     WHERE l.property_key = p_property_key AND l.value = p_value
+       AND (p.status = 'approved'
+            OR (p.status = 'superseded' AND EXISTS (SELECT 1 FROM public.schema_proposals n
+                                                     WHERE n.supersedes_proposal_id = p.id AND n.status = 'approved'))))
+$fn$;
+REVOKE ALL ON FUNCTION public.labor_statement_value_admitted(text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.labor_statement_value_admitted(text, text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.reported_labor_statement_check(
   p_source_table text, p_source_row_id uuid, p_quote text, p_low numeric, p_high numeric, p_qualifiers jsonb)
@@ -272,6 +305,8 @@ BEGIN
     ELSIF k <> 'labor_stated_subject' AND (jsonb_typeof(q -> k) <> 'string' OR NOT EXISTS (
             SELECT 1 FROM public.labor_statement_values l WHERE l.property_key = k AND l.value = q ->> k)) THEN
       reasons := reasons || ('qualifier_value_unknown:' || k);
+    ELSIF k NOT IN ('labor_stated_subject', 'labor_speaker_role') AND NOT public.labor_statement_value_admitted(k, q ->> k) THEN
+      reasons := reasons || ('qualifier_value_unratified:' || k);
     END IF;
   END LOOP;
   FOREACH k IN ARRAY ARRAY['labor_scope', 'labor_statement_kind', 'labor_time_basis'] LOOP
@@ -315,6 +350,9 @@ BEGIN
   END IF;
   role := coalesce(role, 'unknown');
   role_basis := coalesce(role_basis, 'the source row does not establish the speaker');
+  IF NOT public.labor_statement_value_admitted('labor_speaker_role', role) THEN
+    reasons := reasons || 'speaker_role_unratified'::text;
+  END IF;
 
   RETURN jsonb_build_object('ok', cardinality(reasons) = 0, 'reasons', to_jsonb(reasons),
     'contract', 'reported_labor_hours_v1', 'quote_hash', md5(coalesce(p_quote, '')), 'text_md5', md5(txt),
