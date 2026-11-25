@@ -225,3 +225,28 @@ export function closedAnswer(parsed) {
 }
 
 export const isUuid = (s) => typeof s === 'string' && UUID.test(s);
+
+// A readable answer as a keyed reading for ingest-observation (method fact_doubt_reread_v1). row = one row of
+// fact_doubt_readings_to_land (20261124193100): one read is one observation with ONE witness photo; every answer image id
+// rides along as witness_image_ids. The value is the marking as the reader gave it; the writer's physical-reading gate
+// admits or refuses the key and the characters. Nothing else from the request (quote, asker, earlier answers) is carried.
+export const REREAD_METHOD = 'fact_doubt_reread_v1';
+export function buildReadingObservation(row) {
+  if (!isUuid(row?.request_id) || !isUuid(row?.vehicle_id) || !isUuid(row?.image_id)) throw new Error('row needs request, vehicle and image ids');
+  const key = String(row.property_key ?? ''); const value = String(row.value ?? '').trim(); const model = String(row.model ?? '').trim();
+  if (!/^[a-z][a-z0-9_]*$/.test(key) || !value || !model) throw new Error('row needs a property key, a value and a model');
+  const ids = Array.isArray(row.image_ids) ? row.image_ids.filter(isUuid) : [];
+  const confidence = row.confidence == null ? null : Number(row.confidence);
+  return {
+    source_slug: 'photo_pipeline', kind: 'specification', vehicle_id: row.vehicle_id, property_key: key,
+    observed_at: row.taken_at ?? row.answered_at, agent_inferred: true, agent_model: model, agent_tier: 'fact_doubt_reader',
+    extraction_method: REREAD_METHOD, source_identifier: `${REREAD_METHOD}:${row.request_id}`,
+    structured_data: {
+      [key]: value, image_id: row.image_id, source_family: `image:${row.image_id}`, visual_relation: 'direct_transcription',
+      witness_image_ids: ids.length ? ids : [row.image_id], capture_at: row.taken_at ?? null,
+      observed_at_basis: row.taken_at ? 'photo_capture_time' : 'answer_time', fact_doubt_request_id: row.request_id,
+      answer_confidence: Number.isFinite(confidence) ? confidence : null,
+      limitation: 'A blind re-read of the cited photos by the doubt loop; one reader. The marking as read; its meaning comes from vehicle_decode_rules.',
+    },
+  };
+}

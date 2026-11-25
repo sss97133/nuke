@@ -200,3 +200,39 @@ test('closeup boxes come from text positions only: grown, merged, capped', () =>
   assert.equal(closeupBoxes(null).length, 0);
   assert.equal(closeupBoxes([{ bbox: [0, 0, 10, 10] }, { bbox: [500, 500, 510, 510] }, { bbox: [900, 0, 910, 10] }, { bbox: [0, 900, 10, 910] }]).length, 3);
 });
+// ── landing a readable answer ──
+const I3 = '44444444-4444-4444-4444-444444444444'; const I4 = '55555555-5555-5555-5555-555555555555';
+test('a value answer becomes one keyed reading with one witness photo and no quote', async () => {
+  const { buildReadingObservation, REREAD_METHOD } = await import('./fact-doubts.mjs');
+  const row = { request_id: I1, vehicle_id: I2, property_id: I3, property_key: 'transmission_case_casting', value: ' 3851325 ', image_id: I1,
+    image_ids: [I1, I2, 'junk'], taken_at: '2026-10-28T17:05:00Z', model: 'claude-sonnet-5-5', confidence: '0.8', answered_at: '2026-11-22T05:10:00Z', quote: SECRET };
+  const b = buildReadingObservation(row);
+  assert.equal(b.extraction_method, REREAD_METHOD); assert.equal(b.kind, 'specification'); assert.equal(b.agent_inferred, true);
+  assert.equal(b.property_key, 'transmission_case_casting'); assert.equal(b.structured_data.transmission_case_casting, '3851325');
+  assert.equal(b.structured_data.image_id, I1); assert.equal(b.structured_data.source_family, `image:${I1}`);
+  assert.equal(b.structured_data.visual_relation, 'direct_transcription'); assert.deepEqual(b.structured_data.witness_image_ids, [I1, I2]);
+  assert.equal(b.observed_at, row.taken_at); assert.equal(b.structured_data.answer_confidence, 0.8); assert.equal(b.agent_model, 'claude-sonnet-5-5');
+  assert.equal(b.source_identifier, `${REREAD_METHOD}:${I1}`); assert.ok(!JSON.stringify(b).includes(SECRET));
+  assert.throws(() => buildReadingObservation({ ...row, image_id: null }));
+  assert.throws(() => buildReadingObservation({ ...row, value: '  ' }));
+  assert.throws(() => buildReadingObservation({ ...row, model: '' }));
+});
+test('the lander posts each listed answer to ingest-observation and counts landed, duplicate, refused and failed', async () => {
+  const { main } = await import('./land-fact-doubt-readings.mjs');
+  const base = { vehicle_id: I2, property_key: 'engine_block_casting', value: '9799140', image_id: I1, image_ids: [I1], model: 'm', taken_at: null, answered_at: '2026-11-22T05:10:00Z' };
+  const rows = [{ ...base, request_id: I1 }, { ...base, request_id: I2 }, { ...base, request_id: I3 }, { ...base, request_id: I4 }, { ...base, request_id: 'bad' }];
+  const replies = [{ ok: true, status: 200, json: { observation_id: I1 } }, { ok: true, status: 200, json: { observation_id: I2, duplicate: true } },
+    { ok: false, status: 400, json: { error: 'A physical reading is the marking as read: capitals, digits and separators' } }, { ok: false, status: 503, json: null }];
+  const posted = [];
+  const links = [];
+  const db = { rpc: async (fn, b) => { if (fn === 'record_fact_doubt_landing') { links.push(b); return true; }
+      assert.equal(fn, 'fact_doubt_readings_to_land'); assert.equal(b.p_limit, 50); return rows; },
+    fn: async (name, body) => { assert.equal(name, 'ingest-observation'); posted.push(body); return replies[posted.length - 1]; } };
+  const s = await main([], {}, { db });
+  assert.equal(s.listed, 5); assert.equal(posted.length, 4); assert.equal(s.landed, 1); assert.equal(s.duplicate, 1); assert.equal(s.refused, 2); assert.equal(s.failed, 1);
+  assert.equal(s.refusal_classes.row_shape, 1); assert.ok(Object.keys(s.refusal_classes).some((k) => k.startsWith('400: A physical reading is the marking as read')));
+  assert.ok(!JSON.stringify(s).includes('9799140'), 'counts only');
+  assert.equal(s.linked, 2); assert.deepEqual(links.map((l) => l.p_observation_id), [I1, I2]); assert.equal(links[0].p_request_id, I1);
+  const dry = await main(['--dry-run'], {}, { db: { rpc: async () => rows, fn: async () => { throw new Error('no post on a dry run'); } } });
+  assert.equal(dry.listed, 5); assert.equal(dry.landed, 0);
+});

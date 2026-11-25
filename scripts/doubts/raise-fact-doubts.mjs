@@ -45,17 +45,20 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const db = client(env); const version = producerVersion(SCRIPT); const runId = randomUUID();
   const [vehicle] = await db.req(`vehicles?select=id,user_id&id=eq.${vehicleId}&deleted_at=is.null`);
   if (!vehicle) throw new Error('vehicle not found');
-  const reg = new Map((await db.req('observation_properties?select=id,property_key,data_type&ratified_at=not.is.null&deprecated_at=is.null&limit=5000')).map((p) => [p.property_key, p]));
+  const reg = new Map((await db.req('observation_properties?select=id,property_key,data_type,verification_scope&ratified_at=not.is.null&deprecated_at=is.null&limit=5000')).map((p) => [p.property_key, p]));
   const doubts = []; const unmapped = [];
   for (const dim of HEADER_DIMENSIONS) {
     const r = deriveDoubts({ [dim]: await db.rpc('vehicle_facet_items', { p_vehicle_id: vehicleId, p_dimension: dim }) }, reg);
     doubts.push(...r.doubts); unmapped.push(...r.unmapped);
   }
   if (from) { const r = doubtsFromReaderFile(JSON.parse(readFileSync(from, 'utf8')), reg); doubts.push(...r.doubts); unmapped.push(...r.unmapped); }
-  const summary = { run_id: runId, producer_version: version, vehicle_id: vehicleId, dry_run: dry, doubts: [], skipped_no_frames: [], unmapped, retired: 0, errors: [] };
+  const summary = { run_id: runId, producer_version: version, vehicle_id: vehicleId, dry_run: dry, doubts: [], skipped_no_frames: [], skipped_class_scope: [], unmapped, retired: 0, errors: [] };
   const seen = new Set();
   for (const d of doubts) {
     if (seen.has(d.property_key)) continue; seen.add(d.property_key);
+    // The registry row is the rule: a re-read as printed applies only to an instance-scope property (trigger
+    // evidence_judgment_fact_doubt_scope refuses the rest); a class-scope one is settled by decode rules.
+    if (reg.get(d.property_key)?.verification_scope !== 'instance') { summary.skipped_class_scope.push({ property_key: d.property_key, item_key: d.item_key }); continue; }
     try {
       const imageIds = pickFrames(await candidateFrames(db, vehicleId, d));
       const itemIds = [...new Set(d.receipt_item_ids)];
