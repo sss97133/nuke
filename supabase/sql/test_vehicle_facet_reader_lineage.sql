@@ -1,5 +1,5 @@
 -- Disposable PG17: a photo reading's reader family is its lineage (reader_lineages), not its method name
--- (facet_reader_lineage_v1, 20261124193000). Reuses the facet fixture; every fixture is synthetic. Proves on a public car:
+-- (facet_reader_lineage_v1, 20261124193000; asked once per model, 20261124193200). Reuses the facet fixture; every fixture is synthetic. Proves on a public car:
 -- two models of one lineage reading one photo are one reader (reading); two lineages reading one photo establish; two
 -- methods of one lineage on two photos stay a reading (they established before); two lineages that read the same stamp
 -- differently are a conflict whose sides each carry their reader; a model with no row is its own lineage; a reading
@@ -69,6 +69,9 @@ RESET ROLE;
 
 \ir ../migrations/20261124193000_facet_reader_lineage.sql
 \ir ../migrations/20261124193000_facet_reader_lineage.sql
+-- the family asked once per model (20261124193200): same output
+\ir ../migrations/20261124193200_facet_reader_lineage_once.sql
+\ir ../migrations/20261124193200_facet_reader_lineage_once.sql
 
 SET ROLE anon;
 SET test.auth_role = 'anon';
@@ -79,6 +82,8 @@ BEGIN
   d := pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure);
   PERFORM public.t_assert((length(d) - length(replace(d, 'facet_reader_lineage_v1', ''))) / length('facet_reader_lineage_v1') = 1,
     'patched once');
+  PERFORM public.t_assert((length(d) - length(replace(d, 'facet_reader_lineage_v2', ''))) / length('facet_reader_lineage_v2') = 1
+      AND position('public.reader_lineage(o.agent_model)' IN d) = 0, 'v2 patched once; no per-row lookup left');
   item := public.t_item('10000000-0000-0000-0000-000000000003', 'engine', 'engine.current.block_casting');
   PERFORM public.t_assert(item->>'status' = 'reading', format('Opus + Sonnet on one photo is one reader; got %s', item->>'status'));
   PERFORM public.t_assert(item#>>'{sources,0,reader}' = 'anthropic', format('source names its lineage; got %s', item->'sources'));
