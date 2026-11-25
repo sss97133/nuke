@@ -6,6 +6,11 @@
 \ir test_private_row_reader_probes.sql
 CREATE TABLE public.platform_config (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), config_key text NOT NULL UNIQUE,
   config_value jsonb NOT NULL, description text, updated_at timestamptz DEFAULT now(), updated_by uuid);
+-- the rotation check below needs the hour's rotated first to differ from the rank-first: when (1 + hour) is a multiple of
+-- the probe count, one more (missing) probe shifts it
+INSERT INTO public.private_row_probes (rank, relation, row_key, subject_kind, subject_column, owner_lane, note)
+SELECT 99, 'rotation_pad', 'id', 'vehicle', 'id', 'test', 'pads the probe count off the hour'
+ WHERE (1 + extract(hour FROM now())::int) % (SELECT count(*) FROM public.private_row_probes WHERE active) = 0;
 CREATE TABLE public._before AS SELECT public.assay_private_row_exposure() AS r;
 \ir ../migrations/20261125235500_private_row_watch_budget.sql
 \ir ../migrations/20261125235500_private_row_watch_budget.sql
@@ -18,12 +23,12 @@ BEGIN
     RAISE EXCEPTION 'FAIL: patch not applied exactly once';
   END IF;
 
-  -- default budget: every probe assessed, the same readings as before the patch (order aside)
+  -- default budget: every probe assessed, the same readings as before the patch (order and the new per-probe ms aside)
   r := public.assay_private_row_exposure();
   SELECT x.r INTO b FROM public._before x;
   IF jsonb_array_length(r->'not_assessed') <> 0 THEN RAISE EXCEPTION 'FAIL: default budget skipped %', r->'not_assessed'; END IF;
   IF r->'exposed_relations' <> b->'exposed_relations' OR r->'probes' <> b->'probes'
-     OR (SELECT jsonb_agg(e ORDER BY e::text) FROM jsonb_array_elements(r->'relations') e)
+     OR (SELECT jsonb_agg(e - 'ms' ORDER BY (e - 'ms')::text) FROM jsonb_array_elements(r->'relations') e)
         <> (SELECT jsonb_agg(e ORDER BY e::text) FROM jsonb_array_elements(b->'relations') e) THEN
     RAISE EXCEPTION 'FAIL: readings changed by the patch';
   END IF;
@@ -58,6 +63,13 @@ BEGIN
                               FROM public.private_row_probes WHERE active)) THEN RAISE; END IF;
   END;
   UPDATE public.platform_config SET config_value = '{"budget_ms": 20000}' WHERE config_key = 'private_row_watch';
+END $$;
+
+-- every assessed probe carries its own ms
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements((public.assay_private_row_exposure())->'relations') e
+              WHERE NOT coalesce((e->>'missing')::boolean, false) AND NOT coalesce((e->>'not_assessed')::boolean, false)
+                AND e->>'ms' IS NULL) THEN RAISE EXCEPTION 'FAIL: an assessed probe has no ms'; END IF;
 END $$;
 
 -- the job: its command carries the 30 s bound and quiet notices, then calls the watch
@@ -104,7 +116,8 @@ DO $$ DECLARE msg text; BEGIN
   RAISE EXCEPTION 'FAIL: watch green with a timed-out probe';
 EXCEPTION WHEN raise_exception THEN
   GET STACKED DIAGNOSTICS msg = MESSAGE_TEXT;
-  IF msg NOT LIKE 'private rows: exposed % of % probed, not assessed %' OR msg NOT LIKE '%timed out: slow_feed()%' THEN RAISE; END IF;
+  IF msg NOT LIKE 'private rows: exposed % of % probed, not assessed %' OR msg NOT LIKE '%timed out: slow_feed()%'
+     OR msg NOT LIKE '%not assessed (budget 20000 ms, ran % ms): %slow_feed()%' THEN RAISE; END IF;
 END $$;
 RESET statement_timeout;
 UPDATE public.private_row_probes SET active = false WHERE reader = 'slow_feed';
@@ -120,6 +133,16 @@ BEGIN
     FROM generate_series(0, 23) h) s;
   IF firsts <> least(24, (SELECT count(*) FROM public.private_row_probes WHERE active)) THEN
     RAISE EXCEPTION 'FAIL: rotation leads with only % distinct probes', firsts;
+  END IF;
+END $$;
+-- the watch replacement refuses a body it does not know
+CREATE OR REPLACE FUNCTION public.private_row_exposure_watch() RETURNS jsonb LANGUAGE sql AS $f$ SELECT '{}'::jsonb $f$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261125235500_private_row_watch_budget.sql
+\set ON_ERROR_STOP on
+DO $$ BEGIN
+  IF (SELECT prosrc FROM pg_proc WHERE oid = 'public.private_row_exposure_watch()'::regprocedure) NOT LIKE '%SELECT ''{}''::jsonb%' THEN
+    RAISE EXCEPTION 'FAIL: watch replaced over an unknown body';
   END IF;
 END $$;
 SELECT 'private_row_watch_budget: ok';

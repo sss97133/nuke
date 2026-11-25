@@ -36,7 +36,7 @@ DECLARE
   r1 text := $r$  priv text; sub text; t0 timestamptz := clock_timestamp(); err text; aud_out jsonb; label text; ids jsonb; returned int;
   -- private_row_watch_budget_v1
   skipped text[] := '{}';
-  timed_out text[] := '{}'; stop boolean := false;
+  timed_out text[] := '{}'; stop boolean := false; tp timestamptz;
   budget_ms int := coalesce((SELECT CASE WHEN c.config_value->>'budget_ms' ~ '^\d{1,6}$' THEN (c.config_value->>'budget_ms')::int END
                                FROM public.platform_config c WHERE c.config_key = 'private_row_watch'), 20000);$r$;
   a2 text := $a$  FOR p IN SELECT * FROM public.private_row_probes WHERE active ORDER BY rank, relation, reader LOOP
@@ -57,6 +57,7 @@ DECLARE
   a4 text := $a$    keys := NULL;
     IF p.reader_args IS NULL THEN$a$;
   r4 text := $r$    BEGIN  -- probe guard: the job's statement_timeout firing here ends this probe and the probing
+    tp := clock_timestamp();
     keys := NULL;
     IF p.reader_args IS NULL THEN$r$;
   a5 text := $a$    END LOOP;
@@ -67,15 +68,19 @@ DECLARE
       IF NOT label = ANY (timed_out) THEN timed_out := timed_out || label; END IF;
       IF NOT label = ANY (skipped) THEN skipped := skipped || label; END IF;
       per := per || jsonb_build_object('relation', label, 'kind', p.subject_kind, 'owner', p.owner_lane,
-                                       'not_assessed', true, 'timed_out', true);
+                                       'not_assessed', true, 'timed_out', true,
+                                       'ms', (extract(epoch FROM clock_timestamp() - tp) * 1000)::int);
       CONTINUE;
     END;
     IF hit AND NOT label = ANY (exposed) THEN$r$;
+  a6 text := $a$                                     'private_sampled', coalesce(returned, cardinality(keys), 0), 'visible', aud_out, 'exposed', hit);$a$;
+  r6 text := $r$                                     'private_sampled', coalesce(returned, cardinality(keys), 0), 'visible', aud_out, 'exposed', hit,
+                                     'ms', (extract(epoch FROM clock_timestamp() - tp) * 1000)::int);$r$;
   pair record;
 BEGIN
   d := pg_get_functiondef('public.assay_private_row_exposure()'::regprocedure);
   IF position('private_row_watch_budget_v1' IN d) > 0 THEN RETURN; END IF;
-  FOR pair IN SELECT * FROM (VALUES (a1, r1), (a2, r2), (a3, r3), (a4, r4), (a5, r5)) v(a, r) LOOP
+  FOR pair IN SELECT * FROM (VALUES (a1, r1), (a2, r2), (a3, r3), (a4, r4), (a5, r5), (a6, r6)) v(a, r) LOOP
     IF (length(d) - length(replace(d, pair.a, ''))) / length(pair.a) <> 1 THEN
       RAISE EXCEPTION 'private_row_watch_budget: anchor drifted (% matches): %', (length(d) - length(replace(d, pair.a, ''))) / length(pair.a), left(pair.a, 60);
     END IF;
@@ -92,6 +97,15 @@ VALUES ('private_row_watch', '{"budget_ms": 20000}'::jsonb,
         'private_row_watch_budget_v1: assay_private_row_exposure() starts no probe after budget_ms; the job private-row-exposure-watch is capped at 30 s (statement_timeout in its command). 20000 = about 3x the 7 s warm sum and 2x the 10 s run cancelled at 10:41Z 2026-11-25. Migration 20261125235500.')
 ON CONFLICT (config_key) DO NOTHING;
 
+-- the watch is replaced whole, in one statement with its guard: only over the body 20261125100000 left (md5 3e8a636a...,
+-- read live 2026-11-25) or this one
+DO $w$
+DECLARE src text := (SELECT prosrc FROM pg_proc WHERE oid = 'public.private_row_exposure_watch()'::regprocedure);
+BEGIN
+  IF md5(src) <> '3e8a636a52870755e9f5864b59ffbc2a' AND position('private_row_watch_budget_v1' IN src) = 0 THEN
+    RAISE EXCEPTION 'private_row_exposure_watch body drifted (md5 %), re-read before replacing', md5(src);
+  END IF;
+  EXECUTE $body$
 CREATE OR REPLACE FUNCTION public.private_row_exposure_watch()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -99,6 +113,7 @@ CREATE OR REPLACE FUNCTION public.private_row_exposure_watch()
 AS $function$
 DECLARE r jsonb; n int; m int; k int; line text; detail text;
 BEGIN
+  -- private_row_watch_budget_v1
   r := public.assay_private_row_exposure();
   -- per relation label: not assessed when any of its probes was skipped or timed out; probed otherwise (missing readers aside)
   SELECT count(*) FILTER (WHERE NOT unread AND NOT missing), count(*) FILTER (WHERE unread)
@@ -109,7 +124,7 @@ BEGIN
             FROM jsonb_array_elements(r->'relations') e GROUP BY 1) s;
   n := (r->>'exposed_relations')::int;
   line := format('exposed %s of %s probed, not assessed %s', n, m, k);
-  r := r || jsonb_build_object('line', line);
+  r := r || jsonb_build_object('line', line, 'assessed_relations', m, 'not_assessed_relations', k);
   IF n > 0 OR k > 0 THEN
     SELECT string_agg(format('%s [%s] anon %s, stranger %s of %s', x->>'relation', x->>'owner',
                              coalesce(x#>>'{visible,anon}', '-'), coalesce(x#>>'{visible,authenticated}', '-'),
@@ -123,7 +138,9 @@ BEGIN
     RAISE EXCEPTION 'private rows: %: %', line, detail;
   END IF;
   RETURN r;
-END $function$;
+END $function$
+$body$;
+END $w$;
 REVOKE ALL ON FUNCTION public.private_row_exposure_watch() FROM PUBLIC, anon, authenticated;
 
 -- the job carries its own bound: 30 s, above the 20 s budget plus the slowest probe measured cold (5 s)
