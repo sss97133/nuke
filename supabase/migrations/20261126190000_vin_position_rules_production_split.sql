@@ -1,5 +1,5 @@
--- Reference structure that lets a pre-1981 VIN decode by join, production counts split by
--- trim and engine, and a keyed region inside a photo. Reference rows only; every row cites
+-- Reference structure that lets a pre-1981 VIN decode by join, and production counts split by
+-- trim and engine. Reference rows only; every row cites
 -- the page it was read from. No vehicle-specific rows.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
@@ -87,28 +87,3 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.vehicle_production_data p
   WHERE p.make = 'Pontiac' AND p.model = 'Firebird' AND p.year = 1973
     AND p.body_style = 'Coupe' AND p.trim_level = x.trim AND p.engine_option = x.eng);
-
--- 3. A keyed region inside a photo --------------------------------------------------------
--- No foreign key to vehicle_images on purpose: adding one takes a lock on that table while
--- live writers hold it. image_id is checked by the writer.
-CREATE TABLE IF NOT EXISTS public.image_regions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  image_id uuid NOT NULL,
-  observation_id uuid,
-  component_key text,
-  label text NOT NULL,
-  x numeric NOT NULL CHECK (x >= 0 AND x <= 1),
-  y numeric NOT NULL CHECK (y >= 0 AND y <= 1),
-  w numeric NOT NULL CHECK (w > 0 AND w <= 1),
-  h numeric NOT NULL CHECK (h > 0 AND h <= 1),
-  method text NOT NULL CHECK (method IN ('hand_placed','text_recognition','reader','subject_mask')),
-  created_by text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (x + w <= 1.0001 AND y + h <= 1.0001)
-);
-COMMENT ON TABLE public.image_regions IS
-  'Where in a photo a reading or component sits: box as fractions of the frame, the observation it belongs to, and how the box was made. hand_placed rows are for display only and are never a witness.';
-CREATE INDEX IF NOT EXISTS image_regions_image_idx ON public.image_regions (image_id);
-CREATE INDEX IF NOT EXISTS image_regions_observation_idx ON public.image_regions (observation_id) WHERE observation_id IS NOT NULL;
-ALTER TABLE public.image_regions ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.image_regions FROM anon, authenticated;
