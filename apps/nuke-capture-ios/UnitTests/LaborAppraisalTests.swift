@@ -50,7 +50,7 @@ final class LaborAppraisalTests: XCTestCase {
 
     func testSegmentLinesPrintWordsNotIdentifiers() throws {
         let a = try appraisal()
-        let all = a.segments.flatMap(LaborWords.lines).joined(separator: "\n")
+        let all = a.segments.flatMap { LaborWords.lines($0) }.joined(separator: "\n")
         XCTAssertFalse(all.contains("stage_transition_labor_map"), "a rule identifier reached the screen")
         XCTAssertFalse(all.contains("INT-CARPET-RR"), "an operation code reached the screen")
         XCTAssertFalse(all.contains("not named"))
@@ -83,6 +83,20 @@ final class LaborAppraisalTests: XCTestCase {
         var floor = w; floor.max_witnessed = false
         XCTAssertEqual(LaborWords.witnessedTotal(floor), "at least 71 h, typical 81 h")
         XCTAssertNil(LaborWords.witnessedTotal(.init(hours_min: nil, hours_typical: nil, hours_max: 40)))
+        // 20261125033000: a witnessed max that leaves segments unknown is not a bound either.
+        let known = LaborAppraisal.WitnessedTotal(hours_min: 71, hours_typical: 81, hours_max: 92, unknown_min_segments: 4, unknown_max_segments: 4)
+        XCTAssertEqual(LaborWords.witnessedTotal(known), "at least 71 h, typical 81 h")
+        XCTAssertEqual(LaborWords.witnessedUnknown(known), " (4 segments with no witnessed minimum, 4 with no witnessed maximum)")
+        XCTAssertEqual(LaborWords.witnessedUnknown(.init(unknown_min_segments: 0)), "")
+    }
+
+    func testStepsAndPartsUseTheReadersNames() {
+        let names = LaborNames(transitions: ["t1": .init(label: "Full body block sand")], operations: ["INT-SEATS-RR": .init(name: "Seats R&R (pair)")])
+        XCTAssertEqual(LaborWords.step(LaborStageStep(from_stage: "primed", to_stage: "blocked", transition_id: "t1"), names), "Full body block sand")
+        XCTAssertEqual(LaborWords.step(LaborStageStep(from_stage: "primed", to_stage: "blocked", transition_id: "t2"), names), "primed to blocked")
+        XCTAssertEqual(LaborWords.parts("Fitted parts with a book operation",
+                                        [LaborPart(item_id: "r2", hours: 1, operation_code: "INT-SEATS-RR")], names),
+                       "Fitted parts with a book operation: 1. Seats R&R (pair), 1 h")
     }
 
     func testCoverageCountsPricedSegmentsAndDatesInTheViewersZone() throws {
