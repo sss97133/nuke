@@ -21,7 +21,10 @@ GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.jwt(), auth.uid() TO anon, authenticated, service_role;
 
 -- The live shapes, grants and policies as measured 2026-11-24 (Pacific).
-CREATE TABLE public.user_presence(id bigserial PRIMARY KEY, vehicle_id uuid NOT NULL, user_id uuid,
+-- guardrail-allow(center-key-fk): vehicle_views.vehicle_id: this stand-in mirrors the live table, which has no foreign key; the policies under test do not depend on one.
+CREATE TABLE public.vehicles(id uuid PRIMARY KEY);
+INSERT INTO public.vehicles(id) VALUES ('00000000-0000-0000-0000-0000000000c1'), ('00000000-0000-0000-0000-0000000000c2');
+CREATE TABLE public.user_presence(id bigserial PRIMARY KEY, vehicle_id uuid NOT NULL REFERENCES public.vehicles(id) ON DELETE CASCADE, user_id uuid,
   last_seen_at timestamptz NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX user_presence_vehicle_user_unique ON public.user_presence(vehicle_id, user_id);
 CREATE TABLE public.vehicle_views(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid,
