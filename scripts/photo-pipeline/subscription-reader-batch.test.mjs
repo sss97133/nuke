@@ -64,7 +64,8 @@ const FAKE_KILL = `#!/bin/bash
 printf '%s\\n' "$*" >> "$HOME/kill-calls.log"
 `;
 const FULL = ['subscription-document-reader.mjs', 'reader-heartbeat.mjs', 'subscription-frame-classifier.mjs', 'reader-heartbeat.mjs',
-  'fact-doubt-cycle.mjs', 'reader-heartbeat.mjs', 'reconcile-receipt-work.mjs', 'reader-heartbeat.mjs'];
+  'fact-doubt-cycle.mjs', 'reader-heartbeat.mjs', 'reconcile-receipt-work.mjs', 'reader-heartbeat.mjs',
+  'answer-receipt-parts.mjs', 'reader-heartbeat.mjs'];
 
 async function withHome(fn) {
   const home = mkdtempSync(join(tmpdir(), 'reader-batch-'));

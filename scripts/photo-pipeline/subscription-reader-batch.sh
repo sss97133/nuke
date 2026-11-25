@@ -151,6 +151,10 @@ READER_PATH_FIRST="$HOME/.local/bin" run_reader fact-doubt-cycle "$MAIN/scripts/
 #    2026-11-24 nothing ran it after its hand runs of 11-09/10, so receipts and photos landed since raised no question.
 #    --keep-answered: an answered line keeps its answer until its receipt, line or frame is withdrawn.
 run_reader reconcile-receipt-work "$MAIN/scripts/receipt-work/reconcile-receipt-work.mjs" --user-id "$OWNER" --keep-answered
+# 6. the receipt_part_visible answerer (scripts/receipt-work/answer-receipt-parts.mjs): claim pending questions, highest
+#    line amount first, and have the subscription CLI read their candidate frames blind (line words and photo zone only;
+#    no vendor, price or dates). Capped per fire (RECEIPT_ANSWERS, default 6); answers land through answer_evidence_judgment.
+READER_PATH_FIRST="$HOME/.local/bin" run_reader answer-receipt-parts "$MAIN/scripts/receipt-work/answer-receipt-parts.mjs" --limit "${RECEIPT_ANSWERS:-6}"
 LAST_CLEAN="$FRAME_CLEAN"
 # fast fires run only after a full fire whose first reads ended clean; a full fire that holds them says so
 if [ "$LAST_CLEAN" -eq 1 ]; then rm -f "$FAST_HOLD"; else
