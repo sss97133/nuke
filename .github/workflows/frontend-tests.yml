@@ -847,7 +847,7 @@ jobs:
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
       - name: Verify extract-bat-core writes an end event only after the close, and its page read clock
         run: |
-          deno test --node-modules-dir=none supabase/functions/extract-bat-core/auctionClose.test.ts supabase/functions/extract-bat-core/sourceReadClock.test.ts supabase/functions/extract-bat-core/vehicleIdentity.test.ts
+          deno test --node-modules-dir=none supabase/functions/extract-bat-core/auctionClose.test.ts supabase/functions/extract-bat-core/sourceReadClock.test.ts supabase/functions/extract-bat-core/vehicleIdentity.test.ts supabase/functions/extract-bat-core/staleSnapshot.test.ts
       - name: Verify native BaT frames, per-lot admission isolation and coverage
         run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/batLiveEvents.test.ts supabase/functions/extract-bat-core/liveStream.test.ts supabase/functions/extract-bat-core/batHtmlRecovery.test.ts
       - name: Verify the Craigslist attribute block (parser, queue payload, funnel, VIN landing, ledger row)
