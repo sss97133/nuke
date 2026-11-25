@@ -11,7 +11,11 @@
 --           inserts land and RETURNING shows them; a PATCH may not change user_id, may not move a photo onto a car
 --           the caller cannot edit, may return a photo to the car it was merged from, may set merged_from only to the
 --           row's car; definer writers and the service role are untouched;
---   mutants: without the restrictive policy, or without the trigger, the stranger cases land again;
+--           the gate starts at pending and ai_scan_metadata carries only the VehicleComments listing keys on a
+--           signed-in insert (NULL or 'approved' gate, reader keys, a non-object refused); the iOS, web-pick and
+--           VehicleComments row shapes land; a later server trigger may still add keys;
+--   mutants: without the restrictive floor (with a permissive any-car policy), without either guard, the stranger
+--           cases land again;
 --   the migration applies twice; the revert restores the before state.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -105,9 +109,17 @@ GRANT EXECUTE ON FUNCTION public.user_can_edit_vehicle(uuid, uuid) TO authentica
 \i :with3961
 \endif
 
+CREATE TYPE public.vision_gate_status AS ENUM ('pending', 'approved', 'rejected_personal', 'rejected_misattributed', 'review_needed');
 CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles(id),
   user_id uuid, documented_by_user_id uuid, submitted_by uuid, imported_by uuid, ghost_user_id uuid, is_external boolean,
-  merged_from_vehicle_id uuid REFERENCES public.vehicles(id), image_url text, caption text, is_sensitive boolean, ai_scan_metadata jsonb);
+  merged_from_vehicle_id uuid REFERENCES public.vehicles(id), image_url text, caption text, is_sensitive boolean,
+  vision_gate_status public.vision_gate_status DEFAULT 'pending', ai_scan_metadata jsonb DEFAULT '{}'::jsonb, source text,
+  storage_path text, file_hash text, ai_processing_status text, exif_data jsonb, taken_at timestamptz);
+-- A later server-side BEFORE INSERT trigger that stamps a key (it sorts after a000_): the client guard must judge the
+-- client's row, not the stamped one.
+CREATE FUNCTION public.test_server_stamp() RETURNS trigger LANGUAGE plpgsql AS
+  $$ BEGIN NEW.ai_scan_metadata := coalesce(NEW.ai_scan_metadata, '{}'::jsonb) || '{"pipeline": {"queued": true}}'::jsonb; RETURN NEW; END $$;
+CREATE TRIGGER trg_test_server_stamp BEFORE INSERT ON public.vehicle_images FOR EACH ROW EXECUTE FUNCTION public.test_server_stamp();
 ALTER TABLE public.vehicle_images ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE ON public.vehicle_images TO anon, authenticated, service_role;
 
@@ -200,6 +212,7 @@ SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id
 SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2')$q$), 'before: stranger names the owner as uploader');
 SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-0000000000f3')$q$), 'before: stranger lands an unfiled photo');
 SELECT public.assert(NOT public.refused($q$UPDATE public.vehicle_images SET vehicle_id = '00000000-0000-0000-0000-0000000000a2' WHERE id = '00000000-0000-0000-0000-0000000000c3'$q$), 'before: stranger PATCHes it onto another owner''s car');
+SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, user_id, vision_gate_status, ai_scan_metadata) VALUES ('00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-0000000000f3', NULL, '{"classification": {"image_type": "vehicle_exterior"}}')$q$), 'before: uploader skips the gate and writes reader keys');
 RESET ROLE;
 SELECT public.assert((SELECT count(*) FROM public.vehicle_images WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a2' AND id::text LIKE '%c_') = 3, 'before: 3 stranger rows on a2');
 DELETE FROM public.vehicle_images WHERE id::text LIKE '%c_';
@@ -230,6 +243,26 @@ SELECT public.test_definer_file('00000000-0000-0000-0000-0000000000d3', '0000000
 SELECT public.test_definer_add('00000000-0000-0000-0000-0000000000d5', '00000000-0000-0000-0000-0000000000a3');
 RESET ROLE;
 SELECT public.assert((SELECT count(*) FROM public.vehicle_images WHERE id IN ('00000000-0000-0000-0000-0000000000d3', '00000000-0000-0000-0000-0000000000d5') AND vehicle_id = '00000000-0000-0000-0000-0000000000a3') = 2, 'definer writers file as before');
+
+-- The gate and the readers' keys (as the owner of a2)
+SET ROLE authenticated; SELECT set_config('test.role', 'authenticated', false), set_config('test.uid', '00000000-0000-0000-0000-0000000000f2', false);
+SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id, vision_gate_status) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2', NULL)$q$), 'gate NULL at insert: refused');
+SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id, vision_gate_status) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2', 'approved')$q$), 'gate approved at insert: refused');
+SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, user_id, ai_scan_metadata) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000f2', '{"classification": {"image_type": "engine_bay"}}')$q$), 'reader key classification at insert: refused');
+SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, user_id, ai_scan_metadata) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000f2', '{"source": "bat_scraper", "byok_deep_analysis": {"scene_type": "x"}}')$q$), 'a reader key beside listing keys: refused');
+SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, user_id, ai_scan_metadata) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000f2', '[1]')$q$), 'ai_scan_metadata not an object: refused');
+-- the real row shapes: iOS capture (SupabaseService.VehicleImageRow), web pick (#3951), VehicleComments listing import
+WITH i AS (INSERT INTO public.vehicle_images (id, image_url, storage_path, source, ai_processing_status, user_id, documented_by_user_id, file_hash, taken_at, exif_data, is_external) VALUES ('00000000-0000-0000-0000-0000000000e5', 'u', 'users/x/capture-relay/h/f.jpg', 'capture_relay_ios', 'pending', '00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000f2', 'h', now(), '{"synced_by": "capture-relay-ios"}', false) RETURNING vision_gate_status, ai_scan_metadata)
+  SELECT public.assert(count(*) = 1 AND bool_and(vision_gate_status = 'pending' AND ai_scan_metadata ? 'pipeline'), 'iOS capture row lands unfiled, gate pending, server key stamped') FROM i;
+WITH i AS (INSERT INTO public.vehicle_images (id, vehicle_id, image_url, source, user_id, documented_by_user_id, is_external, exif_data) VALUES ('00000000-0000-0000-0000-0000000000e6', '00000000-0000-0000-0000-0000000000a2', 'u', 'web_upload', '00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000f2', false, '{"filing": {"basis": "uploader_pick_at_upload"}}') RETURNING id)
+  SELECT public.assert(count(*) = 1, 'web upload onto a picked car the uploader edits lands') FROM i;
+WITH i AS (INSERT INTO public.vehicle_images (id, vehicle_id, image_url, user_id, source, ai_scan_metadata) VALUES ('00000000-0000-0000-0000-0000000000e7', '00000000-0000-0000-0000-0000000000a2', 'u', '00000000-0000-0000-0000-0000000000f2', 'bat_auction', jsonb_build_object('source', 'bat_scraper', 'bat_url', 'https://example.test/l', 'scraped_at', now(), 'vin_match', true, 'confidence_score', 0.9, 'original_listing', 'https://example.test/l', 'vehicle_expected', '1973 X Y')) RETURNING ai_scan_metadata)
+  SELECT public.assert(count(*) = 1 AND bool_and(ai_scan_metadata ? 'bat_url'), 'VehicleComments listing row lands with its keys') FROM i;
+RESET ROLE;
+SET ROLE service_role; SELECT set_config('test.role', 'service_role', false), set_config('test.uid', '', false);
+INSERT INTO public.vehicle_images (id, vehicle_id, user_id, vision_gate_status, ai_scan_metadata) VALUES ('00000000-0000-0000-0000-0000000000e8', '00000000-0000-0000-0000-0000000000a2', NULL, 'approved', '{"classification": {"image_type": "engine_bay"}}');
+RESET ROLE;
+SELECT public.assert((SELECT vision_gate_status FROM public.vehicle_images WHERE id = '00000000-0000-0000-0000-0000000000e8') = 'approved', 'service role sets the gate and reader keys, user_id NULL');
 
 -- anon
 SET ROLE anon; SELECT set_config('test.role', 'anon', false), set_config('test.uid', '', false);
@@ -263,15 +296,20 @@ INSERT INTO public.vehicle_images (id, vehicle_id, user_id) VALUES ('00000000-00
 UPDATE public.vehicle_images SET user_id = '00000000-0000-0000-0000-0000000000f1', vehicle_id = '00000000-0000-0000-0000-0000000000a3' WHERE id = '00000000-0000-0000-0000-0000000000e9';
 RESET ROLE;
 SELECT public.assert((SELECT vehicle_id FROM public.vehicle_images WHERE id = '00000000-0000-0000-0000-0000000000e9') = '00000000-0000-0000-0000-0000000000a3', 'service role writes as before');
-SELECT public.assert((SELECT count(*) FROM pg_policies WHERE tablename = 'vehicle_images' AND policyname = 'vehicle_images_insert_uploader_tied' AND permissive = 'RESTRICTIVE' AND cmd = 'INSERT') = 1, 'one restrictive INSERT policy');
+SELECT public.assert((SELECT string_agg(policyname || ':' || permissive, ',' ORDER BY policyname) FROM pg_policies WHERE tablename = 'vehicle_images' AND cmd = 'INSERT')
+  = 'service_role_can_insert_vehicle_images:PERMISSIVE,vehicle_images_insert_uploader:PERMISSIVE,vehicle_images_insert_uploader_tied:RESTRICTIVE',
+  'INSERT policies: service, the one end-user policy, the floor');
+SELECT public.assert(NOT has_function_privilege('authenticated', 'public.vehicle_images_client_insert_guard()', 'EXECUTE'), 'insert guard not callable');
 SELECT public.assert(NOT has_function_privilege('authenticated', 'public.vehicle_images_client_move_guard()', 'EXECUTE'), 'guard not callable');
 DELETE FROM public.vehicle_images WHERE id::text ~ '[de][0-9]$';
 
 -- Mutant 1: without the restrictive policy the stranger lands on a2 again, so the cases above kill it.
 DROP POLICY vehicle_images_insert_uploader_tied ON public.vehicle_images;
+CREATE POLICY mutant_any_car ON public.vehicle_images FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
 :stranger
-SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f3')$q$), 'mutant (no restrictive policy): stranger lands');
+SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f3')$q$), 'mutant (no restrictive floor, a permissive any-car policy): stranger lands');
 RESET ROLE;
+DROP POLICY mutant_any_car ON public.vehicle_images;
 DELETE FROM public.vehicle_images WHERE id::text LIKE '%c_';
 \ir ../migrations/20261126040500_vehicle_images_insert_tie.sql
 -- Mutant 2: without the guard the unfiled-then-PATCH path reopens.
@@ -282,10 +320,19 @@ SELECT public.assert(NOT public.refused($q$UPDATE public.vehicle_images SET vehi
 RESET ROLE;
 DELETE FROM public.vehicle_images WHERE id::text LIKE '%c_';
 \ir ../migrations/20261126040500_vehicle_images_insert_tie.sql
+-- Mutant 3: without the insert guard the uploader skips the gate again.
+DROP TRIGGER a000_vehicle_images_client_insert_guard ON public.vehicle_images;
+SET ROLE authenticated; SELECT set_config('test.role', 'authenticated', false), set_config('test.uid', '00000000-0000-0000-0000-0000000000f2', false);
+SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id, vision_gate_status) VALUES ('00000000-0000-0000-0000-0000000000c5', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2', NULL)$q$), 'mutant (no insert guard): gate NULL lands');
+RESET ROLE;
+DELETE FROM public.vehicle_images WHERE id::text LIKE '%c_';
+\ir ../migrations/20261126040500_vehicle_images_insert_tie.sql
 
 \ir revert_20261126040500_vehicle_images_insert_tie.sql
 :stranger
 SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f3')$q$), 'revert: before state restored');
 RESET ROLE;
-SELECT public.assert(to_regprocedure('public.vehicle_images_client_move_guard()') IS NULL, 'revert: guard removed');
+SELECT public.assert(to_regprocedure('public.vehicle_images_client_move_guard()') IS NULL
+  AND to_regprocedure('public.vehicle_images_client_insert_guard()') IS NULL, 'revert: guards removed');
+SELECT public.assert((SELECT count(*) FROM pg_policies WHERE tablename = 'vehicle_images' AND cmd = 'INSERT') = 6, 'revert: the six INSERT policies are back');
 \echo vehicle_images_insert_tie: ok
