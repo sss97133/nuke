@@ -25,14 +25,6 @@
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
-ALTER TABLE public.labor_evidence_grade_policy DROP CONSTRAINT IF EXISTS labor_evidence_grade_policy_counts_in_check;
-UPDATE public.labor_evidence_grade_policy SET counts_in = 'unwitnessed' WHERE counts_in = 'unwitnessed_purchase';
-ALTER TABLE public.labor_evidence_grade_policy ADD CONSTRAINT labor_evidence_grade_policy_counts_in_check
-  CHECK (counts_in IN ('witnessed', 'unwitnessed', 'none'));
-UPDATE public.labor_evidence_grade_policy
-   SET meaning = replace(meaning, 'counted with unwitnessed purchases, not witnessed', 'counted as work not witnessed')
- WHERE grade = 'photo_key_reading';
-
 DO $patch$
 DECLARE
   d text;
@@ -101,5 +93,13 @@ BEGIN
     IF n <> 1 THEN RAISE EXCEPTION 'labor unwitnessed anchor % drifted: % matches', i, n; END IF;
     d := replace(d, anchors[i], repls[i]);
   END LOOP;
+  -- the policy and the reader change together, after every anchor matched
+  ALTER TABLE public.labor_evidence_grade_policy DROP CONSTRAINT IF EXISTS labor_evidence_grade_policy_counts_in_check;
+  UPDATE public.labor_evidence_grade_policy SET counts_in = 'unwitnessed' WHERE counts_in = 'unwitnessed_purchase';
+  ALTER TABLE public.labor_evidence_grade_policy ADD CONSTRAINT labor_evidence_grade_policy_counts_in_check
+    CHECK (counts_in IN ('witnessed', 'unwitnessed', 'none'));
+  UPDATE public.labor_evidence_grade_policy
+     SET meaning = replace(meaning, 'counted with unwitnessed purchases, not witnessed', 'counted as work not witnessed')
+   WHERE grade = 'photo_key_reading';
   EXECUTE d;
 END $patch$;

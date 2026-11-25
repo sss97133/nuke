@@ -54,15 +54,43 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- The review case: answer every evidence part of vehicle 1's electrical segment not fitted.
+-- The review case, step 1: one of the two evidence parts of vehicle 1's electrical segment (a stage-priced segment)
+-- answered not fitted beside one still unwitnessed. That piece adds 0 h: the segment and the totals are unchanged,
+-- only the piece counts move. (Per-piece segments already price only fitted + unwitnessed pieces: witness contract,
+-- '3 x 4/6/12' with one panel not fitted.)
 CREATE TEMP TABLE _elec_before AS SELECT public._seg('10000000-0000-0000-0000-000000000001', 'electrical') AS s,
   public.vehicle_labor_appraisal('10000000-0000-0000-0000-000000000001') -> 'totals' AS t;
-INSERT INTO evidence_judgment_requests(vehicle_id, question_kind, status, params, answer)
-  SELECT '10000000-0000-0000-0000-000000000001', 'receipt_part_visible', 'answered',
-         jsonb_build_object('item_id', f.item_id), '{"installed":"no"}'
+CREATE TEMP TABLE _elec_parts AS
+  SELECT f.item_id, row_number() OVER (ORDER BY f.item_id) AS n
     FROM _elec_before b, jsonb_array_elements_text(b.s -> 'evidence_ids') e
     JOIN public._fixture_receipt_lines f ON f.item_id::text = e
    WHERE f.line_kind = 'part';
+INSERT INTO evidence_judgment_requests(vehicle_id, question_kind, status, params, answer)
+  SELECT '10000000-0000-0000-0000-000000000001', 'receipt_part_visible', 'answered',
+         jsonb_build_object('item_id', p.item_id), '{"installed":"no"}'
+    FROM _elec_parts p WHERE p.n = 1;
+SET test.auth_role = 'anon';
+DO $$
+DECLARE b jsonb; t0 jsonb; s jsonb; t jsonb;
+BEGIN
+  SELECT x.s, x.t INTO b, t0 FROM _elec_before x;
+  PERFORM public.assert((SELECT count(*) FROM _elec_parts) = 2 AND (b #>> '{graded_pieces,unwitnessed}')::int = 2,
+                        'fixture: two unwitnessed evidence parts: ' || b::text);
+  s := public._seg('10000000-0000-0000-0000-000000000001', 'electrical');
+  t := public.vehicle_labor_appraisal('10000000-0000-0000-0000-000000000001') -> 'totals';
+  PERFORM public.assert((s->>'hours_min')::numeric = (b->>'hours_min')::numeric AND (s->>'hours_max')::numeric = (b->>'hours_max')::numeric
+                        AND (s #>> '{graded_pieces,not_fitted}')::int = 1 AND (s #>> '{graded_pieces,unwitnessed}')::int = 1
+                        AND NOT (s -> 'graded_pieces' ? 'unpriced'), 'one not fitted beside one unwitnessed: ' || s::text);
+  PERFORM public.assert(t -> 'with_unwitnessed' = t0 -> 'with_unwitnessed' AND t -> 'by_grade' = t0 -> 'by_grade',
+                        'the not-fitted piece adds 0 h: ' || t::text);
+END $$;
+RESET ROLE;
+
+-- Step 2: the other part answered not fitted too; nothing in the segment is work.
+INSERT INTO evidence_judgment_requests(vehicle_id, question_kind, status, params, answer)
+  SELECT '10000000-0000-0000-0000-000000000001', 'receipt_part_visible', 'answered',
+         jsonb_build_object('item_id', p.item_id), '{"installed":"no"}'
+    FROM _elec_parts p WHERE p.n = 2;
 SET test.auth_role = 'anon';
 DO $$
 DECLARE b jsonb; t0 jsonb; s jsonb; t jsonb;
