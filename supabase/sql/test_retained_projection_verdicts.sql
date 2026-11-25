@@ -666,6 +666,30 @@ BEGIN
 END $$;
 SELECT pg_temp.check_e('after the source turned private', 8);
 
+-- A projection superseded when the backfill reaches its car still gets a verdict; un-superseded later with its old
+-- ingested_at (unmerge_vehicle), the tail never sees it, but its verdict goes stale (o.is_superseded is in input_fp)
+-- and the sweep regrades it, so it counts again.
+-- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in an empty disposable PG17 database only.
+DELETE FROM public.retained_projection_verdicts WHERE projection_id = '00000000-0000-0000-0000-00000000e010';
+UPDATE public.vehicle_observations SET is_superseded = true WHERE id = '00000000-0000-0000-0000-00000000e010';
+UPDATE public.retained_projection_backfill_cars SET graded_at = NULL WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1';
+UPDATE public.retained_projection_grading_state SET backfill_done = false WHERE id;
+CALL public.retained_projection_grade_tick();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts WHERE projection_id = '00000000-0000-0000-0000-00000000e010')
+     OR (SELECT graded_at FROM public.retained_projection_backfill_cars WHERE vehicle_id = '00000000-0000-0000-0000-0000000000c1') IS NULL THEN
+    RAISE EXCEPTION 'FAIL the backfill skipped a superseded projection'; END IF;
+  RAISE NOTICE 'PASS the backfill grades a projection that is superseded when its car is reached';
+END $$;
+UPDATE public.vehicle_observations SET is_superseded = false WHERE id = '00000000-0000-0000-0000-00000000e010';   -- the unmerge
+CALL public.retained_projection_grade_tick();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts_for(ARRAY['00000000-0000-0000-0000-00000000e010'::uuid])) THEN
+    RAISE EXCEPTION 'FAIL the un-superseded projection does not count after the sweep'; END IF;
+  RAISE NOTICE 'PASS un-superseded with its old ingested_at, the projection counts again after the sweep';
+END $$;
+SELECT pg_temp.check_e('after an un-supersede', 8);
+
 \ir revert_20261126063500_retained_projection_verdicts.sql
 DO $$ BEGIN
   IF to_regclass('public.retained_projection_verdicts') IS NOT NULL OR to_regprocedure('public.retained_projection_verdicts_for(uuid[])') IS NOT NULL

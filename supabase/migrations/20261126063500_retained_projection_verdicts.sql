@@ -465,7 +465,9 @@ BEGIN
   END LOOP;
 
   -- 3b. backfill: after the census, car by car in key order (publicly readable first, most projections first), a chunk
-  --     of the car's ungraded, unsuperseded projections per commit; a car with none left is marked graded.
+  --     of the car's ungraded projections per commit, superseded ones included (unmerge_vehicle can un-supersede a
+  --     projection with its old ingested_at, which the tail never sees; its verdict, with o.is_superseded in input_fp,
+  --     goes stale and the sweep regrades it); a car with none left is marked graded.
   LOOP
     EXIT WHEN clock_timestamp() >= until;
     SELECT * INTO st FROM public.retained_projection_grading_state WHERE id;
@@ -479,7 +481,7 @@ BEGIN
     END IF;
     SELECT array_agg(x.id) INTO ids FROM (
       SELECT o.id FROM public.vehicle_observations o
-       WHERE o.vehicle_id = car AND o.extraction_method = 'retained_listing_property_projection_v1' AND o.is_superseded IS NOT TRUE
+       WHERE o.vehicle_id = car AND o.extraction_method = 'retained_listing_property_projection_v1'
          AND NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts d WHERE d.projection_id = o.id)
        LIMIT chunk) x;
     IF ids IS NULL THEN
