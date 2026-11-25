@@ -211,6 +211,9 @@ BEGIN
   r := public.bat_live_stream_check();
   PERFORM public.assert(r ->> 'status' = 'failed' AND r ->> 'reason' = 'http_401', format('4xx (%s)', r));
 
+  PERFORM public._set(jsonb_build_array(public._call(9003, '22 minutes', 0)), jsonb_build_object('at', now() - interval '1 minute', 'stream_lots', 0));
+  r := public.bat_live_stream_check();
+  PERFORM public.assert(r ->> 'status' = 'passed', format('a call 22 min old is inside 2 x 10 + 5 min (%s)', r));
   PERFORM public._set(jsonb_build_array(public._call(9003, '26 minutes', 0)), jsonb_build_object('at', now() - interval '1 minute', 'stream_lots', 0));
   r := public.bat_live_stream_check();
   PERFORM public.assert(r ->> 'status' = 'failed' AND r ->> 'reason' = 'not_called', format('no call in 2 x 10 + 5 min (%s)', r));
