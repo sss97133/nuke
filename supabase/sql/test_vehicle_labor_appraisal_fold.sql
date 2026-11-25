@@ -34,9 +34,11 @@ ALTER TABLE public.labor_operations ADD COLUMN IF NOT EXISTS code text;
 CREATE TABLE public.model_fold_work (vehicle_id uuid PRIMARY KEY, state text DEFAULT 'pending', priority smallint,
   reasons text[], first_dirty_at timestamptz, dirty_at timestamptz, attempts int DEFAULT 0, next_attempt_at timestamptz,
   updated_at timestamptz);
-CREATE TABLE public.model_fold_signal (id bigserial PRIMARY KEY, vehicle_id uuid, reason text, origin_id uuid, priority smallint);
+CREATE TABLE public.model_fold_signal (id bigserial PRIMARY KEY, vehicle_id uuid, reason text, origin_id uuid, priority smallint,
+  at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.image_privacy_rules (rule_key text PRIMARY KEY);
 CREATE TABLE public.vehicle_facet_grade_folds (vehicle_id uuid PRIMARY KEY, evidence_changed_at timestamptz);
-CREATE FUNCTION public.model_fold_config() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"sweep_pending_cap": 1000}'::jsonb $$;
+CREATE FUNCTION public.model_fold_config() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"sweep_pending_cap": 1000, "settle_seconds": 300}'::jsonb $$;
 CREATE FUNCTION public.model_fold_signals_on() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 CREATE FUNCTION public.model_fold_signal_priority(p_id uuid, p_make text, p_model text, p_vin text, p_year integer, p_max integer)
   RETURNS smallint LANGUAGE sql STABLE AS $$ SELECT NULL::smallint $$;
@@ -152,6 +154,9 @@ BEGIN
     PERFORM public.model_fold_one(gen_random_uuid(), r.v, '{}'::jsonb);
     c := public.vehicle_labor_appraisal_compute(r.v);
     s := public.vehicle_labor_appraisal(r.v);
+    PERFORM public.assert(s #>> '{state,queued}' = 'true' AND s #>> '{state,fresh}' = 'false', 'a waiting signal keeps it not fresh: ' || r.v);
+    DELETE FROM public.model_fold_signal WHERE vehicle_id = r.v;  -- the tick absorbed and folded it
+    s := public.vehicle_labor_appraisal(r.v);
     PERFORM public.assert((s ->> 'state')::jsonb ->> 'fresh' = 'true', 'fresh row read: ' || r.v);
     PERFORM public.assert((s - 'as_of' - 'state') = (c - 'as_of'), 'stored read = computed read: ' || r.v);
     n := n + 1;
@@ -197,6 +202,7 @@ BEGIN
   PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = vid AND g.priority = 2),
                         'a labor-input signal on a car with a row is admitted at priority 2');
   PERFORM public.vehicle_labor_appraisal_fold(vid);
+  DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
   PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'true', 'refold makes it fresh');
   g := public.vehicle_labor_appraisal_gauge();
   PERFORM public.assert((g ->> 'stamps_answered_24h')::int >= 1 AND (g ->> 'stale_p50_s') IS NOT NULL
@@ -217,6 +223,7 @@ INSERT INTO public.receipt_items (id, receipt_id)
   SELECT e.receipt_item_id, '20000000-0000-0000-0000-000000000001' FROM public.receipt_line_edges e
    WHERE e.classifier = 'system' ORDER BY e.receipt_item_id LIMIT 1 ON CONFLICT DO NOTHING;
 SELECT public.vehicle_labor_appraisal_fold(v) FROM fold_v;
+DELETE FROM public.model_fold_signal;
 UPDATE public.receipt_line_edges SET classified_at = now() + interval '1 hour'
  WHERE receipt_item_id = (SELECT min(id::text)::uuid FROM public.receipt_items) AND classifier = 'system';
 DO $$ BEGIN
@@ -249,8 +256,71 @@ BEGIN
   PERFORM public.assert(NOT (r ? 'error'), 'old stamp folds: ' || r::text);
   PERFORM public.assert((SELECT wait_ms FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = vid ORDER BY id DESC LIMIT 1)
                         > 400::bigint * 86400 * 1000 - 1, 'old stamp: wait logged in bigint ms');
+  DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
   PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'true', 'old stamp: fresh after fold');
 END $$;
+
+-- The two-session race (ta-skeptic): a stamp clocked before the fold began but committed after it carries
+-- evidence_changed_at <= folded_at; its signal (same transaction) keeps the read not fresh until a fold answers it.
+DO $$
+DECLARE vid uuid := (SELECT v FROM fold_v); s jsonb;
+BEGIN
+  PERFORM public.vehicle_labor_appraisal_fold(vid);
+  DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
+  UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = folded_at - interval '1 second' WHERE vehicle_id = vid;
+  INSERT INTO public.model_fold_signal (vehicle_id, reason, priority) VALUES (vid, 'late_commit_fixture', 2);
+  s := public.vehicle_labor_appraisal(vid);
+  PERFORM public.assert(s #>> '{state,fresh}' = 'false' AND s #>> '{state,queued}' = 'true', 'late-committed stamp: not fresh');
+  DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
+  INSERT INTO public.model_fold_work (vehicle_id, state, priority, dirty_at, first_dirty_at) VALUES (vid, 'pending', 2, now(), now());
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'false', 'absorbed into pending work: not fresh');
+  -- the seed leaves a pending car alone (re-signalling would push dirty_at forward and starve settle)
+  UPDATE public.vehicle_labor_appraisal_state SET error = 'fixture_failure' WHERE vehicle_id = vid;
+  PERFORM public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = vid), 'seed skips a pending car');
+  UPDATE public.model_fold_work SET state = 'done' WHERE vehicle_id = vid;
+  PERFORM public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((SELECT at FROM public.model_fold_signal WHERE vehicle_id = vid) <= now() - interval '300 seconds',
+                        'seed signal is clocked settle_seconds back, claimable at the next tick');
+  PERFORM public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((SELECT count(*) FROM public.model_fold_signal WHERE vehicle_id = vid) = 1, 'a second seed run adds nothing');
+  DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
+  DELETE FROM public.model_fold_work WHERE vehicle_id = vid;
+  PERFORM public.vehicle_labor_appraisal_fold(vid);
+END $$;
+
+-- The key moves when a labor callee is replaced or a receipt line rule row is edited.
+DO $$
+DECLARE k0 text := public.vehicle_labor_appraisal_logic_key(); d text;
+BEGIN
+  PERFORM public.assert((SELECT count(*) FROM pg_proc WHERE proname = 'receipt_line_system') > 0, 'fixture has receipt_line_system');
+  d := pg_get_functiondef((SELECT oid FROM pg_proc WHERE proname = 'receipt_line_system' LIMIT 1));
+  EXECUTE regexp_replace(d, '\$function\$\s*$', '') || E'\n-- fixture edit\n$function$';
+  PERFORM public.assert(public.vehicle_labor_appraisal_logic_key() <> k0, 'callee replaced: key moves');
+  EXECUTE d;
+  PERFORM public.assert(public.vehicle_labor_appraisal_logic_key() = k0, 'callee restored: key back');
+  UPDATE public.receipt_line_rules SET status = status || '' WHERE rule_id = (SELECT min(rule_id) FROM public.receipt_line_rules);
+  PERFORM public.assert(public.vehicle_labor_appraisal_logic_key() = k0, 'no-op rule update: same key');
+  CREATE TEMP TABLE rl0 AS SELECT * FROM public.receipt_line_rules;
+  UPDATE public.receipt_line_rules SET status = 'retired_fixture' WHERE rule_id = (SELECT min(rule_id) FROM public.receipt_line_rules);
+  PERFORM public.assert(public.vehicle_labor_appraisal_logic_key() <> k0, 'receipt_line_rules edit: key moves');
+  UPDATE public.receipt_line_rules r SET status = r0.status FROM rl0 r0 WHERE r0.rule_id = r.rule_id;
+  PERFORM public.assert(public.vehicle_labor_appraisal_logic_key() = k0, 'rule restored: key back');
+END $$;
+
+-- A classifier that starts calling an unlisted function: the closure check names it and the gauge reports it.
+CREATE FUNCTION public.labor_fixture_helper() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$;
+DO $$
+DECLARE d text := pg_get_functiondef((SELECT oid FROM pg_proc WHERE proname = 'receipt_line_system' LIMIT 1));
+BEGIN
+  PERFORM public.assert(public.labor_fold_logic_unlisted() IS NULL, 'closure complete before the edit');
+  EXECUTE regexp_replace(d, '\$function\$\s*$', '') || E'\n-- calls labor_fixture_helper() now\n$function$';
+  PERFORM public.assert(public.labor_fold_logic_unlisted() LIKE '%labor_fixture_helper (called by receipt_line_system)%',
+                        'unlisted callee named: ' || coalesce(public.labor_fold_logic_unlisted(), 'null'));
+  PERFORM public.assert(public.vehicle_labor_appraisal_gauge() ->> 'unlisted_callees' LIKE '%labor_fixture_helper%', 'gauge reports it');
+  EXECUTE d;
+END $$;
+DROP FUNCTION public.labor_fixture_helper();
 
 -- A no-op update keeps the key; a rule row edit moves it, every row is stale, and the seed signals them again.
 CREATE TEMP TABLE key0 AS SELECT public.vehicle_labor_appraisal_logic_key() AS k;

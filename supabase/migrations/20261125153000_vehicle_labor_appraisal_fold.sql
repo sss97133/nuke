@@ -11,10 +11,15 @@
 --                       logic_version, folded_key, folded_at (start of the fold), evidence_changed_at (stamped by
 --                       model_fold_signal_ids), ms, error. No client grant. Only vehicle_labor_appraisal_fold writes it.
 --   vehicle_labor_appraisal_compute(uuid)  today's reader body, renamed; service role only. Holds the visibility test.
---   vehicle_labor_appraisal_logic_key()  md5 over the compute body and the labor rule tables (labor_stage_rules,
---                       labor_stage_rule_transitions, labor_stage_rule_operations, labor_operations,
---                       stage_transition_labor_map, labor_evidence_grade_policy, labor_hours_bases); 1.3 ms measured.
---                       A fold-local key like vehicle_facet_grades_logic_key: a labor rule edit re-folds labor only.
+--   labor_fold_logic_functions  (proname PK, counts_in_key, reason): the compute and every public function it reaches
+--                       (29 hashed; 4 named out with a reason: the viewer-dependent and caller tests). The closure is
+--                       checked by labor_fold_logic_unlisted(): the migration refuses while it names a callee, and the
+--                       gauge reports it (live closure clean 2026-11-25).
+--   vehicle_labor_appraisal_logic_key()  md5 over the bodies of those functions (all overloads), the list itself and the
+--                       rule tables (labor_stage_rules, labor_stage_rule_transitions, labor_stage_rule_operations,
+--                       labor_operations, stage_transition_labor_map, labor_evidence_grade_policy, labor_hours_bases,
+--                       receipt_line_rules, image_privacy_rules). About 13 ms measured live (EXPLAIN ANALYZE of the
+--                       function and rule-row hashes). A classifier replace or a rule row edit re-folds labor only.
 --   vehicle_labor_appraisal_in_scope(uuid)  public, not deleted, and holds a receipt, a receipt_vehicle_links row, an
 --                       evidence_judgment_requests row or a current image_visible_paint_stage observation
 --                       (live 2026-11-25: 25, 26, 20 and 27 cars).
@@ -23,8 +28,9 @@
 --                       A failure lands in error and never aborts model_fold_one.
 --   vehicle_labor_appraisal(uuid)  same signature and grants. A public car with a stored read returns it with
 --                       as_of = folded_at and state {fresh, computed true, computed_at, evidence_changed_at,
---                       key_current, error}. fresh is false while evidence_changed_at > folded_at, the key moved or the
---                       last fold failed (the last good read stays and is served; lead ruling 2026-11-25: the renderer
+--                       key_current, queued, error}. fresh is false while evidence_changed_at > folded_at, the key
+--                       moved, a signal or pending/leased work waits for the car (a stamp committed after the fold
+--                       began), or the last fold failed (the last good read stays and is served; lead ruling 2026-11-25: the renderer
 --                       prints the hours "as of <computed_at>, recomputing" and never as current). An in-scope car
 --                       never folded returns status 'not_yet_computed', no segments, state.computed false (blank, never
 --                       a cold compute). Not public, out of scope, or a viewer_dependent_rule refusal: computed at read.
@@ -40,19 +46,24 @@
 --                       car that has a labor state row is admitted at coalesce(tier priority, 2): a smaller tier priority
 --                       still wins. Cost at the measured rate: 511 vehicle_observations inserts + 24 vehicles updates a
 --                       day on the 50 in-scope cars (live 24 h, 2026-11-25), at most 535 x (206 ms model fold + 1.5 s
---                       mean labor compute) = about 15 min of 30 s tick time a day, i.e. about 1% of the 40 s budget
---                       ticks. The queue dedups a car already pending, so bursts cost one fold.
+--                       mean labor compute) = about 15 min of fold time a day against 6 s of budget per 30 s tick
+--                       (model_fold_config budget_ms 6000: 17,280 s a day), about 5%. The queue dedups a car already
+--                       pending, so bursts cost one fold.
 --   Seed: vehicle_labor_appraisal_enqueue(500) every 5 minutes signals (model_fold_signal, reason labor_logic_key,
---                       priority 4, at most 500) in-scope cars whose row is missing, errored, stale or on an old key.
---                       Live 2026-11-25: 50 in-scope cars; a rule edit settles in about 50 x (206 ms model fold +
---                       the labor compute, 42-4,402 ms measured, 20.9 s over 14 cars): about 85 s of fold time,
---                       ahead of any bulk pass at 5 and behind the tiers at 2-3.
+--                       priority 4, at most 500, at = now() - settle_seconds so the next tick may claim it) in-scope
+--                       cars whose row is missing, errored, stale or on an old key, skipping a car with a signal or
+--                       pending/leased work (re-signalling would push dirty_at forward and starve settle).
+--                       Live 2026-11-25: 50 in-scope cars; a rule edit costs about 50 x (206 ms model fold + the labor
+--                       compute, 42-4,402 ms measured, 20.9 s over 14 cars) = about 85 s of fold time, i.e. about 15
+--                       ticks at 6 s: about 8 min after the seed runs, ahead of any bulk pass at 5.
 --   vehicle_labor_appraisal_gauge()  rows, off_key, stale_now, errored, newest_folded_at, folds_24h,
 --                       stamps_answered_24h, errors_24h, stale_p50_s / stale_p90_s (stamp -> fold end, seconds, over
---                       the folds of the last 24 h that answered a stamp), key. Expected stale duration, to be
---                       replaced by the gauge's measure after deploy: p50 about 17 s (half a 30 s tick + 206 ms + 1.5 s
---                       mean compute), p90 about 35 s (a full tick + the 4.4 s slowest measured compute), with the queue
---                       empty above priority 2 (live model_fold_work 2026-11-25 08:35 UTC: 0 pending, 15,812 done).
+--                       the folds of the last 24 h that answered a stamp), key, unlisted_callees. Expected stale
+--                       duration for a new input, to be replaced by the gauge's measure after deploy: at least
+--                       settle_seconds 300 s (a car is claimed once dirty_at is 300 s old, or at first_dirty_at +
+--                       max_delay 1800 s while inputs keep arriving), plus up to one 30 s tick and the fold: p50 about
+--                       320 s, p90 under 1,800 s (ta-skeptic 2026-11-25). After deploy the 50 seeded cars are
+--                       claimable at once and fold in about 8 min.
 --   The labor tables stay out of model_fold_logic_key (one edit, one re-fold).
 -- Test: supabase/sql/test_vehicle_labor_appraisal_fold.sql (PG17).
 --
@@ -80,6 +91,10 @@ COMMENT ON TABLE public.vehicle_labor_appraisal_state IS
 ALTER TABLE public.vehicle_labor_appraisal_state ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.vehicle_labor_appraisal_state FROM anon, authenticated;
 GRANT SELECT ON public.vehicle_labor_appraisal_state TO service_role;
+
+-- The reader asks whether a car has a signal waiting (model_fold_signal held 0 rows, 669 inserts since stats reset,
+-- 2026-11-25 08:55 UTC); an index keeps that a lookup during a bulk burst.
+CREATE INDEX IF NOT EXISTS model_fold_signal_vehicle_idx ON public.model_fold_signal (vehicle_id);
 
 -- One row per fold: how long a stamped car waited (stamp -> fold start) and what the fold cost. The gauge reads it.
 CREATE TABLE IF NOT EXISTS public.vehicle_labor_appraisal_fold_runs (
@@ -118,17 +133,94 @@ GRANT EXECUTE ON FUNCTION public.vehicle_labor_appraisal_compute(uuid) TO servic
 COMMENT ON FUNCTION public.vehicle_labor_appraisal_compute(uuid) IS
   'labor_fold_v1: the labor appraisal computed from the log (the former reader body). Called by vehicle_labor_appraisal_fold, and by the reader when no fresh stored row exists. Service role only.';
 
+-- The functions whose bodies are labor logic (ta-skeptic 2026-11-25: the compute calls the receipt line classifiers
+-- directly, so replacing one must move the key). Grain: function name, all overloads. counts_in_key false names a
+-- callee left out with its reason. The guard below refuses the migration while any public function called by a listed
+-- function is unlisted (callees found by name followed by '(' in the body; live closure measured 2026-11-25).
+CREATE TABLE IF NOT EXISTS public.labor_fold_logic_functions (
+  proname text PRIMARY KEY CHECK (proname ~ '^[a-z][a-z0-9_]*$'),
+  counts_in_key boolean NOT NULL,
+  reason text NOT NULL
+);
+ALTER TABLE public.labor_fold_logic_functions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.labor_fold_logic_functions FROM anon, authenticated;
+GRANT SELECT ON public.labor_fold_logic_functions TO service_role;
+INSERT INTO public.labor_fold_logic_functions (proname, counts_in_key, reason) VALUES
+  ('vehicle_labor_appraisal_compute', true, 'the reader body'),
+  ('build_phase_system', true, 'called by the compute'),
+  ('receipt_item_product_card', true, 'called by the compute'),
+  ('receipt_line_labor_operation', true, 'called by the compute'),
+  ('receipt_line_system', true, 'called by the compute'),
+  ('receipt_line_work_kind', true, 'called by the compute'),
+  ('receipt_work_lines', true, 'called by the compute'),
+  ('vehicle_reviewed_phase_frames', true, 'called by the compute'),
+  ('vehicle_image_gallery_eligible', true, 'called by the compute: which image ids the stored read may carry'),
+  ('image_photo_end', true, 'called by receipt_work_lines'),
+  ('image_photo_zones', true, 'called by receipt_work_lines'),
+  ('receipt_doc_kind_quoted', true, 'called by receipt_work_lines'),
+  ('receipt_line_kind', true, 'called by receipt_work_lines'),
+  ('receipt_line_photo_end', true, 'called by receipt_work_lines'),
+  ('receipt_line_photo_zone', true, 'called by receipt_work_lines'),
+  ('receipt_work_frame_eligible', true, 'called by receipt_work_lines'),
+  ('photo_reading_is_print', true, 'called by vehicle_reviewed_phase_frames'),
+  ('receipt_product_eligible', true, 'called by receipt_item_product_card'),
+  ('receipt_product_number', true, 'called by receipt_item_product_card'),
+  ('receipt_product_supplier', true, 'called by receipt_item_product_card'),
+  ('get_service_url', true, 'called by receipt_item_product_card'),
+  ('receipt_line_rule_hit', true, 'called by receipt_line_system and receipt_line_labor_operation'),
+  ('vehicle_image_privacy_withheld', true, 'called by vehicle_image_gallery_eligible'),
+  ('bat_pending_image_has_listing', true, 'called by vehicle_image_gallery_eligible'),
+  ('bat_pending_image_listing_by_id', true, 'called by vehicle_image_gallery_eligible'),
+  ('image_stage_custody_external', true, 'called by vehicle_image_privacy_withheld'),
+  ('vehicle_viewer_tied', false, 'the caller test inside vehicle_image_privacy_withheld; the fold runs with no caller, so the stored read is the logged-out form'),
+  ('vehicle_facet_items', false, 'viewer-dependent: read only under a facet_truthy rule, which the fold refuses to store'),
+  ('vehicle_statements', false, 'viewer-dependent: read only under a statement_present rule, which the fold refuses to store'),
+  ('vehicle_user_has_access', false, 'the caller visibility test; the stored read is the public form')
+ON CONFLICT (proname) DO UPDATE SET counts_in_key = excluded.counts_in_key, reason = excluded.reason;
+
+-- Public functions a listed labor function calls that the list does not name (NULL when none). The migration refuses
+-- while it is non-null and the gauge reports it, so a later callee added to a classifier shows up as a defect.
+CREATE OR REPLACE FUNCTION public.labor_fold_logic_unlisted()
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
+  WITH bodies AS (SELECT p.proname::text AS caller, p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                   WHERE n.nspname = 'public'
+                     AND p.proname::text IN (SELECT l.proname FROM public.labor_fold_logic_functions l WHERE l.counts_in_key)),
+  fns AS (SELECT DISTINCT p.proname::text AS proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+           WHERE n.nspname = 'public' AND p.prokind = 'f')
+  SELECT string_agg(DISTINCT f.proname || ' (called by ' || b.caller || ')', ', ')
+    FROM bodies b CROSS JOIN LATERAL (SELECT DISTINCT lower(m[1]) AS tok FROM regexp_matches(b.prosrc, '([A-Za-z_][A-Za-z0-9_]*)\s*\(', 'g') m) t
+    JOIN fns f ON f.proname = t.tok AND f.proname <> b.caller
+   WHERE f.proname NOT IN ('vehicle_labor_appraisal', 'vehicle_labor_appraisal_compute')
+     AND NOT EXISTS (SELECT 1 FROM public.labor_fold_logic_functions l WHERE l.proname = f.proname)
+$fn$;
+REVOKE ALL ON FUNCTION public.labor_fold_logic_unlisted() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.labor_fold_logic_unlisted() TO service_role;
+
+DO $closure$
+DECLARE missing text := public.labor_fold_logic_unlisted();
+BEGIN
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'labor_fold_v1: labor logic calls functions not in labor_fold_logic_functions: %', missing;
+  END IF;
+END $closure$;
+
 CREATE OR REPLACE FUNCTION public.vehicle_labor_appraisal_logic_key()
 RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
   SELECT md5(concat_ws('|', 'labor_fold_v1',
-    (SELECT md5(p.prosrc) FROM pg_proc p WHERE p.oid = 'public.vehicle_labor_appraisal_compute(uuid)'::regprocedure),
+    (SELECT md5(coalesce(string_agg(p.proname || ':' || md5(p.prosrc), ',' ORDER BY p.proname, md5(p.prosrc)), ''))
+       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public'
+        AND p.proname IN (SELECT l.proname FROM public.labor_fold_logic_functions l WHERE l.counts_in_key)),
+    (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_fold_logic_functions t),
     (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_stage_rules t),
     (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_stage_rule_transitions t),
     (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_stage_rule_operations t),
     (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_operations t),
     (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.stage_transition_labor_map t),
     (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_evidence_grade_policy t),
-    (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_hours_bases t)))
+    (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_hours_bases t),
+    (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.receipt_line_rules t),
+    (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.image_privacy_rules t)))
 $fn$;
 REVOKE ALL ON FUNCTION public.vehicle_labor_appraisal_logic_key() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_labor_appraisal_logic_key() TO anon, authenticated, service_role;
@@ -203,6 +295,7 @@ DECLARE
   v record;
   st public.vehicle_labor_appraisal_state%ROWTYPE;
   key_current boolean;
+  queued boolean;
 BEGIN
   SELECT id, is_public, deleted_at INTO v FROM public.vehicles WHERE id = p_vehicle_id;
   IF NOT FOUND OR v.is_public IS NOT TRUE OR v.deleted_at IS NOT NULL THEN
@@ -220,9 +313,14 @@ BEGIN
                               'state', jsonb_build_object('fresh', false, 'computed', false, 'error', st.error));
   END IF;
   key_current := st.folded_key IS NOT DISTINCT FROM public.vehicle_labor_appraisal_logic_key();
+  -- A stamp committed after the fold began can carry an earlier clock than folded_at (ta-skeptic's two-session race):
+  -- a signal or queued work for the car means a fold has not yet answered it.
+  queued := EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = p_vehicle_id)
+         OR EXISTS (SELECT 1 FROM public.model_fold_work w WHERE w.vehicle_id = p_vehicle_id AND w.state IN ('pending', 'leased'));
   RETURN st.read || jsonb_build_object('as_of', st.folded_at,
     'state', jsonb_build_object(
-      'fresh', key_current AND st.error IS NULL AND NOT coalesce(st.evidence_changed_at > st.folded_at, false),
+      'fresh', key_current AND st.error IS NULL AND NOT queued AND NOT coalesce(st.evidence_changed_at > st.folded_at, false),
+      'queued', queued,
       'computed', true, 'computed_at', st.folded_at, 'evidence_changed_at', st.evidence_changed_at,
       'key_current', key_current, 'error', st.error));
 END
@@ -339,14 +437,17 @@ END $patch$;
 -- Seed: in-scope cars whose stored read is missing, errored, stale or on an old key.
 CREATE OR REPLACE FUNCTION public.vehicle_labor_appraisal_enqueue(p_limit integer DEFAULT 500)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $fn$
--- One queue (ta-facts, 2026-11-25): signals with reason labor_logic_key at priority 9, at most p_limit per run, for
+-- One queue (ta-facts, 2026-11-25): signals with reason labor_logic_key at priority 4, at most p_limit per run, for
 -- in-scope cars whose stored row is missing, errored, stale or on an old key. model_fold_absorb_signals moves them to
--- model_fold_work; each runs the full model_fold_one.
+-- model_fold_work; each runs the full model_fold_one. A car already pending or leased in model_fold_work is skipped
+-- (re-signalling it would push dirty_at forward and starve settle), and a seed signal is stamped at = now() - the
+-- queue's settle_seconds so the tick may claim it at once (ta-skeptic 2026-11-25).
 DECLARE k text := public.vehicle_labor_appraisal_logic_key(); n int := 0;
+  settle interval := make_interval(secs => coalesce((public.model_fold_config() ->> 'settle_seconds')::int, 300));
 BEGIN
   DELETE FROM public.vehicle_labor_appraisal_fold_runs WHERE started_at < now() - interval '30 days';
-  INSERT INTO public.model_fold_signal (vehicle_id, reason, priority)
-  SELECT c.vehicle_id, 'labor_logic_key', 4
+  INSERT INTO public.model_fold_signal (vehicle_id, reason, priority, at)
+  SELECT c.vehicle_id, 'labor_logic_key', 4, now() - settle
     FROM (SELECT r.vehicle_id FROM public.receipts r WHERE r.vehicle_id IS NOT NULL
           UNION SELECT l.vehicle_id FROM public.receipt_vehicle_links l WHERE l.retired_at IS NULL AND l.vehicle_id IS NOT NULL
           UNION SELECT j.vehicle_id FROM public.evidence_judgment_requests j WHERE j.vehicle_id IS NOT NULL
@@ -357,7 +458,8 @@ BEGIN
    WHERE NOT EXISTS (SELECT 1 FROM public.vehicle_labor_appraisal_state s
                       WHERE s.vehicle_id = c.vehicle_id AND s.folded_key = k AND s.error IS NULL AND s.read IS NOT NULL
                         AND (s.evidence_changed_at IS NULL OR s.evidence_changed_at <= s.folded_at))
-     AND NOT EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = c.vehicle_id AND g.reason = 'labor_logic_key')
+     AND NOT EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = c.vehicle_id)
+     AND NOT EXISTS (SELECT 1 FROM public.model_fold_work w WHERE w.vehicle_id = c.vehicle_id AND w.state IN ('pending', 'leased'))
    ORDER BY c.vehicle_id
    LIMIT greatest(0, least(coalesce(p_limit, 500), 500));
   GET DIAGNOSTICS n = ROW_COUNT;
@@ -387,7 +489,8 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog,
       FROM public.vehicle_labor_appraisal_fold_runs r WHERE r.started_at > now() - interval '24 hours')
   SELECT jsonb_build_object('rows', st.n_rows, 'off_key', st.off_key, 'stale_now', st.stale_now, 'errored', st.errored,
     'newest_folded_at', st.newest_folded_at, 'folds_24h', runs.folds_24h, 'stamps_answered_24h', runs.stamps_answered_24h,
-    'errors_24h', runs.errors_24h, 'stale_p50_s', runs.stale_p50_s, 'stale_p90_s', runs.stale_p90_s, 'key', (SELECT k FROM k))
+    'errors_24h', runs.errors_24h, 'stale_p50_s', runs.stale_p50_s, 'stale_p90_s', runs.stale_p90_s, 'key', (SELECT k FROM k),
+    'unlisted_callees', public.labor_fold_logic_unlisted())
   FROM st, runs
 $fn$;
 REVOKE ALL ON FUNCTION public.vehicle_labor_appraisal_gauge() FROM PUBLIC, anon, authenticated;
