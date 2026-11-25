@@ -31,7 +31,7 @@
 -- Cost (prod, read-only, one public car with 1,542 qualifying frames of 2,746, warm): the class over those frames
 -- 540 ms (the work today's body already does through the view), the gallery test's privacy rule over them 90 ms.
 -- The heaviest public car (12,688 candidates) has 0 qualifying frames, so 0 helper calls.
--- Contract: supabase/sql/test_cover_class_no_view_scan.sql. Revert: supabase/sql/revert_20261126054500_cover_class_no_view_scan.sql.
+-- Contract: supabase/sql/test_cover_class_no_view_scan.sql. Revert: supabase/sql/revert_20261126103000_cover_class_no_view_scan.sql.
 
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -57,7 +57,7 @@ DECLARE
   vi public.vehicle_images;
   v_uid uuid := auth.uid();
 BEGIN
-  -- cover_class_no_view_scan_v1 (20261126054500): the class only, from the photo row's own fields and stored reading,
+  -- cover_class_no_view_scan_v1 (20261126103000): the class only, from the photo row's own fields and stored reading,
   -- behind the visibility test of vehicle_image_scan_metadata (uploader, or shown on a public non-deleted car, or tied)
   SELECT * INTO vi FROM public.vehicle_images i WHERE i.id = p_image_id;
   IF NOT FOUND THEN
@@ -78,7 +78,7 @@ $function$;
 REVOKE ALL ON FUNCTION public.vehicle_image_cover_class(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_image_cover_class(uuid) TO anon, authenticated, service_role;
 COMMENT ON FUNCTION public.vehicle_image_cover_class(uuid) IS
-  'Whole-car cover class (garage_cover_class) of one photo from its own row; NULL unless the caller uploaded it, it is shown (gallery-eligible, not sensitive) on a public non-deleted car, or the caller is tied. Returns no reading text. 20261126054500.';
+  'Whole-car cover class (garage_cover_class) of one photo from its own row; NULL unless the caller uploaded it, it is shown (gallery-eligible, not sensitive) on a public non-deleted car, or the caller is tied. Returns no reading text. 20261126103000.';
 
 DO $reg$
 BEGIN
@@ -86,7 +86,7 @@ BEGIN
     EXECUTE $i$INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
       VALUES ('vehicle_image_cover_class(uuid)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')',
               '3af9ebbc1bebf423e3bd1e0b7c45a194', 'ta-policies',
-              '20261126054500 restates the vehicle_images read policy (shown, uploader, tied) before returning a photo''s cover class')
+              '20261126103000 restates the vehicle_images read policy (shown, uploader, tied) before returning a photo''s cover class')
       ON CONFLICT (reader, relation, policy_filter) DO NOTHING$i$;
   END IF;
 END

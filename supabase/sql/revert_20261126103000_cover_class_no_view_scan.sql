@@ -1,4 +1,4 @@
--- Revert 20261126054500_cover_class_no_view_scan.sql: get_first_image_batch reads the class over the view's
+-- Revert 20261126103000_cover_class_no_view_scan.sql: get_first_image_batch reads the class over the view's
 -- ai_scan_metadata again (its 2026-11-25 body, prosrc md5 checked) and the helper is dropped.
 BEGIN;
 SET LOCAL lock_timeout = '5s';

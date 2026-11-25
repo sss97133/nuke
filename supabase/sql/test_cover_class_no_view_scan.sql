@@ -1,5 +1,5 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_<name> -f supabase/sql/test_cover_class_no_view_scan.sql
--- Proves 20261126054500_cover_class_no_view_scan.sql:
+-- Proves 20261126103000_cover_class_no_view_scan.sql:
 --   * Before, with the live get_first_image_batch body: over the live view shape (ai_scan_metadata a plain column) anon's
 --     cover for car A is the front three-quarter frame. Over the #3935 view shape (the column is a per-row lateral call
 --     to vehicle_image_scan_metadata, here a stub that withholds the narrative from a stranger), the reader runs once
@@ -175,8 +175,8 @@ SELECT public.t_assert(public.t_get('b_3935_calls')::int = 43 AND public.t_get('
 
 -- The migration, applied over the live view shape, then again (a no-op).
 SELECT public.t_view('live');
-\ir ../migrations/20261126054500_cover_class_no_view_scan.sql
-\ir ../migrations/20261126054500_cover_class_no_view_scan.sql
+\ir ../migrations/20261126103000_cover_class_no_view_scan.sql
+\ir ../migrations/20261126103000_cover_class_no_view_scan.sql
 SELECT public.t_assert(
   (SELECT prosecdef AND proconfig = '{"search_path=pg_catalog, public"}' FROM pg_proc WHERE oid = 'public.vehicle_image_cover_class(uuid)'::regprocedure)
   AND has_function_privilege('anon', 'public.vehicle_image_cover_class(uuid)', 'EXECUTE')
@@ -234,7 +234,7 @@ SELECT public.t_assert((SELECT recorded_hash = '3af9ebbc1bebf423e3bd1e0b7c45a194
                         WHERE reader = 'vehicle_image_cover_class(uuid)' AND relation = 'vehicle_images'), 'helper registered as a policy copy');
 
 -- The revert restores the live body (its own md5 check) and drops the helper; the defect is back.
-\ir revert_20261126054500_cover_class_no_view_scan.sql
+\ir revert_20261126103000_cover_class_no_view_scan.sql
 BEGIN; SELECT public.t_view('3935'); SELECT public.t_cover('r_3935'); COMMIT;
 SELECT public.t_assert(to_regprocedure('public.vehicle_image_cover_class(uuid)') IS NULL
   AND NOT EXISTS (SELECT 1 FROM public.private_row_policy_copies WHERE reader = 'vehicle_image_cover_class(uuid)')
