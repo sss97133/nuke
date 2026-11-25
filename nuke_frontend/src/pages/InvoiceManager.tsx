@@ -163,14 +163,13 @@ const InvoiceManager: React.FC = () => {
       }));
 
       // The plate is not read off the embed: license_plate is withheld from signed-in strangers by column grant.
-      // vehicle_row_read returns it to the car's owner and tied viewers and null to everyone else.
+      // vehicle_plates_read returns it, in one call, for the cars the caller is an insider on (owner, uploader, tied).
       const plateVehicleIds = [...new Set((data || []).map((inv: any) => inv.event?.vehicle?.id).filter(Boolean))] as string[];
       if (plateVehicleIds.length > 0) {
-        const plates = new Map<string, string | null>();
-        await Promise.all(plateVehicleIds.map(async (vehicleId) => {
-          const { data: row } = await supabase.rpc('vehicle_row_read', { p_vehicle_id: vehicleId });
-          plates.set(vehicleId, (row as { license_plate?: string | null } | null)?.license_plate || null);
-        }));
+        const { data: plateRows } = await supabase.rpc('vehicle_plates_read', { p_vehicle_ids: plateVehicleIds });
+        const plates = new Map<string, string | null>(
+          ((plateRows || []) as { vehicle_id: string; license_plate: string | null }[]).map((r) => [r.vehicle_id, r.license_plate]),
+        );
         (data || []).forEach((inv: any, i: number) => {
           const vehicleId = inv.event?.vehicle?.id;
           if (vehicleId) formatted[i].vehicle_license_plate = plates.get(vehicleId) ?? null;
