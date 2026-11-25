@@ -31,8 +31,12 @@
 --                       receipt -> vehicle and the receipt's active links. vehicle_observations, vehicle_images and
 --                       vehicles already signal. model_fold_signal_ids stamps the state row and admits a car that has
 --                       one (ta-facts' two lines). model_fold_one calls the fold after the facet grade fold.
---   Seed: vehicle_labor_appraisal_enqueue() every 5 minutes queues in-scope cars whose row is missing, errored, stale
---                       or on an old key, at model_fold_work priority 9, under sweep_pending_cap.
+--   Seed: vehicle_labor_appraisal_enqueue(500) every 5 minutes signals (model_fold_signal, reason labor_logic_key,
+--                       priority 9, at most 500) in-scope cars whose row is missing, errored, stale or on an old key.
+--                       Live 2026-11-25: 50 in-scope cars; a rule edit settles in about 50 x (206 ms model fold +
+--                       the labor compute, 42-4,402 ms measured, 20.9 s over 14 cars): about 85 s of fold time.
+--   vehicle_labor_appraisal_gauge()  rows, off_key, stale, errored, folded_24h, newest_folded_at.
+--   The labor tables stay out of model_fold_logic_key (one edit, one re-fold).
 -- Test: supabase/sql/test_vehicle_labor_appraisal_fold.sql (PG17).
 --
 -- REVERT. Unschedule vehicle-labor-appraisal-seed; drop the signal triggers and labor_fold_item_signal; remove the
@@ -82,7 +86,7 @@ COMMENT ON FUNCTION public.vehicle_labor_appraisal_compute(uuid) IS
 
 CREATE OR REPLACE FUNCTION public.vehicle_labor_appraisal_logic_key()
 RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
-  SELECT md5(concat_ws('|',
+  SELECT md5(concat_ws('|', 'labor_fold_v1',
     (SELECT md5(p.prosrc) FROM pg_proc p WHERE p.oid = 'public.vehicle_labor_appraisal_compute(uuid)'::regprocedure),
     (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_stage_rules t),
     (SELECT md5(coalesce(string_agg(t::text, ',' ORDER BY t::text), '')) FROM public.labor_stage_rule_transitions t),
@@ -277,15 +281,15 @@ BEGIN
 END $patch$;
 
 -- Seed: in-scope cars whose stored read is missing, errored, stale or on an old key.
-CREATE OR REPLACE FUNCTION public.vehicle_labor_appraisal_enqueue()
+CREATE OR REPLACE FUNCTION public.vehicle_labor_appraisal_enqueue(p_limit integer DEFAULT 500)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $fn$
-DECLARE k text := public.vehicle_labor_appraisal_logic_key(); cap int; pend int; n int := 0;
+-- One queue (ta-facts, 2026-11-25): signals with reason labor_logic_key at priority 9, at most p_limit per run, for
+-- in-scope cars whose stored row is missing, errored, stale or on an old key. model_fold_absorb_signals moves them to
+-- model_fold_work; each runs the full model_fold_one.
+DECLARE k text := public.vehicle_labor_appraisal_logic_key(); n int := 0;
 BEGIN
-  cap := coalesce((public.model_fold_config() ->> 'sweep_pending_cap')::int, 1000);
-  SELECT count(*) INTO pend FROM public.model_fold_work WHERE state = 'pending';
-  IF pend >= cap THEN RETURN jsonb_build_object('waiting', 'model_fold_work', 'pending', pend, 'cap', cap); END IF;
-  INSERT INTO public.model_fold_work AS w (vehicle_id, priority, reasons, first_dirty_at, dirty_at, next_attempt_at)
-  SELECT c.vehicle_id, 9, '{labor_appraisal}', now(), now(), now()
+  INSERT INTO public.model_fold_signal (vehicle_id, reason, priority)
+  SELECT c.vehicle_id, 'labor_logic_key', 9
     FROM (SELECT r.vehicle_id FROM public.receipts r WHERE r.vehicle_id IS NOT NULL
           UNION SELECT l.vehicle_id FROM public.receipt_vehicle_links l WHERE l.retired_at IS NULL AND l.vehicle_id IS NOT NULL
           UNION SELECT j.vehicle_id FROM public.evidence_judgment_requests j WHERE j.vehicle_id IS NOT NULL
@@ -296,22 +300,33 @@ BEGIN
    WHERE NOT EXISTS (SELECT 1 FROM public.vehicle_labor_appraisal_state s
                       WHERE s.vehicle_id = c.vehicle_id AND s.folded_key = k AND s.error IS NULL AND s.read IS NOT NULL
                         AND (s.evidence_changed_at IS NULL OR s.evidence_changed_at <= s.folded_at))
-   LIMIT greatest(0, cap - pend)
-  ON CONFLICT (vehicle_id) DO UPDATE SET
-    reasons = CASE WHEN w.state IN ('done', 'dead') THEN excluded.reasons
-                   ELSE (SELECT array_agg(DISTINCT x ORDER BY x) FROM unnest(w.reasons || excluded.reasons) x) END,
-    priority = CASE WHEN w.state IN ('done', 'dead') THEN 9 ELSE w.priority END,
-    first_dirty_at = CASE WHEN w.state IN ('done', 'dead') THEN now() ELSE w.first_dirty_at END,
-    dirty_at = CASE WHEN w.state IN ('done', 'dead') THEN now() ELSE w.dirty_at END,
-    state = CASE WHEN w.state = 'leased' THEN w.state ELSE 'pending' END,
-    attempts = CASE WHEN w.state = 'dead' THEN 0 ELSE w.attempts END,
-    next_attempt_at = CASE WHEN w.state IN ('done', 'dead') THEN now() ELSE w.next_attempt_at END,
-    updated_at = now();
+     AND NOT EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = c.vehicle_id AND g.reason = 'labor_logic_key')
+   ORDER BY c.vehicle_id
+   LIMIT greatest(0, least(coalesce(p_limit, 500), 500));
   GET DIAGNOSTICS n = ROW_COUNT;
-  RETURN jsonb_build_object('queued', n, 'pending_before', pend, 'key', k);
+  RETURN jsonb_build_object('queued', n, 'key', k);
 END $fn$;
-REVOKE ALL ON FUNCTION public.vehicle_labor_appraisal_enqueue() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.vehicle_labor_appraisal_enqueue() TO service_role;
+REVOKE ALL ON FUNCTION public.vehicle_labor_appraisal_enqueue(integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.vehicle_labor_appraisal_enqueue(integer) TO service_role;
+
+-- Gauge (ta-facts condition 5): rows off the current key, stale, errored, and the newest fold. Off-key should reach 0
+-- after a rule edit; flat above 0 is the defect.
+CREATE OR REPLACE FUNCTION public.vehicle_labor_appraisal_gauge()
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
+  SELECT jsonb_build_object(
+    'rows', count(*),
+    'off_key', count(*) FILTER (WHERE s.folded_key IS DISTINCT FROM k.k),
+    'stale', count(*) FILTER (WHERE s.evidence_changed_at > s.folded_at),
+    'errored', count(*) FILTER (WHERE s.error IS NOT NULL),
+    'folded_24h', count(*) FILTER (WHERE s.folded_at > now() - interval '24 hours'),
+    'newest_folded_at', max(s.folded_at),
+    'key', k.k)
+  FROM (SELECT public.vehicle_labor_appraisal_logic_key() AS k) k
+  LEFT JOIN public.vehicle_labor_appraisal_state s ON true
+  GROUP BY k.k
+$fn$;
+REVOKE ALL ON FUNCTION public.vehicle_labor_appraisal_gauge() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.vehicle_labor_appraisal_gauge() TO service_role;
 
 DO $cron$
 BEGIN
@@ -320,6 +335,6 @@ BEGIN
       PERFORM cron.unschedule('vehicle-labor-appraisal-seed');
     END IF;
     PERFORM cron.schedule('vehicle-labor-appraisal-seed', '1-56/5 * * * *',
-      $c$SET client_min_messages = error; SET statement_timeout = '30s'; SET lock_timeout = '5s'; SELECT public.vehicle_labor_appraisal_enqueue();$c$);
+      $c$SET client_min_messages = error; SET statement_timeout = '30s'; SET lock_timeout = '5s'; SELECT public.vehicle_labor_appraisal_enqueue(500);$c$);
   END IF;
 END $cron$;

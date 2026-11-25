@@ -139,8 +139,8 @@ BEGIN
   FOR r IN SELECT b.v FROM _labor_names_before b JOIN public.vehicles v ON v.id = b.v
             WHERE v.is_public IS TRUE AND v.deleted_at IS NULL LOOP
     PERFORM public.assert(public.vehicle_labor_appraisal_in_scope(r.v), 'in scope: ' || r.v);
-    PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_work w WHERE w.vehicle_id = r.v AND w.priority = 9
-                                   AND 'labor_appraisal' = ANY (w.reasons)), 'seed queued: ' || r.v);
+    PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = r.v AND g.priority = 9
+                                   AND g.reason = 'labor_logic_key'), 'seed signalled: ' || r.v);
     PERFORM public.model_fold_one(gen_random_uuid(), r.v, '{}'::jsonb);
     c := public.vehicle_labor_appraisal_compute(r.v);
     s := public.vehicle_labor_appraisal(r.v);
@@ -151,7 +151,10 @@ BEGIN
   PERFORM public.assert(n >= 2, format('fixture folds %s cars', n));
   PERFORM public.assert((SELECT count(*) FROM public.vehicle_labor_appraisal_state WHERE error IS NULL AND read IS NOT NULL) = n,
                         'one stored row per folded car');
+  DELETE FROM public.model_fold_signal;  -- the queue absorbs them
   PERFORM public.assert((public.vehicle_labor_appraisal_enqueue() ->> 'queued')::int = 0, 'nothing to seed once fresh');
+  PERFORM public.assert((public.vehicle_labor_appraisal_gauge() ->> 'off_key')::int = 0
+                        AND (public.vehicle_labor_appraisal_gauge() ->> 'errored')::int = 0, 'gauge: 0 off key, 0 errored');
 END $$;
 RESET test.auth_role;
 
@@ -188,12 +191,20 @@ DO $$ BEGIN
 END $$;
 SELECT public.vehicle_labor_appraisal_fold(v) FROM fold_v;
 
--- A rule row changes: the key moves, every row is stale, and the seed queues them again.
+-- A no-op update keeps the key; a rule row edit moves it, every row is stale, and the seed signals them again.
+CREATE TEMP TABLE key0 AS SELECT public.vehicle_labor_appraisal_logic_key() AS k;
+UPDATE public.labor_hours_bases SET meaning = meaning WHERE basis_key = 'uncited_seed';
+DO $$ BEGIN
+  PERFORM public.assert(public.vehicle_labor_appraisal_logic_key() = (SELECT k FROM key0), 'no-op update: same key');
+END $$;
 UPDATE public.labor_hours_bases SET meaning = meaning || ' (fixture edit)' WHERE basis_key = 'uncited_seed';
 DO $$ BEGIN
   PERFORM public.assert(public.vehicle_labor_appraisal((SELECT v FROM fold_v)) ->> 'status' = 'recomputing', 'rule change: recomputing');
-  UPDATE public.model_fold_work SET state = 'done';
-  PERFORM public.assert((public.vehicle_labor_appraisal_enqueue() ->> 'queued')::int > 0, 'rule change: seed queues again');
+  PERFORM public.assert(public.vehicle_labor_appraisal_logic_key() <> (SELECT k FROM key0), 'rule edit: key moves');
+  PERFORM public.assert((public.vehicle_labor_appraisal_gauge() ->> 'off_key')::int > 0, 'gauge: rows off key after the edit');
+  DELETE FROM public.model_fold_signal;
+  PERFORM public.assert((public.vehicle_labor_appraisal_enqueue() ->> 'queued')::int > 0, 'rule change: seed signals again');
+  PERFORM public.assert((public.vehicle_labor_appraisal_enqueue() ->> 'queued')::int = 0, 'seed does not signal a car twice');
 END $$;
 SELECT public.vehicle_labor_appraisal_fold(v) FROM fold_v;
 
@@ -223,7 +234,8 @@ DO $$ BEGIN
   PERFORM public.assert(has_function_privilege('anon', 'public.vehicle_labor_appraisal(uuid)', 'EXECUTE'), 'anon reads');
   PERFORM public.assert(NOT has_function_privilege('anon', 'public.vehicle_labor_appraisal_compute(uuid)', 'EXECUTE'), 'anon cannot compute');
   PERFORM public.assert(NOT has_function_privilege('anon', 'public.vehicle_labor_appraisal_fold(uuid)', 'EXECUTE'), 'anon cannot fold');
-  PERFORM public.assert(NOT has_function_privilege('anon', 'public.vehicle_labor_appraisal_enqueue()', 'EXECUTE'), 'anon cannot enqueue');
+  PERFORM public.assert(NOT has_function_privilege('anon', 'public.vehicle_labor_appraisal_enqueue(integer)', 'EXECUTE'), 'anon cannot enqueue');
+  PERFORM public.assert(NOT has_function_privilege('anon', 'public.vehicle_labor_appraisal_gauge()', 'EXECUTE'), 'anon cannot gauge');
   PERFORM public.assert(NOT has_table_privilege('anon', 'public.vehicle_labor_appraisal_state', 'SELECT'), 'anon cannot read the state table');
   PERFORM public.assert(position('labor_fold_v1' IN pg_get_functiondef('public.model_fold_one(uuid,uuid,jsonb,uuid[])'::regprocedure)) > 0
                         AND position('labor_fold_v1' IN pg_get_functiondef('public.model_fold_signal_ids(uuid[],text)'::regprocedure)) > 0,
