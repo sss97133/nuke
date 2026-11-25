@@ -33,6 +33,8 @@ struct LaborStageStep: Decodable, Equatable {
     var photo_phase: String?
     var images: Int?
     var panel_count: Int?
+    /// stage_transition_labor_map key; its words are in the reader's names.transitions.
+    var transition_id: String?
     var hours_min: Double?
     var hours_typical: Double?
     var hours_max: Double?
@@ -66,7 +68,7 @@ struct LaborSegment: Decodable, Equatable, Identifiable {
     var reassembly: Reassembly?
     /// The rule's identifier: kept off the screen (the web puts it in a title attribute).
     var citation: String?
-    /// witnessed | unwitnessed_purchase: which of the reader's two totals the segment's hours belong to.
+    /// witnessed | unwitnessed (unwitnessed_purchase before the labor reader's rename): which of the reader's two totals the segment's hours belong to.
     var counts_in: String?
     var witnessed_hours_min: Double?
     var witnessed_hours_typical: Double?
@@ -82,6 +84,8 @@ struct LaborAppraisal: Decodable, Equatable {
         var hours_typical: Double?
         var hours_max: Double?
         var unknown_min_segments: Int?
+        /// Segments whose witnessed max is unknown (20261125033000): hours_max is then not a bound.
+        var unknown_max_segments: Int?
         /// false: the reader says its max is not witnessed (a book bound), so only the floor and typical are.
         var max_witnessed: Bool?
     }
@@ -91,6 +95,8 @@ struct LaborAppraisal: Decodable, Equatable {
         var hours_max: Double?
         var by_grade: [String: LaborRange]?
         var witnessed: WitnessedTotal?
+        /// with_unwitnessed is the renamed with_unwitnessed_purchases (an alias for one release).
+        var with_unwitnessed: LaborRange?
         var with_unwitnessed_purchases: LaborRange?
         var priced_segments: Int?
         var rule: String?
@@ -101,6 +107,15 @@ struct LaborAppraisal: Decodable, Equatable {
     var applicable: Bool?
     var segments: [LaborSegment]
     var totals: Totals?
+    /// The keys' words, read from their own rows (20261125073000).
+    var names: LaborNames?
+}
+
+struct LaborNames: Decodable, Equatable {
+    struct Transition: Decodable, Equatable { var label: String? }
+    struct Operation: Decodable, Equatable { var name: String? }
+    var transitions: [String: Transition]?
+    var operations: [String: Operation]?
 }
 
 /// The web renderer's words (LaborAppraisal.tsx), ported one function to one function.
@@ -125,9 +140,11 @@ enum LaborWords {
 
     static func range(_ r: LaborRange?) -> String? { r.flatMap { range($0.hours_min, $0.hours_typical, $0.hours_max) } }
 
-    static func step(_ s: LaborStageStep) -> String {
+    /// A stage step: the reader's label for its transition when it names one, else its two stages.
+    static func step(_ s: LaborStageStep, _ names: LaborNames? = nil) -> String {
         [
-            [s.from_stage, s.to_stage].compactMap { $0 }.map(ItemText.codeText).joined(separator: " to "),
+            s.transition_id.flatMap { names?.transitions?[$0]?.label }
+                ?? [s.from_stage, s.to_stage].compactMap { $0 }.map(ItemText.codeText).joined(separator: " to "),
             s.zone.flatMap { $0 != "*" && !$0.contains("*") ? ItemText.codeText($0) : nil },
             s.status.map(ItemText.codeText),
             s.photo_phase.map { "photographed as \(ItemText.codeText($0))" },
@@ -137,13 +154,14 @@ enum LaborWords {
         ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
-    static func partWords(_ p: LaborPart) -> String? {
-        [p.part?.name, p.name, p.description].compactMap { $0 }.first { !$0.isEmpty }
+    static func partWords(_ p: LaborPart, _ names: LaborNames? = nil) -> String? {
+        [p.part?.name, p.name, p.description, p.operation_code.flatMap { names?.operations?[$0]?.name }]
+            .compactMap { $0 }.first { !$0.isEmpty }
     }
 
     /// Each named part with its hours, the rest counted. Operation codes are keys, not words: never printed.
-    static func parts(_ title: String, _ parts: [LaborPart]) -> String {
-        let said = parts.compactMap { p in partWords(p).map { [$0, h(p.hours)].compactMap { $0 }.joined(separator: ", ") } }
+    static func parts(_ title: String, _ parts: [LaborPart], _ names: LaborNames? = nil) -> String {
+        let said = parts.compactMap { p in partWords(p, names).map { [$0, h(p.hours)].compactMap { $0 }.joined(separator: ", ") } }
         let others = parts.count - said.count
         var line = "\(title): \(parts.count)"
         if !said.isEmpty { line += ". " + said.joined(separator: "; ") }
@@ -203,18 +221,27 @@ enum LaborWords {
     /// The witnessed total as the reader marks it: a floor when the reader marks its max unwitnessed or sends none.
     static func witnessedTotal(_ w: LaborAppraisal.WitnessedTotal?) -> String? {
         guard let w, let typical = w.hours_typical else { return nil }
-        if w.max_witnessed == false || (w.hours_max == nil && w.hours_min != nil) {
+        if w.max_witnessed == false || (w.unknown_max_segments ?? 0) > 0 || (w.hours_max == nil && w.hours_min != nil) {
             if let lo = w.hours_min, lo != typical { return "at least \(h(lo)!), typical \(h(typical)!)" }
             return "at least \(h(typical)!)"
         }
         return range(w.hours_min, typical, w.hours_max)
     }
 
+    /// The reader's counts of segments with no witnessed minimum or maximum, said beside the witnessed total.
+    static func witnessedUnknown(_ w: LaborAppraisal.WitnessedTotal?) -> String {
+        let said = [
+            (w?.unknown_min_segments ?? 0) > 0 ? "\(w!.unknown_min_segments!) segments with no witnessed minimum" : nil,
+            (w?.unknown_max_segments ?? 0) > 0 ? "\(w!.unknown_max_segments!) with no witnessed maximum" : nil,
+        ].compactMap { $0 }
+        return said.isEmpty ? "" : " (" + said.joined(separator: ", ") + ")"
+    }
+
     /// How the segment's hours are known, then its witness, stages and parts: the web's caption lines in order.
-    static func lines(_ s: LaborSegment) -> [String] {
+    static func lines(_ s: LaborSegment, _ names: LaborNames? = nil) -> [String] {
         let known = [
             s.evidence_grade.map { "Evidence: \(ItemText.codeText($0))" } ?? "Ungraded by the reader",
-            s.counts_in == "unwitnessed_purchase" ? "counted with purchases not seen fitted" : nil,
+            s.counts_in == "unwitnessed" || s.counts_in == "unwitnessed_purchase" ? "counted with purchases not seen fitted" : nil,
             s.hours_basis.map { "hours from \(ItemText.codeText($0))" },
             s.paper_hours.map { "\(h($0)!) on shop paper" },
             range(s.book_hours).map { "book range \($0)" },
@@ -225,9 +252,9 @@ enum LaborWords {
         if let w = witnessedHours(s) { out.append(w) }
         if let w = witness(s) { out.append("Pieces: \(w)") }
         if s.range_below_paper == true { out.append("The book range is below the hours on shop paper; the paper hours are used.") }
-        if let steps = s.stage_steps, !steps.isEmpty { out.append("Stages: " + steps.map(step).joined(separator: "; ")) }
-        if let m = s.reassembly?.matched, !m.isEmpty { out.append(parts("Fitted parts with a book operation", m)) }
-        if let u = s.reassembly?.unmatched, !u.isEmpty { out.append(parts("Fitted parts without a book operation", u)) }
+        if let steps = s.stage_steps, !steps.isEmpty { out.append("Stages: " + steps.map { step($0, names) }.joined(separator: "; ")) }
+        if let m = s.reassembly?.matched, !m.isEmpty { out.append(parts("Fitted parts with a book operation", m, names)) }
+        if let u = s.reassembly?.unmatched, !u.isEmpty { out.append(parts("Fitted parts without a book operation", u, names)) }
         return out
     }
 
@@ -295,11 +322,10 @@ struct LaborAppraisalContent: View {
         } else if appraisal.applicable == true, !priced.isEmpty {
             section {
                 caption("Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.")
-                if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed_purchases) {
+                if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed ?? totals.with_unwitnessed_purchases) {
                     Text("Hours, two totals side by side").font(.caption.weight(.semibold)).padding(.top, 4)
                     row("Witnessed", (LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
-                        + ((totals.witnessed?.unknown_min_segments ?? 0) > 0
-                           ? " (\(totals.witnessed!.unknown_min_segments!) segments with no witnessed minimum)" : ""))
+                        + LaborWords.witnessedUnknown(totals.witnessed))
                     row("With purchases not seen fitted", with)
                 }
                 if let byGrade = appraisal.totals?.by_grade, !byGrade.isEmpty {
@@ -311,7 +337,7 @@ struct LaborAppraisalContent: View {
                 ForEach(priced) { segment in
                     DisclosureGroup {
                         VStack(alignment: .leading, spacing: 4) {
-                            ForEach(Array(LaborWords.lines(segment).enumerated()), id: \.offset) { _, line in caption(line) }
+                            ForEach(Array(LaborWords.lines(segment, appraisal.names).enumerated()), id: \.offset) { _, line in caption(line) }
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
                     } label: {
                         HStack(alignment: .firstTextBaseline) {
