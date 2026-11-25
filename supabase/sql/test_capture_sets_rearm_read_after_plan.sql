@@ -2,8 +2,9 @@
 -- every chunk covering it, through capture_sets_enqueue, and a replay after the day is re-planned enqueues nothing.
 -- Cases (owner U, Pacific days):
 --   R1 2017-02-05: a photo read after its only chunk was created            -> enqueued, reason read_after_scoring 1
---   R2 2017-09-03: two such photos, plus one read before a later chunk       -> enqueued once, read_after_scoring 2
---   N1 2018-01-10: read after the first chunk, but a later chunk postdates it -> not enqueued
+--   R2 2017-09-03: two such photos, plus one read before a later chunk but in no set -> enqueued once, read_after_scoring 3
+--   N1 2018-01-10: read after the first chunk, a later chunk postdates it and the photo is in a set -> not enqueued
+--   R3 2018-01-20: a later chunk postdates the read, but the photo is in no set -> enqueued
 --   N2 2018-02-10: read after its chunk, image_type other (scorer blocks it)  -> not enqueued
 --   N3 2018-03-10: read after its chunk, duplicate                            -> not enqueued
 --   N4 2018-04-10: read after its chunk, filed on a car                       -> not enqueued
@@ -31,6 +32,7 @@ BEGIN IF cond IS NOT TRUE THEN RAISE EXCEPTION 'Contract failed: %', label; END 
 
 -- ===== stand-ins: the columns the re-arm reads
 -- guardrail-allow(center-key-fk): vehicle_images: disposable PG17 stand-in of a live table; only the columns the re-arm reads
+-- guardrail-allow(center-key-fk): capture_landing_sets: disposable PG17 stand-in of a live table; only the columns the re-arm reads
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid, vehicle_id uuid,
   source text DEFAULT 'capture_relay_ios', exif_data jsonb, image_url text DEFAULT 'x.jpg', taken_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(), ai_processing_status text DEFAULT 'completed', ai_processing_completed_at timestamptz,
@@ -40,6 +42,8 @@ CREATE TABLE public.capture_landing_config(id int PRIMARY KEY DEFAULT 1 CHECK (i
 CREATE TABLE public.capture_landing_chunks(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), track text NOT NULL DEFAULT 'manual',
   user_id uuid NOT NULL, t_from timestamptz NOT NULL, t_to timestamptz NOT NULL, dry boolean NOT NULL DEFAULT false,
   state text NOT NULL DEFAULT 'applied', created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE public.capture_landing_sets(chunk_id uuid NOT NULL REFERENCES capture_landing_chunks(id), set_key text NOT NULL,
+  image_ids uuid[] NOT NULL, PRIMARY KEY (chunk_id, set_key));
 CREATE TABLE public.capture_set_rescore_queue(user_id uuid NOT NULL, day date NOT NULL, requested_at timestamptz NOT NULL DEFAULT now(),
   not_before date NOT NULL DEFAULT (CURRENT_DATE + 1), reasons jsonb NOT NULL DEFAULT '[]'::jsonb, done_run_id uuid,
   done_at timestamptz, PRIMARY KEY (user_id, day));
@@ -163,6 +167,13 @@ SELECT pg_temp.day('2017-02-05'); SELECT pg_temp.photo('2017-02-05');
 SELECT pg_temp.day('2017-09-03'); SELECT pg_temp.photo('2017-09-03'); SELECT pg_temp.photo('2017-09-03');
 SELECT pg_temp.photo('2017-09-03', now() - interval '3 hours');
 SELECT pg_temp.day('2018-01-10'); SELECT pg_temp.day('2018-01-10', now() - interval '30 minutes'); SELECT pg_temp.photo('2018-01-10');
+CREATE FUNCTION pg_temp.in_set(d text) RETURNS void LANGUAGE sql AS $$
+  INSERT INTO public.capture_landing_sets(chunk_id, set_key, image_ids)
+  SELECT (SELECT c.id FROM public.capture_landing_chunks c WHERE c.t_from = (d || ' 00:00')::timestamp AT TIME ZONE 'America/Los_Angeles'
+           ORDER BY c.created_at DESC LIMIT 1), 'set:' || d,
+         (SELECT array_agg(v.id) FROM public.vehicle_images v WHERE (v.taken_at AT TIME ZONE 'America/Los_Angeles')::date = d::date) $$;
+SELECT pg_temp.in_set('2018-01-10');
+SELECT pg_temp.day('2018-01-20'); SELECT pg_temp.day('2018-01-20', now() - interval '30 minutes'); SELECT pg_temp.photo('2018-01-20');
 SELECT pg_temp.day('2018-02-10'); SELECT pg_temp.photo('2018-02-10', extra => '{"type":"other"}');
 SELECT pg_temp.day('2018-03-10'); SELECT pg_temp.photo('2018-03-10', extra => '{"dup":true}');
 SELECT pg_temp.day('2018-04-10'); SELECT pg_temp.photo('2018-04-10', extra => '{"vehicle":"00000000-0000-4000-8000-0000000000c3"}');
@@ -188,11 +199,11 @@ ALTER FUNCTION public.capture_sets_enqueue_held(uuid, date, jsonb) RENAME TO cap
 
 -- ===== apply
 \ir ../migrations/20261125131000_capture_sets_rearm_read_after_plan.sql
-SELECT pg_temp.ok((SELECT array_agg(day ORDER BY day) FROM capture_set_rescore_queue WHERE done_at IS NULL) = ARRAY['2017-02-05'::date, '2017-09-03'::date],
-  'only R1 and R2 are enqueued (N1-N8 are not)');
-SELECT pg_temp.ok((SELECT (reasons->-1->>'read_after_scoring')::int = 2 AND reasons->-1->>'by' = '20261125131000_capture_sets_rearm_read_after_plan'
+SELECT pg_temp.ok((SELECT array_agg(day ORDER BY day) FROM capture_set_rescore_queue WHERE done_at IS NULL) = ARRAY['2017-02-05'::date, '2017-09-03'::date, '2018-01-20'::date],
+  'only R1, R2 and R3 are enqueued (N1-N8 are not)');
+SELECT pg_temp.ok((SELECT (reasons->-1->>'read_after_scoring')::int = 3 AND reasons->-1->>'by' = '20261125131000_capture_sets_rearm_read_after_plan'
                      AND not_before = current_date FROM capture_set_rescore_queue WHERE day = '2017-09-03'),
-  'R2: one queue row, read_after_scoring 2 (the photo read before a covering chunk does not count), due today');
+  'R2: one queue row for the day, read_after_scoring 3 (two read after the plan, one read before it but in no set), due today');
 SELECT pg_temp.ok((SELECT reasons = '[{"arrival":16},{"read_after_scoring":1,"by":"20261125131000_capture_sets_rearm_read_after_plan"}]'::jsonb
                           AND done_at IS NULL AND not_before = '2026-11-09'
                      FROM capture_set_rescore_queue WHERE day = '2017-02-05'),
@@ -203,7 +214,8 @@ SELECT pg_temp.ok(jsonb_path_query_first((SELECT reasons FROM capture_set_rescor
 
 -- ===== replay after the drain re-planned both days: nothing
 UPDATE capture_set_rescore_queue SET done_at = now();
-SELECT pg_temp.day('2017-02-05', now()); SELECT pg_temp.day('2017-09-03', now());
+SELECT pg_temp.day('2017-02-05', now()); SELECT pg_temp.day('2017-09-03', now()); SELECT pg_temp.day('2018-01-20', now());
+SELECT pg_temp.in_set('2017-02-05'); SELECT pg_temp.in_set('2017-09-03'); SELECT pg_temp.in_set('2018-01-20');
 \ir ../migrations/20261125131000_capture_sets_rearm_read_after_plan.sql
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM capture_set_rescore_queue WHERE done_at IS NULL),
   'replay after the days are re-planned enqueues 0');
