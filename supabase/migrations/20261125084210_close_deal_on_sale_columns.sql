@@ -13,13 +13,17 @@
 --
 -- WHAT CHANGES.
 -- 1. auction_source_price_rules(source PK, final_bid_is_hammer, basis): whether a house's final bid on a sold lot is
---    its hammer. Seeded BaT: sold rows ended 2026-09-01..11-13 = 9,511; winning_bid = high_bid on 9,510; high_bid =
---    hammer_price on 6,621 of the 6,622 with a hammer.
--- 2. close_deal_on_sale: sale price = gross_price, else hammer_price, else the final bid (winning_bid, high_bid) only
---    when the source's rule row says it is the hammer; otherwise the price is unknown. Sold date = auction_end_date,
---    never the day the row landed. An open consignment deal whose price or end date is unknown is not closed; a
---    deal_close_skips row (auction_event_id, deal_jacket_id, reason) says why. A sale that ended before the deal was
---    opened never closes it. Open consignment deal_jackets today: 0 (5 consignment deals, all closed).
+--    its hammer. Seeded BaT only: sold rows ended 2026-09-01..11-13 = 9,511; winning_bid = high_bid on 9,510; high_bid =
+--    hammer_price on 6,621 of the 6,622 with a hammer; sold rows ended since 10-01 with the final bid only: 2,889 of
+--    5,793 (skeptic2, 11-25). No other source gets the fallback without its own row.
+-- 2. close_deal_on_sale: the price and its class come from the row: gross_price (class gross), else hammer_price
+--    (hammer), else the final bid (winning_bid, high_bid) only where the source's rule row says it is the hammer
+--    (final_bid); otherwise the price is unknown. Sold date = auction_end_date, never the day the row landed. An open
+--    consignment deal whose price or end date is unknown is not closed; a deal_close_skips row says why. A closure is
+--    keyed to its event (deal_jackets.closed_by_auction_event_id FK, closed_price_basis): a later write of the SAME
+--    event with an equal or better price class (gross > hammer > final_bid) corrects it; a different event never can.
+--    A sale that ended before the deal was opened never closes it. Open consignment deal_jackets today: 0 (5
+--    consignment deals, all closed before this column existed, so none is re-opened to correction).
 -- 3. Transfers. Each settled sold lot fires auto_create_transfer_on_auction_close (sales ended within 30 days) ->
 --    transfer-automator seed_from_auction -> ownership_transfers row and, unless suppress_notifications,
 --    notify-transfer-parties (SMS / email to buyer and seller contacts). Messages to other people are the owner's
@@ -45,7 +49,8 @@ REVOKE ALL ON public.auction_source_price_rules FROM PUBLIC, anon, authenticated
 GRANT SELECT ON public.auction_source_price_rules TO service_role;
 INSERT INTO public.auction_source_price_rules (source, final_bid_is_hammer, basis) VALUES
   ('bat', true, 'auction_events bat sold, ended 2026-09-01..11-13: 9,511 rows; winning_bid = high_bid on 9,510; '
-                'high_bid = hammer_price on 6,621 of the 6,622 with a hammer (read 2026-11-25).')
+                'high_bid = hammer_price on 6,621 of the 6,622 with a hammer; since 10-01, 2,889 of 5,793 sold rows carry '
+                'the final bid only (read 2026-11-25). The house reports the winning bid as the result.')
 ON CONFLICT (source) DO NOTHING;
 COMMENT ON TABLE public.auction_source_price_rules IS
 'Per auction house: whether the final bid on a sold lot (winning_bid, else high_bid) is its hammer price. Read by close_deal_on_sale() when a sold row carries no gross or hammer price. Migration 20261125084210.';
@@ -64,6 +69,20 @@ GRANT SELECT ON public.deal_close_skips TO service_role;
 COMMENT ON TABLE public.deal_close_skips IS
 'An open consignment deal that a sold auction_events row did not close, and why: its price or its end date is unknown. Written by close_deal_on_sale(). Migration 20261125084210.';
 
+ALTER TABLE public.deal_jackets
+  ADD COLUMN IF NOT EXISTS closed_by_auction_event_id uuid REFERENCES public.auction_events (id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS closed_price_basis text;
+DO $c$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'deal_jackets_closed_price_basis_check') THEN
+    ALTER TABLE public.deal_jackets ADD CONSTRAINT deal_jackets_closed_price_basis_check
+      CHECK (closed_price_basis IN ('gross', 'hammer', 'final_bid'));
+  END IF;
+END $c$;
+COMMENT ON COLUMN public.deal_jackets.closed_by_auction_event_id IS
+'The auction_events row whose sale closed this deal (close_deal_on_sale); only that event may correct the closure. NULL for deals closed by hand or before 20261125084210.';
+COMMENT ON COLUMN public.deal_jackets.closed_price_basis IS
+'Which price of the closing event sale_price_inc_doc holds: gross (gross_price), hammer (hammer_price) or final_bid (the final bid, where auction_source_price_rules says it is the hammer). Migration 20261125084210.';
+
 INSERT INTO public.platform_config (config_key, config_value, description)
 VALUES ('transfer_notifications', '{"enabled": false}'::jsonb,
         'Whether auction-close transfers may message buyers and sellers (notify-transfer-parties). Messages to other people are the owner''s decision; off unless he turns it on. Read by auto_create_transfer_on_auction_close(). Migration 20261125084210.')
@@ -77,39 +96,55 @@ SET search_path = public, pg_catalog
 AS $$
 DECLARE
   v_deal record;
+  v_basis text;
+  v_rank int;
   v_sale_price numeric;
   v_threshold numeric;
   v_profit numeric;
 BEGIN
   IF NEW.outcome IS DISTINCT FROM 'sold' THEN RETURN NEW; END IF;
 
-  -- close_deal_on_sale_columns_v1: a price the row carries, or the final bid where the house's rule row says it is the
-  -- hammer; otherwise unknown.
-  v_sale_price := coalesce(NEW.gross_price, NEW.hammer_price,
-                           CASE WHEN EXISTS (SELECT 1 FROM public.auction_source_price_rules p
-                                              WHERE p.source = NEW.source AND p.final_bid_is_hammer)
-                                THEN coalesce(NEW.winning_bid, NEW.high_bid) END);
-  IF v_sale_price <= 0 THEN v_sale_price := NULL; END IF;
+  -- close_deal_on_sale_columns_v1: a price the row carries, with its class; the final bid only where the house's rule
+  -- row says it is the hammer; otherwise unknown. No current date.
+  v_basis := CASE WHEN NEW.gross_price > 0 THEN 'gross'
+                  WHEN NEW.hammer_price > 0 THEN 'hammer'
+                  WHEN coalesce(NEW.winning_bid, NEW.high_bid) > 0
+                       AND EXISTS (SELECT 1 FROM public.auction_source_price_rules p
+                                    WHERE p.source = NEW.source AND p.final_bid_is_hammer) THEN 'final_bid' END;
+  v_sale_price := CASE v_basis WHEN 'gross' THEN NEW.gross_price WHEN 'hammer' THEN NEW.hammer_price
+                               WHEN 'final_bid' THEN coalesce(NEW.winning_bid, NEW.high_bid) END;
+  v_rank := CASE v_basis WHEN 'gross' THEN 3 WHEN 'hammer' THEN 2 WHEN 'final_bid' THEN 1 END;
+
+  IF v_basis IS NULL OR NEW.auction_end_date IS NULL THEN
+    INSERT INTO public.deal_close_skips (auction_event_id, deal_jacket_id, reason)
+    SELECT NEW.id, dj.id, CASE WHEN v_basis IS NULL THEN 'price_unknown' ELSE 'end_date_unknown' END
+      FROM public.deal_jackets dj
+     WHERE dj.vehicle_id = NEW.vehicle_id AND dj.deal_type = 'consignment'
+       AND (dj.sold_date IS NULL OR dj.closed_by_auction_event_id = NEW.id)
+    ON CONFLICT (auction_event_id, deal_jacket_id, reason) DO NOTHING;
+    RETURN NEW;
+  END IF;
 
   FOR v_deal IN
-    SELECT dj.id, dj.vehicle_id
+    SELECT dj.id
       FROM public.deal_jackets dj
      WHERE dj.vehicle_id = NEW.vehicle_id
        AND dj.deal_type = 'consignment'
-       AND dj.sold_date IS NULL
        -- A sale that ended before the deal was opened does not close it.
-       AND (NEW.auction_end_date IS NULL OR NEW.auction_end_date >= dj.created_at)
+       AND NEW.auction_end_date >= dj.created_at
+       AND (dj.sold_date IS NULL
+            -- The event that closed the deal may correct its own closure with an equal or better price class.
+            OR (dj.closed_by_auction_event_id = NEW.id
+                AND v_rank >= CASE dj.closed_price_basis WHEN 'gross' THEN 3 WHEN 'hammer' THEN 2 WHEN 'final_bid' THEN 1 ELSE 4 END
+                AND (dj.sale_price_inc_doc IS DISTINCT FROM v_sale_price
+                     OR dj.sold_date IS DISTINCT FROM NEW.auction_end_date::date
+                     OR dj.closed_price_basis IS DISTINCT FROM v_basis)))
   LOOP
-    IF NEW.auction_end_date IS NULL OR v_sale_price IS NULL THEN
-      INSERT INTO public.deal_close_skips (auction_event_id, deal_jacket_id, reason)
-      VALUES (NEW.id, v_deal.id, CASE WHEN v_sale_price IS NULL THEN 'price_unknown' ELSE 'end_date_unknown' END)
-      ON CONFLICT (auction_event_id, deal_jacket_id, reason) DO NOTHING;
-      CONTINUE;
-    END IF;
-
     UPDATE public.deal_jackets SET
       sold_date = NEW.auction_end_date::date,
       sale_price_inc_doc = v_sale_price,
+      closed_by_auction_event_id = NEW.id,
+      closed_price_basis = v_basis,
       updated_at = now()
     WHERE id = v_deal.id;
 
