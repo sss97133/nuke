@@ -189,14 +189,17 @@ ON CONFLICT (proname) DO UPDATE SET counts_in_key = excluded.counts_in_key, reas
 -- while it is non-null and the gauge reports it, so a later callee added to a classifier shows up as a defect.
 CREATE OR REPLACE FUNCTION public.labor_fold_logic_unlisted()
 RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
-  WITH bodies AS (SELECT p.proname::text AS caller, p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+  -- Each CTE is MATERIALIZED: inlined, the planner re-ran the regexp over every body once per public function and the
+  -- 2026-11-25 deploy hit the 120 s statement_timeout here; materialized it reads in 25 ms live (EXPLAIN ANALYZE).
+  WITH bodies AS MATERIALIZED (SELECT p.proname::text AS caller, p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                    WHERE n.nspname = 'public'
                      AND p.proname::text IN (SELECT l.proname FROM public.labor_fold_logic_functions l WHERE l.counts_in_key)),
-  fns AS (SELECT DISTINCT p.proname::text AS proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+  toks AS MATERIALIZED (SELECT DISTINCT b.caller, lower(m[1]) AS tok
+                          FROM bodies b, regexp_matches(b.prosrc, '([A-Za-z_][A-Za-z0-9_]*)\s*\(', 'g') m),
+  fns AS MATERIALIZED (SELECT DISTINCT p.proname::text AS proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
            WHERE n.nspname = 'public' AND p.prokind = 'f')
-  SELECT string_agg(DISTINCT f.proname || ' (called by ' || b.caller || ')', ', ')
-    FROM bodies b CROSS JOIN LATERAL (SELECT DISTINCT lower(m[1]) AS tok FROM regexp_matches(b.prosrc, '([A-Za-z_][A-Za-z0-9_]*)\s*\(', 'g') m) t
-    JOIN fns f ON f.proname = t.tok AND f.proname <> b.caller
+  SELECT string_agg(DISTINCT f.proname || ' (called by ' || t.caller || ')', ', ')
+    FROM toks t JOIN fns f ON f.proname = t.tok AND f.proname <> t.caller
    WHERE f.proname NOT IN ('vehicle_labor_appraisal', 'vehicle_labor_appraisal_compute')
      AND NOT EXISTS (SELECT 1 FROM public.labor_fold_logic_functions l WHERE l.proname = f.proname)
 $fn$;
