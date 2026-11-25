@@ -86,6 +86,8 @@ jobs:
         env:
           REQUESTED_MIGRATION_FILE: ${{ github.event.inputs.migration_file }}
           GITHUB_TOKEN: ${{ github.token }}
+          # Escape for deploy-base.mjs only: read when no earlier push run applied (see its header); clear after use.
+          DEPLOY_BASE_SHA: ${{ vars.DEPLOY_BASE_SHA }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SINCE="${{ github.event.inputs.migrations_since }}"
