@@ -75,3 +75,18 @@ test('the content probe samples as anon, counts only, and rolls back', async () 
   assert.doesNotMatch(sql, /SELECT v FROM|string_agg|array_agg/);
   assert.match(sql, /ROLLBACK;$/);
 });
+
+// --counts (WARN only, 2026-11-24): a public reader that counts data-set memberships with no grade split.
+import { ungradedCounts } from './no-pii-exposure.mjs';
+
+test('a public reader counting memberships with no grade is warned; graded, revoked or invoker readers are not', () => {
+  const ungraded = `CREATE OR REPLACE FUNCTION public.set_sizes(p uuid) RETURNS int LANGUAGE sql STABLE SECURITY DEFINER AS $$
+    SELECT count(DISTINCT vehicle_id)::int FROM data_set_members WHERE set_id = p AND state = 'active' $$;`;
+  assert.deepEqual(ungradedCounts(ungraded).map((h) => `${h.fn}:${h.anon}`), ['set_sizes:default PUBLIC execute']);
+  assert.deepEqual(ungradedCounts(`${ungraded}\nREVOKE ALL ON FUNCTION public.set_sizes(uuid) FROM PUBLIC, anon, authenticated;`), []);
+  assert.deepEqual(ungradedCounts(`${ungraded}\nREVOKE ALL ON FUNCTION public.set_sizes(uuid) FROM PUBLIC, anon;\nGRANT EXECUTE ON FUNCTION public.set_sizes(uuid) TO anon;`)
+    .map((h) => h.anon), ['granted']);
+  assert.deepEqual(ungradedCounts(ungraded.replace("state = 'active'", "grade = 'established'")), []);
+  assert.deepEqual(ungradedCounts(ungraded.replace('SECURITY DEFINER', '')), []);
+  assert.deepEqual(ungradedCounts(`CREATE FUNCTION public.n() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT count(*)::int FROM vehicles $$;`), []);
+});

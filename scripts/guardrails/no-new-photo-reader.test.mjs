@@ -108,3 +108,63 @@ test('the owner direction on photo reading is still where every agent starts', (
   assert.match(text('skills/image-keys/SKILL.md'), /^name: image-keys$/m, 'the keys brief exists');
   assert.ok(text('.github/workflows/pre-deploy-check.yml').includes('scripts/guardrails/no-new-photo-reader.mjs'), 'the gate is still run on pull requests');
 });
+
+// 2026-11-24: #3707 passed this check while ratifying 22 observation_properties rows with no proposal.
+import { ratifiedWithoutProposal, centerKeysWithoutFk, schemaViolations } from './no-new-photo-reader.mjs';
+import { readdirSync } from 'node:fs';
+
+test('vocabulary ratified in a migration without a schema_proposals row fails, in both insert shapes and by update', () => {
+  const insert3707 = `INSERT INTO public.observation_properties (
+  property_key, label, value_type, cardinality, description, discriminator_key, verification_scope, ratified_at
+)
+SELECT v.property_key, v.label, v.value_type, v.cardinality, v.description, v.discriminator_key, v.verification_scope, now()
+FROM (VALUES ('byok_carb_casting', 'Carburetor casting', 'text', 'single', 'x', NULL, 'vehicle')) v(property_key, label, value_type, cardinality, description, discriminator_key, verification_scope)
+WHERE NOT EXISTS (SELECT 1 FROM public.observation_properties op WHERE op.property_key = v.property_key);`;
+  assert.equal(ratifiedWithoutProposal(insert3707).length, 1);
+  assert.equal(ratifiedWithoutProposal(`INSERT INTO observation_properties (property_key, ratified_at) VALUES ('a', now());`).length, 1);
+  assert.equal(ratifiedWithoutProposal(`UPDATE public.observation_properties op SET ratified_at = now() WHERE property_key = 'a';`).length, 1);
+  assert.equal(ratifiedWithoutProposal(`DO $$ BEGIN INSERT INTO observation_properties (property_key, ratified_at) VALUES ('a', now()); END $$;`).length, 1);
+  // passes: a proposal filed in the same migration, an unratified row, a reasoned exception, the ratifier function
+  assert.equal(ratifiedWithoutProposal(`INSERT INTO schema_proposals (id) VALUES (gen_random_uuid());\n${insert3707}`).length, 0);
+  assert.equal(ratifiedWithoutProposal(`INSERT INTO observation_properties (property_key, label) VALUES ('a', 'A');`).length, 0);
+  assert.equal(ratifiedWithoutProposal(`-- guardrail-allow(ratified-vocabulary): observation_properties: ok\n${insert3707}`).length, 1, 'a reason under 12 characters does not count');
+  assert.equal(ratifiedWithoutProposal(`-- guardrail-allow(ratified-vocabulary): observation_properties: restores rows dropped by 20260101 revert\n${insert3707}`).length, 0);
+  assert.equal(ratifiedWithoutProposal(`CREATE OR REPLACE FUNCTION public.ratify_property(p uuid) RETURNS void LANGUAGE sql AS $$
+    UPDATE observation_properties SET ratified_at = now() WHERE id = (SELECT property_id FROM schema_proposals WHERE id = p AND status = 'approved') $$;`).length, 0);
+});
+
+test('a new table with a center id and no foreign key fails; every way of keying it passes', () => {
+  const sql = `
+    CREATE TABLE public.part_hours (id uuid, vehicle_id uuid NOT NULL, receipt_item_id uuid, note text);
+    CREATE TABLE public.keyed_inline (id uuid, vehicle_id uuid REFERENCES public.vehicles(id), image_id uuid NOT NULL REFERENCES vehicle_images (id) ON DELETE CASCADE);
+    CREATE TABLE public.keyed_table_level (id uuid, receipt_id uuid, sibling_receipt_id uuid,
+      CONSTRAINT fk1 FOREIGN KEY (receipt_id) REFERENCES receipts(id), FOREIGN KEY (sibling_receipt_id) REFERENCES receipts(id));
+    CREATE TABLE IF NOT EXISTS keyed_later (id uuid, observation_id uuid, evidence_image_ids uuid[]);
+    ALTER TABLE keyed_later ADD CONSTRAINT keyed_later_obs_fk FOREIGN KEY (observation_id) REFERENCES vehicle_observations(id);
+    CREATE TEMP TABLE scratch (vehicle_id uuid);
+    CREATE TABLE plain (id uuid, vehicle_count int, vehicle_ids_seen int, identity text);`;
+  assert.deepEqual(centerKeysWithoutFk(sql), [{ table: 'part_hours', column: 'vehicle_id' }, { table: 'part_hours', column: 'receipt_item_id' }]);
+  const bare = `-- guardrail-allow(center-key-fk): part_hours:\nCREATE TABLE part_hours (id uuid, vehicle_id uuid);`;
+  assert.equal(centerKeysWithoutFk(bare).length, 1, 'a marker without a reason does not count');
+  const reasoned = `-- guardrail-allow(center-key-fk): part_hours.vehicle_id: rows outlive a merged vehicle; merge_into_primary repoints them\nCREATE TABLE part_hours (id uuid, vehicle_id uuid);`;
+  assert.equal(centerKeysWithoutFk(reasoned).length, 0);
+});
+
+test('the key checks report through schemaViolations with the file', () => {
+  const files = { 'supabase/migrations/20270101000000_x.sql': 'create table x (id uuid, vehicle_id uuid); insert into observation_properties (property_key, ratified_at) values (\'a\', now());' };
+  assert.deepEqual(schemaViolations(Object.keys(files), { read: (f) => files[f] }).map((v) => `${v.kind}:${v.what}`),
+    ['vocabulary:observation_properties', 'center-key:x.vehicle_id']);
+});
+
+// Replay of every migration dated 2026-11-24 (45 files), measured when the key checks were written: no vocabulary
+// ratified without a proposal, and five vehicle_id columns with no foreign key, all in the morning's model fold and
+// coverage sample tables (queue, log and sample tables). They are the debt the rule names; a later migration keys
+// them or a marker gives the reason. The replay pins the set, so a change to the detector that adds or drops one shows.
+test('replay: the 2026-11-24 migrations hold five unkeyed vehicle_id columns and no unproposed vocabulary', () => {
+  const dir = join(ROOT, 'supabase/migrations');
+  const today = readdirSync(dir).filter((f) => /^20261124\d{6}_.+\.sql$/.test(f)).map((f) => `supabase/migrations/${f}`);
+  assert.ok(today.length >= 45);
+  assert.deepEqual(schemaViolations(today, { read: (f) => text(f) }).map((v) => `${v.kind}:${v.what}`), [
+    'center-key:coverage_sample_vehicles.vehicle_id', 'center-key:model_fold_signal.vehicle_id', 'center-key:model_fold_work.vehicle_id',
+    'center-key:model_fold_scope_members.vehicle_id', 'center-key:model_fold_tick_runs.vehicle_id']);
+});
