@@ -120,7 +120,7 @@ export function SegmentRows({ segment, names }: { segment: LaborSegment; names?:
   const r = segment.reassembly;
   const known = [
     segment.evidence_grade ? `Evidence: ${codeText(segment.evidence_grade)}` : 'Ungraded by the reader',
-    segment.counts_in === 'unwitnessed_purchase' ? 'counted with purchases not seen fitted' : null,
+    segment.counts_in === 'unwitnessed' || segment.counts_in === 'unwitnessed_purchase' ? 'counted with purchases not seen fitted' : null,
     segment.hours_basis ? `hours from ${codeText(segment.hours_basis)}` : null,
     segment.paper_hours != null ? `${h(segment.paper_hours)} on shop paper` : null,
     segment.book_hours ? `book range ${rangeText(segment.book_hours)}` : null,
@@ -158,7 +158,7 @@ export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
   if (!appraisal.applicable || !priced.length) return null;
   const byGrade = appraisal.totals?.by_grade ? Object.entries(appraisal.totals.by_grade) : [];
   const witnessedTotal = witnessedTotalText(appraisal.totals?.witnessed);
-  const withPurchases = rangeText(appraisal.totals?.with_unwitnessed_purchases);
+  const withPurchases = rangeText(appraisal.totals?.with_unwitnessed ?? appraisal.totals?.with_unwitnessed_purchases);
   return <Section title="Labor appraisal by segment" coverage={coverage}>
     <Text role="caption" as="p">Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.</Text>
     {appraisal.totals?.witnessed && withPurchases && <div title={appraisal.totals?.rule ?? undefined}><Rows title="Hours, two totals side by side">

@@ -26,7 +26,7 @@ export interface LaborSegment extends LaborRange {
   hours_basis?: string | null; paper_hours?: number | null; book_hours?: LaborRange | null; range_below_paper?: boolean | null;
   evidence_grade?: string | null; evidence_count?: number | null; stage_steps?: LaborStageStep[] | null;
   hours_counted_elsewhere?: number | null; fitted_parts?: number | null;
-  /** witnessed | unwitnessed_purchase: which of the reader's two totals this segment's hours belong to. */
+  /** witnessed | unwitnessed (unwitnessed_purchase before the labor reader's rename): which of the reader's two totals this segment's hours belong to. */
   counts_in?: string | null; counted_in?: string | null;
   witnessed_hours_min?: number | null; witnessed_hours_typical?: number | null; witnessed_hours_max?: number | null;
   /** The reader's witness counts for the segment's pieces (from 20261124214500), with the pieces themselves. */
@@ -46,7 +46,9 @@ export interface LaborAppraisal {
     /** The reader's two totals, side by side: hours witnessed, and hours including purchases not seen fitted. */
     /** max_witnessed false: the reader says its max is not witnessed (a book bound), so only the floor and typical are. */
     /** unknown_max_segments (from 20261125033000): segments whose witnessed max is unknown, so hours_max is not a bound. */
-    witnessed?: (LaborRange & { unknown_min_segments?: number | null; unknown_max_segments?: number | null; max_witnessed?: boolean | null }) | null; with_unwitnessed_purchases?: LaborRange | null;
+    witnessed?: (LaborRange & { unknown_min_segments?: number | null; unknown_max_segments?: number | null; max_witnessed?: boolean | null }) | null;
+    /** with_unwitnessed is the renamed with_unwitnessed_purchases (kept by the reader as an alias for one release). */
+    with_unwitnessed?: LaborRange | null; with_unwitnessed_purchases?: LaborRange | null;
     priced_segments?: number | null; unwitnessed_purchase_segments?: number | null; rule?: string | null;
   }) | null;
   /** The keys' words, read from their own rows (20261125073000): transitions by transition_id, operations by code. */

@@ -68,7 +68,7 @@ struct LaborSegment: Decodable, Equatable, Identifiable {
     var reassembly: Reassembly?
     /// The rule's identifier: kept off the screen (the web puts it in a title attribute).
     var citation: String?
-    /// witnessed | unwitnessed_purchase: which of the reader's two totals the segment's hours belong to.
+    /// witnessed | unwitnessed (unwitnessed_purchase before the labor reader's rename): which of the reader's two totals the segment's hours belong to.
     var counts_in: String?
     var witnessed_hours_min: Double?
     var witnessed_hours_typical: Double?
@@ -95,6 +95,8 @@ struct LaborAppraisal: Decodable, Equatable {
         var hours_max: Double?
         var by_grade: [String: LaborRange]?
         var witnessed: WitnessedTotal?
+        /// with_unwitnessed is the renamed with_unwitnessed_purchases (an alias for one release).
+        var with_unwitnessed: LaborRange?
         var with_unwitnessed_purchases: LaborRange?
         var priced_segments: Int?
         var rule: String?
@@ -239,7 +241,7 @@ enum LaborWords {
     static func lines(_ s: LaborSegment, _ names: LaborNames? = nil) -> [String] {
         let known = [
             s.evidence_grade.map { "Evidence: \(ItemText.codeText($0))" } ?? "Ungraded by the reader",
-            s.counts_in == "unwitnessed_purchase" ? "counted with purchases not seen fitted" : nil,
+            s.counts_in == "unwitnessed" || s.counts_in == "unwitnessed_purchase" ? "counted with purchases not seen fitted" : nil,
             s.hours_basis.map { "hours from \(ItemText.codeText($0))" },
             s.paper_hours.map { "\(h($0)!) on shop paper" },
             range(s.book_hours).map { "book range \($0)" },
@@ -320,7 +322,7 @@ struct LaborAppraisalContent: View {
         } else if appraisal.applicable == true, !priced.isEmpty {
             section {
                 caption("Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.")
-                if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed_purchases) {
+                if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed ?? totals.with_unwitnessed_purchases) {
                     Text("Hours, two totals side by side").font(.caption.weight(.semibold)).padding(.top, 4)
                     row("Witnessed", (LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
                         + LaborWords.witnessedUnknown(totals.witnessed))
