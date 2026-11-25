@@ -11,7 +11,7 @@
 // Read tool only; the answer records the model id the CLI reports.
 //
 //   cd ~/nuke && dotenvx run -q -- node scripts/receipt-work/answer-receipt-parts.mjs [--limit 6] [--reclaim-minutes 30]
-//        [--dry-run] [--out file.json] [--owner <uuid>]   (--owner/--out are passed by the subscription batch)
+//        [--budget-seconds 240] [--dry-run] [--out file.json] [--owner <uuid>]   (--owner/--out come from the batch)
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -103,37 +103,44 @@ async function readOne(db, q, env) {
 export async function main(argv = process.argv.slice(2), env = process.env) {
   const limit = Number(arg(argv, '--limit', 6)); const reclaim = Number(arg(argv, '--reclaim-minutes', 30));
   if (!(limit >= 1 && limit <= MAX_LIMIT)) throw new Error(`--limit must be 1..${MAX_LIMIT}`);
-  const dry = argv.includes('--dry-run'); const out = arg(argv, '--out');
+  const dry = argv.includes('--dry-run'); const out = arg(argv, '--out'); const budget = Number(arg(argv, '--budget-seconds', 240));
   const db = client(env); const version = producerVersion(SCRIPT); const runId = randomUUID(); const claimedBy = `${AGENT}:${runId}`;
-  const s = { cli: 'answer-receipt-parts', claimed: 0, answered: 0, refused: 0, errors: 0, stopped: null, by_outcome: {}, usd_covered: 0, run_id: runId, dry_run: dry };
+  const s = { cli: 'answer-receipt-parts', claimed: 0, answered: 0, refused: 0, refused_problems: {}, errors: 0, stopped: null, by_outcome: {}, usd_covered: 0, run_id: runId, dry_run: dry };
   if (dry) {
     const pending = await db.req(`evidence_judgment_requests?select=id,priority&department=eq.${DEPARTMENT}&question_kind=eq.${QUESTION}&status=eq.pending&order=priority.desc,created_at&limit=${limit}`);
     return { ...s, would_claim: pending.length, usd_covered: pending.reduce((a, r) => a + (r.priority ?? 0), 0) };
   }
-  const claimed = await db.rpc('claim_evidence_judgments', { p_department: DEPARTMENT, p_question_kind: QUESTION, p_limit: limit, p_claimed_by: claimedBy, p_stale_minutes: reclaim });
-  s.claimed = claimed.length; const detail = [];
-  for (const q of claimed) {
-    if (s.stopped) break;
+  // One claim at a time, highest amount first, until the limit or the wall-time budget: a fire never strands claims it
+  // will not read (a stranded claim waits --reclaim-minutes), and six slow reads cannot hold the batch for 24 minutes.
+  const t0 = Date.now(); const detail = [];
+  while (s.claimed < limit && !s.stopped && (Date.now() - t0) / 1000 < budget) {
+    const [q] = await db.rpc('claim_evidence_judgments', { p_department: DEPARTMENT, p_question_kind: QUESTION, p_limit: 1, p_claimed_by: claimedBy, p_stale_minutes: reclaim });
+    if (!q) break;
+    s.claimed++;
     try {
       const r = await readOne(db, q, env);
       const answer = closedAnswer(answerJsonFrom(r.text));
       const problems = answerProblems(q.params, answer);
-      if (problems.length) { s.refused++; detail.push({ id: q.id, problems }); continue; }
+      if (problems.length) { s.refused++; for (const x of problems) s.refused_problems[x] = (s.refused_problems[x] ?? 0) + 1; detail.push({ id: q.id, problems }); continue; }
       await db.rpc('answer_evidence_judgment', { p_id: q.id, p_claimed_by: claimedBy, p_answer: answer, p_answer_agent: AGENT, p_answer_model: r.model ?? 'unknown', p_answer_version: version });
       s.answered++; s.usd_covered += q.priority ?? 0;
       const k = `${answer.visible}/${answer.installed}`; s.by_outcome[k] = (s.by_outcome[k] ?? 0) + 1;
       detail.push({ id: q.id, outcome: k, model: r.model });
     } catch (e) {
       s.errors++; detail.push({ id: q.id, error: String(e.message).slice(0, 200) });
-      // a usage limit ends the run; unanswered claims become reclaimable after --reclaim-minutes
+      // a usage limit ends the run; the unanswered claim becomes reclaimable after --reclaim-minutes
       if (e.stop || isUsageLimit(e.message)) s.stopped = String(e.message).slice(0, 120);
     }
   }
+  s.seconds = Math.round((Date.now() - t0) / 1000);
+  // the heartbeat's terms (reader-heartbeat.mjs): questions taken up and answered, so a run of fires that answers none is seen
+  s.frames = s.claimed; s.read = s.answered;
   if (out && (s.claimed || s.errors)) writeFileSync(out, JSON.stringify({ ...s, detail }, null, 1));
   return s;
 }
 
 if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().then((s) => { console.log(JSON.stringify(s)); process.exitCode = s.errors && !s.answered ? 1 : 0; })
+  // exit 0 whenever the run reported, as fact-doubt-cycle does: a usage limit is a stop in the summary, not a silent reader
+  main().then((s) => { console.log(JSON.stringify(s)); process.exitCode = 0; })
     .catch((e) => { console.error(e.message); process.exitCode = 1; });
 }
