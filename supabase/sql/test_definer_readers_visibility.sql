@@ -420,18 +420,18 @@ CREATE FUNCTION public.t_hash(p regprocedure) RETURNS text LANGUAGE sql AS
 $$ SELECT encode(sha256(convert_to(prosrc, 'UTF8')), 'base64') FROM pg_proc WHERE oid = p $$;
 -- The photo ids of the fixture, so a caller can ask for each by id as the iOS app does.
 CREATE TABLE public.t_ids (id uuid PRIMARY KEY REFERENCES public.vehicle_images(id));
--- What the caller's claims read, as sorted label lists.
+-- What the caller's claims read, as label lists sorted in the C collation (the CI server's locale differs from a Mac's).
 CREATE FUNCTION public.t_analysis() RETURNS text LANGUAGE sql AS
-$$ SELECT coalesce(string_agg(g.narrative, ',' ORDER BY g.narrative), '')
+$$ SELECT coalesce(string_agg(g.narrative, ',' ORDER BY g.narrative COLLATE "C"), '')
      FROM public.t_ids i CROSS JOIN LATERAL public.get_image_deep_analysis(i.id) g $$;
 CREATE FUNCTION public.t_feed(p_limit int) RETURNS text LANGUAGE sql AS
-$$ SELECT coalesce(string_agg(e ->> 'line', ',' ORDER BY e ->> 'line'), '')
+$$ SELECT coalesce(string_agg(e ->> 'line', ',' ORDER BY e ->> 'line' COLLATE "C"), '')
      FROM jsonb_array_elements(public.intake_live_state(p_limit, 30) -> 'feed') e $$;
 CREATE FUNCTION public.t_fleet() RETURNS text LANGUAGE sql AS
-$$ SELECT coalesce(string_agg(coalesce(e ->> 'vehicle_name', '?'), ',' ORDER BY e ->> 'vehicle_name'), '')
+$$ SELECT coalesce(string_agg(coalesce(e ->> 'vehicle_name', '?'), ',' ORDER BY e ->> 'vehicle_name' COLLATE "C"), '')
      FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'fleet') e $$;
 CREATE FUNCTION public.t_sessions() RETURNS text LANGUAGE sql AS
-$$ SELECT coalesce(string_agg(l, ',' ORDER BY l), '') FROM (
+$$ SELECT coalesce(string_agg(l, ',' ORDER BY l COLLATE "C"), '') FROM (
      SELECT coalesce(e ->> 'title', '(hidden)') || ':' || coalesce(e ->> 'vehicle_name', '-') AS l
      FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'sessions_today') e) s $$;
 -- Sessions whose title or summary text reaches the caller.
@@ -440,7 +440,7 @@ $$ SELECT count(*) FROM jsonb_array_elements(public.intake_live_state(30, 30) ->
    WHERE e ->> 'title' IS NOT NULL OR e ->> 'summary' IS NOT NULL $$;
 -- Every vehicle name anywhere in the reply (fleet, feed, sessions).
 CREATE FUNCTION public.t_names() RETURNS text LANGUAGE sql AS
-$$ SELECT coalesce(string_agg(DISTINCT n, ',' ORDER BY n), '') FROM (
+$$ SELECT coalesce(string_agg(DISTINCT n COLLATE "C", ',' ORDER BY n COLLATE "C"), '') FROM (
      SELECT e ->> 'vehicle_name' n FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'fleet') e
      UNION ALL SELECT e ->> 'vehicle_name' FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'feed') e
      UNION ALL SELECT e ->> 'vehicle_name' FROM jsonb_array_elements(public.intake_live_state(30, 30) -> 'sessions_today') e) s
@@ -503,7 +503,7 @@ INSERT INTO public.work_sessions (user_id, vehicle_id, session_date, title, work
 SET ROLE anon; SELECT t_claims('');
 SELECT t_assert(t_analysis() = 'deleted_c,dup_a,photog_b,plate_a,private_b,sensitive_a,shown_a,unfiled_u1',
   'before: anon reads all 8 analyses by id (no caller test in the definer body)');
-SELECT t_assert(t_feed(1) = 'unfiled_u1' AND t_fleet() = 'A,B,C' AND t_sessions() = 's_a:A,s_b:B,s_b3:B,s_c:C',
+SELECT t_assert(t_feed(1) = 'unfiled_u1' AND t_fleet() = 'A,B,C' AND t_sessions() = 's_a:A,s_b3:B,s_b:B,s_c:C',
   'before: anon feed leads with an unfiled photo; fleet names B and C; every session is listed');
 RESET ROLE;
 
@@ -561,7 +561,7 @@ SET ROLE authenticated; SELECT t_claims('00000000-0000-0000-0000-000000000001');
 SELECT t_assert(t_analysis() = 'deleted_c,dup_a,photog_b,plate_a,private_b,sensitive_a,shown_a,unfiled_u1',
   'after: u1 (uploader, tied to A, B, C) reads all 8, its unfiled photo included');
 SELECT t_assert(t_feed(30) = 'deleted_c,dup_a,photog_b,plate_a,private_b,sensitive_a,shown_a,unfiled_u1'
-  AND t_fleet() = 'A,B,C' AND t_sessions() = 's_a:A,s_b:B,s_b3:B,s_c:C', 'after: u1 sees its whole feed, fleet and sessions');
+  AND t_fleet() = 'A,B,C' AND t_sessions() = 's_a:A,s_b3:B,s_b:B,s_c:C', 'after: u1 sees its whole feed, fleet and sessions');
 RESET ROLE;
 
 -- u2: a signed-in stranger reads only what anon reads.
