@@ -24,12 +24,16 @@
 --       alone; in any other leaf the URLs are left alone and the text around them is redacted. skip_key_regex: a leaf
 --       under a matching key is left alone unless the key matches never_skip_key_regex (a CHECK makes a skip name one).
 --       Seeded: email (text_redact_contact's, every leaf) and phone (text_redact_contact's, skips
---       (^|_)(id|number|chassis)$|^repost_of$ from the census, never skips phone|mobile|cell|tel|contact|whatsapp|fax).
---     joined_prefilter_safe (default false) admits a rule to the joined-text fast path; true only on the three seeded
---     rules, each proven by the contract's equivalence run (joined answer = leaf-by-leaf answer). CHECKs refuse a
---     pattern or key regex that does not compile or matches the empty string, a pattern with \A or \Z, and a rule of
---     one action
---     carrying the other's columns. anon and authenticated read it; only the service role and migrations write it.
+--       (^|_)(id|number|chassis)$|^repost_of$|(^|_)timestamp(_|$) from the census, never skips
+--       phone|mobile|cell|tel|contact|whatsapp|fax).
+--     prefilter_proven_pattern_md5 (default null) admits a rule to the joined-text fast path only while it equals
+--     contact_redaction_rule_proof_md5(action, key_regex, pattern) of the row as it stands: the proof is keyed to the
+--     pattern it proved, so an edited pattern falls to the leaf-by-leaf walk with nothing to remember. Seeded on the three
+--     rules from the patterns that passed the contract's equivalence run and skeptic2's 30,000-document fuzz (joined
+--     answer = leaf-by-leaf answer). CHECKs refuse a pattern or key regex that does not compile or matches the empty
+--     string, a pattern with \A or \Z, and a rule of one action carrying the other's columns.
+--     Number leaves are walked as their text: a number matching a redact rule (the phone rule needs 10 digits in a
+--     phone shape) becomes the replacement string; a key a drop rule names is dropped whatever its value's type. anon and authenticated read it; only the service role and migrations write it.
 --   public.text_redact_by_rules(text, rules, key), public.jsonb_redact_contact_leaves(jsonb, rules, key): the walk.
 --   public.jsonb_redact_contact(jsonb): reads the enabled rules once and tries each once over all it could change,
 --     joined by newlines (keys holding a value; string leaves with URLs cut out where the rule skips them); walks only
@@ -79,12 +83,12 @@ CREATE TABLE IF NOT EXISTS public.contact_redaction_rules (
   never_skip_key_regex text CHECK (never_skip_key_regex IS NULL OR ('' ~ never_skip_key_regex) IS NOT NULL),
   ordinal integer NOT NULL UNIQUE,
   enabled boolean NOT NULL DEFAULT true,
-  -- May jsonb_redact_contact's fast path test this rule once over all leaves (or keys) joined by newlines? Only when a
-  -- contract proves the joined answer equals the leaf-by-leaf answer for this row: test_projection_origin_metadata_leaves
-  -- runs that equivalence for every row where this is true, read from the table. A regex can see across the joining
-  -- newline in many ways (negative lookarounds, embedded (?s)/(?p) options, ...), so the default is false: a new rule
-  -- is exact by default (its values are walked leaf by leaf) and fast only once proven.
-  joined_prefilter_safe boolean NOT NULL DEFAULT false,
+  -- May jsonb_redact_contact's fast path test this rule once over all leaves (or keys) joined by newlines? Only while
+  -- this equals contact_redaction_rule_proof_md5(action, key_regex, pattern): the hash of the definition a contract
+  -- proved joined answer = leaf-by-leaf answer for (test_projection_origin_metadata_leaves runs that equivalence for
+  -- every row where the two match, read from the table). A regex can see across the joining newline in many ways
+  -- (negative lookarounds, embedded (?s)/(?p) options, ...), so a new rule, or an edited one, is walked leaf by leaf.
+  prefilter_proven_pattern_md5 text CHECK (prefilter_proven_pattern_md5 IS NULL OR prefilter_proven_pattern_md5 ~ '^[0-9a-f]{32}$'),
   reason text NOT NULL CHECK (length(reason) >= 12),
   measured_at date NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -110,17 +114,33 @@ REVOKE ALL ON public.contact_redaction_rules FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.contact_redaction_rules TO anon, authenticated;
 GRANT ALL ON public.contact_redaction_rules TO service_role;
 
+-- The proof key: what the fast path's joined test depends on (the action and the regex it runs). One definition, used by
+-- the seed, the fast path and the contract.
+CREATE OR REPLACE FUNCTION public.contact_redaction_rule_proof_md5(p_action text, p_key_regex text, p_pattern text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE
+ SET search_path TO ''
+AS $function$
+  SELECT pg_catalog.md5(p_action || ':' || coalesce(p_pattern, p_key_regex, ''))
+$function$;
+GRANT EXECUTE ON FUNCTION public.contact_redaction_rule_proof_md5(text, text, text) TO anon, authenticated, service_role;
+
 INSERT INTO public.contact_redaction_rules
   (rule_key, action, key_regex, pattern, replacement, skip_url_leaves, skip_key_regex, never_skip_key_regex, ordinal,
-   reason, measured_at, joined_prefilter_safe) VALUES
+   reason, measured_at, prefilter_proven_pattern_md5)
+SELECT v.*, public.contact_redaction_rule_proof_md5(v.action, v.key_regex, v.pattern)
+FROM (VALUES
   ('contact_keys', 'drop_key', '^(seller_phone|party_type)$', NULL, NULL, false, NULL, NULL, 5,
-   'Key census 2026-11-25, 32 of 4,096 id slices (8,962 public cars): party_type (BaT seller line) holds a string on 231 cars, 212 of them a phone or email; seller_phone named by the lead (1 car in a 128-slice leaf sample). No other key named phone, mobile, cell, tel, contact, whatsapp, fax or mail in the sample. A key holding null is kept.', '2026-11-25', true),
+   'Key census 2026-11-25, 32 of 4,096 id slices (8,962 public cars): party_type (BaT seller line) holds a string on 231 cars, 212 of them a phone or email; seller_phone named by the lead (1 car in a 128-slice leaf sample). No other key named phone, mobile, cell, tel, contact, whatsapp, fax or mail in the sample. A key holding null is kept.', '2026-11-25'::date),
   ('email', 'redact', NULL, '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}', '[contact through Nuke]',
    false, NULL, NULL, 10,
-   'text_redact_contact email pattern, verbatim; every leaf, URLs included, as the serialized-text regex covered', '2026-11-25', true),
+   'text_redact_contact email pattern, verbatim; every leaf, URLs included, as the serialized-text regex covered', '2026-11-25'::date),
   ('phone', 'redact', NULL, '(\(\d{3}\)|\m\d{3})[-. )]*\d{3}[-. ]*\d{4}(?![0-9])', '[contact through Nuke]', true,
-   '(^|_)(id|number|chassis)$|^repost_of$', 'phone|mobile|cell|tel|contact|whatsapp|fax', 20,
-   'text_redact_contact phone pattern, verbatim. Key skips from the 128-slice leaf census (1/32 of public cars), phone-shaped values under chassis_number 22, craigslist_post_id 20, chassis 17, repost_of 2, engine_number 1, auction_observation_id 1, source_snapshot_id 1, snapshot_id 1; 246 URL leaves. Never skipped: a key naming a contact.', '2026-11-25', true)
+   '(^|_)(id|number|chassis)$|^repost_of$|(^|_)timestamp(_|$)', 'phone|mobile|cell|tel|contact|whatsapp|fax', 20,
+   'text_redact_contact phone pattern, verbatim. Key skips from the 128-slice leaf census (1/32 of public cars), phone-shaped values under chassis_number 22, craigslist_post_id 20, chassis 17, repost_of 2, engine_number 1, auction_observation_id 1, source_snapshot_id 1, snapshot_id 1; 246 URL leaves. Number leaves (walked as text), 4 of 512 id ranges 2026-11-25: every phone-shaped one (169) is a 10-digit epoch under timestamp_end, so timestamp keys are skipped. Never skipped: a key naming a contact.', '2026-11-25'::date)
+) v(rule_key, action, key_regex, pattern, replacement, skip_url_leaves, skip_key_regex, never_skip_key_regex, ordinal,
+    reason, measured_at)
 ON CONFLICT (rule_key) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.text_redact_by_rules(p_text text, p_rules jsonb, p_key text DEFAULT NULL)
@@ -168,6 +188,9 @@ AS $function$
     WHEN 'array' THEN (SELECT coalesce(pg_catalog.jsonb_agg(public.jsonb_redact_contact_leaves(e.value, p_rules, p_key) ORDER BY e.ord), '[]'::jsonb)
                        FROM pg_catalog.jsonb_array_elements(p_j) WITH ORDINALITY e(value, ord))
     WHEN 'string' THEN pg_catalog.to_jsonb(public.text_redact_by_rules(p_j #>> '{}', p_rules, p_key))
+    -- A number is walked as its text; it stays a number unless a rule changes that text.
+    WHEN 'number' THEN (SELECT CASE WHEN t.r IS DISTINCT FROM p_j #>> '{}' THEN pg_catalog.to_jsonb(t.r) ELSE p_j END
+                        FROM (SELECT public.text_redact_by_rules(p_j #>> '{}', p_rules, p_key) AS r) t)
     ELSE p_j END
 $function$;
 
@@ -189,10 +212,12 @@ BEGIN
   SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('action', c.action, 'key_regex', c.key_regex,
            'pattern', c.pattern, 'replacement', c.replacement, 'skip_url_leaves', c.skip_url_leaves,
            'skip_key_regex', c.skip_key_regex, 'never_skip_key_regex', c.never_skip_key_regex) ORDER BY c.ordinal),
-         pg_catalog.bool_and(c.joined_prefilter_safe)
+         pg_catalog.bool_and(coalesce(c.prefilter_proven_pattern_md5
+                               = public.contact_redaction_rule_proof_md5(c.action, c.key_regex, c.pattern), false))
     INTO v_rules, v_safe FROM public.contact_redaction_rules c WHERE c.enabled;
   IF v_rules IS NULL THEN RETURN 'null'::jsonb; END IF;  -- no enabled rule: withhold, never pass raw
-  -- A rule not proven safe for the joined test (joined_prefilter_safe false) is applied leaf by leaf: walk.
+  -- A rule whose proof key does not match its definition as it stands (never proven, or edited since) is applied leaf
+  -- by leaf: walk.
   IF NOT v_safe THEN
     RETURN public.jsonb_redact_contact_leaves(p_j, v_rules);
   END IF;
@@ -204,7 +229,7 @@ BEGIN
          pg_catalog.string_agg(pg_catalog.regexp_replace(l #>> '{}', 'https?://\S+', E'\n', 'gi'), E'\n')
            FILTER (WHERE (l #>> '{}') !~* '^\s*https?://\S+\s*$')
     INTO v_all, v_text
-  FROM pg_catalog.jsonb_path_query(p_j, 'strict $.**') l WHERE pg_catalog.jsonb_typeof(l) = 'string';
+  FROM pg_catalog.jsonb_path_query(p_j, 'strict $.**') l WHERE pg_catalog.jsonb_typeof(l) IN ('string', 'number');
   FOR r IN SELECT x FROM pg_catalog.jsonb_array_elements(v_rules) x LOOP
     IF r ->> 'action' = 'drop_key' THEN
       IF v_keys IS NULL THEN
@@ -267,7 +292,8 @@ BEGIN
   SELECT p.prosecdef, p.provolatile, p.proconfig, position('projection_origin_metadata_leaves_v1' in p.prosrc) > 0
            AND position('vehicle_row_projection_withheld_columns_v1' in p.prosrc) > 0 AS marked
   INTO f FROM pg_proc p WHERE p.oid = 'public.vehicle_row_public_projection(jsonb)'::regprocedure;
-  SELECT count(*) INTO n FROM public.contact_redaction_rules WHERE enabled AND joined_prefilter_safe AND rule_key IN ('contact_keys', 'email', 'phone');
+  SELECT count(*) INTO n FROM public.contact_redaction_rules WHERE enabled AND rule_key IN ('contact_keys', 'email', 'phone')
+    AND prefilter_proven_pattern_md5 = public.contact_redaction_rule_proof_md5(action, key_regex, pattern);
   IF NOT (NOT f.prosecdef AND f.provolatile = 's' AND f.proconfig = ARRAY['search_path=""'] AND f.marked AND n = 3
           AND NOT has_table_privilege('anon', 'public.contact_redaction_rules', 'INSERT')
           AND NOT has_table_privilege('authenticated', 'public.contact_redaction_rules', 'UPDATE')

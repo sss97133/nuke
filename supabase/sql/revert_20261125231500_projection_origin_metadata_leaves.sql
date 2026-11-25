@@ -1,6 +1,6 @@
 -- REVERT of 20261125231500_projection_origin_metadata_leaves.sql: restores the vehicle_row_public_projection body of
 -- 20261125202000 (sha256 of prosrc d72ab841ab9c56dea9e1e4773141e021e979d3c8c0d413057c715831d2e8514d), which redacts
--- emails only, over origin_metadata's serialized text. contact_redaction_rules and the three helper functions are left in
+-- emails only, over origin_metadata's serialized text. contact_redaction_rules and the four helper functions are left in
 -- place (unused). Apply only through a migration that copies it.
 BEGIN;
 SET LOCAL statement_timeout = '30s';

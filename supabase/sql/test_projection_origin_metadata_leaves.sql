@@ -78,14 +78,16 @@ BEGIN
   -- 1b. An id/serial key skip never applies to a key that names a contact.
   ASSERT m ->> 'phone_number' = '[contact through Nuke]' AND m ->> 'seller_contact_id' = '[contact through Nuke]'
      AND m ->> 'Cell_Number' = '[contact through Nuke]', '1b contact-named id/number keys are redacted';
-  -- 2. URL leaves keep their digits; id and serial keys keep their values; numbers are not strings.
+  -- 2. URL leaves keep their digits; id and serial keys keep their values.
   ASSERT m -> 'images' = src -> 'images' AND m -> 'thumbnail_url' = src -> 'thumbnail_url'
      AND m -> 'discovery_url' = src -> 'discovery_url', '2 URL leaves the page renders are untouched';
   ASSERT m -> 'chassis_number' = src -> 'chassis_number' AND m -> 'craigslist_post_id' = src -> 'craigslist_post_id'
      AND m -> 'engine_number' = src -> 'engine_number' AND m -> 'repost_of' = src -> 'repost_of'
      AND m -> 'auction_observation_id' = src -> 'auction_observation_id' AND m -> 'source_snapshot_id' = src -> 'source_snapshot_id'
      AND m -> 'bat_snapshot_parsed' -> 'chassis' = src -> 'bat_snapshot_parsed' -> 'chassis', '2 id and serial keys are untouched';
-  ASSERT m -> 'lot' = '7025550154'::jsonb, '2 a json number is not a string leaf';
+  -- A number is walked as its text (lead ruling, 2026-11-25): a 10-digit phone-shaped number under a key no rule skips
+  -- is redacted like the same digits in a string.
+  ASSERT m -> 'lot' = '"[contact through Nuke]"'::jsonb, format('2 a phone-shaped number is walked as text: %s', m -> 'lot');
   -- 3. Emails are redacted in URL leaves too, as the serialized-text regex did; keys are kept.
   ASSERT m ->> 'bat_url' = 'https://example.invalid/listing?who=[contact through Nuke]', '3 email inside a URL';
   ASSERT (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(m) k)
@@ -309,16 +311,19 @@ INSERT INTO public.om_corpus VALUES
   (17, '[]'), (18, '{}'), (19, '{"n": 7025550104, "b": true}'), (20, '{"a": "line one\nSECRET-7\nline three"}'),
   (21, '{"a": "702-555-0105", "b": "x"}'), (22, '[["a"], ["b", "SECRET-9"]]'), (23, '{"Cell_Number": "x 702.555.0106"}');
 
--- 14. Every rule flagged joined_prefilter_safe, read from the table: with that rule alone enabled, and with all flagged
---     rules together, the fast path's answer equals the leaf-by-leaf walk on every corpus value. A rule flagged without
---     this holding fails here.
+-- 14. Every rule whose prefilter_proven_pattern_md5 matches its definition as it stands, read from the table: with that
+--     rule alone enabled, and with all such rules together, the fast path's answer equals the leaf-by-leaf walk on every
+--     corpus value. A rule keyed as proven without this holding fails here.
 BEGIN;
 DO $$
 DECLARE r record; c record; rules jsonb; bad text[] := '{}'; flagged int := 0;
 BEGIN
-  FOR r IN SELECT rule_key FROM public.contact_redaction_rules WHERE joined_prefilter_safe UNION ALL SELECT '*all flagged*' LOOP
-    UPDATE public.contact_redaction_rules SET enabled = (CASE WHEN r.rule_key = '*all flagged*' THEN joined_prefilter_safe
-                                                              ELSE rule_key = r.rule_key END);
+  FOR r IN SELECT rule_key FROM public.contact_redaction_rules
+            WHERE prefilter_proven_pattern_md5 = public.contact_redaction_rule_proof_md5(action, key_regex, pattern)
+           UNION ALL SELECT '*all flagged*' LOOP
+    UPDATE public.contact_redaction_rules SET enabled = (CASE WHEN r.rule_key = '*all flagged*'
+        THEN coalesce(prefilter_proven_pattern_md5 = public.contact_redaction_rule_proof_md5(action, key_regex, pattern), false)
+        ELSE rule_key = r.rule_key END);
     SELECT jsonb_agg(jsonb_build_object('action', x.action, 'key_regex', x.key_regex, 'pattern', x.pattern,
              'replacement', x.replacement, 'skip_url_leaves', x.skip_url_leaves, 'skip_key_regex', x.skip_key_regex,
              'never_skip_key_regex', x.never_skip_key_regex) ORDER BY x.ordinal)
@@ -330,12 +335,12 @@ BEGIN
       END IF;
     END LOOP;
   END LOOP;
-  ASSERT flagged >= 3, format('14 the three seeded rules are flagged (%s)', flagged);
+  ASSERT flagged >= 3, format('14 the three seeded rules carry a matching proof key (%s)', flagged);
   ASSERT cardinality(bad) = 0, format('14 joined answer differs from the walk: %s', bad);
 END $$;
 ROLLBACK;
 
--- 15. A new rule is exact by default: joined_prefilter_safe defaults to false, and such a rule is applied leaf by leaf,
+-- 15. A new rule is exact by default: prefilter_proven_pattern_md5 defaults to null, and such a rule is applied leaf by leaf,
 --     so skeptic2's probes (embedded (?s), negative lookarounds at leaf edges) redact a later leaf as the walk does.
 BEGIN;
 INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
@@ -345,13 +350,57 @@ INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replaceme
          ('probe_tok', 'redact', '(?<!.)TOKEN\w+', '[gone]', false, 44, 'contract case: unproven rule', '2026-11-25'),
          ('probe_sp', 'redact', 'SECRET\d{3}(?!\s)', '[gone]', false, 45, 'contract case: unproven rule', '2026-11-25');
 DO $$ BEGIN
-  ASSERT NOT (SELECT bool_or(joined_prefilter_safe) FROM public.contact_redaction_rules WHERE rule_key LIKE 'probe_%'),
-    '15 the flag defaults to false';
+  ASSERT (SELECT bool_and(prefilter_proven_pattern_md5 IS NULL) FROM public.contact_redaction_rules WHERE rule_key LIKE 'probe_%'),
+    '15 the proof key defaults to null';
   ASSERT public.jsonb_redact_contact('{"a": "first leaf", "b": "SECRET-42"}') = '{"a": "first leaf", "b": "[gone]"}', '15 (?s)^ on a later leaf';
   ASSERT public.jsonb_redact_contact('{"a": "x", "b": "PRIVATEdata"}') = '{"a": "x", "b": "[gone]"}', '15 (?<!.) on a later leaf';
   ASSERT public.jsonb_redact_contact('{"a": "first leaf", "b": "TOKENabc"}') = '{"a": "first leaf", "b": "[gone]"}', '15 (?<!.) token';
   ASSERT public.jsonb_redact_contact('["SECRET123", "later leaf"]') = '["[gone]", "later leaf"]', '15 (?!\s) at a leaf end';
 END $$;
 ROLLBACK;
+
+-- 16. The proof is keyed to the pattern it proved: skeptic2's edit of a proven rule (email's pattern to (?s)^SECRET-\d+,
+--     which passes the CHECK) leaves its proof key stale, so the rule falls to the walk and a later leaf is redacted.
+--     Restoring the proved pattern restores the fast path's eligibility with no other write.
+BEGIN;
+UPDATE public.contact_redaction_rules SET pattern = '(?s)^SECRET-\d+', replacement = '[gone]' WHERE rule_key = 'email';
+DO $$ BEGIN
+  ASSERT (SELECT prefilter_proven_pattern_md5 <> public.contact_redaction_rule_proof_md5(action, key_regex, pattern)
+            FROM public.contact_redaction_rules WHERE rule_key = 'email'), '16 the edit leaves the proof key stale';
+  ASSERT public.jsonb_redact_contact('{"a": "first leaf", "b": "SECRET-42"}') = '{"a": "first leaf", "b": "[gone]"}',
+    format('16 an edited pattern is walked: %s', public.jsonb_redact_contact('{"a": "first leaf", "b": "SECRET-42"}'));
+  ASSERT public.jsonb_redact_contact('{"b": "SECRET-42"}') = '{"b": "[gone]"}', '16 single leaf';
+END $$;
+ROLLBACK;
+
+-- 17. Numbers. A key a drop rule names is dropped whatever its value's type (number, string, array, object). A number
+--     under any other key is walked as its text: a 10-digit phone-shaped number becomes the replacement (a contact key
+--     is never skipped), a number under a skipped id key stays, a short number stays a number; the fast path and the
+--     walk agree (the corpus row 19 and these).
+DO $$
+DECLARE v jsonb; rules jsonb;
+BEGIN
+  FOREACH v IN ARRAY ARRAY['7025551234', '"702-555-1234"', '[7025551234]', '{"n": 7025551234}']::jsonb[] LOOP
+    ASSERT public.jsonb_redact_contact(jsonb_build_object('party_type', v, 'k', 1)) = '{"k": 1}',
+      format('17 party_type holding %s is dropped', v);
+    ASSERT public.jsonb_redact_contact(jsonb_build_object('a', jsonb_build_object('Seller_Phone', v), 'k', 1)) = '{"a": {}, "k": 1}',
+      format('17 nested Seller_Phone holding %s is dropped', v);
+  END LOOP;
+  ASSERT public.jsonb_redact_contact('{"phone": 7025551234}') = '{"phone": "[contact through Nuke]"}',
+    format('17 numeric phone under a contact key: %s', public.jsonb_redact_contact('{"phone": 7025551234}'));
+  ASSERT public.jsonb_redact_contact('{"chassis_number": 7025551234, "price": 45000, "miles": 12345678, "timestamp_end": 1700000000}')
+       = '{"chassis_number": 7025551234, "price": 45000, "miles": 12345678, "timestamp_end": 1700000000}',
+    '17 skipped id and epoch keys and short numbers stay numbers';
+  ASSERT public.jsonb_redact_contact('{"x": [1, {"y": 7025550199}]}') = '{"x": [1, {"y": "[contact through Nuke]"}]}',
+    format('17 nested numeric phone: %s', public.jsonb_redact_contact('{"x": [1, {"y": 7025550199}]}'));
+  SELECT jsonb_agg(jsonb_build_object('action', x.action, 'key_regex', x.key_regex, 'pattern', x.pattern,
+           'replacement', x.replacement, 'skip_url_leaves', x.skip_url_leaves, 'skip_key_regex', x.skip_key_regex,
+           'never_skip_key_regex', x.never_skip_key_regex) ORDER BY x.ordinal) INTO rules
+    FROM public.contact_redaction_rules x WHERE x.enabled;
+  FOREACH v IN ARRAY ARRAY['{"phone": 7025551234}', '{"n": 7025550104, "b": true}', '{"price": 45000}',
+                           '{"chassis_number": 7025551234}', '[7025551234, "x"]', '{"timestamp_end": 1700000000}']::jsonb[] LOOP
+    ASSERT public.jsonb_redact_contact(v) = public.jsonb_redact_contact_leaves(v, rules), format('17 fast = walk on %s', v);
+  END LOOP;
+END $$;
 
 SELECT 'PASS: the public projection redacts origin_metadata leaf by leaf with contact rule rows' AS result;
