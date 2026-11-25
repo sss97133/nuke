@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { claimStageWork, claimStageWorkUpTo, FIRST_READS_PER_HOUR, firstReadAllowance, firstReadsSinceQuery, inputFingerprint, queuedFirstReads, queuedFirstReadsQuery, receiptForDeepResult, receiptForKeyedResult, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
+import { claimStageWork, claimStageWorkUpTo, FIRST_READS_PER_HOUR, firstReadAllowance, firstReadsSinceQuery, inputFingerprint, ownerFromStageConfig, queuedFirstReads, queuedFirstReadsQuery, receiptForDeepResult, receiptForKeyedResult, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
 
 const ctx = { reader: 'claude-cli claude-sonnet-5-5 subscription', promptVersion: 'v98' };
 
@@ -292,4 +292,15 @@ test('keyed values: the number written, or the projection\'s own reason', () => 
     assert.ok(!('source_observation_id' in receiptForKeyedResult({ projection }, kctx).detail), JSON.stringify(projection));
   }
   assert.ok(!('source_observation_id' in receiptForKeyedResult({ error: 'boom' }, kctx).detail));
+});
+
+test('--owner config takes the one owner the reconciler names, and refuses anything else', async () => {
+  const id = '0b9f107a-d124-49de-9ded-94698f63c1c4';
+  const asked = [];
+  const rest = (cfg) => async (q) => { asked.push(q); return cfg === undefined ? [] : [{ config_value: cfg }]; };
+  assert.equal(await ownerFromStageConfig(rest({ enabled: true, user_ids: [id] })), id);
+  assert.match(asked[0], /config_key=eq\.image_stage_reconciler/);
+  for (const cfg of [undefined, { enabled: true }, { user_ids: [] }, { user_ids: [id, id] }, { user_ids: [id.toUpperCase()] }, { user_ids: ['x'] }, { user_ids: [7] }]) {
+    await assert.rejects(ownerFromStageConfig(rest(cfg)), (e) => e.code === 'owner_config' && !e.message.includes(id));
+  }
 });

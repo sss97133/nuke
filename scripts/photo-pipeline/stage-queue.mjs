@@ -36,6 +36,23 @@ export async function stageQueueEnabled(rest, owner) {
 }
 
 /**
+ * The owner whose photos the ledger hands out, read from platform_config image_stage_reconciler.user_ids, for a reader
+ * started without the id (`--owner config`: the scheduled run in .github/workflows/photo-keys.yml, whose repository and
+ * logs are public). Exactly one lowercase uuid, or an Error with code 'owner_config': no list, an empty list or several
+ * owners is a question for a person, not something to pick from.
+ */
+export const OWNER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export async function ownerFromStageConfig(rest) {
+  const rows = await rest('platform_config?select=config_value&config_key=eq.image_stage_reconciler');
+  const ids = (Array.isArray(rows) ? rows[0]?.config_value : null)?.user_ids;
+  const fail = (why) => Object.assign(new Error(`owner from platform_config: ${why}`), { code: 'owner_config' });
+  if (!Array.isArray(ids)) throw fail('image_stage_reconciler has no user_ids list');
+  if (ids.length !== 1) throw fail(`image_stage_reconciler names ${ids.length} owners, not one`);
+  if (typeof ids[0] !== 'string' || !OWNER_UUID.test(ids[0])) throw fail('the one user_id is not a lowercase uuid');
+  return ids[0];
+}
+
+/**
  * The newly landed photos whose first read is waiting right now: queued in the live lane (the photo insert trigger and the
  * reconciler's recent-photo pass put them there) and past any retry pause (not_before). The backfill lane is left out on
  * purpose: older photos keep the pace of the full fires. The timestamp is quoted because PostgREST reads `.` and `:`
