@@ -7,6 +7,11 @@ import XCTest
 @testable import NukeCapture
 
 final class TokenItemsTests: XCTestCase {
+    // The fixtures' clocks are midnight UTC; the days below are the UTC days. The viewer's-zone case is in LaborAppraisalTests.
+    private var zone: TimeZone!
+    override func setUp() { super.setUp(); zone = ProfileClock.timeZone; ProfileClock.timeZone = TimeZone(identifier: "UTC")! }
+    override func tearDown() { ProfileClock.timeZone = zone; super.tearDown() }
+
     private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         try JSONDecoder().decode(T.self, from: Data(json.utf8))
     }
