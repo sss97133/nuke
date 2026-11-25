@@ -6,6 +6,12 @@
 -- vehicle_row_public_projection, get_vehicle_profile_data (sha-asserted by the test that loads this file).
 -- vehicle_image_gallery_eligible is a stub (true): the gallery gate is not under test here and has its own contract.
 -- Schema only; no production row is copied. Load into an empty disposable PG17 database.
+-- guardrail-allow(center-key-fk): vehicles: disposable fixture mirroring the live table, which has no foreign key on these columns
+-- guardrail-allow(center-key-fk): vehicle_images: disposable fixture mirroring the live table, which has no foreign key on these columns
+-- guardrail-allow(center-key-fk): timeline_events: disposable fixture mirroring the live table, which has no foreign key on these columns
+-- guardrail-allow(center-key-fk): work_sessions: disposable fixture mirroring the live table, which has no foreign key on these columns
+-- guardrail-allow(center-key-fk): auction_comments: disposable fixture mirroring the live table, which has no foreign key on these columns
+-- guardrail-allow(center-key-fk): vehicle_observations: disposable fixture mirroring the live table, which has no foreign key on these columns
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
     OR current_setting('server_version_num')::int / 10000 <> 17
