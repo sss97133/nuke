@@ -10,7 +10,7 @@
 @media print {
   @page { size: letter; margin: 14mm 12mm; }
   html, body { background: #fff !important; }
-  .header-wrapper, .app-footer, .mobile-bottom-nav, .vehicle-tab-bar, .vp-print-record, .vp-col-divider,
+  .header-wrapper, .app-footer, .mobile-bottom-nav, .vehicle-tab-bar, .vp-print-record, .vp-labor-status button, .vp-col-divider,
   .vp-receipt-jump, .vp-receipt-filter, .vp-receipt-browse, .vp-receipt-expand, .vp-financial-action, .vp-financial-original,
   [aria-label^="Explore ZIP"] { display: none !important; }
   /* The replacement-cost scenario and the per-system cost-basis cards were never approved as part of the car's record
