@@ -3,7 +3,7 @@
 --   (-v dmig=<path> runs the contract against another body; the mutation runs use it.)
 -- Proves 20261125225500_profile_deleted_redirect.sql: get_vehicle_profile_data answers a non-insider for a deleted merged
 -- car with the redirect only ({"vehicle": {"id", "merged_into_vehicle_id"}}), for a deleted unmerged car exactly as for a
--- missing one (NULL); insiders and the service role read both whole as before; every other answer is byte-identical;
+-- missing one (NULL), and for a stub whose target the caller may not read exactly as missing too; insiders and the service role read both whole as before; every other answer is byte-identical;
 -- vehicle_publicly_readable is the one predicate (same body as 20261125214500's). Builds on the 20261125221500 contract
 -- (which runs 20261125220000's first) and its fixture.
 \set ON_ERROR_STOP on
@@ -15,11 +15,14 @@
 
 -- Fixture rows in an empty disposable PG17 database, never production.
 -- 3333 public and deleted (owner bbbb); 6666 public, deleted, merged into 1111 (a stub; contributor dddd tied);
--- 7777 public, merged into 1111, not deleted; 4444 missing.
+-- 7777 public, merged into 1111, not deleted; 4444 missing; 8888 public, deleted, merged into the private 2222 and
+-- 9999 public, deleted, merged into the deleted 3333 (stubs whose target is not publicly readable).
 INSERT INTO public.vehicles (id, is_public, deleted_at, merged_into_vehicle_id, owner_id, uploaded_by, make, model, year) VALUES
   ('33333333-3333-4333-8333-333333333333', true, now(), null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'Deleted', 1970),
   ('66666666-6666-4666-8666-666666666666', true, now(), '11111111-1111-4111-8111-111111111111', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'Stub', 1969),
-  ('77777777-7777-4777-8777-777777777777', true, null, '11111111-1111-4111-8111-111111111111', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'MergedLive', 1968);
+  ('77777777-7777-4777-8777-777777777777', true, null, '11111111-1111-4111-8111-111111111111', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'MergedLive', 1968),
+  ('88888888-8888-4888-8888-888888888888', true, now(), '22222222-2222-4222-8222-222222222222', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'StubToPrivate', 1967),
+  ('99999999-9999-4999-8999-999999999999', true, now(), '33333333-3333-4333-8333-333333333333', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'StubToDeleted', 1966);
 INSERT INTO public.vehicle_contributors (id, vehicle_id, user_id, status, role) VALUES
   (gen_random_uuid(), '66666666-6666-4666-8666-666666666666', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'active', 'mechanic');
 
@@ -39,7 +42,8 @@ BEGIN
     INSERT INTO public.pd_answers SELECT p_phase, c.caller, v.id, public.get_vehicle_profile_data(v.id)::jsonb
       FROM (VALUES ('11111111-1111-4111-8111-111111111111'::uuid), ('22222222-2222-4222-8222-222222222222'::uuid),
                    ('33333333-3333-4333-8333-333333333333'::uuid), ('44444444-4444-4444-8444-444444444444'::uuid),
-                   ('66666666-6666-4666-8666-666666666666'::uuid), ('77777777-7777-4777-8777-777777777777'::uuid)) v(id);
+                   ('66666666-6666-4666-8666-666666666666'::uuid), ('77777777-7777-4777-8777-777777777777'::uuid),
+                   ('88888888-8888-4888-8888-888888888888'::uuid), ('99999999-9999-4999-8999-999999999999'::uuid)) v(id);
     RESET ROLE;
   END LOOP;
   PERFORM set_config('request.jwt.claims', '', false);
@@ -73,6 +77,14 @@ BEGIN
          = '{"vehicle": {"id": "66666666-6666-4666-8666-666666666666", "merged_into_vehicle_id": "11111111-1111-4111-8111-111111111111"}}',
       format('2 %s reads the stub as a redirect only', k);
   END LOOP;
+  -- 2b. A stub whose target an outsider may not read (private, or deleted and unmerged) answers exactly like a missing
+  --     car: its redirect would name a car the caller cannot open.
+  FOREACH k IN ARRAY ARRAY['anon','stranger','noclaims','author','contributor'] LOOP
+    ASSERT pg_temp.pd('after', k, '88888888-8888-4888-8888-888888888888') IS NULL
+       AND pg_temp.pd('after', k, '99999999-9999-4999-8999-999999999999') IS NULL, format('2b %s: stub to an unreadable car = missing', k);
+  END LOOP;
+  ASSERT pg_temp.pd('after', 'owner', '88888888-8888-4888-8888-888888888888') -> 'vehicle' ->> 'model' = 'StubToPrivate',
+    '2b the owner still reads it whole';
   -- 3. Insiders and the service role read both deleted cars whole, as before.
   FOREACH k IN ARRAY ARRAY['owner','service'] LOOP
     ASSERT pg_temp.pd('after', k, del) = pg_temp.pd('before', k, del) AND pg_temp.pd('after', k, stub) = pg_temp.pd('before', k, stub)
@@ -83,7 +95,9 @@ BEGIN
   -- 4. Everything else is byte-identical: live cars, merged-but-live cars, private cars, missing cars.
   SELECT count(*) INTO n FROM public.pd_answers a JOIN public.pd_answers b USING (caller, vehicle)
    WHERE a.phase = 'after' AND b.phase = 'before' AND a.r IS DISTINCT FROM b.r
-     AND NOT (a.vehicle IN (del, stub) AND a.caller IN ('anon','stranger','noclaims','author'))
+     AND NOT (a.vehicle IN (del, stub, '88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999')
+              AND a.caller IN ('anon','stranger','noclaims','author'))
+     AND NOT (a.vehicle IN ('88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999') AND a.caller = 'contributor')
      AND NOT (a.vehicle = del AND a.caller = 'contributor');
   ASSERT n = 0, format('4 %s other answers changed', n);
   ASSERT pg_temp.pd('after', 'anon', '77777777-7777-4777-8777-777777777777') -> 'vehicle' ->> 'model' = 'MergedLive',
