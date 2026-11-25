@@ -204,3 +204,11 @@ test('an oversized reading drops the stage summaries before it drops the first-r
   const big = readingFromSummary(JSON.stringify({ frames: 20, read: 18, by_type: Object.fromEntries(Array.from({ length: 600 }, (_, i) => [`type_${i}_${'y'.repeat(30)}`, 1])) }));
   assert.deepEqual([big.frames, big.read, big.summary_reduced, 'by_type' in big], [20, 18, true, false]);
 });
+
+test('READER_HOST names where the fire ran, in fixed words only', () => {
+  const summary = '{"frames":2,"read":2}';
+  const at = (host) => buildHeartbeatBody({ name: 'subscription-frame-classifier', summary, elapsedMs: '5', host }).p_reading;
+  assert.equal(at('github_actions').host, 'github_actions');
+  assert.equal('host' in at(undefined), false);
+  for (const bad of ['GitHub', 'a b', 'x'.repeat(25), '', 'run-1']) assert.equal('host' in at(bad), false, bad);
+});

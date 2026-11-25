@@ -53,7 +53,7 @@ export function readingFromSummary(summaryText) {
  * The request body. Throws an Error with code 'bad_call' for an unknown reader, and 'nothing_to_post' when the reader
  * failed (non-zero exit) or printed no JSON object.
  */
-export function buildHeartbeatBody({ name, summary, elapsedMs, readerExit }) {
+export function buildHeartbeatBody({ name, summary, elapsedMs, readerExit, host }) {
   const fail = (code, message) => Object.assign(new Error(message), { code });
   if (!READERS.includes(name)) throw fail('bad_call', 'unknown reader');
   const exit = Number.parseInt(readerExit ?? '0', 10);
@@ -61,6 +61,9 @@ export function buildHeartbeatBody({ name, summary, elapsedMs, readerExit }) {
   const reading = readingFromSummary(summary);
   if (!reading) throw fail('nothing_to_post', 'no JSON summary');
   const elapsed = Number.parseInt(elapsedMs ?? '0', 10);
+  // READER_HOST: where the fire ran (github_actions for .github/workflows/photo-keys.yml; unset on the Mac). The two share
+  // one heartbeat row until record_reader_heartbeat admits a second name; this says which one wrote it. Fixed words only.
+  if (typeof host === 'string' && /^[a-z_]{1,24}$/.test(host)) reading.host = host;
   return { p_jobname: name, p_reading: reading, p_elapsed_ms: Number.isFinite(elapsed) && elapsed > 0 ? elapsed : 0 };
 }
 
@@ -115,7 +118,7 @@ async function main() {
   const name = READERS.includes(process.env.READER_NAME) ? process.env.READER_NAME : 'unknown-reader';
   let body;
   try {
-    body = buildHeartbeatBody({ name: process.env.READER_NAME, summary: process.env.READER_SUMMARY, elapsedMs: process.env.READER_ELAPSED_MS, readerExit: process.env.READER_EXIT });
+    body = buildHeartbeatBody({ name: process.env.READER_NAME, summary: process.env.READER_SUMMARY, elapsedMs: process.env.READER_ELAPSED_MS, readerExit: process.env.READER_EXIT, host: process.env.READER_HOST });
   } catch (e) {
     if (e.code === 'nothing_to_post') { console.log(`heartbeat ${name} not posted: ${e.message}`); return 3; }
     console.log(`heartbeat: ${e.message}`);

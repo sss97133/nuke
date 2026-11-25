@@ -18,7 +18,7 @@
 //   keyed_values   (--keyed-limit, default 60)  the sanctioned projection of that photo's current reading; no model call
 // A stage the database does not hold yet claims nothing: a quiet no-op. Every model call starts lean (leanClaudeArgs).
 //
-//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid> [--probe] [--limit N] [--concurrency 2] [--model claude-sonnet-5-5] [--status failed,pending] [--source auto|stage-queue|status] [--deep-limit 20] [--keyed-limit 60] [--dry-run] [--out receipt.json]
+//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid|config> [--probe] [--limit N] [--concurrency 2] [--model claude-sonnet-5-5] [--status failed,pending] [--source auto|stage-queue|status] [--deep-limit 20] [--keyed-limit 60] [--dry-run] [--out receipt.json]
 //   ... --stage-dry-run --image-ids <uuid,uuid> [--stages deep_reading,keyed_values]   reads those photos twice and prints, per photo, validity, seconds, tokens, the agreement
 //                                                 and the exact envelope it would post, plus the keyed projection as a dry run; claims and writes nothing
 import { execFile, spawn } from 'node:child_process';
@@ -29,7 +29,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, firstReadAllowance, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
+import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, firstReadAllowance, inputFingerprint, ownerFromStageConfig, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
 import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, REFUSAL_STREAK_STOP, admitsFrom, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, projectionAnswer, subscriptionEnv, refusalStreak } from './deep-stage.mjs';
 const run = promisify(execFile);
 
@@ -38,7 +38,6 @@ const URL_ = process.env.SUPABASE_URL, KEY = process.env.SUPABASE_SERVICE_ROLE_K
 if (!URL_ || !KEY) { console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required (run under dotenvx)'); process.exit(2); }
 if (!args.owner || args.owner === true) { console.error('--owner <uuid> is required'); process.exit(2); }
 if (process.env.ANTHROPIC_API_KEY) { console.error('refusing: ANTHROPIC_API_KEY is set; this reader runs on the subscription login only'); process.exit(2); }
-const OWNER = args.owner;
 const limit = args.limit && args.limit !== true ? Number(args.limit) : 200;
 const conc = args.concurrency && args.concurrency !== true ? Number(args.concurrency) : 2;
 const model = args.model && args.model !== true ? String(args.model) : DEFAULT_MODEL;
@@ -60,6 +59,13 @@ async function rpc(name, body) {
   const r = await fetch(`${URL_}/rest/v1/rpc/${name}`, { method: 'POST', headers: H, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`${name}: ${r.status} ${(await r.text()).slice(0, 200)}`);
   return r.json();
+}
+// --owner config: the one owner platform_config image_stage_reconciler.user_ids names (stage-queue.mjs ownerFromStageConfig),
+// for a run whose command line and log are public (.github/workflows/photo-keys.yml); --owner <uuid> is unchanged.
+let OWNER = args.owner;
+if (OWNER === 'config') {
+  try { OWNER = await ownerFromStageConfig(rest); }
+  catch (e) { console.error(e.code === 'owner_config' ? e.message : 'owner from platform_config: the config could not be read'); process.exit(2); }
 }
 async function orchestrator(body, timeoutMs = 0) {
   const r = await fetch(`${URL_}/functions/v1/photo-pipeline-orchestrator`, { method: 'POST', headers: H, body: JSON.stringify(body), ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}) });
