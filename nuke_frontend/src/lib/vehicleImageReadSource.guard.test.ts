@@ -73,3 +73,13 @@ describe('ai_scan_metadata reads go through vehicle_images_public', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('the scan document costs a call per row', () => {
+  it('the without-scan column list is the public list minus ai_scan_metadata only', async () => {
+    const { VEHICLE_IMAGE_PUBLIC_COLUMNS, VEHICLE_IMAGE_COLUMNS_WITHOUT_SCAN } = await import('./vehicleImageColumns');
+    const all = VEHICLE_IMAGE_PUBLIC_COLUMNS.split(', ');
+    const without = VEHICLE_IMAGE_COLUMNS_WITHOUT_SCAN.split(', ');
+    expect(without).not.toContain('ai_scan_metadata');
+    expect(all.filter(c => !without.includes(c))).toEqual(['ai_scan_metadata']);
+  });
+});
