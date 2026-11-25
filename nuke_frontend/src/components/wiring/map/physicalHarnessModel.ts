@@ -35,7 +35,7 @@ export function readPhysicalHarnessModel(value: unknown, vehicleId: string): Phy
 }
 
 export interface SchematicEnd {
-  id: string; nodeKey: string; endpointId: string; code: string; cavity: string | null; rawCavity: string | null;
+  id: string; nodeKey: string; isBus: boolean; endpointId: string; code: string; cavity: string | null; rawCavity: string | null;
 }
 export interface SchematicPiece {
   id: string; code: string; circuit: PhysicalCircuit; segment: PhysicalSegment;
@@ -56,7 +56,7 @@ export function physicalSchematicPieces(model: PhysicalHarnessModel, section: st
     const pin = t.cavity_layout_id ?? (t.cavity && !/^(stud|lug|[-+]?\s*post)/i.test(t.cavity) ? t.cavity : null);
     const shared = segment.link_state !== 'stale' && nets.has(segment.net_id)
       && (e.node_kind === 'bus' || (e.node_kind === 'terminals' && pin != null));
-    return { id: t.id, endpointId: e.id, code: e.code, cavity: cavOf(t.cavity), rawCavity: t.cavity,
+    return { id: t.id, isBus: shared && e.node_kind === 'bus', endpointId: e.id, code: e.code, cavity: cavOf(t.cavity), rawCavity: t.cavity,
       nodeKey: shared ? JSON.stringify([e.id, segment.net_id, e.node_kind === 'bus' ? 'bus' : pin]) : t.id };
   };
   const pieces: SchematicPiece[] = [];

@@ -10,7 +10,7 @@ import { publicName } from './useWorkspaceSelection';
 import { physicalSchematicPieces, physicalPieceLabel, type SchematicPiece } from './physicalHarnessModel';
 import { usePhysicalHarnessModel } from './usePhysicalHarnessModel';
 
-interface Row { key: string; code: string; cav: string; wires: string[]; terminationIds: string[]; y: number; dev: string }
+interface Row { key: string; isBus: boolean; code: string; cav: string; wires: string[]; terminationIds: string[]; y: number; dev: string }
 interface Place { col: number; x: number; y: number; w: number; h: number; rows: Row[] }
 const PASS = /^(FIREWALL-|SPL-|RAIL-)|PASS/;
 const ROW = 17, HDR = 34, GAP = 22, BW = [236, 168, 236], LANE = 6;
@@ -22,7 +22,7 @@ function layout(pieces: SchematicPiece[]) {
     if (!h) return;
     const dev = h.endpointId, k = h.nodeKey;
     const m = rows.get(dev) ?? new Map<string, Row>(); rows.set(dev, m);
-    const r = m.get(k) ?? { key: k, code: h.code, cav: h.cavity ?? '', wires: [], terminationIds: [], y: 0, dev }; m.set(k, r);
+    const r = m.get(k) ?? { key: k, isBus: h.isBus, code: h.code, cav: h.cavity ?? '', wires: [], terminationIds: [], y: 0, dev }; m.set(k, r);
     if (!r.wires.includes(p.code)) r.wires.push(p.code);
     if (!r.terminationIds.includes(h.id)) r.terminationIds.push(h.id);
     if (!PASS.test(h.code)) score.set(dev, (score.get(dev) ?? 0) + (i === 0 ? 1 : -1));
@@ -130,7 +130,7 @@ export function SchematicBlock({ cw, vehicleId, section, sel, rel, isOwner, onSe
       {selected.length > 0 && <ul aria-label="Selected wire pieces">{selected.map(p => <li key={p.id}>{physicalPieceLabel(p)}</li>)}</ul>}
       {pieces.some(p => !p.from || !p.to) && <ul aria-label="Incomplete wire connections">{pieces.filter(p => !p.from || !p.to).map(p =>
         <li key={p.id}>Wire {p.code}: {!p.from && !p.to ? 'both ends need identification' : 'one end needs identification'}.</li>)}</ul>}
-      <svg width={L.width * z} height={L.height * z} viewBox={`0 0 ${L.width} ${L.height}`} role="img" aria-label="Block diagram of this section's wires">
+      <svg width={L.width * z} height={L.height * z} viewBox={`0 0 ${L.width} ${L.height}`} role="group" aria-label="Block diagram of this section's wires">
         <text x={L.X[0]} y={22} fontFamily={cw.fontBody} fontSize={10} fontWeight={700} fill={cw.inkMuted}>SOURCES AND CONTROLLERS</text>
         {L.cols[1].length > 0 && <text x={L.X[1]} y={22} fontFamily={cw.fontBody} fontSize={10} fontWeight={700} fill={cw.inkMuted}>PASS-THROUGHS AND SPLICES</text>}
         {L.cols[2].length > 0 && <text x={L.X[2]} y={22} fontFamily={cw.fontBody} fontSize={10} fontWeight={700} fill={cw.inkMuted}>LOADS AND SENSORS</text>}
@@ -153,11 +153,11 @@ export function SchematicBlock({ cw, vehicleId, section, sel, rel, isOwner, onSe
                 onClick={() => onSelect('n:' + codes[0])}>{name(dev).slice(0, p.w > 200 ? 34 : 24)}</text>
               <text x={p.x + 7} y={p.y + 26} fontFamily={cw.fontMono} fontSize={9.5} fill={cw.inkMuted}>{codes.join(' ').slice(0, p.w > 200 ? 40 : 28)}</text>
               {p.rows.map(r => {
-                const key = r.code + '|' + r.cav, on = selPin === key, rl = has && r.wires.some(w => rel.wires.has(w));
+                const key = r.code + '|' + r.cav, on = r.isBus ? sel === 'n:' + r.code : selPin === key, rl = has && r.wires.some(w => rel.wires.has(w));
                 return (
-                  <g key={r.key} data-electrical-node={r.key} data-termination-ids={r.terminationIds.join(',')} onClick={() => onSelect('p:' + key)} style={{ cursor: 'pointer' }}>
+                  <g key={r.key} data-electrical-node={r.key} data-termination-ids={r.terminationIds.join(',')} onClick={() => onSelect(r.isBus ? 'n:' + r.code : 'p:' + key)} style={{ cursor: 'pointer' }}>
                     <rect x={p.x + 1} y={r.y - ROW / 2} width={p.w - 2} height={ROW} fill={on ? cw.accent : rl ? `${cw.accent}22` : 'transparent'} />
-                    <text x={p.x + 7} y={r.y + 3.5} fontFamily={cw.fontMono} fontSize={10.5} fill={on ? cw.onAccent : cw.ink}>{(r.cav || '—').slice(0, 9)}</text>
+                    <text x={p.x + 7} y={r.y + 3.5} fontFamily={cw.fontMono} fontSize={10.5} fill={on ? cw.onAccent : cw.ink}>{r.isBus ? 'Bus' : (r.cav || '—').slice(0, 9)}</text>
                     <text x={p.x + 72} y={r.y + 3.5} fontFamily={cw.fontMono} fontSize={10} fill={on ? cw.onAccent : cw.inkMuted}>{r.wires.join(' ').slice(0, p.w > 200 ? 26 : 14)}</text>
                   </g>
                 );

@@ -114,6 +114,17 @@ it('joins shared pins only through the existing endpoint/cavity and current net 
   const pieces = physicalSchematicPieces(model, 'engine', false);
   expect(pieces[0].from?.nodeKey).not.toBe(pieces[2].from?.nodeKey);
 });
+it('represents a recorded bus as a common node without assigning one lug label to every end', async () => {
+  model.endpoints.find(e => e.id === 'ecu')!.node_kind = 'bus';
+  model.circuits.push({ ...model.circuits[0], id: 'c2', code: 'RETURN-2' });
+  model.terminations.push({ id: 't5', circuit_id: 'c2', endpoint_id: 'ecu', cavity: 'stud, different lug', cavity_layout_id: null });
+  model.segments.push({ ...segment('branch', 't5', '', 2), circuit_id: 'c2', to_termination_id: null, link_state: 'incomplete' });
+  await render();
+  const rows = host.querySelectorAll('[data-endpoint-id="ecu"] [data-electrical-node]');
+  expect(rows).toHaveLength(1); expect(rows[0].textContent).toContain('Bus');
+  await act(async () => rows[0].dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(onSelect).toHaveBeenCalledWith('n:M130-B');
+});
 it('rejects wrong-vehicle and incompatible snapshots', () => {
   expect(() => readPhysicalHarnessModel(model, 'another-vehicle')).toThrow();
   expect(() => readPhysicalHarnessModel({ ...model, contract_version: 2 }, vehicleId)).toThrow();
