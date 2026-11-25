@@ -1,6 +1,7 @@
 -- Empty disposable PG17 only:
 --   createdb dm_refinement_msl; psql -X -v ON_ERROR_STOP=1 -d dm_refinement_msl -f this-file.sql
 -- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in the disposable contract database.
+-- guardrail-allow(center-key-fk): vehicle_events.merged_from_vehicle_id: mirrors production, which has no foreign key on this column (pg_constraint read 2026-11-26: vehicle_events_vehicle_id_fkey only)
 -- Proves 20261126080000_market_source_landing_readable_cars.sql against the live definition (20261021004000, whose body
 -- hashes to the live prosrc, 2026-11-25), called as anon:
 --   before: the dealer-organization fallback lists a private car's link with its VIN and the link's price, and the event
