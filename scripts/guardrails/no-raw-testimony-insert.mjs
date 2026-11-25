@@ -317,7 +317,7 @@ export const CHANGE_TESTIMONY_TABLES = [
 // AGENTS.md "Row writes" (2026-11-24), by function name. ingest-observation is an edge function and writes through
 // ingest_observation*; the supersession functions are the ones db-safety.md names. The test checks that every name
 // here still appears in AGENTS.md or db-safety.md, so the list cannot drift from the rule silently. decide_evidence is
-// not listed: 20261126071500 took it out of evidence_writer_names() until the owner-confirmation loop ships, and the
+// not listed: 20261126074500 took it out of evidence_writer_names() until the owner-confirmation loop ships, and the
 // migration that brings it back adds it here too.
 export const SANCTIONED_WRITERS = [
   "correct_vehicle_sale_provenance_batch", "correct_vehicle_event_attribution",

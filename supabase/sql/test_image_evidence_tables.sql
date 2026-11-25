@@ -24,7 +24,7 @@
 --   * the channel rules on a writer's name: an owner session writes only through decide_evidence; a human: decision
 --     needs role authenticated, the caller's own uid and an aal2 session, and is stamped with aal, amr, session_id,
 --     api_role and outer_writer; a writer without its token is refused;
---   * 20261126071500 (applied after M1a, as live): no agent records an owner decision. decide_evidence is not a writer
+--   * 20261126074500 (applied after M1a, as live): no agent records an owner decision. decide_evidence is not a writer
 --     name, so a function of that name created here cannot write as service_role or as the owner; an 'agent:'
 --     decision is refused from every role and every writer, also once a later migration lists decide_evidence again
 --     (simulated below). The migration refuses a drifted body, re-applies as a no-op, and its revert file restores
@@ -146,14 +146,14 @@ SET SESSION AUTHORIZATION dm_contract_evidence_owner;
 \ir ../migrations/20261021220000_image_evidence_tables.sql
 SELECT md5(prosrc) AS m1a_guard_md5 FROM pg_proc WHERE oid = 'public.evidence_insert_guard()'::regprocedure \gset
 SELECT md5(prosrc) AS m1a_names_md5 FROM pg_proc WHERE oid = 'public.evidence_writer_names()'::regprocedure \gset
-\ir ../migrations/20261126071500_evidence_guard_refuse_agent_decisions.sql
+\ir ../migrations/20261126074500_evidence_guard_refuse_agent_decisions.sql
 RESET SESSION AUTHORIZATION;
 SELECT t_assert(:'m1a_guard_md5' = '8d9b6e3a8bcbf640c83d720287d69276' AND :'m1a_names_md5' = 'f58bf0e4845ea6eb8e8d5e13773ceca1',
   'the M1a bodies here are the live ones (md5 of evidence_insert_guard and evidence_writer_names, 2026-11-25)');
 SELECT t_assert((SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.evidence_insert_guard()'::regprocedure) = '32d257037fcd12703ee4cdd0903e6aca'
   AND (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.evidence_writer_names()'::regprocedure) = 'dbc8779323dd88c31f1e28fca2a377a2'
   AND NOT ('decide_evidence' = ANY (public.evidence_writer_names())) AND cardinality(public.evidence_writer_names()) = 17,
-  '20261126071500: both bodies replaced; the writer names are the other 17, without decide_evidence');
+  '20261126074500: both bodies replaced; the writer names are the other 17, without decide_evidence');
 SELECT pg_get_functiondef('public.evidence_writer_names()'::regprocedure) AS f0_names_def \gset
 
 \set nine '{evidence_runs,image_vehicle_candidates,image_capture_time_claims,evidence_links,evidence_account_entities,vehicle_change_claims,vehicle_change_claim_support,user_day_vehicle_context,evidence_decisions}'
@@ -266,7 +266,7 @@ BEGIN
   RETURN jsonb_build_object('run', v_run, 'candidate', v_cand, 'time_claim', v_time, 'link', v_link, 'entity', v_ent,
     'claim', v_claim, 'support', v_sup, 'day', v_day, 'decision', v_dec);
 END $$;
--- One confirm of an image candidate on the caller's behalf, named by decided_by. 20261126071500 removed decide_evidence
+-- One confirm of an image candidate on the caller's behalf, named by decided_by. 20261126074500 removed decide_evidence
 -- from the writer names, so this is the lead's contract case: a function of that name, created here, as a later
 -- migration could. An 'agent:' row carries every field ed_agent_traceable asks for, so only the guard can refuse it.
 CREATE FUNCTION public.decide_evidence(p_user uuid, p_target uuid, p_decided_by text, p_review_method text) RETURNS uuid
@@ -584,7 +584,7 @@ SELECT public.decide_evidence(:'u1', :'cand_u1', 'human:' || :'u1', 'owner_app')
 SELECT t_refused('job: a service_role session cannot write a human: decision (decide_evidence is not a writer)', :'SQLSTATE',
   :'LAST_ERROR_MESSAGE', '42501',
   'evidence_decisions: the outermost caller is not an evidence writer (PL/pgSQL function decide_evidence(uuid,uuid,text,text) line % at SQL statement)');
--- The lead's contract case (20261126071500): a function named decide_evidence cannot write an agent: decision as
+-- The lead's contract case (20261126074500): a function named decide_evidence cannot write an agent: decision as
 -- service_role. Before it, this was the one path the guard admitted.
 \set ON_ERROR_STOP off
 SELECT public.decide_evidence(:'u1', :'cand_u1', 'agent:contract-session', 'owner_chat_review');
@@ -601,7 +601,7 @@ SELECT t_refused('job: a listed writer cannot write an agent: decision as servic
 SELECT t_assert(t_rows() = :'rows_seeded', 'no refused statement changed a row');
 
 -- 8. The owner's own session (PostgREST, role authenticated): the channel rules the guard enforces on a writer's name.
--- 8a. As migrated (20261126071500): decide_evidence is not a writer name, so the owner session writes nothing.
+-- 8a. As migrated (20261126074500): decide_evidence is not a writer name, so the owner session writes nothing.
 :OWNER
 SET request.jwt.claims = :'u1_aal2';
 \set ON_ERROR_STOP off
@@ -671,7 +671,7 @@ SELECT t_assert((SELECT user_id = :'u1' AND decided_by = 'human:' || :'u1'
   AND (SELECT count(*) FROM evidence_decisions WHERE decided_by LIKE 'agent:%') = 0,
   'owner session at aal2: the human: decision is written and stamped with aal, amr, session_id, api_role and outer_writer; it is the only human: row; no agent: row exists');
 
--- 8c. 20261126071500 itself: it refuses a drifted body and changes nothing, re-applies as a no-op, and its revert file
+-- 8c. 20261126074500 itself: it refuses a drifted body and changes nothing, re-applies as a no-op, and its revert file
 -- restores the M1a bodies byte for byte. Applied as the owner, as the deploy applies it live. The relisted writer
 -- names from 8b are a body the migration does not know (neither M1a's nor its own).
 SELECT md5(prosrc) AS drifted_names_md5 FROM pg_proc WHERE oid = 'public.evidence_writer_names()'::regprocedure \gset
@@ -679,7 +679,7 @@ SET SESSION AUTHORIZATION dm_contract_evidence_owner;
 \set LAST_ERROR_SQLSTATE none
 \echo 'Expected next: the migration raises "evidence_writer_names body drifted" and the rest of its transaction is skipped.'
 \set ON_ERROR_STOP off
-\ir ../migrations/20261126071500_evidence_guard_refuse_agent_decisions.sql
+\ir ../migrations/20261126074500_evidence_guard_refuse_agent_decisions.sql
 \set ON_ERROR_STOP on
 RESET SESSION AUTHORIZATION;
 SELECT t_assert(:'LAST_ERROR_SQLSTATE' = '25P02'
@@ -688,14 +688,14 @@ SELECT t_assert(:'LAST_ERROR_SQLSTATE' = '25P02'
   'over a drifted evidence_writer_names body the migration raises and changes neither function');
 SELECT :'f0_names_def' \gexec
 SET SESSION AUTHORIZATION dm_contract_evidence_owner;
-\ir ../migrations/20261126071500_evidence_guard_refuse_agent_decisions.sql
-\ir revert_20261126071500_evidence_guard_refuse_agent_decisions.sql
+\ir ../migrations/20261126074500_evidence_guard_refuse_agent_decisions.sql
+\ir revert_20261126074500_evidence_guard_refuse_agent_decisions.sql
 RESET SESSION AUTHORIZATION;
 SELECT t_assert((SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.evidence_insert_guard()'::regprocedure) = :'m1a_guard_md5'
   AND (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.evidence_writer_names()'::regprocedure) = :'m1a_names_md5',
   'the migration re-applies over itself; the revert file then restores both M1a bodies (live md5s)');
 SET SESSION AUTHORIZATION dm_contract_evidence_owner;
-\ir ../migrations/20261126071500_evidence_guard_refuse_agent_decisions.sql
+\ir ../migrations/20261126074500_evidence_guard_refuse_agent_decisions.sql
 RESET SESSION AUTHORIZATION;
 SELECT t_assert((SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.evidence_insert_guard()'::regprocedure) = '32d257037fcd12703ee4cdd0903e6aca'
   AND (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.evidence_writer_names()'::regprocedure) = 'dbc8779323dd88c31f1e28fca2a377a2'
@@ -704,7 +704,7 @@ SELECT t_assert((SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.evidence_in
   AND NOT has_function_privilege('service_role', 'public.evidence_insert_guard()', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.evidence_writer_names()', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.evidence_writer_names()', 'EXECUTE'),
-  'applied again after the revert: the 20261126071500 bodies, same owner, search_path and grants');
+  'applied again after the revert: the 20261126074500 bodies, same owner, search_path and grants');
 
 -- 9. Atomic apply: over a conflicting public.evidence_decisions in a second database, the migration fails and leaves
 -- nothing behind. The second database is dropped before its result is asserted.

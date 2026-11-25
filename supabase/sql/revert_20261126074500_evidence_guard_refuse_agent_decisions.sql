@@ -1,8 +1,8 @@
--- Revert of supabase/migrations/20261126071500_evidence_guard_refuse_agent_decisions.sql: restores the
+-- Revert of supabase/migrations/20261126074500_evidence_guard_refuse_agent_decisions.sql: restores the
 -- 20261021220000 bodies of evidence_insert_guard() and evidence_writer_names() byte for byte, which reopens the latent
 -- path (an 'agent:' decision from a service-role caller whose outermost frame is named decide_evidence). Ship it only
 -- as a reviewed migration (copy it under supabase/migrations with a new version); never apply it by hand.
--- Guard: each body must be the 20261126071500 body or already the 20261021220000 one; the end md5s are asserted.
+-- Guard: each body must be the 20261126074500 body or already the 20261021220000 one; the end md5s are asserted.
 --   evidence_insert_guard  32d257037fcd12703ee4cdd0903e6aca -> 8d9b6e3a8bcbf640c83d720287d69276
 --   evidence_writer_names  dbc8779323dd88c31f1e28fca2a377a2 -> f58bf0e4845ea6eb8e8d5e13773ceca1
 BEGIN;

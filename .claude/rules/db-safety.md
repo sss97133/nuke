@@ -61,7 +61,7 @@ Testimony is the rows that record what was observed, by whom, from what source a
   (`owner_delegated_sign_register`): no Sign an agent makes on his behalf records one, because `decide_evidence` reads
   the auth server's own session and factor records (an aal2 session stepped up with his verified second factor, enrolled
   at least 7 days earlier, within the last 15 minutes), which a delegated Sign does not satisfy.
-- Where that is enforced: in the tables' guard. Since `20261126071500` the insert guard refuses every `agent:`
+- Where that is enforced: in the tables' guard. Since `20261126074500` the insert guard refuses every `agent:`
   decision, from every role and every writer, and `evidence_writer_names()` no longer lists `decide_evidence`, so no
   function of that name can write the store (contract: `supabase/sql/test_image_evidence_tables.sql`). That closed the
   latent path the `20261021220000` guard left: an `agent:` decision from a service-role caller whose outermost frame

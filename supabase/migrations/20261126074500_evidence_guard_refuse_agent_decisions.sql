@@ -17,7 +17,7 @@
 -- no-op); anything else raises and changes nothing. The after-md5s are asserted at the end.
 --   evidence_insert_guard  8d9b6e3a8bcbf640c83d720287d69276 -> 32d257037fcd12703ee4cdd0903e6aca
 --   evidence_writer_names  f58bf0e4845ea6eb8e8d5e13773ceca1 -> dbc8779323dd88c31f1e28fca2a377a2
--- Revert: supabase/sql/revert_20261126071500_evidence_guard_refuse_agent_decisions.sql.
+-- Revert: supabase/sql/revert_20261126074500_evidence_guard_refuse_agent_decisions.sql.
 -- Contract: supabase/sql/test_image_evidence_tables.sql applies 20261021220000 and then this file.
 BEGIN;
 SET LOCAL statement_timeout = '30s';
