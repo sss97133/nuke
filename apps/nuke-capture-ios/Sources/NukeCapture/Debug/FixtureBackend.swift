@@ -97,6 +97,8 @@ enum FixtureBackend {
         "profile_vehicle_relationships_read_v1", "profile_labor_read_v1", "profile_money_read_v1",
         // A vehicle's log book (20261120100000_vehicle_bound_statements.sql): a STABLE reader.
         "vehicle_statements",
+        // The labor appraisal by segment (VehicleLaborAppraisalSection): a STABLE reader.
+        "vehicle_labor_appraisal",
     ]
 
     /// Explore's anonymous market reads. Explore is the default tab, so they run in every launch that
@@ -237,6 +239,7 @@ enum FixtureBackend {
             return ok(GarageCardFixtures.profileRead(args["p_vehicle_id"] as? String ?? ""))
         case "vehicle_statements" where scenario == "garage-cards": return ok(GarageCardFixtures.statements)
         case "vehicle_statements": return ok("null")
+        case "vehicle_labor_appraisal": return ok("null")
         case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             {"vehicle_id":"\(navigationVehicleId)","viewer":"\((scenario.hasPrefix("receipt-") || scenario.hasPrefix("financial-")) ? "owner" : "anon")","read_at":"2026-10-31T12:00:00Z",
