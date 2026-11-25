@@ -1,4 +1,4 @@
--- Contract: 20261126001000 private_row_watch_missing_age_v1, on the reader-probe fixture with the policy-copy table
+-- Contract: 20261126013700 private_row_watch_missing_age_v1, on the reader-probe fixture with the policy-copy table
 -- (20261125204500) and the budget watch (20261125235500). A probe or copy reading missing for less than
 -- missing_after_hours is silent; past it the watch fails naming it; a present probe however old is never listed; the
 -- config row moves the age; the watch is replaced only over the budget watch's body. Synthetic rows only.
@@ -7,8 +7,8 @@ CREATE TABLE public.platform_config (id uuid PRIMARY KEY DEFAULT gen_random_uuid
   config_value jsonb NOT NULL, description text, updated_at timestamptz DEFAULT now(), updated_by uuid);
 \ir ../migrations/20261125204500_private_row_policy_copy_drift.sql
 \ir ../migrations/20261125235500_private_row_watch_budget.sql
-\ir ../migrations/20261126001000_private_row_watch_missing_age.sql
-\ir ../migrations/20261126001000_private_row_watch_missing_age.sql
+\ir ../migrations/20261126013700_private_row_watch_missing_age.sql
+\ir ../migrations/20261126013700_private_row_watch_missing_age.sql
 
 -- the fixture's tables carry other policies than production, so every copy but the reader-less one reads drifted:
 -- leave only that one active, and the watch raises only for the age rule
@@ -69,7 +69,7 @@ END $$;
 -- the replacement refuses a body it does not know
 CREATE OR REPLACE FUNCTION public.private_row_exposure_watch() RETURNS jsonb LANGUAGE sql AS $f$ SELECT '{}'::jsonb $f$;
 \set ON_ERROR_STOP off
-\ir ../migrations/20261126001000_private_row_watch_missing_age.sql
+\ir ../migrations/20261126013700_private_row_watch_missing_age.sql
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF (SELECT prosrc FROM pg_proc WHERE oid = 'public.private_row_exposure_watch()'::regprocedure) NOT LIKE '%SELECT ''{}''::jsonb%' THEN

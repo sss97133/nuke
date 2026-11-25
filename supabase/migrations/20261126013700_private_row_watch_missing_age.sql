@@ -32,7 +32,7 @@ END $o$;
 
 UPDATE public.platform_config
    SET config_value = config_value || '{"missing_after_hours": 72}'::jsonb,
-       description = coalesce(description, '') || ' missing_after_hours (20261126001000): an active probe or policy copy reading missing longer than this fails the watch by name; 72 h = three days for a reader registered ahead of its PR to deploy.',
+       description = coalesce(description, '') || ' missing_after_hours (20261126013700): an active probe or policy copy reading missing longer than this fails the watch by name; 72 h = three days for a reader registered ahead of its PR to deploy.',
        updated_at = now()
  WHERE config_key = 'private_row_watch' AND NOT config_value ? 'missing_after_hours';
 
