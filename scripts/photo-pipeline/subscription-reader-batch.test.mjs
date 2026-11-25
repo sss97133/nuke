@@ -45,6 +45,7 @@ case "$script" in
     stopped=null; [ -n "\${FAKE_STOPPED:-}" ] && stopped="\\"$FAKE_STOPPED\\""
     echo "{\\"cli\\":\\"lean\\",\\"frames\\":$frames,\\"source\\":\\"stage-queue\\",\\"read\\":$frames,\\"accepted\\":$frames,\\"classifier_rejected\\":0,\\"errors\\":0,\\"error_classes\\":{},\\"receipts\\":$frames,\\"receipt_errors\\":0,\\"stopped\\":$stopped,\\"by_type\\":{},\\"read_seconds\\":1,\\"stages\\":{\\"deep_reading\\":{\\"claimed\\":\${FAKE_DEEP:-0},\\"stopped\\":null}}}" ;;
   subscription-document-reader.mjs)
+    [ -n "\${FAKE_DOC_HANG:-}" ] && exec sleep 30
     out="$(arg --out "$@")"; [ -n "$out" ] && echo '{}' > "$out"
     echo "{\\"frames\\":0,\\"read\\":0,\\"page\\":0,\\"landed\\":0,\\"waiting_no_vehicle\\":0,\\"vehicle_document\\":0,\\"errors\\":0,\\"error_classes\\":{},\\"receipts\\":0,\\"receipt_errors\\":0,\\"stopped\\":null,\\"by_type\\":{},\\"read_seconds\\":0,\\"to_land\\":\${FAKE_RELANDED:-0},\\"relanded\\":\${FAKE_RELANDED:-0},\\"reland_vehicle_document\\":0,\\"reland_errors\\":0}" ;;
   fact-doubt-cycle.mjs) echo '{"cli":"fact-doubt-cycle","raised":0,"answered":0,"errors":0}' ;;
@@ -197,5 +198,16 @@ test('a fire keeps its receipt file whenever its summary counts any work', async
     const r = await fire({ FAKE_RELANDED: '3' });
     assert.equal(r.receipts.length, 1, 'a document fire that read no new page but landed three again');
     assert.match(r.receipts[0], /^subscription-document-reader-/);
+  });
+});
+
+test('a reader that never exits is ended at the wall-clock limit, and the fire goes on to the next reader', async () => {
+  await withHome(async ({ fire }) => {
+    const t0 = Date.now();
+    const r = await fire({ FAKE_DOC_HANG: '1', NUKE_READER_MAX_SECONDS: '1' });
+    assert.equal(r.code, 0);
+    assert.ok(Date.now() - t0 < 15000, 'the fire did not wait for the hung reader');
+    assert.match(r.stdout, /subscription-document-reader ended after 1s \(NUKE_READER_MAX_SECONDS\); exit=142/);
+    assert.deepEqual(r.scripts, FULL, 'frames, doubts and receipts still run after it');
   });
 });

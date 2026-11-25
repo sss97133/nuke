@@ -36,6 +36,11 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then echo "refusing: ANTHROPIC_API_KEY set in the launchd environment"; exit 2; fi
 FULL_EVERY="${NUKE_READER_FULL_EVERY:-570}"; FAST_ROUNDS="${NUKE_READER_FAST_ROUNDS:-6}"
+# READER_MAX_SECONDS: the wall clock one reader may run before it is ended (SIGALRM, exit 142). On 2026-11-24 the
+# document reader found 0 frames at 18:28 PT and then never exited (no socket, no child, no receipt file); every later
+# fire saw it in pgrep and skipped, so no photo was read for over an hour and the checkout was never refreshed. Measured
+# over the 4 days before: the longest run of any reader was 356 s (fact-doubt-cycle), frame reader p95 145 s.
+READER_MAX_SECONDS="${NUKE_READER_MAX_SECONDS:-1200}"; case "$READER_MAX_SECONDS" in ''|*[!0-9]*|0) READER_MAX_SECONDS=1200;; esac
 FULL_STAMP="$LOGDIR/.subscription-reader-last-full"; FAST_HOLD="$LOGDIR/.subscription-reader-fast-hold"
 last_full="$(cat "$FULL_STAMP" 2>/dev/null)"; case "$last_full" in ''|*[!0-9]*) last_full=0;; esac
 if [ $(( $(date +%s) - last_full )) -ge "$FULL_EVERY" ]; then MODE=full; else MODE=fast; fi
@@ -64,8 +69,13 @@ run_reader() { # name script args...
   # READER_PATH_FIRST: a directory searched ahead of the rest of PATH for this reader only. On 2026-11-20 /usr/local/bin/claude
   # (2.1.20, no --safe-mode) shadowed ~/.local/bin/claude (2.1.329); the frame reader's lean calls need the newer one, and the
   # reader falls back to its old call when the CLI it finds cannot take them.
-  summary="$(cd "$HOME/nuke" && PATH="${READER_PATH_FIRST:+$READER_PATH_FIRST:}$PATH" dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
+  summary="$(cd "$HOME/nuke" && PATH="${READER_PATH_FIRST:+$READER_PATH_FIRST:}$PATH" dotenvx run -q -f "$ENV_FILE" -- perl -e 'alarm shift; exec @ARGV or exit 127' "$READER_MAX_SECONDS" node "$@" --owner "$OWNER" --out "$out" 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
   local rc=$?
+  # perl sets the alarm and becomes the reader (exec keeps the pid), so the alarm ends the reader itself, not a wrapper
+  # around it. An ended reader posts no heartbeat (non-zero exit), so the 40-minute watch still sees it.
+  if [ $(( $(date +%s) - started_s )) -ge "$READER_MAX_SECONDS" ]; then
+    echo "$STAMP $name ended after ${READER_MAX_SECONDS}s (NUKE_READER_MAX_SECONDS); exit=$rc"
+  fi
   echo "$STAMP $name exit=$rc ${summary:-no summary}"
   # How the fire ended, for the fast fires: the photos it claimed, and whether it ended clean (exit 0, first reads not
   # stopped). Both are read from the start of the summary line, ahead of anything a model wrote; the reader's own test
