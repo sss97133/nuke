@@ -7,7 +7,7 @@ describe('profile fallback transport', () => {
   const target = '00000000-0000-0000-0000-0000000000b2';
   const vin = '1GCEK14K8EJ123456';
   async function load(row: Row | null, emptyRpc = false, options: {
-    address?: string; vinRows?: unknown; vinStatus?: number; vinNetworkError?: boolean;
+    address?: string; vinRows?: unknown; vinStatus?: number; vinNetworkError?: boolean; rpc?: unknown;
   } = {}) {
     const requests: URL[] = [];
     const bodies: unknown[] = [];
@@ -23,6 +23,7 @@ describe('profile fallback transport', () => {
         return json(options.vinRows === undefined ? [] : options.vinRows, options.vinStatus ?? 200);
       }
       if (url.pathname === '/rest/v1/rpc/get_vehicle_profile_data') {
+        if (options.rpc !== undefined) return json(options.rpc);
         return emptyRpc ? json({ vehicle: null }) : json({ code: '57014', message: 'statement timeout' }, 500);
       }
       if (url.pathname === '/rest/v1/vehicles') {
@@ -61,6 +62,13 @@ describe('profile fallback transport', () => {
     ]);
     expect(out.requests[1].searchParams.get('id')).toBe(`eq.${id}`);
     expect(out.setLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  it('routes the profile reader\'s two-key merge answer for a deleted stub (20261125225500)', async () => {
+    const out = await load(null, false, { rpc: { vehicle: { id, merged_into_vehicle_id: target } } });
+    expect(out.navigate).toHaveBeenCalledWith(`/vehicle/${target}`, { replace: true });
+    expect(out.setVehicle).not.toHaveBeenCalled();
+    expect(out.requests.map(url => url.pathname)).toEqual(['/rest/v1/rpc/get_vehicle_profile_data']);
   });
 
   it('routes a merged fallback record to its target before displaying the stub', async () => {
