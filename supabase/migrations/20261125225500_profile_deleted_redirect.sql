@@ -43,8 +43,9 @@ COMMENT ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid)
   'The public-row predicate for vehicles: public, and not deleted unless it was merged (a merged stub stays readable as '
   'a redirect only). Called by vehicle_row_read, get_vehicle_profile_data and the vehicles read policy. Inlinable: keep it '
   'plain SQL with no SET clause and no table read.';
-REVOKE ALL ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) TO anon, authenticated, service_role;
+-- EXECUTE to PUBLIC, never revoked: 20261125225000 puts this predicate in the vehicles read policies (TO public), and a
+-- role that reads vehicles under RLS without EXECUTE (pg_read_all_data members) would fail there. It reads no data.
+GRANT EXECUTE ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) TO PUBLIC, anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.get_vehicle_profile_data(p_vehicle_id uuid)
  RETURNS json

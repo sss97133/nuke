@@ -109,6 +109,8 @@ DO $$ BEGIN
   ASSERT (SELECT encode(sha256(convert_to(prosrc, 'UTF8')), 'hex') FROM pg_proc
           WHERE oid = 'public.vehicle_publicly_readable(boolean,timestamptz,uuid)'::regprocedure)
        = '9fba27fc97f7e966763ee5f5e1c92d06dea5dda20aa720e1faaab63de31e8bd3', '5 same predicate body as vehicle_row_read''s migration';
+  ASSERT has_function_privilege('pg_read_all_data', 'public.vehicle_publicly_readable(boolean,timestamptz,uuid)', 'EXECUTE'),
+    '5 EXECUTE stays with PUBLIC (the vehicles policies of 20261125225000 call it for every role)';
   ASSERT position('vehicle_publicly_readable(v.is_public, v.deleted_at, v.merged_into_vehicle_id)' in
           (SELECT prosrc FROM pg_proc WHERE oid = 'public.get_vehicle_profile_data(uuid)'::regprocedure)) > 0, '5 the reader calls it';
 END $$;
