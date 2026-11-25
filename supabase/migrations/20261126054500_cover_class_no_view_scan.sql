@@ -15,18 +15,22 @@
 -- Changes:
 --   1. vehicle_image_cover_class(p_image_id uuid) RETURNS integer, SECURITY DEFINER: the same garage_cover_class over the
 --      photo row's own zone, angle (ai_detected_angle, else angle), category and stored reading. It returns only the
---      class (an integer, lower is a better whole-car cover), never the reading. NULL unless the photo is not sensitive
---      and on a public non-deleted car, or the caller uploaded it, or the caller is tied to the car
---      (vehicle_viewer_tied: owner fields, access rows, service_role). Every term is COALESCEd.
+--      class (an integer, lower is a better whole-car cover), never the reading. Its visibility test is the one
+--      vehicle_image_scan_metadata (20261125200000) states: the caller uploaded the photo, or it is not sensitive, on a
+--      public non-deleted car and gallery-eligible (vehicle_image_gallery_eligible over the base row), or the caller is
+--      tied (vehicle_viewer_tied: owner fields, access rows, service_role); otherwise NULL. Every term is COALESCEd.
+--      Registered in private_row_policy_copies (vehicle_images, 3af9ebbc...) as that reader is.
 --   2. get_first_image_batch: an anchored edit replaces the one garage_cover_class(... vi.ai_scan_metadata ...) call with
 --      vehicle_image_cover_class(vi.id). The call sits inside the existing CASE, so it runs only for approved frames no
 --      cheap reading places elsewhere; the ranked query no longer names the view's ai_scan_metadata, so the planner
---      drops that column (and, under #3935, its per-row reader call). The admission step still reads the chosen row
---      through the view (one reader call per row tried, usually one).
+--      drops that column (and, under #3935, its per-row reader call). The admission step's whole-row gallery test
+--      inlines to the columns it reads, so it calls no reader either (PG17 on production's view, overload and the
+--      #3935 migration: 32 reader calls before, 0 after, with the ten best frames failing admission).
 --   Covers are unchanged today: the class is computed from the same stored reading the view returns now. Under #3935
 --   they stay the same for every viewer instead of shifting for logged-out ones.
--- Residual (stated, not closed here): for a photo the gallery hides on a public car, the helper returns its class
--- integer (scene, distance, finish and staging folded into one number); no reading text leaves the function.
+-- Cost (prod, read-only, one public car with 1,542 qualifying frames of 2,746, warm): the class over those frames
+-- 540 ms (the work today's body already does through the view), the gallery test's privacy rule over them 90 ms.
+-- The heaviest public car (12,688 candidates) has 0 qualifying frames, so 0 helper calls.
 -- Contract: supabase/sql/test_cover_class_no_view_scan.sql. Revert: supabase/sql/revert_20261126054500_cover_class_no_view_scan.sql.
 
 BEGIN;
@@ -50,32 +54,43 @@ STABLE SECURITY DEFINER COST 5
 SET search_path TO 'pg_catalog', 'public'
 AS $function$
 DECLARE
-  r record;
+  vi public.vehicle_images;
   v_uid uuid := auth.uid();
 BEGIN
-  -- cover_class_no_view_scan_v1 (20261126054500): the class only, from the photo row's own fields and stored reading
-  SELECT i.vehicle_id, i.user_id, i.is_sensitive, i.vehicle_zone, coalesce(i.ai_detected_angle, i.angle) AS ang,
-         i.image_category, i.ai_scan_metadata -> 'byok_deep_analysis' AS reading, v.is_public, v.deleted_at
-    INTO r
-    FROM public.vehicle_images i
-    JOIN public.vehicles v ON v.id = i.vehicle_id
-   WHERE i.id = p_image_id;
+  -- cover_class_no_view_scan_v1 (20261126054500): the class only, from the photo row's own fields and stored reading,
+  -- behind the visibility test of vehicle_image_scan_metadata (uploader, or shown on a public non-deleted car, or tied)
+  SELECT * INTO vi FROM public.vehicle_images i WHERE i.id = p_image_id;
   IF NOT FOUND THEN
     RETURN NULL;
   END IF;
-  IF NOT (COALESCE(r.is_public = true AND r.deleted_at IS NULL AND COALESCE(r.is_sensitive, false) = false, false)
-          OR COALESCE(v_uid IS NOT NULL AND r.user_id = v_uid, false)
-          OR COALESCE(public.vehicle_viewer_tied(r.vehicle_id), false)) THEN
+  IF NOT (COALESCE(v_uid IS NOT NULL AND vi.user_id = v_uid, false)
+          OR COALESCE(COALESCE(vi.is_sensitive, false) = false
+                      AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vi.vehicle_id AND v.is_public = true AND v.deleted_at IS NULL)
+                      AND public.vehicle_image_gallery_eligible(vi), false)
+          OR COALESCE(public.vehicle_viewer_tied(vi.vehicle_id), false)) THEN
     RETURN NULL;
   END IF;
-  RETURN public.garage_cover_class(r.vehicle_zone, r.ang, r.image_category, r.reading);
+  RETURN public.garage_cover_class(vi.vehicle_zone, coalesce(vi.ai_detected_angle, vi.angle), vi.image_category,
+                                   vi.ai_scan_metadata -> 'byok_deep_analysis');
 END
 $function$;
 
 REVOKE ALL ON FUNCTION public.vehicle_image_cover_class(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_image_cover_class(uuid) TO anon, authenticated, service_role;
 COMMENT ON FUNCTION public.vehicle_image_cover_class(uuid) IS
-  'Whole-car cover class (garage_cover_class) of one photo from its own row; NULL unless shown-eligible on a public car, the caller''s upload, or the caller is tied. Returns no reading text. 20261126054500.';
+  'Whole-car cover class (garage_cover_class) of one photo from its own row; NULL unless the caller uploaded it, it is shown (gallery-eligible, not sensitive) on a public non-deleted car, or the caller is tied. Returns no reading text. 20261126054500.';
+
+DO $reg$
+BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    EXECUTE $i$INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
+      VALUES ('vehicle_image_cover_class(uuid)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')',
+              '3af9ebbc1bebf423e3bd1e0b7c45a194', 'ta-policies',
+              '20261126054500 restates the vehicle_images read policy (shown, uploader, tied) before returning a photo''s cover class')
+      ON CONFLICT (reader, relation, policy_filter) DO NOTHING$i$;
+  END IF;
+END
+$reg$;
 
 -- Anchored edit: exactly one occurrence of the class call over the view's column; an applied body is left alone.
 DO $edit$

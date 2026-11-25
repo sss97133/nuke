@@ -18,6 +18,11 @@ END
 $edit$;
 
 DROP FUNCTION IF EXISTS public.vehicle_image_cover_class(uuid);
+DO $r$ BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    EXECUTE $d$DELETE FROM public.private_row_policy_copies WHERE reader = 'vehicle_image_cover_class(uuid)'$d$;
+  END IF;
+END $r$;
 
 DO $verify$
 BEGIN
