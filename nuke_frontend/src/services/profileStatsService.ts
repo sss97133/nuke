@@ -68,7 +68,7 @@ export interface OrganizationProfileData {
  */
 // The vehicle fields the profile tabs read from an embedded vehicle. A vehicles(*) embed fails since the
 // owner's purchase facts are not granted to readers (lib/privateMoney).
-const PROFILE_VEHICLE_COLUMNS = 'id, year, make, model, trim, vin, is_public, primary_image_url';
+const PROFILE_VEHICLE_COLUMNS = 'id, year, make, model, trim, vin, is_public, primary_image_url, deleted_at, merged_into_vehicle_id';
 
 export async function getUserProfileData(userId: string): Promise<UserProfileData> {
   // Profile + claimed identities are independent — fetch in parallel.
