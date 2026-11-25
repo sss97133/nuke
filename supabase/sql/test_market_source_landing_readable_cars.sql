@@ -22,6 +22,38 @@ $function$;
 REVOKE ALL ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) TO anon, authenticated;
 CREATE TABLE public.organizations (id uuid PRIMARY KEY);
+-- The vehicles read policies verbatim (live 2026-11-25), for the registered copy's hash (vehicle_user_has_access comes
+-- from the shared fixture; the definer reader runs as the table owner, so the policies decide nothing here).
+CREATE POLICY vehicles_private_select ON public.vehicles FOR SELECT USING ((is_public = false) AND (( SELECT auth.uid() AS uid) IS NOT NULL) AND ((( SELECT auth.uid() AS uid) = user_id) OR (( SELECT auth.uid() AS uid) = owner_id) OR (( SELECT auth.uid() AS uid) = uploaded_by) OR vehicle_user_has_access(id, ( SELECT auth.uid() AS uid))));
+CREATE POLICY vehicles_public_select ON public.vehicles FOR SELECT USING ((is_public = true) OR (auth.role() = 'service_role'::text));
+-- private_row_policy_copies and its hash function as live (20261125204500, first_recorded_at from 20261126013700).
+CREATE TABLE public.private_row_policy_copies (
+  reader        text NOT NULL CHECK (reader ~ '^[a-z_][a-z0-9_]*\(([a-z_][a-z0-9_ ]*(\[\])?(, *[a-z_][a-z0-9_ ]*(\[\])?)*)?\)$'),
+  relation      text NOT NULL CHECK (relation ~ '^[a-z_][a-z0-9_]*$'),
+  policy_filter text NOT NULL CHECK (policy_filter <> '' AND position(';' IN policy_filter) = 0),
+  recorded_hash text NOT NULL CHECK (recorded_hash ~ '^[0-9a-f]{32}$'),
+  owner_lane    text NOT NULL,
+  note          text NOT NULL CHECK (note <> ''),
+  recorded_at   timestamptz NOT NULL DEFAULT now(),
+  active        boolean NOT NULL DEFAULT true,
+  first_recorded_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (reader, relation, policy_filter)
+);
+CREATE FUNCTION public.private_row_policy_hash(p_relation text, p_policy_filter text)
+RETURNS TABLE (policy_hash text, policies int) LANGUAGE plpgsql STABLE SET search_path = pg_catalog, public AS $f$
+BEGIN
+  IF p_relation !~ '^[a-z_][a-z0-9_]*$' OR position(';' IN p_policy_filter) > 0 THEN
+    RAISE EXCEPTION 'private_row_policy_hash: bad relation or filter';
+  END IF;
+  RETURN QUERY EXECUTE format(
+    'SELECT md5(string_agg(p.policyname || '':'' || p.permissive || '':'' || p.cmd || '':'' || p.roles::text || '':'' || coalesce(p.qual, ''''),
+                           ''|'' ORDER BY p.policyname)), count(*)::int
+       FROM pg_catalog.pg_policies p WHERE p.schemaname = ''public'' AND p.tablename = %L AND (%s)', p_relation, p_policy_filter);
+END $f$;
+DO $$ BEGIN
+  ASSERT (SELECT h.policy_hash FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')') h)
+         = '7773d11e280e80abad0422000a1ff9cc', 'fixture vehicles read policies hash as live';
+END $$;
 CREATE TABLE public.market_source_days (
   day date NOT NULL,
   source_slug text NOT NULL,
@@ -289,5 +321,27 @@ DO $$ BEGIN
   ASSERT position('market_source_landing_readable_cars_v1' IN (SELECT prosrc FROM pg_proc
            WHERE oid = 'public.market_source_landing_read(text,timestamp with time zone)'::regprocedure)) = 0,
     '4 drifted body refused, not edited';
+END $$;
+-- 5. The copy is registered once, with the live hash; a changed vehicles read policy refuses the registration.
+DO $$ BEGIN
+  ASSERT (SELECT count(*) FROM public.private_row_policy_copies
+           WHERE reader = 'market_source_landing_read(text,timestamp with time zone)' AND relation = 'vehicles'
+             AND recorded_hash = '7773d11e280e80abad0422000a1ff9cc' AND active AND owner_lane = 'ta-provenance') = 1,
+    '5 copy registered';
+  ASSERT to_regprocedure((SELECT reader FROM public.private_row_policy_copies
+                           WHERE reader LIKE 'market_source_landing_read(%')) IS NOT NULL, '5 the reader name resolves';
+END $$;
+DELETE FROM public.private_row_policy_copies WHERE reader LIKE 'market_source_landing_read(%';
+\ir ../migrations/20261021004000_market_source_window_starts_at_first_bar.sql
+ALTER POLICY vehicles_public_select ON public.vehicles USING (true);
+\set ON_ERROR_STOP off
+\ir ../migrations/20261126080000_market_source_landing_readable_cars.sql
+\set ON_ERROR_STOP on
+DO $$ BEGIN
+  ASSERT NOT EXISTS (SELECT 1 FROM public.private_row_policy_copies WHERE reader LIKE 'market_source_landing_read(%'),
+    '5 registration refused on changed policies';
+  ASSERT position('market_source_landing_readable_cars_v1' IN (SELECT prosrc FROM pg_proc
+           WHERE oid = 'public.market_source_landing_read(text,timestamp with time zone)'::regprocedure)) = 0,
+    '5 the whole migration rolled back';
 END $$;
 SELECT 'PASS: market_source_landing_read lists only readable cars and reads car attributes only from them' AS result;

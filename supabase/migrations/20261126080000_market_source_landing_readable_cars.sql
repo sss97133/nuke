@@ -86,4 +86,25 @@ BEGIN
   END IF;
 END
 $check$;
+
+-- The body now restates the vehicles read rule (vehicle_publicly_readable is vehicles_public_select plus the deleted
+-- test): register the copy so the hourly exposure watch fails when the vehicles read policies change (as 20261125220000).
+DO $reg$
+DECLARE h text;
+BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    IF to_regprocedure('public.private_row_policy_hash(text,text)') IS NOT NULL THEN
+      EXECUTE $q$SELECT h.policy_hash FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')') h$q$
+         INTO h;
+      IF h IS DISTINCT FROM '7773d11e280e80abad0422000a1ff9cc' THEN -- gitleaks:allow (policy fingerprint read 2026-11-25, not a secret)
+        RAISE EXCEPTION 'the vehicles read policies changed since 2026-11-25 (md5 %); re-read the copy first', h;
+      END IF;
+    END IF;
+    EXECUTE $i$INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
+      VALUES ('market_source_landing_read(text,timestamp with time zone)', 'vehicles', 'p.cmd IN (''SELECT'', ''ALL'')',
+              '7773d11e280e80abad0422000a1ff9cc', 'ta-provenance',
+              '20261126080000 restates vehicles_public_select (and the deleted test) as vehicle_publicly_readable on its three vehicles joins and the dealer fallback')
+      ON CONFLICT (reader, relation, policy_filter) DO NOTHING$i$;
+  END IF;
+END $reg$;
 COMMIT;
