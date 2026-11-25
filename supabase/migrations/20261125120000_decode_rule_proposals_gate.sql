@@ -28,12 +28,15 @@
 --      upper-case tokens (letters and digits; punctuation and spacing are not tokens). On the cited line (the
 --      proposal's citation_line, or else the only line where it holds): the code is printed exactly once as whole
 --      tokens; value_text starts at the very next token (a code table prints code and meaning side by side, so a
---      neighbour row's meaning or a far phrase does not count); and every
---      scalar leaf of value (each string and number the rule writes) is printed as whole tokens after the code. A
+--      neighbour row's meaning or a far phrase does not count) and does not run into the next row: it holds no repeat of
+--      the token printed before the code followed by a code-shaped token, and when the code starts the line, no token of
+--      the code's length and class (letters or digits); and every
+--      scalar leaf of value (each string and number the rule writes) is printed as whole tokens inside the value_text span. A
 --      code printed on another line too needs citation_line. A boolean or null leaf is not printable. A written label
 --      that differs from the print is refused; value_text carries at least 2 letters or digits (a keyed normalization map is a later rule table, never free text), so a
 --      vin_format row (a regex) cannot be proposed here.
---   3. supersedes_rule_id names a current rule with the same rule_key, make, model and code; without one, a current
+--   3. supersedes_rule_id names a current rule with the same rule_key, make, model and code whose years the proposal
+--      covers (a narrower supersede would leave years with no current rule: supersede_drops_years); without one, a current
 --      rule for that key, make, model, code and overlapping years refuses the proposal. A per-code advisory lock
 --      serializes two proposals for one code, and vehicle_decode_rules_document_current allows one current
 --      document-cited row per key, make, model, code and years. The old row is superseded before the new one is
@@ -146,7 +149,7 @@ DECLARE
   is_factory boolean;
   reasons text[] := '{}';
   hit_lines int[] := '{}'; code_lines int[] := '{}'; line_no int; cp int[]; vp int[]; c int; v int; ok boolean;
-  leaf record; n_leaves int := 0;
+  leaf record; n_leaves int := 0; vs int; ve int; shape text;
   cars uuid[];
   n_before int := 0; n_filled int := 0; n_removed int := 0; n_labelled int := 0; n_changed int := 0;
   label_changes jsonb;
@@ -214,7 +217,17 @@ BEGIN
       t := public.decode_rule_tokens(lines[line_no]);
       cp := public.decode_rule_token_positions(t, ct);
       IF cardinality(cp) <> 1 THEN reasons := array_append(reasons, 'code_repeats_on_line'::text); END IF;
-      -- every scalar leaf the rule writes is printed after the code on that line
+      -- the printed value_text span on the line: from the token after the code, |value_text| tokens long
+      vs := cp[1] + cardinality(ct);
+      ve := vs + cardinality(vt) - 1;
+      shape := CASE WHEN array_to_string(ct, '') ~ '^[0-9]+$' THEN '^[0-9]{' WHEN array_to_string(ct, '') ~ '^[A-Z]+$' THEN '^[A-Z]{'
+                    ELSE '^[A-Z0-9]{' END || length(array_to_string(ct, '')) || '}$';
+      IF (CASE WHEN cp[1] > 1
+              THEN EXISTS (SELECT 1 FROM generate_subscripts(vt, 1) i WHERE i < cardinality(vt)
+                             AND vt[i] = t[cp[1] - 1] AND vt[i + 1] ~ ('^[A-Z0-9]{' || length(array_to_string(ct, '')) || '}$'))
+              ELSE EXISTS (SELECT 1 FROM unnest(vt) z(tok) WHERE z.tok ~ shape) END) THEN
+        reasons := array_append(reasons, 'value_text_crosses_next_code'::text); END IF;
+      -- every scalar leaf the rule writes is printed inside that span
       FOR leaf IN SELECT x.val FROM jsonb_path_query(p.value, 'strict $.**') AS x(val)
                  WHERE jsonb_typeof(x.val) NOT IN ('object', 'array') LOOP
         n_leaves := n_leaves + 1;
@@ -224,8 +237,8 @@ BEGIN
         END IF;
         lt := public.decode_rule_tokens(leaf.val #>> '{}');
         IF cardinality(lt) = 0 OR NOT EXISTS (SELECT 1 FROM unnest(public.decode_rule_token_positions(t, lt)) q(pos)
-                                              WHERE q.pos > cp[1]) THEN
-          reasons := array_append(reasons, ('value_leaf_not_printed:' || (leaf.val #>> '{}'))::text);
+                                              WHERE q.pos >= vs AND q.pos + cardinality(lt) - 1 <= ve) THEN
+          reasons := array_append(reasons, ('value_leaf_not_in_value_text:' || (leaf.val #>> '{}'))::text);
         END IF;
       END LOOP;
       IF n_leaves = 0 THEN reasons := array_append(reasons, 'value_has_no_leaf'::text); END IF;
@@ -240,7 +253,12 @@ BEGIN
                     WHERE s.id = p.supersedes_rule_id AND s.superseded_at IS NULL AND s.rule_key = p.rule_key
                       AND lower(s.make) = lower(p.make) AND lower(s.model) IS NOT DISTINCT FROM lower(p.model)
                       AND upper(btrim(s.code)) = upper(btrim(p.code))) THEN
-      reasons := array_append(reasons, 'supersedes_other_rule'::text); END IF;
+      reasons := array_append(reasons, 'supersedes_other_rule'::text);
+    ELSIF NOT EXISTS (SELECT 1 FROM public.vehicle_decode_rules s
+                       WHERE s.id = p.supersedes_rule_id AND coalesce(s.year_min, 0) >= p.year_min
+                         AND coalesce(s.year_max, 9999) <= p.year_max) THEN
+      reasons := array_append(reasons, 'supersede_drops_years'::text);
+    END IF;
   ELSIF EXISTS (SELECT 1 FROM public.vehicle_decode_rules s
                  WHERE s.superseded_at IS NULL AND s.rule_key = p.rule_key AND lower(s.make) = lower(p.make)
                    AND lower(s.model) IS NOT DISTINCT FROM lower(p.model) AND upper(btrim(s.code)) = upper(btrim(p.code))

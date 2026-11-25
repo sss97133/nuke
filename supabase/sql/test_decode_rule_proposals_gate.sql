@@ -95,7 +95,9 @@ INSERT INTO public.service_manual_chunks VALUES
   ('c0000000-0000-0000-0000-000000000006', 'd0000000-0000-0000-0000-000000000001', 16,
    E'SERIES B BLAZER BODY B BUS\nSERIES CODE B BLAZER\nTRIM CODE B BLACK VINYL'),
   ('c0000000-0000-0000-0000-000000000007', 'd0000000-0000-0000-0000-000000000003', 2,
-   E'SERIES CODE K FOUR-WHEEL DRIVE\nSERIES CODE Q Q');
+   E'SERIES CODE K FOUR-WHEEL DRIVE\nSERIES CODE Q Q'),
+  ('c0000000-0000-0000-0000-000000000008', 'd0000000-0000-0000-0000-000000000001', 17,
+   E'ENGINE CODE Z 6.6 LITER 4 BBL V8\nTONNAGE CODE 1 1/2 TON\nX 2 DOOR COUPE');
 INSERT INTO public.vehicles VALUES
   ('a0000000-0000-0000-0000-000000000001', 'Testmake', 'T', 1977, 'CK1234567890A', true, NULL),
   ('a0000000-0000-0000-0000-000000000002', 'Testmake', 'T', 1978, 'CK2234567890A', true, NULL),
@@ -168,7 +170,7 @@ BEGIN
   r := public.vehicle_decode_rule_propose('vin_format', 'Testmake', NULL, 'AAA', 1973, 1980,
          '{"regex": "^C[A-Z][0-9A-Z]{11}$", "positions": {"series": [3, 1]}}',
          'vehicle identification layout', 'c0000000-0000-0000-0000-000000000004', 'test');
-  IF r ->> 'status' <> 'rejected' OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(r -> 'reasons') x WHERE x LIKE 'value_leaf_not_printed:%')
+  IF r ->> 'status' <> 'rejected' OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(r -> 'reasons') x WHERE x LIKE 'value_leaf_not_in_value_text:%')
      OR (r ->> 'cars_compared')::int <> 0 THEN RAISE EXCEPTION '7 format regex admitted: %', r; END IF;
 
   -- 8. a named supersede in scope: K re-cited from another page with its printed label replaces it; the measure keeps
@@ -222,7 +224,7 @@ BEGIN
   -- 12. skeptic2 (1): a label the page does not print (MOTOR HOME) with a printed value_text is refused
   r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, 'K', 1973, 1980, '{"series": "MOTOR HOME"}',
          'four-wheel drive', 'c0000000-0000-0000-0000-000000000001', 'test', '{}'::jsonb, k_rule);
-  IF r ->> 'status' <> 'rejected' OR NOT (r -> 'reasons') ? 'value_leaf_not_printed:MOTOR HOME' THEN RAISE EXCEPTION '12 unprinted label admitted: %', r; END IF;
+  IF r ->> 'status' <> 'rejected' OR NOT (r -> 'reasons') ? 'value_leaf_not_in_value_text:MOTOR HOME' THEN RAISE EXCEPTION '12 unprinted label admitted: %', r; END IF;
 
   -- 13. skeptic2 (2): the neighbour row's meaning on a flat page (K ... Z UNUSED SERIES) is not K's
   r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, 'K', 1973, 1980, '{"series": "Unused series"}',
@@ -265,6 +267,38 @@ BEGIN
   r := public.vehicle_decode_rule_propose('vin_series_char', 'Othermake', NULL, 'Q', 1973, 1980, '{"series": "Q"}',
          'q', 'c0000000-0000-0000-0000-000000000007', 'test');
   IF r ->> 'status' <> 'rejected' OR NOT (r -> 'reasons') ? 'value_text_under_2_characters' THEN RAISE EXCEPTION '17 one-character value admitted: %', r; END IF;
+
+  -- 19. skeptic2 01:15 (1): the next row's meaning on a flat line is not inside K's value_text
+  r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, 'K', 1973, 1980, '{"series": "Unused series"}',
+         'four-wheel drive', 'c0000000-0000-0000-0000-000000000005', 'test', '{}'::jsonb, k_rule);
+  IF r ->> 'status' <> 'rejected' OR NOT (r -> 'reasons') ? 'value_leaf_not_in_value_text:Unused series' THEN RAISE EXCEPTION '19 neighbour leaf admitted: %', r; END IF;
+  -- ... nor may value_text run on into the next row's code
+  r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, 'K', 1973, 1980, '{"series": "Unused series"}',
+         'four-wheel drive series code z unused series', 'c0000000-0000-0000-0000-000000000005', 'test', '{}'::jsonb, k_rule);
+  IF r ->> 'status' <> 'rejected' OR NOT (r -> 'reasons') ? 'value_text_crosses_next_code' THEN RAISE EXCEPTION '19b run-on value_text admitted: %', r; END IF;
+
+  -- 19c. digits inside a letter code's value are not a next row (true negative)
+  r := public.vehicle_decode_rule_propose('vin_engine_char', 'Testmake', NULL, 'Z', 1973, 1980, '{"engine": "6.6 liter 4 bbl v8"}',
+         '6.6 liter 4 bbl v8', 'c0000000-0000-0000-0000-000000000008', 'test');
+  IF (r -> 'reasons') ? 'value_text_crosses_next_code' OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(r -> 'reasons') x
+       WHERE x LIKE 'value_leaf_not_in_value_text:%') THEN RAISE EXCEPTION '19c engine value refused as run-on: %', r; END IF;
+  -- 19d. a labelled digit code whose value carries digits is not a run-on either (true negative)
+  r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, '1', 1973, 1980, '{"tonnage": "1/2 ton"}',
+         '1/2 ton', 'c0000000-0000-0000-0000-000000000008', 'test');
+  IF (r -> 'reasons') ? 'value_text_crosses_next_code' OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(r -> 'reasons') x
+       WHERE x LIKE 'value_leaf_not_in_value_text:%') THEN RAISE EXCEPTION '19d tonnage value refused as run-on: %', r; END IF;
+
+  -- 19e. a letter code that starts its line, with a digit in its value (true negative)
+  r := public.vehicle_decode_rule_propose('vin_body_code', 'Testmake', NULL, 'X', 1973, 1980, '{"body": "2 door coupe"}',
+         '2 door coupe', 'c0000000-0000-0000-0000-000000000008', 'test');
+  IF (r -> 'reasons') ? 'value_text_crosses_next_code' THEN RAISE EXCEPTION '19e body value refused as run-on: %', r; END IF;
+
+  -- 20. skeptic2 01:15 (2): a supersede for fewer years would leave 1973-1977 with no current K rule
+  r := public.vehicle_decode_rule_propose('vin_series_char', 'Testmake', NULL, 'K', 1977, 1980, '{"series": "Four-wheel drive"}',
+         'four-wheel drive', 'c0000000-0000-0000-0000-000000000001', 'test', '{}'::jsonb, k_rule);
+  IF r ->> 'status' <> 'rejected' OR NOT (r -> 'reasons') ? 'supersede_drops_years'
+     OR NOT EXISTS (SELECT 1 FROM public.vehicle_decode_rules WHERE id = k_rule AND superseded_at IS NULL) THEN
+    RAISE EXCEPTION '20 narrowing supersede admitted: %', r; END IF;
 
   -- 18. one current document-cited rule per scope is a constraint, not only the gate's check
   BEGIN
