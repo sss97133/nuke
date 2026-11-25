@@ -10,6 +10,10 @@
 --   * an edge that stops being due is retired, not deleted; anon cannot read the edges or run the fold;
 --   * applied twice; the revert restores vehicle_spend_lines_due byte for byte.
 \set ON_ERROR_STOP on
+-- guardrail-allow(center-key-fk): timeline_events: stub of the production table, for the reader under test
+-- guardrail-allow(center-key-fk): vehicle_value_recompute_queue: stub of the production table, for the reader under test
+-- guardrail-allow(center-key-fk): receipts: stub of the production table, for the reader under test
+-- guardrail-allow(center-key-fk): receipt_vehicle_links: stub of the production table, for the reader under test
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_receipt_relations%' OR to_regclass('public.receipts') IS NOT NULL THEN
     RAISE EXCEPTION 'Requires empty disposable dm_refinement_receipt_relations* database'; END IF;
