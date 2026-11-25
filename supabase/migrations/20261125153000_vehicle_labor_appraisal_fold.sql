@@ -25,7 +25,11 @@
 --                       (live 2026-11-25: 25, 26, 20 and 27 cars).
 --   vehicle_labor_appraisal_fold(uuid)  definer, the only writer. Refuses to store (error 'viewer_dependent_rule')
 --                       while an active rule reads facets or statements (caller-dependent inputs; 0 active rules do).
---                       A failure lands in error and never aborts model_fold_one.
+--                       A failure lands in error and never aborts model_fold_one. The compute runs under logged-out
+--                       claims (request.jwt.claims role anon, no sub; the caller's claims are put back): with no claims
+--                       vehicle_image_privacy_withheld takes its no-viewer branch and would store custody photos anon
+--                       may not see (ta-skeptic 2026-11-25: 20 custody photos on public cars, 0/20 withheld with no
+--                       claims, 20/20 as anon).
 --   vehicle_labor_appraisal(uuid)  same signature and grants. A public car with a stored read returns it with
 --                       as_of = folded_at and state {fresh, computed true, computed_at, evidence_changed_at,
 --                       key_current, queued, error}. fresh is false while evidence_changed_at > folded_at, the key
@@ -39,7 +43,10 @@
 --   Signals (existing model_fold machinery): model_fold_rows_signal on INSERT/DELETE and model_fold_origin_update_signal
 --                       on UPDATE of receipts, receipt_vehicle_links, evidence_judgment_requests;
 --                       labor_fold_item_signal (statement level) on receipt_items and receipt_line_edges, item ->
---                       receipt -> vehicle and the receipt's active links. vehicle_observations, vehicle_images and
+--                       receipt -> vehicle and the receipt's active links; on INSERT/UPDATE of photo_extracted_fields
+--                       under an enabled image_privacy_rules field, photo -> vehicle (vehicle_id is NULL on 56,729 of
+--                       122,194 rows, read 2026-11-25), an update signalling only when field, value or photo changed.
+--                       vehicle_observations, vehicle_images and
 --                       vehicles already signal. model_fold_signal_ids stamps the state row and admits a car that has
 --                       one (ta-facts' two lines). model_fold_one calls the fold after the facet grade fold.
 --   Priority (ta-facts' proposal 2026-11-25, lead: labor re-fold above the bulk passes, which run at 5). A signal on a
@@ -172,7 +179,7 @@ INSERT INTO public.labor_fold_logic_functions (proname, counts_in_key, reason) V
   ('bat_pending_image_has_listing', true, 'called by vehicle_image_gallery_eligible'),
   ('bat_pending_image_listing_by_id', true, 'called by vehicle_image_gallery_eligible'),
   ('image_stage_custody_external', true, 'called by vehicle_image_privacy_withheld'),
-  ('vehicle_viewer_tied', false, 'the caller test inside vehicle_image_privacy_withheld; the fold runs with no caller, so the stored read is the logged-out form'),
+  ('vehicle_viewer_tied', false, 'the caller test inside vehicle_image_privacy_withheld; the fold computes under logged-out claims (role anon, no sub), so it is false and the stored read is the logged-out form'),
   ('vehicle_facet_items', false, 'viewer-dependent: read only under a facet_truthy rule, which the fold refuses to store'),
   ('vehicle_statements', false, 'viewer-dependent: read only under a statement_present rule, which the fold refuses to store'),
   ('vehicle_user_has_access', false, 'the caller visibility test; the stored read is the public form')
@@ -248,6 +255,13 @@ DECLARE
   ms int;
   prior public.vehicle_labor_appraisal_state%ROWTYPE;
   stamp timestamptz;
+  -- The stored read is served to anon, so it is computed as anon. A session with no request claims (cron, the fold
+  -- tick) is not a logged-out visitor: vehicle_image_privacy_withheld returns false on its no-viewer branch, which would
+  -- store custody photos a visitor may not see (ta-skeptic 2026-11-25: 20 custody photos on public cars, withheld 0/20
+  -- with no claims, 20/20 as anon). The prior claims are put back after the compute and on error.
+  c_claims text := current_setting('request.jwt.claims', true);
+  c_role text := current_setting('request.jwt.claim.role', true);
+  c_sub text := current_setting('request.jwt.claim.sub', true);
 BEGIN
   SELECT * INTO prior FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = p_vehicle;
   stamp := CASE WHEN prior.evidence_changed_at > coalesce(prior.folded_at, '-infinity'::timestamptz)
@@ -258,7 +272,13 @@ BEGIN
                 WHERE ru.active AND c ->> 'type' IN ('facet_truthy', 'statement_present')) THEN
       RAISE EXCEPTION 'viewer_dependent_rule';
     END IF;
+    PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+    PERFORM set_config('request.jwt.claim.role', 'anon', true);
+    PERFORM set_config('request.jwt.claim.sub', '', true);
     r := public.vehicle_labor_appraisal_compute(p_vehicle);
+    PERFORM set_config('request.jwt.claims', coalesce(c_claims, ''), true);
+    PERFORM set_config('request.jwt.claim.role', coalesce(c_role, ''), true);
+    PERFORM set_config('request.jwt.claim.sub', coalesce(c_sub, ''), true);
     IF r IS NULL OR r ? 'error' THEN
       RAISE EXCEPTION 'no_public_read: %', coalesce(r ->> 'error', 'not visible');
     END IF;
@@ -275,6 +295,9 @@ BEGIN
     VALUES (p_vehicle, t0, stamp, (extract(epoch FROM t0 - stamp) * 1000)::bigint, ms);
     RETURN jsonb_build_object('vehicle_id', p_vehicle, 'ms', ms, 'key', k);
   EXCEPTION WHEN OTHERS THEN
+    PERFORM set_config('request.jwt.claims', coalesce(c_claims, ''), true);
+    PERFORM set_config('request.jwt.claim.role', coalesce(c_role, ''), true);
+    PERFORM set_config('request.jwt.claim.sub', coalesce(c_sub, ''), true);
     ms := (extract(epoch FROM clock_timestamp() - t0) * 1000)::int;
     INSERT INTO public.vehicle_labor_appraisal_state AS s (vehicle_id, folded_key, ms, error, updated_at)
     VALUES (p_vehicle, k, ms, left(SQLERRM, 500), now())
@@ -334,6 +357,26 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $f
 DECLARE ids uuid[]; v_ids uuid[];
 BEGIN
   BEGIN
+    IF TG_TABLE_NAME = 'photo_extracted_fields' THEN
+      -- A reading under an enabled privacy rule moves which photos the stored read may carry. vehicle_id is NULL on
+      -- 56,729 of 122,194 rows (read 2026-11-25), so the car comes from the photo.
+      IF TG_OP = 'INSERT' THEN
+        SELECT array_agg(DISTINCT i.vehicle_id) INTO v_ids
+          FROM new_rows n JOIN public.image_privacy_rules r ON r.field_name = n.field_name AND r.enabled
+          JOIN public.vehicle_images i ON i.id = n.image_id WHERE i.vehicle_id IS NOT NULL;
+      ELSE
+        SELECT array_agg(DISTINCT i.vehicle_id) INTO v_ids
+          FROM old_rows o JOIN new_rows n ON n.id = o.id
+          JOIN public.image_privacy_rules r ON r.enabled AND r.field_name IN (o.field_name, n.field_name)
+          JOIN public.vehicle_images i ON i.id IN (o.image_id, n.image_id)
+         WHERE i.vehicle_id IS NOT NULL
+           AND (o.field_name, o.value, o.image_id) IS DISTINCT FROM (n.field_name, n.value, n.image_id);
+      END IF;
+      IF v_ids IS NOT NULL THEN
+        PERFORM public.model_fold_signal_ids(v_ids, 'labor_photo_extracted_fields_' || lower(TG_OP));
+      END IF;
+      RETURN NULL;
+    END IF;
     IF TG_TABLE_NAME = 'receipt_items' THEN
       IF TG_OP = 'DELETE' THEN SELECT array_agg(DISTINCT o.receipt_id) INTO ids FROM old_rows o;
       ELSIF TG_OP = 'INSERT' THEN SELECT array_agg(DISTINCT n.receipt_id) INTO ids FROM new_rows n;
@@ -393,6 +436,13 @@ BEGIN
     EXECUTE format('CREATE TRIGGER labor_fold_signal_del AFTER DELETE ON public.%I REFERENCING OLD TABLE AS old_rows '
                    'FOR EACH STATEMENT EXECUTE FUNCTION public.labor_fold_item_signal()', t);
   END LOOP;
+  -- photo_extracted_fields: append and correct only (n_tup_del 0 since the stats reset), so insert and update.
+  DROP TRIGGER IF EXISTS labor_fold_signal_ins ON public.photo_extracted_fields;
+  CREATE TRIGGER labor_fold_signal_ins AFTER INSERT ON public.photo_extracted_fields REFERENCING NEW TABLE AS new_rows
+    FOR EACH STATEMENT EXECUTE FUNCTION public.labor_fold_item_signal();
+  DROP TRIGGER IF EXISTS labor_fold_signal_upd ON public.photo_extracted_fields;
+  CREATE TRIGGER labor_fold_signal_upd AFTER UPDATE ON public.photo_extracted_fields REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows
+    FOR EACH STATEMENT EXECUTE FUNCTION public.labor_fold_item_signal();
 END $trg$;
 
 -- model_fold_signal_ids: stamp the labor row and admit a car that has one (ta-facts, 2026-11-25).

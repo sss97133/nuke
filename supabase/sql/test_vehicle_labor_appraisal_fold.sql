@@ -38,6 +38,13 @@ CREATE TABLE public.model_fold_work (vehicle_id uuid PRIMARY KEY, state text DEF
 CREATE TABLE public.model_fold_signal (id bigserial PRIMARY KEY, vehicle_id uuid, reason text, origin_id uuid, priority smallint,
   at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS public.image_privacy_rules (rule_key text PRIMARY KEY);
+ALTER TABLE public.image_privacy_rules ADD COLUMN IF NOT EXISTS field_name text, ADD COLUMN IF NOT EXISTS min_alnum int,
+  ADD COLUMN IF NOT EXISTS applies_to text, ADD COLUMN IF NOT EXISTS enabled boolean;
+-- photo_extracted_fields as production has it (columns read 2026-11-25); image_id and vehicle_id carry no foreign key there.
+-- guardrail-allow(center-key-fk): photo_extracted_fields.image_id: no foreign key in production (pg_constraint 2026-11-25)
+-- guardrail-allow(center-key-fk): photo_extracted_fields.vehicle_id: no foreign key in production (pg_constraint 2026-11-25)
+CREATE TABLE IF NOT EXISTS public.photo_extracted_fields (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), image_id uuid,
+  user_id uuid, vehicle_id uuid, field_name text, value text, created_at timestamptz DEFAULT now());
 CREATE TABLE public.vehicle_facet_grade_folds (vehicle_id uuid PRIMARY KEY REFERENCES public.vehicles(id) ON DELETE CASCADE,
   evidence_changed_at timestamptz);
 CREATE FUNCTION public.model_fold_config() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"sweep_pending_cap": 1000, "settle_seconds": 300}'::jsonb $$;
@@ -342,6 +349,97 @@ DO $$ BEGIN
   PERFORM public.assert((public.vehicle_labor_appraisal_enqueue() ->> 'queued')::int = 0, 'seed does not signal a car twice');
 END $$;
 SELECT public.vehicle_labor_appraisal_fold(v) FROM fold_v;
+
+-- Privacy: the stored read is the logged-out form. Production auth.role()/auth.uid() (request claims) and the live
+-- privacy chain (vehicle_image_privacy_withheld, image_stage_custody_external, vehicle_viewer_tied, the gallery test's
+-- privacy clause, definitions read 2026-11-25) replace the fixture stubs from here on.
+CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT coalesce(nullif(current_setting('request.jwt.claim.role', true), ''),
+                  (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'))::text $$;
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
+  SELECT coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
+                  (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid $$;
+ALTER TABLE public.vehicle_images ADD COLUMN IF NOT EXISTS is_external boolean, ADD COLUMN IF NOT EXISTS user_id uuid,
+  ADD COLUMN IF NOT EXISTS exif_data jsonb;
+CREATE OR REPLACE FUNCTION public.image_stage_custody_external(p_is_external boolean, p_user_id uuid, p_source text, p_exif jsonb)
+ RETURNS boolean LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $function$
+  select case
+    when p_is_external is not true then false
+    when p_user_id is not null and p_source = 'iphoto'
+         and p_exif -> 'source_rendition' ->> 'contract' = 'photos_cached_preview_v1' then false
+    else true
+  end $function$;
+CREATE OR REPLACE FUNCTION public.vehicle_viewer_tied(p_vehicle_id uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT CASE WHEN (SELECT auth.role()) = 'service_role' THEN true WHEN (SELECT auth.uid()) IS NULL THEN false ELSE false END $$;
+CREATE OR REPLACE FUNCTION public.vehicle_image_privacy_withheld(p_image_id uuid)
+ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'pg_catalog', 'public' AS $function$
+  SELECT CASE
+    WHEN (SELECT auth.role()) = 'service_role' THEN false
+    WHEN (SELECT auth.role()) IS NULL AND session_user <> 'authenticator' THEN false
+    ELSE EXISTS (
+      SELECT 1
+      FROM public.photo_extracted_fields f
+      JOIN public.image_privacy_rules r
+        ON r.field_name = f.field_name AND r.enabled AND r.applies_to = 'custody'
+      JOIN public.vehicle_images i ON i.id = f.image_id
+      WHERE f.image_id = p_image_id
+        AND length(regexp_replace(upper(f.value), '[^A-Z0-9]', '', 'g')) >= r.min_alnum
+        AND NOT public.image_stage_custody_external(i.is_external, i.user_id, i.source, i.exif_data)
+        AND i.user_id IS DISTINCT FROM (SELECT auth.uid())
+        AND NOT public.vehicle_viewer_tied(i.vehicle_id))
+  END $function$;
+DO $$
+DECLARE d text := pg_get_functiondef('public.vehicle_image_gallery_eligible(public.vehicle_images)'::regprocedure);
+BEGIN
+  d := regexp_replace(d, '\s*\$function\$\s*$', E'\n     AND NOT public.vehicle_image_privacy_withheld(($1).id)\n$function$');
+  EXECUTE d;
+END $$;
+
+DO $$
+DECLARE
+  car uuid := '10000000-0000-0000-0000-000000000001';
+  img uuid := 'a0000000-0000-0000-0000-000000000020';
+  before_signals int;
+BEGIN
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  PERFORM public.assert((SELECT read::text FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = car) LIKE '%' || img || '%',
+                        'privacy: the photo is in the stored read before it is withheld');
+  -- the uploader's own camera photo (is_external false) with a keyed plate reading: withheld from a visitor
+  UPDATE public.vehicle_images SET is_external = false, user_id = '99000000-0000-0000-0000-000000000001' WHERE id = img;
+  INSERT INTO public.image_privacy_rules (rule_key, field_name, min_alnum, applies_to, enabled) VALUES ('plate', 'plate', 5, 'custody', true);
+  DELETE FROM public.model_fold_signal;
+  INSERT INTO public.photo_extracted_fields (image_id, field_name, value) VALUES (img, 'plate', 'FIX 1234');
+  PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car AND reason = 'labor_photo_extracted_fields_insert'),
+                        'privacy: a reading under a privacy rule signals the photo''s car');
+  PERFORM public.assert(NOT public.vehicle_image_privacy_withheld(img), 'privacy: a session with no claims sees the photo (the hole)');
+  PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+  PERFORM public.assert(public.vehicle_image_privacy_withheld(img), 'privacy: anon does not');
+  PERFORM set_config('request.jwt.claims', '', true);
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  PERFORM public.assert((SELECT read::text FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = car) NOT LIKE '%' || img || '%',
+                        'privacy: the fold stores the logged-out form (photo absent)');
+  PERFORM public.assert(coalesce(current_setting('request.jwt.claims', true), '') = ''
+                        AND coalesce(current_setting('request.jwt.claim.role', true), '') = '',
+                        'privacy: the fold puts the caller''s claims back');
+  PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  PERFORM public.assert(current_setting('request.jwt.claims', true) = '{"role":"service_role"}',
+                        'privacy: a service caller''s claims come back too');
+  PERFORM public.assert((SELECT read::text FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = car) NOT LIKE '%' || img || '%',
+                        'privacy: a service-role fold still stores the logged-out form');
+  PERFORM set_config('request.jwt.claims', '', true);
+  -- a correction that drops the reading below the rule signals again
+  DELETE FROM public.model_fold_signal;
+  UPDATE public.photo_extracted_fields SET value = 'X1' WHERE image_id = img;
+  PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car AND reason = 'labor_photo_extracted_fields_update'),
+                        'privacy: a corrected reading signals');
+  UPDATE public.photo_extracted_fields SET created_at = created_at;
+  PERFORM public.assert((SELECT count(*) FROM public.model_fold_signal WHERE reason = 'labor_photo_extracted_fields_update') = 1,
+                        'privacy: an update that changes no reading signals nothing');
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  PERFORM public.assert((SELECT read::text FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = car) LIKE '%' || img || '%',
+                        'privacy: below the rule the photo is back');
+END $$;
 
 -- A viewer-dependent rule: the fold refuses to store and the reader computes at read.
 UPDATE public.labor_stage_rules SET evidence_requirements = jsonb_set(coalesce(evidence_requirements, '{}'::jsonb), '{all}',
