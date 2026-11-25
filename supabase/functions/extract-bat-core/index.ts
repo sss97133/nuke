@@ -54,7 +54,7 @@ import { readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk,
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
 import { readBatPartyLine, type BatSellerType } from "../_shared/batSellerType.ts";
 import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
-import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { authenticateWriter, requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
 import { resolveBatVehicleIdentity } from "./vehicleIdentity.ts";
 import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type EndRow } from "./auctionClose.ts";
@@ -1136,6 +1136,10 @@ async function tryUpsertMileageTimelineEvent(args: {
 }
 
 Deno.serve(async (req) => {
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open
+  // (2026-11-25). First, so the auth timing below still measures requireWriteAuth alone.
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   const nativeRequestStartedAt = new Date().toISOString(), nativeAuthStarted = performance.now();
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);

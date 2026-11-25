@@ -6,10 +6,13 @@
  * drop the ledger does not explain shows up with its time range. Never calls a scrape endpoint.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 
 Deno.serve(async (req) => {
   const denied = await requireWriteAuth(req); if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   // writeGuard passes OPTIONS through unjudged; answer the preflight here so it never runs the write.
   if (req.method === 'OPTIONS') return new Response(null, { status: 204 });
   const key = Deno.env.get('FIRECRAWL_API_KEY');

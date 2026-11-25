@@ -6,7 +6,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { authenticateWriter, requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireOwnerOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
@@ -29,6 +29,12 @@ Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // The connected QuickBooks company is the owner's own books, and "signed in" means anyone (sign-up is
+  // open and auto-confirmed). So past the write guard, only the service key or the company owner's own
+  // sign-in may call any action (financials, company_info, pull_transactions, the OAuth steps). 2026-09-29;
+  // the shared gate since 2026-11-25 (same test: service, or parent_company NUKE LTD owner_user_id).
+  const notOwner = await requireOwnerOrService(req, { headers: corsHeaders });
+  if (notOwner) return notOwner;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -37,27 +43,6 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_URL') ?? '',
     projectSecretKey() ?? ''
   );
-
-  // The connected QuickBooks company is the owner's own books, and "signed in" means anyone (sign-up is
-  // open and auto-confirmed). So past the write guard, only the service key or the company owner's own
-  // sign-in may call any action (financials, company_info, pull_transactions, the OAuth steps). 2026-09-29.
-  const verdict = await authenticateWriter(req);
-  if (!verdict.ok || verdict.caller.kind !== 'service_role') {
-    const callerId = verdict.ok && (verdict.caller.kind === 'user' || verdict.caller.kind === 'api_key')
-      ? verdict.caller.userId
-      : null;
-    const { data: owner } = await supabase
-      .from('parent_company')
-      .select('owner_user_id')
-      .eq('legal_name', 'NUKE LTD')
-      .maybeSingle();
-    if (!callerId || !owner?.owner_user_id || callerId !== owner.owner_user_id) {
-      return new Response(JSON.stringify({ error: 'forbidden', reason: 'owner only' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-  }
 
   try {
     const url = new URL(req.url);
