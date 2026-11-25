@@ -34,6 +34,7 @@ INSERT INTO public.receipt_line_edges VALUES
   ('00000000-0000-0000-0000-000000000005', 'labor_operation', NULL, 'MECH-TIE'),
   ('00000000-0000-0000-0000-000000000005', 'system', 'brakes', NULL);
 -- receipt_line_gaps stub: the matcher's view has this shape (item, vehicle, system, gap, amount)
+-- guardrail-allow(center-key-fk): _fixture_gaps.vehicle_id: synthetic fixture table in a disposable test database
 CREATE TABLE public._fixture_gaps (item_id uuid, vehicle_id uuid, system_key text, gap text, total_price numeric);
 INSERT INTO public._fixture_gaps VALUES
   (gen_random_uuid(), '10000000-0000-0000-0000-000000000001', 'engine', 'no_operation', 30),
