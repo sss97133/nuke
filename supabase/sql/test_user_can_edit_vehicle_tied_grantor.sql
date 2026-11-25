@@ -1,6 +1,9 @@
 -- Isolated PostgreSQL 17 contract for 20261126011500_user_can_edit_vehicle_tied_grantor.sql.
 -- Builds the live user_can_edit_vehicle(uuid, uuid) and vehicle_user_has_access(uuid, uuid) verbatim (live 2026-11-25,
 -- md5-checked) over the columns they read, then applies the migration. Synthetic rows only. Cases:
+--   * the live chain (read 2026-11-25): a signed-in user with no ties creates an organization through the client
+--     policies, becomes its active owner, links someone else's car, and passes the edit check; after, that link
+--     grants none;
 --   * before: a member of an organization passes the edit check on a car an untied user linked to that organization;
 --     a contributor-role row with no grantor passes;
 --   * after: the untied link grants no edit; a link made by the car's owner, or by a service path (no linker), still does;
@@ -154,6 +157,74 @@ INSERT INTO vehicle_contributor_roles(vehicle_id, user_id, role, approved_by) VA
   (:A, :R1, 'contributor', NULL), (:A, :R2, 'restorer', :R2), (:A, :R3, 'contributor', :O), (:A, :R4, 'moderator', :K),
   (:B, :X, 'contributor', :M);
 
+
+-- The self-made organization chain, from the live policies and trigger (read 2026-11-25), run as a real authenticated
+-- session: any signed-in user creates an organization, becomes its active owner, and links someone else's car to it.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+END $$;
+CREATE SCHEMA auth;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
+$a$ SELECT nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', '')::uuid $a$;
+GRANT USAGE ON SCHEMA auth TO authenticated;
+CREATE TABLE public.organizations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_name text, discovered_by uuid, uploaded_by uuid);
+CREATE TABLE public.business_ownership(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), business_id uuid, owner_id uuid,
+  ownership_percentage numeric, ownership_type text, ownership_title text, acquisition_date date, status text DEFAULT 'active',
+  UNIQUE (business_id, owner_id));
+ALTER TABLE public.organization_contributors ALTER COLUMN status SET DEFAULT 'active',
+  ADD COLUMN verification_method text NOT NULL DEFAULT 'self_claimed', ADD COLUMN verified_by uuid, ADD COLUMN verified_at timestamptz,
+  ADD CONSTRAINT oc_one UNIQUE (organization_id, user_id);
+-- trigger_create_initial_business_ownership, live body
+CREATE FUNCTION public.create_initial_business_ownership() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $t$
+BEGIN
+    IF auth.uid() IS NOT NULL THEN
+        INSERT INTO public.business_ownership (business_id, owner_id, ownership_percentage, ownership_type, ownership_title, acquisition_date)
+        VALUES (NEW.id, auth.uid(), 100.00, 'founder', 'Founder/Owner', CURRENT_DATE)
+        ON CONFLICT (business_id, owner_id) DO NOTHING;
+    END IF;
+    RETURN NEW;
+END; $t$;
+CREATE TRIGGER trigger_create_initial_business_ownership AFTER INSERT ON public.organizations
+  FOR EACH ROW EXECUTE FUNCTION public.create_initial_business_ownership();
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.business_ownership ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.organization_contributors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.organization_vehicles ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT ON public.organizations, public.organization_contributors, public.organization_vehicles TO authenticated;
+GRANT SELECT ON public.vehicles, public.business_ownership TO authenticated;
+CREATE POLICY read_fx ON public.organizations FOR SELECT USING (true);
+CREATE POLICY read_fx ON public.organization_contributors FOR SELECT USING (true);
+CREATE POLICY read_fx ON public.business_ownership FOR SELECT USING (true);
+-- live write policies, verbatim
+CREATE POLICY "Users create orgs" ON public.organizations FOR INSERT WITH CHECK (((( SELECT auth.uid() AS uid) = discovered_by) OR (( SELECT auth.uid() AS uid) = uploaded_by)));
+CREATE POLICY organization_contributors_insert ON public.organization_contributors FOR INSERT WITH CHECK (((( SELECT auth.uid() AS uid) IS NOT NULL) AND (((user_id = ( SELECT auth.uid() AS uid)) AND (role = ANY (ARRAY['contributor'::text, 'photographer'::text])) AND (status = 'pending'::text) AND (verification_method = 'self_claimed'::text) AND (verified_by IS NULL) AND (verified_at IS NULL)) OR ((user_id = ( SELECT auth.uid() AS uid)) AND (role = 'owner'::text) AND (verification_method = 'self_claimed'::text) AND (verified_by IS NULL) AND (verified_at IS NULL) AND (EXISTS ( SELECT 1
+   FROM business_ownership bo
+  WHERE ((bo.business_id = organization_contributors.organization_id) AND (bo.owner_id = ( SELECT auth.uid() AS uid)) AND (bo.status = 'active'::text))))) OR (EXISTS ( SELECT 1
+   FROM organization_contributors oc
+  WHERE ((oc.organization_id = organization_contributors.organization_id) AND (oc.user_id = ( SELECT auth.uid() AS uid)) AND (oc.role = ANY (ARRAY['owner'::text, 'co_founder'::text])) AND (oc.status = 'active'::text)))))));
+CREATE POLICY "Users/owners manage links" ON public.organization_vehicles FOR ALL USING (((linked_by_user_id = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1
+   FROM vehicles v
+  WHERE ((v.id = organization_vehicles.vehicle_id) AND (v.user_id = ( SELECT auth.uid() AS uid))))) OR (EXISTS ( SELECT 1
+   FROM organization_contributors oc
+  WHERE ((oc.organization_id = organization_vehicles.organization_id) AND (oc.user_id = ( SELECT auth.uid() AS uid)) AND (oc.role = ANY (ARRAY['owner'::text, 'manager'::text, 'board_member'::text])) AND (oc.status = 'active'::text))))));
+
+\set Z  '''0c100000-0000-0000-0000-0000000000c1'''
+\set E  '''e0000000-0000-0000-0000-00000000000e'''
+INSERT INTO vehicles(id, user_id, owner_id) VALUES (:E, :O, :O);
+SELECT set_config('request.jwt.claims', json_build_object('sub', :Z, 'role', 'authenticated')::text, false);
+SET ROLE authenticated;
+INSERT INTO organizations(id, business_name, discovered_by) VALUES ('92000000-0000-0000-0000-000000000029', 'self-made', auth.uid());
+INSERT INTO organization_contributors(organization_id, user_id, role, verification_method)
+VALUES ('92000000-0000-0000-0000-000000000029', auth.uid(), 'owner', 'self_claimed');
+INSERT INTO organization_vehicles(organization_id, vehicle_id, relationship_type, status, linked_by_user_id)
+VALUES ('92000000-0000-0000-0000-000000000029', :E, 'service_provider', 'active', auth.uid());
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '', false);
+SELECT t_assert((SELECT status FROM organization_contributors WHERE user_id = :Z) = 'active',
+  'chain: a signed-in user with no ties creates an organization and is its active owner, through the client policies');
+SELECT t_assert(user_can_edit_vehicle(:E, :Z), 'before: that user then passes the edit check on someone else''s car');
+
+
 -- Before.
 SELECT t_assert(user_can_edit_vehicle(:A, :M), 'before: a member passes on a car an untied user linked into the organization');
 SELECT t_assert(user_can_edit_vehicle(:A, :R1) AND user_can_edit_vehicle(:A, :R2), 'before: a role with no grantor, or approved by itself, passes');
@@ -164,7 +235,12 @@ SELECT t_assert(user_can_edit_vehicle(:A, :R1) AND user_can_edit_vehicle(:A, :R2
 SELECT t_assert(NOT user_can_edit_vehicle(:A, :M), 'a link made by an untied user grants a member no edit');
 SELECT t_assert(user_can_edit_vehicle(:B, :M), 'a link made by the car''s owner still grants a member edit');
 SELECT t_assert(user_can_edit_vehicle(:D, :M), 'a link made by a service path (no linker) still grants a member edit');
-SELECT t_assert((SELECT count(*) FROM organization_vehicles) = 3, 'no link was removed');
+SELECT t_assert((SELECT count(*) FROM organization_vehicles) = 4, 'no link was removed');
+
+
+-- Severity case after the change.
+SELECT t_assert(NOT user_can_edit_vehicle(:E, :Z), 'the self-made organization link to someone else''s car grants no edit');
+SELECT t_assert((SELECT count(*) FROM organization_vehicles WHERE vehicle_id = :E) = 1, 'the link itself remains, as a claim');
 
 -- Contributor roles.
 SELECT t_assert(NOT user_can_edit_vehicle(:A, :R1), 'a role with no grantor no longer passes');
