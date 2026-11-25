@@ -149,8 +149,15 @@ export function ItemRow({ item, after }: { item: FacetItem; after?: React.ReactN
     {item.stated && <Text role="caption" as="p" className="k-item__line">Stated: {item.stated}</Text>}
     {item.sides?.length ? <ul className="k-item__sides">{item.sides.map((side, i) => <li key={i}>
       <Text role="body">{valueText(side.value) ?? 'No value'}</Text>
+      {side.witnesses != null && <Text role="caption"> · {side.witnesses} {side.witnesses === 1 ? 'witness' : 'witnesses'}</Text>}
       <Sources sources={side.sources} />
     </li>)}</ul> : <Sources sources={item.sources} />}
+    {item.agreement?.readings != null && <Text role="caption" as="p" className="k-item__line">
+      {[`${item.agreement.readings} ${item.agreement.readings === 1 ? 'reading' : 'readings'}`,
+        item.agreement.photos != null ? `${item.agreement.photos} ${item.agreement.photos === 1 ? 'photo' : 'photos'}` : null,
+        item.agreement.families != null ? `${item.agreement.families} reader ${item.agreement.families === 1 ? 'family' : 'families'}` : null,
+      ].filter(Boolean).join(' · ')}
+    </Text>}
     {item.candidates?.length ? <ul className="k-item__sides">{item.candidates.map((c, i) => <li key={i}>
       <Text role="body">{[c.code, ratioText(c.gears), c.reverse != null ? `reverse ${ratioText(c.reverse)}` : null,
         c.countershaft_in ? `${c.countershaft_in} in countershaft` : null].filter(Boolean).join(' · ')}</Text>
