@@ -18,8 +18,9 @@
 -- After:
 --   (1) The five end-user INSERT policies are replaced by one, vehicle_images_insert_uploader (PERMISSIVE, TO
 --       authenticated), and a RESTRICTIVE floor, vehicle_images_insert_uploader_tied (TO anon, authenticated), with the
---       same check, so a permissive policy added later cannot widen it: user_id = auth.uid(), merged_from_vehicle_id
---       IS NULL, and vehicle_id IS NULL or user_can_edit_vehicle(vehicle_id, auth.uid()). user_id is NULL only from
+--       same check, so a permissive policy added later cannot widen it: user_id = auth.uid(), submitted_by NULL or
+--       auth.uid() (apply_auto_approval_for_image auto-approves for COALESCE(submitted_by, user_id), so naming a
+--       stranger as submitter is the same forgery as naming one as uploader), merged_from_vehicle_id IS NULL, and vehicle_id IS NULL or user_can_edit_vehicle(vehicle_id, auth.uid()). user_id is NULL only from
 --       the service role. user_can_edit_vehicle is the one definition (20261126011500 corrects it in place); this
 --       migration does not define it. RLS checks run after BEFORE triggers, so user_id is read after
 --       vehicle_images_default_attribution fills it and vehicle_id after capture_relay_default_vehicle_fn files a
@@ -32,7 +33,9 @@
 --   (3) BEFORE UPDATE trigger zz_vehicle_images_client_move_guard, named to run after every other BEFORE UPDATE
 --       trigger (some unfile a row or put vehicle_id back). For anon and authenticated only (a PostgREST PATCH, or an
 --       invoker function a signed-in user called; definer writers and the service role are untouched), it refuses
---       (42501): a user_id change; merged_from_vehicle_id set to anything but NULL, its old value or the row's car;
+--       (42501): a user_id change; any vision_gate_status change (to approved, or rejected_* back to anything:
+--       the gate's writers are definer functions and the service role; no web or iOS client writes the column, and
+--       no other BEFORE UPDATE trigger sets it, so the WHEN sees only what the caller sent); merged_from_vehicle_id set to anything but NULL, its old value or the row's car;
 --       vehicle_id moved onto a car the caller cannot edit, unless it is the car the photo was merged from
 --       (unmerge_vehicle returns photos there; (1) and the merged_from rule keep that a car the photo sat on).
 --
@@ -65,6 +68,7 @@ CREATE POLICY vehicle_images_insert_uploader ON public.vehicle_images
   AS PERMISSIVE FOR INSERT TO authenticated
   WITH CHECK (
     user_id = (SELECT auth.uid())
+    AND (submitted_by IS NULL OR submitted_by = (SELECT auth.uid()))
     AND merged_from_vehicle_id IS NULL
     AND (vehicle_id IS NULL OR public.user_can_edit_vehicle(vehicle_id, (SELECT auth.uid())))
   );
@@ -76,6 +80,7 @@ CREATE POLICY vehicle_images_insert_uploader_tied ON public.vehicle_images
   AS RESTRICTIVE FOR INSERT TO anon, authenticated
   WITH CHECK (
     user_id = (SELECT auth.uid())
+    AND (submitted_by IS NULL OR submitted_by = (SELECT auth.uid()))
     AND merged_from_vehicle_id IS NULL
     AND (vehicle_id IS NULL OR public.user_can_edit_vehicle(vehicle_id, (SELECT auth.uid())))
   );
@@ -134,6 +139,9 @@ BEGIN
   IF NEW.user_id IS DISTINCT FROM OLD.user_id THEN
     RAISE EXCEPTION 'vehicle_images: a photo''s uploader cannot be changed' USING ERRCODE = '42501';
   END IF;
+  IF NEW.vision_gate_status IS DISTINCT FROM OLD.vision_gate_status THEN
+    RAISE EXCEPTION 'vehicle_images: vision_gate_status is set by the gate, not by a signed-in user' USING ERRCODE = '42501';
+  END IF;
   IF NEW.merged_from_vehicle_id IS DISTINCT FROM OLD.merged_from_vehicle_id
      AND NEW.merged_from_vehicle_id IS NOT NULL
      AND NEW.merged_from_vehicle_id IS DISTINCT FROM OLD.vehicle_id THEN
@@ -150,7 +158,7 @@ END
 $function$;
 REVOKE ALL ON FUNCTION public.vehicle_images_client_move_guard() FROM PUBLIC, anon, authenticated;
 COMMENT ON FUNCTION public.vehicle_images_client_move_guard() IS
-  'BEFORE UPDATE guard for signed-in writes to vehicle_images (20261126040500): no uploader change, merged_from only to a car the photo sat on, vehicle_id only onto a car the caller can edit or back to merged_from.';
+  'BEFORE UPDATE guard for signed-in writes to vehicle_images (20261126040500): no uploader or gate change, merged_from only to a car the photo sat on, vehicle_id only onto a car the caller can edit or back to merged_from.';
 
 DROP TRIGGER IF EXISTS zz_vehicle_images_client_move_guard ON public.vehicle_images;
 CREATE TRIGGER zz_vehicle_images_client_move_guard
@@ -158,7 +166,8 @@ CREATE TRIGGER zz_vehicle_images_client_move_guard
   FOR EACH ROW
   WHEN (OLD.vehicle_id IS DISTINCT FROM NEW.vehicle_id
         OR OLD.user_id IS DISTINCT FROM NEW.user_id
-        OR OLD.merged_from_vehicle_id IS DISTINCT FROM NEW.merged_from_vehicle_id)
+        OR OLD.merged_from_vehicle_id IS DISTINCT FROM NEW.merged_from_vehicle_id
+        OR OLD.vision_gate_status IS DISTINCT FROM NEW.vision_gate_status)
   EXECUTE FUNCTION public.vehicle_images_client_move_guard();
 
 COMMIT;

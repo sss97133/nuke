@@ -4,18 +4,22 @@
 -- md5 d7e90f2f that 20261126011500 guards on). Writes run under SET ROLE so RLS and the trigger really apply.
 -- Run with -v with3961=<path to 20261126011500_user_can_edit_vehicle_tied_grantor.sql> to repeat every case on that
 -- migration's body.
---   before: a stranger lands a photo on another owner's car, names another person as uploader, or PATCHes an unfiled
---           row onto any car;
+--   before: a stranger lands a photo on another owner's car, names another person as uploader (with self as
+--           submitter) or as submitter, PATCHes an unfiled row onto any car, or PATCHes their own gate to approved;
 --   after:  those are refused 42501, and so are a user_id filled from documented_by_user_id or submitted_by naming
---           someone else, no uploader at all, merged_from set at insert, and anon; own unfiled, owner and contributor
+--           someone else, merged_from set at insert, and anon; a row naming no uploader is filled as the caller by
+--           the live trigger order (submitted_by, then user_id) and lands; own unfiled, owner and contributor
 --           inserts land and RETURNING shows them; a PATCH may not change user_id, may not move a photo onto a car
 --           the caller cannot edit, may return a photo to the car it was merged from, may set merged_from only to the
 --           row's car; definer writers and the service role are untouched;
+--           submitted_by naming someone else beside user_id = self (apply_auto_approval_for_image approves for it)
+--           is refused; a signed-in PATCH may not change vision_gate_status (pending to approved, rejected back to
+--           approved or pending, to NULL), while other columns on a rejected row stay editable;
 --           the gate starts at pending and ai_scan_metadata carries only the VehicleComments listing keys on a
 --           signed-in insert (NULL or 'approved' gate, reader keys, a non-object refused); the iOS, web-pick and
 --           VehicleComments row shapes land; a later server trigger may still add keys;
---   mutants: without the restrictive floor (with a permissive any-car policy), without either guard, the stranger
---           cases land again;
+--   mutants: without the restrictive floor (with a permissive any-car policy), without either guard, without the
+--           submitted_by term, without the gate in the move guard's WHEN, the stranger cases land again;
 --   the migration applies twice; the revert restores the before state.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -140,6 +144,11 @@ END;
 $function$;
 CREATE TRIGGER trg_vehicle_images_default_attribution BEFORE INSERT ON public.vehicle_images
   FOR EACH ROW EXECUTE FUNCTION public.vehicle_images_default_attribution();
+-- The submitted_by fill of apply_auto_approval_for_image as live (BEFORE INSERT, invoker): the policy reads its result.
+CREATE FUNCTION public.test_auto_approval_actor() RETURNS trigger LANGUAGE plpgsql AS
+  $$ BEGIN NEW.submitted_by := COALESCE(NEW.submitted_by, NEW.user_id, auth.uid()); RETURN NEW; END $$;
+CREATE TRIGGER trg_auto_approve_vehicle_images BEFORE INSERT ON public.vehicle_images
+  FOR EACH ROW EXECUTE FUNCTION public.test_auto_approval_actor();
 
 -- The live INSERT policies (7, permissive, TO public).
 CREATE POLICY "Authenticated can upload vehicle images" ON public.vehicle_images FOR INSERT
@@ -209,12 +218,18 @@ INSERT INTO public.vehicle_images (id, vehicle_id, user_id, merged_from_vehicle_
 -- Before: the exposure.
 :stranger
 SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f3')$q$), 'before: stranger lands a photo on another owner''s car');
-SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2')$q$), 'before: stranger names the owner as uploader');
+SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2')$q$), 'before: naming the owner as uploader alone is refused (submitted_by is filled from user_id first)');
+SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id, submitted_by) VALUES ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000f3')$q$), 'before: stranger names the owner as uploader and self as submitter');
 SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, user_id) VALUES ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-0000000000f3')$q$), 'before: stranger lands an unfiled photo');
 SELECT public.assert(NOT public.refused($q$UPDATE public.vehicle_images SET vehicle_id = '00000000-0000-0000-0000-0000000000a2' WHERE id = '00000000-0000-0000-0000-0000000000c3'$q$), 'before: stranger PATCHes it onto another owner''s car');
 SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, user_id, vision_gate_status, ai_scan_metadata) VALUES ('00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-0000000000f3', NULL, '{"classification": {"image_type": "vehicle_exterior"}}')$q$), 'before: uploader skips the gate and writes reader keys');
+SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, user_id, submitted_by) VALUES ('00000000-0000-0000-0000-0000000000c5', '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f2')$q$), 'before: stranger names the owner as submitter');
 RESET ROLE;
 SELECT public.assert((SELECT count(*) FROM public.vehicle_images WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a2' AND id::text LIKE '%c_') = 3, 'before: 3 stranger rows on a2');
+SET ROLE authenticated; SELECT set_config('test.role', 'authenticated', false), set_config('test.uid', '00000000-0000-0000-0000-0000000000f2', false);
+SELECT public.assert(NOT public.refused($q$UPDATE public.vehicle_images SET vision_gate_status = 'approved' WHERE id = '00000000-0000-0000-0000-0000000000b2'$q$), 'before: uploader PATCHes own gate to approved');
+RESET ROLE;
+UPDATE public.vehicle_images SET vision_gate_status = 'pending' WHERE id = '00000000-0000-0000-0000-0000000000b2';
 DELETE FROM public.vehicle_images WHERE id::text LIKE '%c_';
 
 \ir ../migrations/20261126040500_vehicle_images_insert_tie.sql
@@ -228,10 +243,13 @@ SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, ve
 SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, user_id) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000f2')$q$), 'forged user_id unfiled: refused');
 SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, documented_by_user_id) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000f2')$q$), 'user_id filled from documented_by_user_id = someone else: refused');
 SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, submitted_by) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000f2')$q$), 'user_id filled from submitted_by = someone else: refused');
-SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, image_url) VALUES (gen_random_uuid(), 'x')$q$), 'no uploader at all: refused');
+SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, user_id, submitted_by) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f2')$q$), 'user_id = self, submitted_by = someone else, unfiled: refused');
+SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id, submitted_by) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f1')$q$), 'submitted_by = the car''s owner, user_id = self: refused');
+WITH i AS (INSERT INTO public.vehicle_images (id, image_url) VALUES ('00000000-0000-0000-0000-0000000000d9', 'x') RETURNING user_id, submitted_by) SELECT public.assert(user_id = '00000000-0000-0000-0000-0000000000f3' AND submitted_by = user_id, 'no uploader named: the triggers fill the caller (submitted_by from auth.uid(), then user_id) and it lands') FROM i;
 SELECT public.assert(public.refused($q$INSERT INTO public.vehicle_images (id, user_id, merged_from_vehicle_id) VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000a2')$q$), 'merged_from set at insert: refused');
 WITH i AS (INSERT INTO public.vehicle_images (id, user_id, is_sensitive) VALUES ('00000000-0000-0000-0000-0000000000d3', '00000000-0000-0000-0000-0000000000f3', false) RETURNING id) SELECT public.assert(count(*) = 1, 'own unfiled insert lands and RETURNING shows it') FROM i;
 WITH i AS (INSERT INTO public.vehicle_images (id, submitted_by) VALUES ('00000000-0000-0000-0000-0000000000d4', '00000000-0000-0000-0000-0000000000f3') RETURNING user_id) SELECT public.assert(user_id = '00000000-0000-0000-0000-0000000000f3', 'submitted_by = self fills user_id = self and lands') FROM i;
+WITH i AS (INSERT INTO public.vehicle_images (id, user_id, submitted_by) VALUES ('00000000-0000-0000-0000-0000000000d6', '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f3') RETURNING submitted_by) SELECT public.assert(submitted_by = '00000000-0000-0000-0000-0000000000f3', 'user_id = submitted_by = self lands') FROM i;
 -- UPDATE as the stranger
 SELECT public.assert(public.refused($q$UPDATE public.vehicle_images SET vehicle_id = '00000000-0000-0000-0000-0000000000a2' WHERE id = '00000000-0000-0000-0000-0000000000d3'$q$), 'PATCH own unfiled row onto another owner''s car: refused');
 SELECT public.assert(public.refused($q$UPDATE public.vehicle_images SET merged_from_vehicle_id = '00000000-0000-0000-0000-0000000000a2' WHERE id = '00000000-0000-0000-0000-0000000000d3'$q$), 'merged_from set to a car the photo never sat on: refused');
@@ -263,6 +281,25 @@ SET ROLE service_role; SELECT set_config('test.role', 'service_role', false), se
 INSERT INTO public.vehicle_images (id, vehicle_id, user_id, vision_gate_status, ai_scan_metadata) VALUES ('00000000-0000-0000-0000-0000000000e8', '00000000-0000-0000-0000-0000000000a2', NULL, 'approved', '{"classification": {"image_type": "engine_bay"}}');
 RESET ROLE;
 SELECT public.assert((SELECT vision_gate_status FROM public.vehicle_images WHERE id = '00000000-0000-0000-0000-0000000000e8') = 'approved', 'service role sets the gate and reader keys, user_id NULL');
+-- The gate on UPDATE: the gate's writer (the service role here) leaves a rejected and a pending row on the uploader's car.
+SET ROLE service_role; SELECT set_config('test.role', 'service_role', false), set_config('test.uid', '', false);
+INSERT INTO public.vehicle_images (id, vehicle_id, user_id, vision_gate_status) VALUES
+  ('00000000-0000-0000-0000-0000000000d7', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2', 'rejected_personal'),
+  ('00000000-0000-0000-0000-0000000000d8', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2', 'pending');
+RESET ROLE;
+SET ROLE authenticated; SELECT set_config('test.role', 'authenticated', false), set_config('test.uid', '00000000-0000-0000-0000-0000000000f2', false);
+SELECT public.assert(public.refused($q$UPDATE public.vehicle_images SET vision_gate_status = 'approved' WHERE id = '00000000-0000-0000-0000-0000000000d8'$q$), 'uploader and owner PATCHes pending to approved: refused');
+SELECT public.assert(public.refused($q$UPDATE public.vehicle_images SET vision_gate_status = 'approved' WHERE id = '00000000-0000-0000-0000-0000000000d7'$q$), 'rejected_personal back to approved: refused');
+SELECT public.assert(public.refused($q$UPDATE public.vehicle_images SET vision_gate_status = 'pending' WHERE id = '00000000-0000-0000-0000-0000000000d7'$q$), 'rejected_personal back to pending (re-queue): refused');
+SELECT public.assert(public.refused($q$UPDATE public.vehicle_images SET vision_gate_status = NULL WHERE id = '00000000-0000-0000-0000-0000000000d8'$q$), 'gate to NULL: refused');
+UPDATE public.vehicle_images SET caption = 'kept', vision_gate_status = vision_gate_status WHERE id = '00000000-0000-0000-0000-0000000000d7';
+RESET ROLE;
+SELECT public.assert((SELECT caption = 'kept' AND vision_gate_status = 'rejected_personal' FROM public.vehicle_images WHERE id = '00000000-0000-0000-0000-0000000000d7'), 'rejected row: caption editable, gate unchanged');
+SELECT public.assert((SELECT vision_gate_status FROM public.vehicle_images WHERE id = '00000000-0000-0000-0000-0000000000d8') = 'pending', 'pending row still pending');
+SET ROLE service_role; SELECT set_config('test.role', 'service_role', false), set_config('test.uid', '', false);
+UPDATE public.vehicle_images SET vision_gate_status = 'approved' WHERE id = '00000000-0000-0000-0000-0000000000d8';
+RESET ROLE;
+SELECT public.assert((SELECT vision_gate_status FROM public.vehicle_images WHERE id = '00000000-0000-0000-0000-0000000000d8') = 'approved', 'the service role still moves the gate');
 
 -- anon
 SET ROLE anon; SELECT set_config('test.role', 'anon', false), set_config('test.uid', '', false);
@@ -325,6 +362,30 @@ DROP TRIGGER a000_vehicle_images_client_insert_guard ON public.vehicle_images;
 SET ROLE authenticated; SELECT set_config('test.role', 'authenticated', false), set_config('test.uid', '00000000-0000-0000-0000-0000000000f2', false);
 SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, vehicle_id, user_id, vision_gate_status) VALUES ('00000000-0000-0000-0000-0000000000c5', '00000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000f2', NULL)$q$), 'mutant (no insert guard): gate NULL lands');
 RESET ROLE;
+DELETE FROM public.vehicle_images WHERE id::text LIKE '%c_';
+\ir ../migrations/20261126040500_vehicle_images_insert_tie.sql
+
+-- Mutant 4: without the gate in the move guard's WHEN the uploader approves their own photo again.
+DROP TRIGGER zz_vehicle_images_client_move_guard ON public.vehicle_images;
+CREATE TRIGGER zz_vehicle_images_client_move_guard BEFORE UPDATE ON public.vehicle_images FOR EACH ROW
+  WHEN (OLD.vehicle_id IS DISTINCT FROM NEW.vehicle_id OR OLD.user_id IS DISTINCT FROM NEW.user_id
+        OR OLD.merged_from_vehicle_id IS DISTINCT FROM NEW.merged_from_vehicle_id)
+  EXECUTE FUNCTION public.vehicle_images_client_move_guard();
+SET ROLE authenticated; SELECT set_config('test.role', 'authenticated', false), set_config('test.uid', '00000000-0000-0000-0000-0000000000f2', false);
+SELECT public.assert(NOT public.refused($q$UPDATE public.vehicle_images SET vision_gate_status = 'approved' WHERE id = '00000000-0000-0000-0000-0000000000b2'$q$), 'mutant (gate not in WHEN): uploader approves own photo');
+RESET ROLE;
+UPDATE public.vehicle_images SET vision_gate_status = 'pending' WHERE id = '00000000-0000-0000-0000-0000000000b2';
+\ir ../migrations/20261126040500_vehicle_images_insert_tie.sql
+-- Mutant 5: without the submitted_by term (both policies) a stranger names the owner as submitter again.
+DROP POLICY vehicle_images_insert_uploader ON public.vehicle_images;
+DROP POLICY vehicle_images_insert_uploader_tied ON public.vehicle_images;
+CREATE POLICY mutant_no_submitter ON public.vehicle_images FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth.uid() AND merged_from_vehicle_id IS NULL
+              AND (vehicle_id IS NULL OR public.user_can_edit_vehicle(vehicle_id, auth.uid())));
+:stranger
+SELECT public.assert(NOT public.refused($q$INSERT INTO public.vehicle_images (id, user_id, submitted_by) VALUES ('00000000-0000-0000-0000-0000000000c6', '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f2')$q$), 'mutant (no submitted_by term): forged submitter lands');
+RESET ROLE;
+DROP POLICY mutant_no_submitter ON public.vehicle_images;
 DELETE FROM public.vehicle_images WHERE id::text LIKE '%c_';
 \ir ../migrations/20261126040500_vehicle_images_insert_tie.sql
 
