@@ -26,6 +26,9 @@
 -- EXPLAIN (prod, 2026-11-25, the five most-called anon statements on vehicles in pg_stat_statements, 7,726-8,980 calls
 -- each; EXPLAIN ANALYZE, median of three, before = live policies as anon, after = the new quals written out for anon):
 -- same plan shapes (four by-id: Index Scan vehicles_pkey; one page: Seq Scan under Limit), 0.12-0.19 ms either way.
+-- Child reads through a policy subquery on vehicles (the #2293 class), same method, median of 5 interleaved: the two
+-- most-called anon vehicle_images statements (10,274 and 7,730 calls) 20.2 -> 20.1 and 20.1 -> 16.3 ms; the
+-- vehicle_events + lateral vehicles statement (3,473 calls) 3.6 -> 2.0 ms; same plan shapes.
 -- CONTRACT: supabase/sql/test_vehicles_policy_deleted_gate.sql (PG17). REVERSAL:
 -- supabase/sql/revert_20261125225000_vehicles_policy_deleted_gate.sql.
 BEGIN;
@@ -57,8 +60,10 @@ CREATE OR REPLACE FUNCTION public.vehicle_publicly_readable(p_is_public boolean,
 AS $function$
   SELECT coalesce(p_is_public, false) AND (p_deleted_at IS NULL OR p_merged_into_vehicle_id IS NOT NULL)
 $function$;
-REVOKE ALL ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) TO anon, authenticated, service_role;
+-- The policies apply TO public, so every role that may read vehicles must be able to execute (and so inline) the
+-- predicate: live 2026-11-25, pg_read_all_data selects vehicles without bypassing RLS and had no EXECUTE. It reads no
+-- data, so PUBLIC.
+GRANT EXECUTE ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) TO PUBLIC, anon, authenticated, service_role;
 
 CREATE TEMP TABLE _vehicles_copy_before AS SELECT NULL::text AS reader, NULL::text AS policy_filter, NULL::text AS h LIMIT 0;
 DO $b$ BEGIN
@@ -119,8 +124,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.oid = 'public.vehicle_publicly_readable(boolean,timestamptz,uuid)'::regprocedure
                  AND p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'sql') AND NOT p.prosecdef
                  AND p.proconfig IS NULL AND p.provolatile = 'i'
-                 AND has_function_privilege('anon', p.oid, 'EXECUTE') AND has_function_privilege('authenticated', p.oid, 'EXECUTE')) THEN
-    RAISE EXCEPTION 'vehicle_publicly_readable not inlinable or not executable by anon and authenticated';
+                 AND NOT EXISTS (SELECT 1 FROM pg_roles r WHERE NOT r.rolsuper AND NOT r.rolbypassrls
+                                   AND has_any_column_privilege(r.oid, 'public.vehicles', 'SELECT')
+                                   AND NOT has_function_privilege(r.oid, p.oid, 'EXECUTE'))) THEN
+    RAISE EXCEPTION 'vehicle_publicly_readable not inlinable, or a role that reads vehicles under RLS cannot execute it';
   END IF;
 END $check$;
 COMMIT;

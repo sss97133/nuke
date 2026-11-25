@@ -39,6 +39,15 @@ CREATE TABLE public.private_row_probes (relation text NOT NULL, subject_kind tex
   sample_filter text CHECK (sample_filter IS NULL OR (reader_args IS NULL AND position(';' IN sample_filter) = 0)), reader_tail text,
   CHECK (subject_kind IN ('image', 'vehicle', 'user', 'flag', 'visibility', 'withheld_column')),
   PRIMARY KEY (relation, subject_kind, subject_column, reader));
+-- The predicate as 20261125214500 left it live: revoked from PUBLIC.
+CREATE FUNCTION public.vehicle_publicly_readable(p_is_public boolean, p_deleted_at timestamptz, p_merged_into_vehicle_id uuid)
+ RETURNS boolean LANGUAGE sql IMMUTABLE PARALLEL SAFE
+AS $function$
+  SELECT coalesce(p_is_public, false) AND (p_deleted_at IS NULL OR p_merged_into_vehicle_id IS NOT NULL)
+$function$;
+REVOKE ALL ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.vehicle_publicly_readable(boolean, timestamptz, uuid) TO anon, authenticated, service_role;
+GRANT SELECT ON public.vehicles TO pg_read_all_data;
 -- Stand-ins for the guard only: it requires the two definer readers to call the predicate already. Their own
 -- contracts are test_vehicle_row_read_deleted_gate.sql and test_profile_deleted_redirect.sql.
 CREATE OR REPLACE FUNCTION public.vehicle_row_read(p_vehicle_id uuid) RETURNS jsonb LANGUAGE sql AS
@@ -135,6 +144,9 @@ DO $$ BEGIN
   ASSERT (SELECT encode(sha256(convert_to(prosrc, 'UTF8')), 'hex') FROM pg_proc
           WHERE oid = 'public.vehicle_publicly_readable(boolean,timestamptz,uuid)'::regprocedure)
        = '9fba27fc97f7e966763ee5f5e1c92d06dea5dda20aa720e1faaab63de31e8bd3', '5 same predicate body as the readers''';
+  -- Live 2026-11-25: pg_read_all_data reads vehicles under RLS; a role like it must be able to execute the predicate.
+  ASSERT has_function_privilege('pg_read_all_data', 'public.vehicle_publicly_readable(boolean,timestamptz,uuid)', 'EXECUTE'),
+    '5 every role that reads vehicles can execute the predicate';
 END $$;
 BEGIN;
 SELECT public.t_claims('');
