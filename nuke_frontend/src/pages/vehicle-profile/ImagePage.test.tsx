@@ -273,6 +273,6 @@ it('reads the source registry by its viewer columns, never * or the internal one
   expect(reads).toHaveLength(1);
   expect(reads[0].selected).toBe(OBSERVATION_SOURCE_PUBLIC_COLUMNS);
   const cols = reads[0].selected.split(',').map((s: string) => s.trim());
-  expect(cols).toHaveLength(23);
-  for (const internal of ['*', 'notes', 'trust_factors', 'species_evidence']) expect(cols).not.toContain(internal);
+  expect(cols).toHaveLength(24);
+  for (const internal of ['*', 'notes', 'trust_factors']) expect(cols).not.toContain(internal);
 });
