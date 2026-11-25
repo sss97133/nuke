@@ -315,8 +315,10 @@ jobs:
             if [ -n "$line" ]; then echo "$line" | jq -r 'to_entries[] | "- \(.key): \(.value | tojson)"'; else echo "- no summary was printed"; fi
           } >> "$GITHUB_STEP_SUMMARY"
           # The heartbeat, as the Mac posts it (reader-heartbeat.mjs: nothing is posted when the reader failed or printed
-          # no summary). record_reader_heartbeat admits one name for this reader, so this run writes the Mac's row; host
-          # says which wrote it. The summary travels in the environment and is parsed as JSON, never run.
-          READER_NAME=subscription-frame-classifier READER_HOST=github_actions READER_SUMMARY="$summary" READER_EXIT="$rc" \
+          # no summary), under this host's own name (20261125171000), so the Mac's subscription-frame-classifier row stays
+          # the Mac's. assay_subscription_readers (cron subscription-reader-watch, its row in v_job_health) fails when this
+          # row is over an hour old while the stages this reader claims hold due work. The summary travels in the
+          # environment and is parsed as JSON, never run.
+          READER_NAME=subscription-frame-classifier-actions READER_HOST=github_actions READER_SUMMARY="$summary" READER_EXIT="$rc" \
             READER_ELAPSED_MS="$(( ( $(date +%s) - started ) * 1000 ))" node scripts/photo-pipeline/reader-heartbeat.mjs 2>/dev/null || true
           exit "$rc"

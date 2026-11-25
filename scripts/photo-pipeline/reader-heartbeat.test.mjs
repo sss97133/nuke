@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { buildHeartbeatBody, postHeartbeat, previousReading, readingFromSummary, withZeroReadRun, MAX_READING_BYTES } from './reader-heartbeat.mjs';
+import { buildHeartbeatBody, postHeartbeat, previousReading, readingFromSummary, withZeroReadRun, MAX_READING_BYTES, READERS, START_READERS } from './reader-heartbeat.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const run = promisify(execFile);
@@ -211,4 +211,16 @@ test('READER_HOST names where the fire ran, in fixed words only', () => {
   assert.equal(at('github_actions').host, 'github_actions');
   assert.equal('host' in at(undefined), false);
   for (const bad of ['GitHub', 'a b', 'x'.repeat(25), '', 'run-1']) assert.equal('host' in at(bad), false, bad);
+});
+
+test('the Actions host posts under its own name, which the start writer does not take', () => {
+  const body = buildHeartbeatBody({ name: 'subscription-frame-classifier-actions', summary: '{"frames":0,"read":0}', elapsedMs: '900', host: 'github_actions' });
+  assert.equal(body.p_jobname, 'subscription-frame-classifier-actions');
+  assert.equal(body.p_reading.host, 'github_actions');
+  assert.ok(READERS.includes('subscription-frame-classifier'), 'the Mac keeps its name');
+  assert.equal(START_READERS.includes('subscription-frame-classifier-actions'), false, 'record_reader_start does not know the Actions name');
+  // the workflow posts under that name, and the name matches the one the migration admits
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  assert.match(readFileSync(join(root, '.github/workflows/photo-keys.yml'), 'utf8'), /READER_NAME=subscription-frame-classifier-actions READER_HOST=github_actions/);
+  assert.match(readFileSync(join(root, 'supabase/migrations/20261125171000_actions_reader_heartbeat.sql'), 'utf8'), /'answer-receipt-parts', 'subscription-frame-classifier-actions'\)/);
 });

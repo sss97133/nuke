@@ -93,6 +93,10 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    every ten minutes with `--limit 20 --concurrency 2` in `scripts/photo-pipeline/subscription-reader-batch.sh`
    (since 2026-11-20 a fast fire each minute between runs the first read of a newly landed photo, up to
    `first_reads_per_hour` in `platform_config` `image_stage_reconciler`, 360 when the row names none).
+   Since 2026-11-25 two hosts read, the Mac's launchd job and the `stages` job of `.github/workflows/photo-keys.yml`,
+   claiming one `image_stage_work` queue under leases and a live daily cap the database enforces
+   (`image_pipeline_stages.live_daily_cap`, #3861). Each posts its own heartbeat (`subscription-frame-classifier`,
+   `subscription-frame-classifier-actions`); a host that stops turns `subscription-reader-watch` red in `v_job_health`.
    Each of those reads lands a description, a colour, text and sometimes an angle, and nothing keyed. A
    request to read faster, or to read everything oldest first, is answered with those facts and one
    question back to the owner: which vehicle or job first, and what budget on his subscription. Raising
