@@ -41,6 +41,7 @@ CREATE TABLE public.receipts (id uuid PRIMARY KEY, vehicle_id uuid, scope_type t
   duplicate_of uuid, is_superseded boolean DEFAULT false, amount_check public.receipt_amount_check, amount_check_reasons jsonb,
   document_kind public.receipt_doc_kind);
 CREATE TABLE public.receipt_items (id uuid PRIMARY KEY, receipt_id uuid REFERENCES public.receipts(id) ON DELETE CASCADE, total_price numeric);
+CREATE TABLE public.vehicle_value_recompute_queue (vehicle_id uuid PRIMARY KEY REFERENCES public.vehicles(id), queued_at timestamptz DEFAULT now());
 CREATE TABLE public.receipt_vehicle_links (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_id uuid REFERENCES public.receipts(id),
   vehicle_id uuid, status text, retired_at timestamptz);
 -- Production definitions, 2026-11-25.
@@ -100,6 +101,7 @@ SELECT public.assert((public.get_vehicle_total_invested_unmasked('00000000-0000-
 
 \ir ../migrations/20261124224500_vehicle_spend_lines.sql
 \ir ../migrations/20261124224500_vehicle_spend_lines.sql
+\ir ../migrations/20261124234500_vehicle_spend_fold_enqueue_value.sql
 
 CREATE FUNCTION pg_temp.rows_of(p_receipt text) RETURNS text LANGUAGE sql AS $$
   SELECT string_agg(basis || ':' || amount::text, ',' ORDER BY basis, amount)
@@ -126,7 +128,9 @@ SELECT public.assert((SELECT count(*) FROM public.vehicle_spend_lines) = 10, 'te
 -- Quiet when nothing changed; refolds one car when its paper changes.
 SELECT public.assert((public.vehicle_spend_fold('t1') ->> 'cars_refolded')::int = 0, 'no change, no refold');
 UPDATE public.receipt_vehicle_links SET retired_at = now() WHERE receipt_id = '00000000-0000-0000-0000-000000000002';
+DELETE FROM public.vehicle_value_recompute_queue;
 SELECT public.assert((public.vehicle_spend_fold('t2') ->> 'cars_refolded')::int = 1, 'retired link refolds V1');
+SELECT public.assert((SELECT array_agg(vehicle_id::text) FROM public.vehicle_value_recompute_queue) = ARRAY['00000000-0000-0000-0000-0000000000a1'], 'the refolded car is queued for value');
 SELECT public.assert(pg_temp.receipts_of('a1') = 185 AND pg_temp.rows_of('000000000002') IS NULL, 'retired link drops its paper');
 UPDATE public.receipts SET is_superseded = true WHERE id = '00000000-0000-0000-0000-000000000001';
 UPDATE public.receipts SET document_kind = 'quote' WHERE id = '00000000-0000-0000-0000-000000000004';
