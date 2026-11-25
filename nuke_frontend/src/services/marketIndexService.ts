@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { explainRefusal } from '../lib/adminOnlyRefusal';
 
 // =====================================================
 // TYPES
@@ -339,7 +340,7 @@ export class MarketIndexService {
         }
       });
 
-      if (error) throw error;
+      if (error) throw explainRefusal(error);
       return data;
     } catch (error) {
       console.error('Error triggering index recalculation:', error);

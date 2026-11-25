@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { explainRefusal } from '../../lib/adminOnlyRefusal';
 
 interface BaTProfileData {
   username: string;
@@ -78,7 +79,7 @@ export const BaTProfileExtractor: React.FC = () => {
         }
       );
 
-      if (extractError) throw extractError;
+      if (extractError) throw explainRefusal(extractError);
       if (extractData?.error) throw new Error(extractData.error);
 
       // Get updated identity data

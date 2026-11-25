@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { ADMIN_ONLY_TEXT, isAdminOnlyRefusal } from '../../lib/adminOnlyRefusal';
 
 interface ProcessingImage {
   id: string;
@@ -129,6 +130,7 @@ export default function LivePhotoProcessor() {
           }
         );
 
+        if (isAdminOnlyRefusal(response)) throw new Error(ADMIN_ONLY_TEXT);
         const result = await response.json();
         clearInterval(progressInterval);
 
@@ -156,7 +158,7 @@ export default function LivePhotoProcessor() {
       } catch (err) {
         clearInterval(progressInterval);
         setImages(prev => prev.map(p =>
-          p.id === img.id ? { ...p, status: 'error', progress: 0, error: String(err) } : p
+          p.id === img.id ? { ...p, status: 'error', progress: 0, error: err instanceof Error ? err.message : String(err) } : p
         ));
         setStats(prev => ({ ...prev, errors: prev.errors + 1, queued: prev.queued - 1 }));
       }
