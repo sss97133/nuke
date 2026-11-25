@@ -16,7 +16,7 @@
 -- 2. model_fold_logic_key also hashes code_reading_polarity_rules, so a rule row edit re-folds like a code edit (this one
 --    included: the pontiac_f_body scope re-derives its memberships).
 -- REVERT: restore the 20261124193900 pattern; drop the logic-key line (marker polarity_rules_in_logic_key_v1).
--- Contract: supabase/sql/test_polarity_offered_rule.sql.
+-- Contract: supabase/sql/test_polarity_reference_after_rule.sql.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 

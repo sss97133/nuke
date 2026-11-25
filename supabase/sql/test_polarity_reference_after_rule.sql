@@ -1,4 +1,4 @@
--- Contract for 20261124195200_polarity_offered_rule (empty disposable PG17; the rule table and model_fold_logic_key stubbed
+-- Contract for 20261124195200_polarity_reference_after_rule (empty disposable PG17; the rule table and model_fold_logic_key stubbed
 -- with the live anchor). Asserts the narrowed pattern on generic phrasings (no listing text), that the logic key moves with
 -- a rule row, and an idempotent re-apply.
 \set ON_ERROR_STOP on
@@ -17,8 +17,8 @@ CREATE FUNCTION public.model_fold_logic_key() RETURNS text LANGUAGE sql STABLE S
 $function$;
 CREATE TEMP TABLE k0 AS SELECT public.model_fold_logic_key() AS k;
 
-\ir ../migrations/20261124195200_polarity_offered_rule.sql
-\ir ../migrations/20261124195200_polarity_offered_rule.sql
+\ir ../migrations/20261124195200_polarity_reference_after_rule.sql
+\ir ../migrations/20261124195200_polarity_reference_after_rule.sql
 
 DO $$
 DECLARE p text := (SELECT pattern FROM public.code_reading_polarity_rules WHERE rule_key = 'candidates_reference_after'); k1 text;
@@ -39,4 +39,4 @@ BEGIN
   ASSERT public.model_fold_logic_key() <> k1, 'a rule row edit moves the logic key';
   ASSERT (SELECT count(*) FROM regexp_matches(pg_get_functiondef('public.model_fold_logic_key()'::regprocedure), 'polarity_rules_in_logic_key_v1', 'g')) = 1, 'patched once';
 END $$;
-\echo polarity_offered_rule: ok
+\echo polarity_reference_after_rule: ok
