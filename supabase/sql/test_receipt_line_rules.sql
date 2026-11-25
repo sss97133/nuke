@@ -1,4 +1,4 @@
--- Disposable PG17: receipt line classification as rows (migration 20261124163000_receipt_line_rules, later 20261124221500).
+-- Disposable PG17: receipt line classification as rows (migration 20261124163000_receipt_line_rules, later 20261124221500, 20261124234000).
 -- Covers: the legacy CASE bodies, loaded verbatim from migration 20261119200000, and the rule reader return the same
 -- system and labor operation for a fixture set that hits every seeded rule plus the order collisions; the migration's
 -- own proof block runs over the fixture lines; scoped and proposed rules never reach the text-only wrappers; a pattern
@@ -420,5 +420,87 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END $$;
+
+-- edges (migration 20261124234000): every line's classifier output is a stored row whose basis is its rule.
+RESET ROLE;
+\i supabase/migrations/20261124234000_receipt_line_edges.sql
+\i supabase/migrations/20261124234000_receipt_line_edges.sql
+DO $$
+DECLARE c text; bad int; m jsonb; j jsonb;
+BEGIN
+  -- Stored edges equal the per-line reader for every fixture line and classifier, after two runs of the migration.
+  FOREACH c IN ARRAY ARRAY['system', 'labor_operation', 'line_kind'] LOOP
+    SELECT count(*) INTO bad FROM public.receipt_items i
+      LEFT JOIN public.receipt_line_edges e ON e.receipt_item_id = i.id AND e.classifier = c
+     WHERE e.rule_id IS DISTINCT FROM (SELECT x.rule_id FROM public.receipt_line_rule_hit(c, i.description, i.part_number) x LIMIT 1);
+    PERFORM public.assert(bad = 0, c || ' edges differ from hit: ' || bad);
+  END LOOP;
+  PERFORM public.assert((SELECT count(*) FROM public.receipt_line_edges) > 0, 'edges written');
+  PERFORM public.assert((SELECT bool_and(grade = 'claim') FROM public.receipt_line_edges), 'every pattern edge is a claim');
+  PERFORM public.assert((SELECT line_kind FROM public.receipt_line_edges
+                          WHERE receipt_item_id = '00000000-0000-0000-0000-000000000d02' AND classifier = 'line_kind') = 'return',
+                        'line_kind edge for the return line');
+  PERFORM public.assert((SELECT count(*) FROM public.receipt_line_edge_runs WHERE source = 'backfill') = 2, 'backfill runs logged');
+  -- A second full run writes nothing: the hourly re-verify is quiet when no trigger missed a line.
+  j := public.receipt_line_edges_refresh(NULL, 'cron');
+  PERFORM public.assert((j->>'written')::int = 0 AND (j->>'deleted')::int = 0, 'quiet re-verify: ' || j::text);
+
+  -- A landed line is keyed by its trigger; an edit that no rule matches removes the edge.
+  INSERT INTO public.receipt_items (id, receipt_id, description) VALUES
+    ('00000000-0000-0000-0000-000000000e01', '00000000-0000-0000-0000-0000000000b1', 'Clutch Kit');
+  PERFORM public.assert((SELECT operation_code FROM public.receipt_line_edges
+                          WHERE receipt_item_id = '00000000-0000-0000-0000-000000000e01' AND classifier = 'labor_operation')
+                        = public.receipt_line_labor_operation('Clutch Kit'), 'insert trigger keyed the line');
+  UPDATE public.receipt_items SET description = 'zzqx widget' WHERE id = '00000000-0000-0000-0000-000000000e01';
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.receipt_line_edges
+                                     WHERE receipt_item_id = '00000000-0000-0000-0000-000000000e01'), 'edit unkeyed the line');
+  -- A promoted rule keys the line it fills; a refused one leaves the edges as they were.
+  m := public.receipt_line_rule_propose('op.960.zzqx', 'labor_operation', 960, '\yzzqx\y', 'TRIM-GRILLE', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-000000000e01']::uuid[]);
+  PERFORM public.assert(m->>'decision' = 'promoted', 'zzqx rule: ' || m::text);
+  PERFORM public.assert((SELECT rule_id || ' ' || operation_code FROM public.receipt_line_edges
+                          WHERE receipt_item_id = '00000000-0000-0000-0000-000000000e01' AND classifier = 'labor_operation')
+                        = 'op.960.zzqx TRIM-GRILLE', 'promotion recomputed the edge');
+  SELECT count(*) INTO bad FROM public.receipt_line_edges;
+  m := public.receipt_line_rule_propose('op.970.too-broad', 'labor_operation', 970, '.', 'TRIM-GRILLE', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-000000000e01']::uuid[]);
+  PERFORM public.assert(m->>'decision' = 'rejected', 'broad rule refused: ' || m::text);
+  PERFORM public.assert((SELECT count(*) FROM public.receipt_line_edges) = bad, 'refused rule left the edges unchanged');
+  -- Retiring the rule removes its edges.
+  UPDATE public.receipt_line_rules SET status = 'retired', retired_at = now() WHERE rule_id = 'op.960.zzqx';
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.receipt_line_edges WHERE rule_id = 'op.960.zzqx'), 'retired rule unkeyed');
+  PERFORM public.assert((SELECT count(*) FROM public.receipt_line_edge_runs WHERE source = 'rules') >= 2, 'rule changes logged');
+
+  -- The database refuses an edge that is not its rule's output, and an 'established' label with no basis.
+  BEGIN
+    INSERT INTO public.receipt_line_edges (receipt_item_id, classifier, rule_id, operation_code, input_md5)
+    SELECT '00000000-0000-0000-0000-000000000e01', 'labor_operation', rule_id, 'TRIM-WING-RR', 'x'
+      FROM public.receipt_line_rules WHERE classifier = 'labor_operation' AND status = 'active'
+       AND operation_code <> 'TRIM-WING-RR' LIMIT 1;
+    RAISE EXCEPTION 'FAIL: edge with a key its rule does not state accepted';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.receipt_line_edges (receipt_item_id, classifier, rule_id, operation_code, grade, input_md5)
+    SELECT '00000000-0000-0000-0000-000000000e01', 'labor_operation', rule_id, operation_code, 'established', 'x'
+      FROM public.receipt_line_rules WHERE classifier = 'labor_operation' AND status = 'active' LIMIT 1;
+    RAISE EXCEPTION 'FAIL: established edge with no basis accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  -- Deleting a line deletes its edges.
+  DELETE FROM public.receipt_items WHERE id = '00000000-0000-0000-0000-000000000e01';
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.receipt_line_edges
+                                     WHERE receipt_item_id = '00000000-0000-0000-0000-000000000e01'), 'cascade');
+END $$;
+-- Logged out: no edge, run or writer is reachable.
+SET ROLE anon;
+DO $$
+BEGIN
+  BEGIN PERFORM 1 FROM public.receipt_line_edges; RAISE EXCEPTION 'FAIL: anon read edges';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN PERFORM public.receipt_line_edges_refresh(NULL, 'call'); RAISE EXCEPTION 'FAIL: anon ran the writer';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+RESET ROLE;
 
 \echo 'test_receipt_line_rules: PASS'
