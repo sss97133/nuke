@@ -146,6 +146,8 @@ end $function$;
 \ir ../migrations/20261125153000_vehicle_labor_appraisal_fold.sql
 \ir ../migrations/20261125153000_vehicle_labor_appraisal_fold.sql
 \ir ../migrations/20261125210500_vehicle_labor_appraisal_fold_reapply.sql
+\ir ../migrations/20261125213000_vehicle_labor_appraisal_enqueue_priority_custody.sql
+\ir ../migrations/20261125213000_vehicle_labor_appraisal_enqueue_priority_custody.sql
 
 -- Every fixture car is in scope through one judgment request row (the fixture's own rows, or one added here).
 INSERT INTO public.evidence_judgment_requests (vehicle_id, question_kind, status)
@@ -440,6 +442,62 @@ BEGIN
   PERFORM public.vehicle_labor_appraisal_fold(car);
   PERFORM public.assert((SELECT read::text FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = car) LIKE '%' || img || '%',
                         'privacy: below the rule the photo is back');
+END $$;
+
+-- The seed (20261125213000): a stored read citing a photo a visitor may no longer see is re-folded, and a car already
+-- waiting in model_fold_work behind other work is lowered to the seed's priority with its clocks kept.
+DO $$
+DECLARE
+  car uuid := '10000000-0000-0000-0000-000000000001';
+  img uuid := 'a0000000-0000-0000-0000-000000000020';
+  r jsonb;
+  t0 timestamptz := '2026-11-25 10:28:03+00';
+BEGIN
+  -- custody moves on vehicle_images alone, which signals nothing
+  -- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture database)
+  UPDATE public.vehicle_images SET is_external = true WHERE id = img;
+  UPDATE public.photo_extracted_fields SET value = 'FIX 1234' WHERE image_id = img;
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  PERFORM public.assert((SELECT read::text FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = car) LIKE '%' || img || '%',
+                        'custody: an outside photo with a plate reading is in the stored read');
+  DELETE FROM public.model_fold_signal;
+  DELETE FROM public.model_fold_work WHERE vehicle_id = car;
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car) AND (r ->> 'cites_withheld_photo')::int = 0,
+                        'custody: a fresh read citing only shown photos is not seeded: ' || r::text);
+  -- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture database)
+  UPDATE public.vehicle_images SET is_external = false WHERE id = img;
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car), 'custody: the photo row change signals nothing');
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car AND reason = 'labor_logic_key')
+                        AND (r ->> 'cites_withheld_photo')::int = 1, 'custody: the seed signals a read citing a withheld photo: ' || r::text);
+  PERFORM public.assert(coalesce(current_setting('request.jwt.claims', true), '') = '', 'custody: the seed puts the caller''s claims back');
+  DELETE FROM public.model_fold_signal;
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  PERFORM public.assert((SELECT read::text FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = car) NOT LIKE '%' || img || '%',
+                        'custody: the re-fold drops the photo');
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car), 'custody: then nothing to seed');
+
+  -- a stale car waiting at priority 9 is lowered to 4; its clocks stay; no second signal
+  UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = folded_at + interval '1 second' WHERE vehicle_id = car;
+  INSERT INTO public.model_fold_work (vehicle_id, state, priority, reasons, dirty_at, first_dirty_at, next_attempt_at)
+  VALUES (car, 'pending', 9, '{sweep}', t0, t0, t0 + interval '5 minutes');
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((SELECT priority = 4 AND reasons = '{labor_logic_key,sweep}' AND dirty_at = t0 AND first_dirty_at = t0
+                                AND next_attempt_at = t0 + interval '5 minutes' FROM public.model_fold_work WHERE vehicle_id = car)
+                        AND (r ->> 'raised')::int = 1 AND NOT EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car),
+                        'priority: a waiting stale car is lowered to 4, clocks kept, not re-signalled: ' || r::text);
+  UPDATE public.model_fold_work SET priority = 9, state = 'leased' WHERE vehicle_id = car;
+  PERFORM public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((SELECT priority FROM public.model_fold_work WHERE vehicle_id = car) = 9, 'priority: a leased row is left alone');
+  UPDATE public.model_fold_work SET state = 'pending' WHERE vehicle_id = car;
+  -- one transaction has one now(): clear the stamp set a second ahead of it, then fold
+  UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = NULL WHERE vehicle_id = car;
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  PERFORM public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((SELECT priority FROM public.model_fold_work WHERE vehicle_id = car) = 9, 'priority: a fresh car keeps its place');
+  DELETE FROM public.model_fold_work WHERE vehicle_id = car;
 END $$;
 
 -- A viewer-dependent rule: the fold refuses to store and the reader computes at read.
