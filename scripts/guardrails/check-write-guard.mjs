@@ -47,13 +47,31 @@ const ALLOWLIST = {
 };
 
 // Functions that write with the service client on ids or text the caller supplies, and so must refuse an ordinary
-// signed-in caller too (sign-up is open and anonymous sign-in is on): each must call requireOwnerOrService,
-// requireAdminOrService or isServiceCaller. Say which rows a stranger could otherwise write.
+// signed-in caller too (sign-up is open with email auto-confirmed, so "signed in" is anyone): each must call
+// requireOwnerOrService, requireAdminOrService or isServiceCaller before it reads the request body.
+// Say which rows a stranger could otherwise write.
 const SERVICE_SCOPED = {
   "deal-jacket-pipeline": "moves a caller-named vehicle_images row onto a car picked from caller text, creates cars, overwrites vehicles.vin/mileage/sale_price/origin_metadata, runs paid extraction (2026-11-25)",
   "forensic-deal-jacket": "stores extractions on a caller-named image and writes vehicles.origin_metadata; runs paid AI (2026-09-29)",
 };
-const STRONG_GATE = /\b(requireOwnerOrService|requireAdminOrService|isServiceCaller)\(/;
+// A statement of its own at the handler's top level (2-4 spaces in), not a clause inside another condition.
+const STRONG_GATE = /^ {2,4}(?:(?:const|let) \w+ = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b)/m;
+const BODY_READ = /\b(req|request)\.(json|formData|text)\(|new URL\(\s*(req|request)\.url/;
+// The gate must run before the handler reads anything the caller sent: a call after the body is parsed, or
+// one that only appears in a later branch, does not count.
+function gatedBeforeBody(fn) {
+  for (const f of readdirSync(path.join(FN_DIR, fn)).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))) {
+    // Comments do not gate anything: blank them out (keeping offsets) before matching.
+    const src = readFileSync(path.join(FN_DIR, fn, f), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+      .replace(/(^|[^:"'`])\/\/[^\n]*/g, (m, p) => p + " ".repeat(m.length - p.length));
+    const gate = STRONG_GATE.exec(src);
+    if (!gate) continue;
+    const body = BODY_READ.exec(src);
+    if (!body || gate.index < body.index) return true;
+  }
+  return false;
+}
 const WRITE_RPCS = new Set(["persist_auction_readiness", "register_make_model_subject", "exec_sql", "execute_sql"]);
 const RAW_PG = /deno\.land\/x\/postgres|postgresjs|npm:postgres|NUKE_DB_POOL_URL|SUPABASE_DB_URL/;
 const RAW_WRITE = /\b(INSERT\s+INTO|UPDATE\s+[a-z_."]+\s+SET|DELETE\s+FROM|TRUNCATE)\b/i;
@@ -133,11 +151,7 @@ while (changed) {
 const writers = [...info].filter(([, i]) => i.reasons.length);
 const unguarded = writers.filter(([fn, i]) => !i.guarded && !(fn in ALLOWLIST));
 const preflightRuns = [...info].filter(([, i]) => i.usesGuard && i.preflight);
-const scopedOpen = Object.keys(SERVICE_SCOPED).filter((fn) => {
-  if (!info.has(fn)) return false;
-  return !readdirSync(path.join(FN_DIR, fn)).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
-    .some((f) => STRONG_GATE.test(readFileSync(path.join(FN_DIR, fn, f), "utf8")));
-});
+const scopedOpen = Object.keys(SERVICE_SCOPED).filter((fn) => info.has(fn) && !gatedBeforeBody(fn));
 const scopedStale = Object.keys(SERVICE_SCOPED).filter((fn) => !info.has(fn));
 const stale = Object.keys(ALLOWLIST).filter((fn) => !info.has(fn));
 const idle = Object.keys(ALLOWLIST).filter((fn) => info.has(fn) && !info.get(fn).reasons.length);
@@ -161,7 +175,7 @@ for (const fn of scopedStale) console.log(`  note: service-scoped entry '${fn}' 
 if (scopedOpen.length) {
   console.error(`\n✗ ${scopedOpen.length} service-scoped function(s) admit any signed-in caller:`);
   for (const fn of scopedOpen) console.error(`  ${fn}  (${SERVICE_SCOPED[fn]})`);
-  console.error("\nAfter requireWriteAuth, add `const notOwner = await requireOwnerOrService(req); if (notOwner) return notOwner;`\n(or requireAdminOrService / isServiceCaller), as forensic-deal-jacket does.");
+  console.error("\nRight after requireWriteAuth, before the body is read, add\n`const notOwner = await requireOwnerOrService(req); if (notOwner) return notOwner;`\n(or requireAdminOrService / isServiceCaller), as forensic-deal-jacket does.");
 }
 if (preflightRuns.length) {
   console.error(`\n✗ ${preflightRuns.length} guarded function(s) run their handler for an anonymous OPTIONS request:`);
