@@ -300,6 +300,30 @@ BEGIN
     RETURNING id INTO v;
   RETURN v;
 END $$;
+-- Every listed writer's name (an overload with a third argument), each writing a fully traceable agent: decision, so
+-- the agent: refusal is shown for all 17, not only for one.
+DO $do$
+DECLARE w text;
+BEGIN
+  FOREACH w IN ARRAY public.evidence_writer_names() LOOP
+    EXECUTE format($f$CREATE FUNCTION public.%I(p_user uuid, p_target uuid, p_channel text) RETURNS uuid
+      LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $b$
+      DECLARE v uuid;
+      BEGIN
+        PERFORM set_config('evidence.writer', 'on', true);
+        INSERT INTO evidence_decisions(user_id, target_kind, target_id, decision, decided_by, on_behalf_of, review_ref,
+            review_method, reason, detail)
+          VALUES (p_user, 'image_candidate', p_target, 'confirmed', 'agent:contract-' || p_channel, p_user,
+            'review:' || gen_random_uuid() || '#1', 'owner_chat_review', 'contract',
+            jsonb_build_object('writer', %L, 'answer_ref', 'answers:' || gen_random_uuid() || '#1',
+                               'answer_sha256', md5('answer') || md5('contract')))
+          RETURNING id INTO v;
+        RETURN v;
+      END $b$$f$, w, w);
+    EXECUTE format('REVOKE ALL ON FUNCTION public.%I(uuid, uuid, text) FROM PUBLIC, anon', w);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION public.%I(uuid, uuid, text) TO authenticated, service_role', w);
+  END LOOP;
+END $do$;
 -- A writer's name that forgets its token.
 CREATE FUNCTION public.record_day_context(p_user_id uuid, p_run uuid) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -597,7 +621,15 @@ SELECT public.evidence_record_answers(:'u1', :'cand_u1');
 \set ON_ERROR_STOP on
 SELECT t_refused('job: a listed writer cannot write an agent: decision as service_role', :'SQLSTATE', :'LAST_ERROR_MESSAGE',
   '42501', 'evidence_decisions: no agent records an owner decision (agent: refused from every caller)');
+-- Each of the 17 writer names, called at top level (\gexec runs every generated call as its own statement).
+\echo 'Expected next: 17 refusals, one per writer name: no agent records an owner decision.'
+\set ON_ERROR_STOP off
+SELECT format('SELECT public.%I(%L, %L, %L)', w, :'u1', :'cand_u1', w) FROM unnest(public.evidence_writer_names()) w \gexec
+\set ON_ERROR_STOP on
 :ADMIN
+SELECT t_assert((SELECT count(*) FROM evidence_decisions WHERE decided_by LIKE 'agent:%') = 0
+  AND cardinality(public.evidence_writer_names()) = 17,
+  'job: none of the 17 writer names can write an agent: decision as service_role');
 SELECT t_assert(t_rows() = :'rows_seeded', 'no refused statement changed a row');
 
 -- 8. The owner's own session (PostgREST, role authenticated): the channel rules the guard enforces on a writer's name.
