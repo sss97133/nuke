@@ -2,8 +2,9 @@
 -- returns the stored row. Builds on the labor reader fixture (test_vehicle_labor_appraisal_names.sql) plus the model fold
 -- signal functions as live on 2026-11-25 (model_fold_signal_ids, model_fold_rows_signal, model_fold_origin_update_signal)
 -- and a model_fold_one stub holding the live anchor. Checks: stored read = computed read minus as_of on every fixture car;
--- an answered judgment request and a changed receipt line edge stamp the row stale and the reader serves the stored
--- read flagged state.fresh false (never blank once computed);
+-- an answered judgment request and a changed receipt line edge stamp the row stale and the reader serves the live
+-- compute (state.basis computed_now); a car too slow to compute at read gets its stored read flagged 'recomputing' or the
+-- not-yet-computed status, named in the gauge; a car with no state row returns the compute (never blank in scope);
 -- a clock-only edge restamp does not; a rule-row change moves the key; model_fold_one folds a car in scope; the signal
 -- writer admits a car that has a row; a viewer-dependent rule stops the fold from storing; a private car is computed
 -- at read; anon cannot call the compute, fold, scope or enqueue functions. Synthetic rows only.
@@ -166,10 +167,12 @@ BEGIN
     PERFORM public.model_fold_one(gen_random_uuid(), r.v, '{}'::jsonb);
     c := public.vehicle_labor_appraisal_compute(r.v);
     s := public.vehicle_labor_appraisal(r.v);
-    PERFORM public.assert(s #>> '{state,queued}' = 'true' AND s #>> '{state,fresh}' = 'false', 'a waiting signal keeps it not fresh: ' || r.v);
+    PERFORM public.assert(s #>> '{state,queued}' = 'true' AND s #>> '{state,basis}' = 'computed_now'
+                          AND (s - 'as_of' - 'state') = (c - 'as_of'), 'a waiting signal: the live compute, basis computed_now: ' || r.v);
     DELETE FROM public.model_fold_signal WHERE vehicle_id = r.v;  -- the tick absorbed and folded it
     s := public.vehicle_labor_appraisal(r.v);
-    PERFORM public.assert((s ->> 'state')::jsonb ->> 'fresh' = 'true', 'fresh row read: ' || r.v);
+    PERFORM public.assert((s ->> 'state')::jsonb ->> 'fresh' = 'true' AND s #>> '{state,basis}' = 'stored'
+                          AND s #>> '{state,label}' IS NULL, 'fresh row read: ' || r.v);
     PERFORM public.assert((s - 'as_of' - 'state') = (c - 'as_of'), 'stored read = computed read: ' || r.v);
     n := n + 1;
   END LOOP;
@@ -183,19 +186,51 @@ BEGIN
 END $$;
 RESET test.auth_role;
 
--- An in-scope car never folded: blank, not computed cold.
+-- An in-scope car never folded: the live compute (lead ruling: the stored row is a cache, never a gate).
+-- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture database)
+SET test.auth_role = 'anon';
 DO $$
 DECLARE vid uuid := (SELECT b.v FROM _labor_names_before b JOIN public.vehicles v ON v.id = b.v
                       WHERE v.is_public IS TRUE ORDER BY b.v LIMIT 1);
-        keep public.vehicle_labor_appraisal_state%ROWTYPE; s jsonb;
+        keep public.vehicle_labor_appraisal_state%ROWTYPE; s jsonb; c jsonb;
 BEGIN
   SELECT * INTO keep FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = vid;
   DELETE FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = vid;
+  c := public.vehicle_labor_appraisal_compute(vid);
   s := public.vehicle_labor_appraisal(vid);
-  PERFORM public.assert(s ->> 'status' = 'not_yet_computed' AND s #>> '{state,computed}' = 'false' AND NOT (s ? 'totals'),
-                        'never computed: blank');
+  PERFORM public.assert(s #>> '{state,basis}' = 'computed_now' AND s #>> '{state,computed}' = 'true'
+                        AND s #>> '{state,fresh}' = 'true' AND s #>> '{state,stored_at}' IS NULL,
+                        'never folded: computed now, not blank: ' || (s -> 'state')::text);
+  PERFORM public.assert((s - 'as_of' - 'state') = (c - 'as_of'), 'contract: no state row returns the same read as the compute');
+  PERFORM public.assert(c ? 'totals' OR c ? 'segments', 'the compute answers');
+  -- A failed fold with no good read and a timeout: the status line, named in the gauge.
+  INSERT INTO public.vehicle_labor_appraisal_state (vehicle_id, ms, error)
+    VALUES (vid, 100, 'canceling statement due to statement timeout');  -- named by the timeout, not the ms
+  s := public.vehicle_labor_appraisal(vid);
+  PERFORM public.assert(s ->> 'status' = 'not_yet_computed' AND s #>> '{state,label}' = 'not yet computed'
+                        AND s #>> '{state,computed}' = 'false' AND NOT (s ? 'totals'), 'too slow, never stored: status line');
+  PERFORM public.assert(public.vehicle_labor_appraisal_gauge() -> 'too_slow_to_compute_at_read' ? vid::text,
+                        'gauge names the slow car');
+  DELETE FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = vid;
+  INSERT INTO public.vehicle_labor_appraisal_state SELECT keep.*;
+  -- A stored read whose fold took at least half of anon's statement_timeout: stale, it serves the stored read with its
+  -- as-of time and label 'recomputing', never a live compute that would time out.
+  UPDATE public.vehicle_labor_appraisal_state SET ms = 7500, evidence_changed_at = folded_at + interval '1 second'
+   WHERE vehicle_id = vid;
+  s := public.vehicle_labor_appraisal(vid);
+  PERFORM public.assert(s #>> '{state,basis}' = 'stored' AND s #>> '{state,label}' = 'recomputing'
+                        AND s #>> '{state,fresh}' = 'false' AND (s ->> 'as_of')::timestamptz = keep.folded_at
+                        AND (s - 'as_of' - 'state') = keep.read, 'slow car, stale: last stored read with as-of');
+  PERFORM public.assert(public.vehicle_labor_appraisal_gauge() -> 'too_slow_to_compute_at_read' ? vid::text,
+                        'gauge names the slow car with a row');
+  UPDATE public.vehicle_labor_appraisal_state SET ms = 7499 WHERE vehicle_id = vid;
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'computed_now'
+                        AND NOT (public.vehicle_labor_appraisal_gauge() -> 'too_slow_to_compute_at_read' ? vid::text),
+                        'under half the timeout: computed now, not named');
+  DELETE FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = vid;
   INSERT INTO public.vehicle_labor_appraisal_state SELECT keep.*;
 END $$;
+RESET test.auth_role;
 
 -- An answer lands: the row goes stale and the reader serves the stored read flagged; the next fold makes it fresh.
 CREATE TEMP TABLE fold_v AS SELECT b.v FROM _labor_names_before b JOIN public.vehicles v ON v.id = b.v
@@ -207,15 +242,16 @@ DECLARE vid uuid := (SELECT v FROM fold_v); s jsonb; st public.vehicle_labor_app
 BEGIN
   SELECT * INTO st FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = vid;
   s := public.vehicle_labor_appraisal(vid);
-  PERFORM public.assert(s #>> '{state,fresh}' = 'false' AND s #>> '{state,computed}' = 'true'
-                        AND (s #>> '{state,evidence_changed_at}')::timestamptz > (s #>> '{state,computed_at}')::timestamptz,
-                        'answer stamps stale: flagged, with computed_at and evidence_changed_at');
-  PERFORM public.assert((s - 'as_of' - 'state') = st.read, 'stale row serves the stored read, not blank');
+  PERFORM public.assert(s #>> '{state,basis}' = 'computed_now' AND s #>> '{state,computed}' = 'true'
+                        AND (s #>> '{state,evidence_changed_at}')::timestamptz > (s #>> '{state,stored_at}')::timestamptz,
+                        'answer stamps stale: computed now, with stored_at and evidence_changed_at');
+  PERFORM public.assert((s - 'as_of' - 'state') = (public.vehicle_labor_appraisal_compute(vid) - 'as_of'),
+                        'stale row: the live compute, not the stored read');
   PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = vid AND g.priority = 2),
                         'a labor-input signal on a car with a row is admitted at priority 2');
   PERFORM public.vehicle_labor_appraisal_fold(vid);
   DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
-  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'true', 'refold makes it fresh');
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'stored', 'refold makes it fresh');
   g := public.vehicle_labor_appraisal_gauge();
   PERFORM public.assert((g ->> 'stamps_answered_24h')::int >= 1 AND (g ->> 'stale_p50_s') IS NOT NULL
                         AND (g ->> 'stale_p90_s')::numeric >= (g ->> 'stale_p50_s')::numeric,
@@ -225,6 +261,7 @@ BEGIN
   UPDATE public.vehicle_labor_appraisal_state SET error = 'fixture_failure' WHERE vehicle_id = vid;
   s := public.vehicle_labor_appraisal(vid);
   PERFORM public.assert(s #>> '{state,error}' = 'fixture_failure' AND s #>> '{state,fresh}' = 'false'
+                        AND s #>> '{state,basis}' = 'stored' AND s #>> '{state,label}' = 'recomputing'
                         AND (s - 'as_of' - 'state') = st.read, 'errored fold: last good read served with state.error');
   PERFORM public.vehicle_labor_appraisal_fold(vid);
 END $$;
@@ -239,12 +276,12 @@ DELETE FROM public.model_fold_signal;
 UPDATE public.receipt_line_edges SET classified_at = now() + interval '1 hour'
  WHERE receipt_item_id = (SELECT min(id::text)::uuid FROM public.receipt_items) AND classifier = 'system';
 DO $$ BEGIN
-  PERFORM public.assert(public.vehicle_labor_appraisal((SELECT v FROM fold_v)) #>> '{state,fresh}' = 'true', 'clock-only restamp: still fresh');
+  PERFORM public.assert(public.vehicle_labor_appraisal((SELECT v FROM fold_v)) #>> '{state,basis}' = 'stored', 'clock-only restamp: still fresh');
 END $$;
 UPDATE public.receipt_line_edges SET system_key = 'paint'
  WHERE receipt_item_id = (SELECT min(id::text)::uuid FROM public.receipt_items) AND classifier = 'system';
 DO $$ BEGIN
-  PERFORM public.assert(public.vehicle_labor_appraisal((SELECT v FROM fold_v)) #>> '{state,fresh}' = 'false', 'changed edge: stale');
+  PERFORM public.assert(public.vehicle_labor_appraisal((SELECT v FROM fold_v)) #>> '{state,basis}' = 'computed_now', 'changed edge: stale, computed now');
 END $$;
 SELECT public.vehicle_labor_appraisal_fold(v) FROM fold_v;
 
@@ -254,7 +291,7 @@ INSERT INTO public.receipts (id, vehicle_id) SELECT '20000000-0000-0000-0000-000
 DO $$
 DECLARE vid uuid := (SELECT v FROM fold_v);
 BEGIN
-  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'false', 'receipt insert: stamped stale');
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'computed_now', 'receipt insert: stamped stale, computed now');
   PERFORM public.assert(EXISTS (SELECT 1 FROM public.model_fold_signal g WHERE g.vehicle_id = vid AND g.priority = 2),
                         'receipt insert: admitted at priority 2');
 END $$;
@@ -269,7 +306,7 @@ BEGIN
   PERFORM public.assert((SELECT wait_ms FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = vid ORDER BY id DESC LIMIT 1)
                         > 400::bigint * 86400 * 1000 - 1, 'old stamp: wait logged in bigint ms');
   DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
-  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'true', 'old stamp: fresh after fold');
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'stored', 'old stamp: fresh after fold');
 END $$;
 
 -- The two-session race (ta-skeptic): a stamp clocked before the fold began but committed after it carries
@@ -282,10 +319,10 @@ BEGIN
   UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = folded_at - interval '1 second' WHERE vehicle_id = vid;
   INSERT INTO public.model_fold_signal (vehicle_id, reason, priority) VALUES (vid, 'late_commit_fixture', 2);
   s := public.vehicle_labor_appraisal(vid);
-  PERFORM public.assert(s #>> '{state,fresh}' = 'false' AND s #>> '{state,queued}' = 'true', 'late-committed stamp: not fresh');
+  PERFORM public.assert(s #>> '{state,basis}' = 'computed_now' AND s #>> '{state,queued}' = 'true', 'late-committed stamp: computed now');
   DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
   INSERT INTO public.model_fold_work (vehicle_id, state, priority, dirty_at, first_dirty_at) VALUES (vid, 'pending', 2, now(), now());
-  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,fresh}' = 'false', 'absorbed into pending work: not fresh');
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'computed_now', 'absorbed into pending work: computed now');
   -- the seed leaves a pending car alone (re-signalling would push dirty_at forward and starve settle)
   UPDATE public.vehicle_labor_appraisal_state SET error = 'fixture_failure' WHERE vehicle_id = vid;
   PERFORM public.vehicle_labor_appraisal_enqueue();
@@ -343,8 +380,8 @@ END $$;
 UPDATE public.labor_hours_bases SET meaning = meaning || ' (fixture edit)' WHERE basis_key = 'uncited_seed';
 DO $$ BEGIN
   PERFORM public.assert(public.vehicle_labor_appraisal((SELECT v FROM fold_v)) #>> '{state,key_current}' = 'false'
-                        AND public.vehicle_labor_appraisal((SELECT v FROM fold_v)) #>> '{state,fresh}' = 'false'
-                        AND public.vehicle_labor_appraisal((SELECT v FROM fold_v)) ? 'segments', 'rule change: stored read, flagged off key');
+                        AND public.vehicle_labor_appraisal((SELECT v FROM fold_v)) #>> '{state,basis}' = 'computed_now'
+                        AND public.vehicle_labor_appraisal((SELECT v FROM fold_v)) ? 'segments', 'rule change: computed now, flagged off key');
   PERFORM public.assert(public.vehicle_labor_appraisal_logic_key() <> (SELECT k FROM key0), 'rule edit: key moves');
   PERFORM public.assert((public.vehicle_labor_appraisal_gauge() ->> 'off_key')::int > 0, 'gauge: rows off key after the edit');
   DELETE FROM public.model_fold_signal;
