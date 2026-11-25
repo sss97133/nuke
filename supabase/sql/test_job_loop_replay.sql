@@ -10,6 +10,8 @@
 --   policy and the vehicle row readers, no job-loop function; test_invoice_party_reads_and_description_redaction.sql)
 --   migrations/20261121233000_receipt_quote_kind.sql (receipts lane: receipt_doc_kind 'quote' and the receipt spend
 --   readers, no job-loop function; test_receipt_quote_kind.sql)
+--   migrations/20261125233000_listing_work_plan_shown_photos.sql (security lane: listing_work_plan_read takes image
+--   claims from shown photos only; needs the gallery fixture; test_listing_work_plan_shown_photos.sql)
 --   and the non-job files of 2026-10-19: facet, truck, auction bids, org signals, lotus/honda identity, cab custody,
 --   device capture, live auction board, profile reader role, merge identity, source species, broadcast profile, org
 --   name trgm, canonical make, identity marks/handle index, family sales, fold docket, marketplace listings.
