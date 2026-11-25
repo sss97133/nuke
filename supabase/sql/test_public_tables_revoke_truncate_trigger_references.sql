@@ -1,4 +1,4 @@
--- Isolated PostgreSQL 17 contract for 20261126003000_public_tables_revoke_truncate_trigger_references.sql.
+-- Isolated PostgreSQL 17 contract for 20261126005500_public_tables_revoke_truncate_trigger_references.sql.
 -- Tables, a view and a materialized view get the live default privileges (arwdDxt to anon and authenticated). After the
 -- migration:
 --   * none grants TRUNCATE, TRIGGER or REFERENCES to anon or authenticated;
@@ -41,7 +41,7 @@ SELECT t_assert(has_table_privilege('anon', 'public.grants_fx_a', 'TRUNCATE')
   AND has_table_privilege('authenticated', 'public.grants_fx_m', 'REFERENCES'), 'before: the defaults grant the three verbs');
 
 SET ROLE postgres;
-\ir ../migrations/20261126003000_public_tables_revoke_truncate_trigger_references.sql
+\ir ../migrations/20261126005500_public_tables_revoke_truncate_trigger_references.sql
 RESET ROLE;
 
 SELECT t_assert(NOT EXISTS (
@@ -67,7 +67,7 @@ SELECT t_assert(has_table_privilege('anon', 'public.grants_fx_new', 'SELECT')
 SELECT md5(string_agg(c.relname || coalesce(c.relacl::text, ''), ',' ORDER BY c.relname)) AS acl_before
   FROM pg_class c WHERE c.relname LIKE 'grants_fx_%' \gset
 SET ROLE postgres;
-\ir ../migrations/20261126003000_public_tables_revoke_truncate_trigger_references.sql
+\ir ../migrations/20261126005500_public_tables_revoke_truncate_trigger_references.sql
 RESET ROLE;
 SELECT t_assert((SELECT md5(string_agg(c.relname || coalesce(c.relacl::text, ''), ',' ORDER BY c.relname))
   FROM pg_class c WHERE c.relname LIKE 'grants_fx_%') = :'acl_before', 're-applying changes nothing');
