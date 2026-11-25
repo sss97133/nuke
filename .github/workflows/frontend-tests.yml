@@ -40,6 +40,7 @@ jobs:
           supabase/functions/ingest-observation/financialEvidence.test.ts
           supabase/functions/vehicle-agent/scope.test.ts
           supabase/functions/vehicle-agent/records.test.ts
+          supabase/functions/_shared/callerDailyCap_test.ts
           supabase/functions/ingest-observation/financialEvidenceHandler.test.ts
           supabase/functions/ingest-observation/financialProcessing.test.ts
           supabase/functions/ingest-observation/financialCandidates_test.ts
