@@ -21,6 +21,14 @@ UPDATE public.receipts SET vendor_organization_id = '00000000-0000-0000-0000-000
 
 \ir ../migrations/20261124213500_receipt_vendor_label_key.sql
 \ir ../migrations/20261124215000_receipt_vendor_label_business_name.sql
+\ir ../migrations/20261125011500_receipt_vendor_label_public_org.sql
+
+-- An organisation that is not public is never named to an untied caller (the body shop fixture is is_public false).
+SELECT set_config('test.role', 'anon', false), set_config('test.uid', '', false);
+SELECT public.assert((SELECT vendor_name FROM public.receipts_public_summary WHERE id = '00000000-0000-0000-0000-0000000000c1')
+                     = 'Seller not identified', 'anon: a keyed organisation that is not public is not named');
+RESET ROLE; SELECT set_config('test.role', '', false);
+UPDATE public.organizations SET is_public = true WHERE id = '00000000-0000-0000-0000-00000000e001';
 
 -- Logged out.
 SELECT set_config('test.role', 'anon', false), set_config('test.uid', '', false);
@@ -73,5 +81,6 @@ SELECT public.assert(position('receipt_vendor_label' IN pg_get_functiondef('publ
                      'revert restores v1');
 \ir ../migrations/20261124213500_receipt_vendor_label_key.sql
 \ir ../migrations/20261124215000_receipt_vendor_label_business_name.sql
+\ir ../migrations/20261125011500_receipt_vendor_label_public_org.sql
 
 SELECT 'test_receipt_vendor_label_key: ok';
