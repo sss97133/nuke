@@ -149,7 +149,7 @@ SET ROLE anon;
 SELECT public.assert(public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a2') ->> 'amounts_visible' = 'false'
                      AND public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a2') ->> 'documented_spend' = 'present'
                      AND public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a2') -> 'breakdown' = 'null'::jsonb
-                     AND public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a2')::text !~ '60', 'anon: presence, no amount');
+                     AND regexp_replace(public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a2')::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') !~ '60', 'anon: presence, no amount');
 SELECT public.assert(public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a3') IS NULL, 'anon on a private car: null');
 DO $$
 DECLARE stmt text;

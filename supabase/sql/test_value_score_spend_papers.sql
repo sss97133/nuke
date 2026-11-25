@@ -42,7 +42,7 @@ INSERT INTO public.vehicle_spend_lines SELECT '00000000-0000-0000-0000-000000000
 SELECT public.assert((SELECT count(*) FROM public.vehicle_value_recompute_queue) = 2, 'the two cars with spend rows are queued');
 SELECT public.compute_vehicle_value(id) FROM public.vehicles;
 SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicles WHERE value_breakdown ? 'receipts_total'), 'no receipts_total');
-SELECT public.assert((SELECT value_breakdown::text !~ '4321|4000|21\.09' FROM public.vehicles WHERE id = '00000000-0000-0000-0000-0000000000a1'), 'no amount in value_breakdown');
+SELECT public.assert((SELECT regexp_replace(value_breakdown::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') !~ '4321|4000|21\.09' FROM public.vehicles WHERE id = '00000000-0000-0000-0000-0000000000a1'), 'no amount in value_breakdown');
 SELECT public.assert((SELECT value_breakdown @> '{"documented_spend": "present", "spend_papers": 3}' FROM public.vehicles WHERE id = '00000000-0000-0000-0000-0000000000a1'), 'a1 presence and papers');
 SELECT public.assert((SELECT value_breakdown @> '{"documented_spend": "none", "spend_papers": 0}' FROM public.vehicles WHERE id = '00000000-0000-0000-0000-0000000000a2'), 'a2 none');
 SELECT public.assert((SELECT value_breakdown @> '{"documented_spend": "none", "spend_papers": 20}' FROM public.vehicles WHERE id = '00000000-0000-0000-0000-0000000000a3'), 'a3 credits only: none, 20 papers');

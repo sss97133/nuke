@@ -51,7 +51,7 @@ SELECT set_config('test.role', 'anon', false), set_config('test.uid', '', false)
 SELECT public.assert(public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1')
                      = '{"amounts_visible": false, "documented_spend": "present", "total_invested": null, "breakdown": null, "components_count": {"receipts": 3}}'::jsonb,
                      'anon on a public vehicle: presence and counts only');
-SELECT public.assert(public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1')::text !~ '4321',
+SELECT public.assert(regexp_replace(public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1')::text, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '', 'g') !~ '4321',
                      'anon never receives the amount');
 SELECT public.assert(public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a2') ->> 'documented_spend' = 'none',
                      'anon on a public vehicle without spend: none');
