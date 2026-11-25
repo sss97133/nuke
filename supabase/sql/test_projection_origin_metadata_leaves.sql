@@ -133,7 +133,11 @@ END $$;
 DO $$
 DECLARE p text; ok boolean;
 BEGIN
-  FOREACH p IN ARRAY ARRAY['(', '.*', 'a*', '', '\Ax\d', 'x\d\Z'] LOOP
+  -- The last four are skeptic2's probes: negative lookarounds the joined fast path would read across a leaf edge
+  -- ({"a":"x","b":"PRIVATEdata"}, {"a":"call 555-1234","b":"y"}, {a:'first leaf',b:'TOKENabc'}, ['SECRET123','later']).
+  FOREACH p IN ARRAY ARRAY['(', '.*', 'a*', '', '\Ax\d', 'x\d\Z', '(?<!.)PRIVATE\w+', '\d{3}-\d{4}(?!.)',
+                           '(?<!.)TOKEN\w+', 'SECRET\d{3}(?!\s)', 'x\d(?![^0-9])', 'x\d(?!\D)', 'x\d(?![[:space:]])',
+                           'x\d(?![\n])', 'x\d(?!(.))', 'x\d(?![0-9])(?!.)'] LOOP
     ok := false;
     BEGIN
       INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
@@ -228,6 +232,31 @@ DO $$ BEGIN
   ASSERT public.jsonb_redact_contact('{"a": "https://h.invalid/x 702-555-0190"}'::jsonb)
        = '{"a": "https://h.invalid/x [contact through Nuke]"}', '11 a leaf that starts with a URL is tried by the fast path';
   ASSERT public.jsonb_redact_contact('{"a": {"Party_Type": "ask"}}'::jsonb) = '{"a": {}}', '11 a contact key alone walks';
+END $$;
+ROLLBACK;
+-- 11a. A negative lookaround on a class with no newline is allowed and agrees at a leaf edge: the seeded phone rule's
+--      (?![0-9]) before a next leaf that starts with a digit (joined, it sees the newline, not the digit).
+DO $$ BEGIN
+  ASSERT public.jsonb_redact_contact('{"a": "call 702-555-1234", "b": "5 cars"}'::jsonb)
+       = '{"a": "call [contact through Nuke]", "b": "5 cars"}', '11a leaf-final phone before a digit-led leaf';
+  ASSERT public.jsonb_redact_contact('["702-555-1234"]'::jsonb) = '["[contact through Nuke]"]', '11a phone alone';
+END $$;
+BEGIN;
+INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
+  VALUES ('ok_lookaround', 'redact', '(?<![_])ZZ\d{2}(?![a-z])(?!\w)', '[gone]', false, 32, 'contract case: allowed lookarounds', '2026-11-25');
+DO $$ BEGIN
+  ASSERT public.jsonb_redact_contact('["x ZZ12", "ab"]'::jsonb) = '["x [gone]", "ab"]', '11a allowed lookarounds: leaf-final match redacted';
+END $$;
+ROLLBACK;
+-- 11b. Positive lookarounds stay allowed: across the joined newline they can only find more, never less, so the fast
+--      path still sends every leaf the walk would change to the walk.
+BEGIN;
+INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
+  VALUES ('lookahead', 'redact', 'SECRET\d{3}(?=\s)', '[gone]', false, 31, 'contract case: positive lookahead rule', '2026-11-25');
+DO $$ BEGIN
+  ASSERT public.jsonb_redact_contact('["SECRET123", "later leaf"]'::jsonb) = '["SECRET123", "later leaf"]',
+    '11b leaf-final match is not redacted by the walk, and the joined text does not force a change';
+  ASSERT public.jsonb_redact_contact('["first", "SECRET123 x"]'::jsonb) = '["first", "[gone] x"]', '11b mid-leaf lookahead redacted';
 END $$;
 ROLLBACK;
 

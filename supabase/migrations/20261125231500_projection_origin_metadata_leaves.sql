@@ -25,7 +25,9 @@
 --       under a matching key is left alone unless the key matches never_skip_key_regex (a CHECK makes a skip name one).
 --       Seeded: email (text_redact_contact's, every leaf) and phone (text_redact_contact's, skips
 --       (^|_)(id|number|chassis)$|^repost_of$ from the census, never skips phone|mobile|cell|tel|contact|whatsapp|fax).
---     CHECKs refuse a pattern or key regex that does not compile or matches the empty string, and a rule of one action
+--     CHECKs refuse a pattern or key regex that does not compile or matches the empty string, a pattern with \A, \Z or a
+--     negative lookaround able to match a newline (each could see past a leaf's edge in the joined text), and a rule of
+--     one action
 --     carrying the other's columns. anon and authenticated read it; only the service role and migrations write it.
 --   public.text_redact_by_rules(text, rules, key), public.jsonb_redact_contact_leaves(jsonb, rules, key): the walk.
 --   public.jsonb_redact_contact(jsonb): reads the enabled rules once and tries each once over all it could change,
@@ -65,7 +67,12 @@ CREATE TABLE IF NOT EXISTS public.contact_redaction_rules (
   action text NOT NULL CHECK (action IN ('drop_key', 'redact')),
   key_regex text,
   -- Compiles, cannot match the empty string, and has no \A or \Z (string-edge anchors the joined-leaf test would miss).
-  pattern text CHECK (pattern IS NULL OR (NOT ('' ~ pattern) AND pattern !~ '\\[AZ]')),
+  -- No negative lookaround that can match a newline: under the fast path's 'w' flag '.', \s and negated brackets match
+  -- the newline that joins two leaves, so (?<!.) or (?!\s) at a leaf edge would see the neighbour and the joined test
+  -- could miss a match the walk makes. Allowed: a lookaround on one \d, \w or plain bracket (not negated, no escape,
+  -- no control character, no nested [), none of which matches a newline, e.g. the seeded phone rule's (?![0-9]).
+  pattern text CHECK (pattern IS NULL OR (NOT ('' ~ pattern) AND pattern !~ '\\[AZ]'
+    AND regexp_replace(pattern, '\(\?<?!(\[[^]^\\[[:cntrl:]][^]\\[[:cntrl:]]*\]|\\[dw])\)', '', 'g') !~ '\(\?<?!')),
   replacement text CHECK (replacement IS NULL OR length(replacement) BETWEEN 1 AND 80),
   -- A leaf that is one URL and nothing else is left alone; in any other leaf the URLs are left alone and the rest is
   -- redacted.
