@@ -18,7 +18,7 @@
 -- 3. The question rule lives on the registry row: a fact doubt asks a reader to read a physical marking as printed, so it
 --    is raised and landed only for a property whose observation_properties.verification_scope is 'instance'. A
 --    class-scope property (engine_configuration, transmission_type) is settled by decode rules, not a re-read: trigger
---    evidence_judgment_fact_doubt_scope refuses a new fact_doubt on one, and fact_doubt_readings_to_land skips one.
+--    evidence_judgment_fact_doubt_scope refuses a new fact_doubt on one, or a revive of an old one to pending (every doubt form: each asks for a reading), and fact_doubt_readings_to_land skips one.
 --    Measured 2026-11-24: of 39 property keys asked, engine_configuration is the only class-scope one (4 requests; its
 --    one value answer was a displacement, because its registry description is only examples, which the blind task strips).
 -- Agreement and disagreement are the fact reader's: one lineage is a reading, a second lineage or paper establishes
@@ -96,7 +96,8 @@ SET search_path = pg_catalog, public
 AS $$
 DECLARE v_scope text; v_key text;
 BEGIN
-  IF NEW.question_kind = 'fact_doubt' AND NEW.subject_table = 'observation_properties' THEN
+  IF NEW.question_kind = 'fact_doubt' AND NEW.subject_table = 'observation_properties'
+     AND (TG_OP = 'INSERT' OR (NEW.status = 'pending' AND OLD.status IS DISTINCT FROM 'pending')) THEN
     SELECT p.verification_scope, p.property_key INTO v_scope, v_key FROM public.observation_properties p WHERE p.id = NEW.subject_id;
     IF v_scope IS DISTINCT FROM 'instance' THEN
       RAISE EXCEPTION 'fact_doubt on % refused: its registry row is verification_scope %, and a re-read as printed applies only to instance-scope properties',
@@ -107,5 +108,5 @@ BEGIN
 END;
 $$;
 DROP TRIGGER IF EXISTS evidence_judgment_fact_doubt_scope ON public.evidence_judgment_requests;
-CREATE TRIGGER evidence_judgment_fact_doubt_scope BEFORE INSERT ON public.evidence_judgment_requests
+CREATE TRIGGER evidence_judgment_fact_doubt_scope BEFORE INSERT OR UPDATE OF status ON public.evidence_judgment_requests
   FOR EACH ROW EXECUTE FUNCTION public.evidence_judgment_fact_doubt_scope();

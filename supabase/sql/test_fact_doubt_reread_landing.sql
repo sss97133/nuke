@@ -124,6 +124,12 @@ BEGIN
     RAISE EXCEPTION 'FAIL: a class-scope fact doubt was raised';
   EXCEPTION WHEN invalid_parameter_value THEN NULL;
   END;
+  BEGIN
+    UPDATE public.evidence_judgment_requests SET status = 'pending' WHERE id = 'a0000000-0000-0000-0000-00000000000b';
+    RAISE EXCEPTION 'FAIL: a class-scope fact doubt was revived';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+  UPDATE public.evidence_judgment_requests SET status = 'withdrawn' WHERE id = 'a0000000-0000-0000-0000-00000000000b';
   INSERT INTO public.evidence_judgment_requests (id, vehicle_id, question_kind, status, subject_table, subject_id, params)
   VALUES ('a0000000-0000-0000-0000-00000000000d', '10000000-0000-0000-0000-000000000001', 'fact_doubt', 'pending', 'observation_properties',
           '40000000-0000-0000-0000-000000000002', '{"doubt_form":"property","property_key":"engine_block_casting"}');
