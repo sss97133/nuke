@@ -2,7 +2,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { LaborAppraisalView, rangeText, witnessText, witnessedHoursText } from './LaborAppraisal';
+import { LaborAppraisalView, rangeText, witnessText, witnessedHoursText, witnessedTotalText } from './LaborAppraisal';
 import live214500 from './__fixtures__/labor-appraisal-214500.json';
 import type { LaborAppraisal } from './hooks/useLaborAppraisal';
 import live from './__fixtures__/labor-appraisal.json';
@@ -84,6 +84,14 @@ describe('LaborAppraisalView', () => {
       { item_id: 'b', hours: null, witness: 'unwitnessed', question_state: 'open' },
       { item_id: 'c', hours: null, witness: 'fitted' } ] }] }))).toBe('1 fitted · 1 bought; fitted question cannot tell · 1 bought; fitted question open');
     expect(witnessText(seg({}))).toBeNull();
+  });
+
+  it('prints the witnessed total as a floor only when the reader marks its max unwitnessed', () => {
+    const w = { hours_min: 71, hours_typical: 81, hours_max: 247 };
+    expect(witnessedTotalText(w)).toBe('71 h to 247 h, typical 81 h');
+    expect(witnessedTotalText({ ...w, max_witnessed: false })).toBe('at least 71 h, typical 81 h');
+    expect(witnessedTotalText({ ...w, hours_max: null })).toBe('at least 71 h, typical 81 h');
+    expect(witnessedTotalText({ hours_min: null, hours_typical: null, hours_max: 40 })).toBeNull();
   });
 
   it('says a missing witnessed minimum instead of filling it', () => {

@@ -82,6 +82,16 @@ export function witnessText(segment: LaborSegment): string | null {
   return parts.filter(Boolean).join(' · ') || null;
 }
 
+/** The witnessed total as the reader marks it. A max the reader marks unwitnessed (max_witnessed false), or does not
+ *  send, is not printed as the top of a witnessed range: "at least 71 h, typical 81 h". No bound is decided here. */
+export function witnessedTotalText(w: (LaborRange & { max_witnessed?: boolean | null }) | null | undefined): string | null {
+  if (!w || w.hours_typical == null) return null;
+  if (w.max_witnessed === false || (w.hours_max == null && w.hours_min != null)) {
+    return w.hours_min != null && w.hours_min !== w.hours_typical ? `at least ${h(w.hours_min)}, typical ${h(w.hours_typical)}` : `at least ${h(w.hours_typical)}`;
+  }
+  return rangeText(w);
+}
+
 /** The segment's witnessed hours, when the reader sends them and they differ from its hours. A missing minimum is
  *  said, not filled: "minimum unknown, at most 84 h". */
 export function witnessedHoursText(segment: LaborSegment): string | null {
@@ -135,12 +145,12 @@ export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
   }
   if (!appraisal.applicable || !priced.length) return null;
   const byGrade = appraisal.totals?.by_grade ? Object.entries(appraisal.totals.by_grade) : [];
-  const witnessedTotal = rangeText(appraisal.totals?.witnessed);
+  const witnessedTotal = witnessedTotalText(appraisal.totals?.witnessed);
   const withPurchases = rangeText(appraisal.totals?.with_unwitnessed_purchases);
   return <Section title="Labor appraisal by segment" coverage={coverage}>
     <Text role="caption" as="p">Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.</Text>
-    {witnessedTotal && withPurchases && <div title={appraisal.totals?.rule ?? undefined}><Rows title="Hours, two totals side by side">
-      <Row label="Witnessed" role="measure">{witnessedTotal}{appraisal.totals?.witnessed?.unknown_min_segments
+    {appraisal.totals?.witnessed && withPurchases && <div title={appraisal.totals?.rule ?? undefined}><Rows title="Hours, two totals side by side">
+      <Row label="Witnessed" role="measure">{witnessedTotal ?? 'none established'}{appraisal.totals?.witnessed?.unknown_min_segments
         ? ` (${appraisal.totals.witnessed.unknown_min_segments} segments with no witnessed minimum)` : ''}</Row>
       <Row label="With purchases not seen fitted" role="measure">{withPurchases}</Row>
     </Rows></div>}

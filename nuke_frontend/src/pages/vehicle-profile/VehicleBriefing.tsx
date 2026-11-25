@@ -17,6 +17,7 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import type { VehicleIntel } from './hooks/useVehicleIntel';
 import { useVehiclePriceFacts, priceKindLabel, type PriceFacts } from './hooks/useVehiclePriceFacts';
+import { day } from '../../kit';
 
 // ---------------------------------------------------------------------------
 // Stored appraisal (vehicle_condition_scores). Its range is a reported output;
@@ -261,9 +262,9 @@ const VehicleBriefing: React.FC<{ collapsed?: boolean }> = ({ collapsed = false 
     });
     const computed = eyeRead.computedAt ? new Date(eyeRead.computedAt) : null;
     pills.push({
-      label: 'COMPUTED (UTC)',
+      label: 'COMPUTED',
       value: computed && Number.isFinite(computed.getTime())
-        ? computed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+        ? day(eyeRead.computedAt)
         : 'Unknown',
     });
     pills.push({ label: 'INPUT COUNT', value: eyeRead.reportedInputCount != null ? `${eyeRead.reportedInputCount} reported` : 'Unknown' });

@@ -3,6 +3,7 @@ import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { askAgent } from '../../components/agent/askAgent';
 import PrefetchLink from '../../components/PrefetchLink';
 import { useBuildLedger, type BookCostEntry, type BookCostTotal, type BuildLedgerEntry, type BuildLedgerGroup, type WorkingNoteTable } from './hooks/useBuildLedger';
+import { day } from '../../kit';
 
 // ── Formatting ──
 
@@ -10,12 +11,10 @@ import { useBuildLedger, type BookCostEntry, type BookCostTotal, type BuildLedge
 const fmt = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Show the audit date exactly as recorded (UTC), never shifted to the viewer's TZ.
+// A calendar day prints as recorded; a timestamp prints in the viewer's own zone (kit day()).
 const fmtDate = (iso: string | null) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  if (!iso || Number.isNaN(Date.parse(iso))) return '—';
+  return day(iso);
 };
 
 const monoNum: React.CSSProperties = {

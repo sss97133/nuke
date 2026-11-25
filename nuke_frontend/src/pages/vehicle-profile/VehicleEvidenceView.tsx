@@ -7,6 +7,7 @@ import { useVehicleImageEvidence, hasImageAnalysis, hasImageZone, relatedFieldIm
 import { useFieldProvenance, citedFieldImages, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import './vehicle-evidence.css';
+import { day } from '../../kit';
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
 
 const FIELDS = [
@@ -18,8 +19,7 @@ const FIELDS = [
 ] as const;
 function date(value: string | null | undefined) {
   if (!value) return 'Unknown';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? 'Unknown' : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  return Number.isNaN(Date.parse(value)) ? 'Unknown' : day(value);
 }
 
 const VehicleEvidenceView: React.FC = () => {

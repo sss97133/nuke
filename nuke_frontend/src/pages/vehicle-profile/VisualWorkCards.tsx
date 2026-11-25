@@ -7,8 +7,9 @@ import { supabase } from '../../lib/supabase';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 import { Seen, SeenContext } from './BuildRecord';
 import './visual-work.css';
+import { day } from '../../kit';
 
-const date = (value: string) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const date = (value: string) => day(value);
 export function photoDate(image: { taken_at: string | null; capture_time_zone?: string | null }): string {
   if (!image.taken_at || !Number.isFinite(Date.parse(image.taken_at))) return 'Photo date unknown';
   const captured = new Date(image.taken_at);

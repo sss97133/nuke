@@ -2,14 +2,14 @@ import React, { useRef, useState } from 'react';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useBuildLedger, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
-import { Row, Rows } from '../../kit';
+import { Row, Rows, day } from '../../kit';
 const WorkOrderFinancialRecords = React.lazy(() => import('./FinancialReceiptRecords').then(module => ({ default: module.WorkOrderFinancialRecords })));
 import FinancialLedger from './FinancialLedger';
 import { moneyLabel } from './hooks/useVehicleFinancials';
 
 function recordedDate(value: string | null) {
   if (!value || !Number.isFinite(Date.parse(value))) return 'Date not recorded';
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  return day(value);
 }
 
 const cents = (value: number) => Math.round(value * 100);

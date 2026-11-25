@@ -9,6 +9,7 @@ import {
   type VehicleCohortFilterKey,
 } from '../../lib/market/vehicleTaxonomy';
 import type { CompSale, CompScope } from './hooks/useVehicleIntel';
+import { day } from '../../kit';
 
 const money = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
 const labelKey = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -148,7 +149,7 @@ export default function SoldContext({
       {group.sales.map(sale => <div className="vp-sold-context__sale" key={sale.id}>
         <Link to={`/vehicle/${sale.id}`} className="vp-sold-context__record" aria-label={`Inspect ${group.label}, sold ${sale.sale_date}`}>
           {sale.thumbnail && <img src={sale.thumbnail} width="40" height="30" alt="" loading="lazy" />}
-          <span>{new Date(sale.sale_date!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}
+          <span>{day(sale.sale_date)}
             <small>{sale.mileage != null ? `${sale.mileage.toLocaleString()} mi recorded` : 'Mileage unrecorded'}</small></span>
         </Link>
         <strong>{money(sale.sale_price)}</strong>

@@ -1,11 +1,14 @@
 import { RANK_FLOOR, type Measure } from './types';
 
-/** A date for humans: short month, day, year, in UTC; 'unknown date' when the clock is missing or unparseable. */
+/** A date for humans: short month, day, year; 'unknown date' when the clock is missing or unparseable. A calendar day
+ *  ('2024-01-08') is printed as that day. A timestamp is printed in the viewer's own time zone: a reader stamped
+ *  02:48 UTC on Nov 25 is Nov 24 for a viewer in Las Vegas (lead, 2026-11-24). */
 export function day(iso: string | null | undefined): string {
   if (!iso) return 'unknown date';
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return 'unknown date';
-  return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const calendarDay = /^\d{4}-\d{2}-\d{2}$/.test(iso.trim());
+  return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', ...(calendarDay ? { timeZone: 'UTC' } : {}) });
 }
 
 /** A value in its unit. USD gets a dollar sign, percentages one decimal, counts their separators. */

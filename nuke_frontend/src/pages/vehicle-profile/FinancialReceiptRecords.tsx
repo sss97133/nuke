@@ -16,6 +16,7 @@ import { useBuildReconstruction, usePartEvidence } from './hooks/useBuildReconst
 import { BuildRecord, SeenContext } from './BuildRecord';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 import { useDocumentMode } from './documentMode';
+import { day } from '../../kit';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
 function amountText(amount: number | null, currency: string | null): string {
@@ -102,7 +103,7 @@ interface ReceiptPage {
 
 function printedDate(value: string | null): string {
   if (!value || !Number.isFinite(Date.parse(value))) return 'Date not recorded';
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  return day(value);
 }
 
 /** The retained correction points to an existing receipt, whose existing reader

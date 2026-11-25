@@ -42,7 +42,8 @@ export interface LaborAppraisal {
   totals: (LaborRange & {
     by_grade?: Record<string, LaborRange> | null;
     /** The reader's two totals, side by side: hours witnessed, and hours including purchases not seen fitted. */
-    witnessed?: (LaborRange & { unknown_min_segments?: number | null }) | null; with_unwitnessed_purchases?: LaborRange | null;
+    /** max_witnessed false: the reader says its max is not witnessed (a book bound), so only the floor and typical are. */
+    witnessed?: (LaborRange & { unknown_min_segments?: number | null; max_witnessed?: boolean | null }) | null; with_unwitnessed_purchases?: LaborRange | null;
     priced_segments?: number | null; unwitnessed_purchase_segments?: number | null; rule?: string | null;
   }) | null;
 }

@@ -109,6 +109,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Pages print timestamps in the viewer's own zone (kit day()). Tests pin one zone so a fixture date renders the
+    // same on a laptop in Las Vegas and on a CI runner; the kit test checks a second zone explicitly.
+    env: { TZ: 'UTC' },
     exclude: [
       '**/node_modules/**',
       '**/dist/**',

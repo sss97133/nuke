@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './catalog-product-reference.css';
+import { day } from '../../kit';
 
 export interface ReceiptCatalogProduct {
   catalog_part_id: string; name: string; part_number: string; manufacturer: string | null;
@@ -11,8 +12,7 @@ export function CatalogProductReference({ product }: { product?: ReceiptCatalogP
   const [failedImage, setFailedImage] = useState<string | null>(null);
   if (!product || !/^https:\/\//.test(product.page_url)) return null;
   const imageUrl = product.image_url && /^https:\/\//.test(product.image_url) && failedImage !== product.image_url ? product.image_url : null;
-  const captured = new Date(product.captured_at);
-  const date = Number.isFinite(captured.getTime()) ? captured.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+  const date = Number.isFinite(Date.parse(product.captured_at)) ? day(product.captured_at) : null;
   let price: string | null = null;
   if (product.quote_price != null && Number.isFinite(product.quote_price) && product.currency) {
     try { price = new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency }).format(product.quote_price); } catch { /* Currency must be known. */ }

@@ -132,6 +132,13 @@ describe('Text and formatting', () => {
     expect(formatMeasure(1338, 'count')).toBe('1,338');
     expect(formatMeasure(NaN, 'USD')).toBe('unknown');
     expect(day('nope')).toBe('unknown date');
+    const zone = process.env.TZ;
+    try {
+      process.env.TZ = 'America/Los_Angeles';
+      // A reader stamped 02:48 UTC on Nov 25 is Nov 24 for a viewer in Las Vegas; a calendar day stays that day.
+      expect(day('2026-11-25T02:48:23.903062+00:00')).toBe('Nov 24, 2026');
+      expect(day('2026-11-25')).toBe('Nov 25, 2026');
+    } finally { process.env.TZ = zone; }
     expect(day(null)).toBe('unknown date');
   });
 });
