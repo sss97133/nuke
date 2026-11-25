@@ -100,7 +100,7 @@ test('the first fire is a full one: checkout refreshed, documents then frames wi
     assert.equal(r.git.some((g) => g.includes('fetch -q origin main')), true, 'a full fire refreshes the checkout');
     assert.deepEqual(r.scripts, FULL);
     assert.deepEqual(r.order.slice(0, 3), ['start', 'subscription-document-reader.mjs', 'reader-heartbeat.mjs'], 'each reader is started on record first');
-    assert.equal(r.starts, 5, 'documents, frames, doubts, receipt reconcile, receipt answers');
+    assert.equal(r.starts, FULL.filter((s) => s !== 'reader-heartbeat.mjs').length, 'one start per reader the full fire runs');
     assert.match(r.calls[0].args, /--deadline-at \d+/, 'the document reader carries its deadline');
     assert.doesNotMatch(r.calls[2].args, /--deadline-at/, 'the frame reader does not end itself, so it carries none');
     assert.match(r.calls[2].args, /--limit 20 --concurrency 2 --status failed,pending --deep-limit 20 --keyed-limit 60 /);
