@@ -1004,6 +1004,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       try {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth?.user?.id || null;
+        // Presence is a signed-in user's own row (20261125091500): an anonymous upsert is refused, so none is sent.
+        if (!uid) return;
         await supabase.from('user_presence').upsert(
           { vehicle_id: vehicle!.id, user_id: uid, last_seen_at: new Date().toISOString() },
           { onConflict: 'vehicle_id,user_id' },
