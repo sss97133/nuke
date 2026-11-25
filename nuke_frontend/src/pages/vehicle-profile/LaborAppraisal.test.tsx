@@ -2,7 +2,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { LaborAppraisalView, rangeText, stepText, witnessText, witnessedHoursText, witnessedTotalText, witnessedUnknownText } from './LaborAppraisal';
+import { LaborAppraisalView, foldStateText, rangeText, stepText, witnessText, witnessedHoursText, witnessedTotalText, witnessedUnknownText } from './LaborAppraisal';
 import live214500 from './__fixtures__/labor-appraisal-214500.json';
 import type { LaborAppraisal } from './hooks/useLaborAppraisal';
 import live from './__fixtures__/labor-appraisal.json';
@@ -130,5 +130,44 @@ describe('LaborAppraisalView', () => {
     const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={{ ...appraisal, segments: [seg] }} />));
     expect(page).toContain('Front bucket seat cover, 2 h; 1 more');
     expect(page).not.toMatch(/INT-SEAT|not in catalog/);
+  });
+  it('prints the reader state label, adds only the date to recomputing, and never a zero', () => {
+    const notYet = { vehicle_id: 'v', status: 'not_yet_computed', segments: [], state: { fresh: false, computed: false, basis: null, label: 'not yet computed', error: null } } as unknown as LaborAppraisal;
+    const blank = text(renderToStaticMarkup(<LaborAppraisalView appraisal={notYet} />));
+    expect(blank).toContain('Labor appraisal: not yet computed');
+    expect(blank).not.toMatch(/\b0 h\b/);
+    const unlabelled = { vehicle_id: 'v', status: 'recomputing', segments: [] } as unknown as LaborAppraisal;
+    expect(renderToStaticMarkup(<LaborAppraisalView appraisal={unlabelled} />)).toBe('');
+
+    const stale = { ...appraisal, as_of: '2026-11-25T18:00:00Z', state: { fresh: false, computed: true, basis: 'stored', label: 'recomputing', key_current: true, error: null } };
+    expect(foldStateText(stale)).toBe('As of Nov 25, 2026, recomputing');
+    expect(text(renderToStaticMarkup(<LaborAppraisalView appraisal={stale} />))).toContain('As of Nov 25, 2026, recomputing');
+    const computedNow = { ...appraisal, state: { fresh: true, computed: true, basis: 'computed_now', label: null, stored_at: '2026-11-24T10:00:00Z' } };
+    expect(foldStateText(computedNow)).toBeNull();
+    expect(text(renderToStaticMarkup(<LaborAppraisalView appraisal={computedNow} />))).not.toContain('recomputing');
+    // Words come from the reader: a not-fresh state with no label prints nothing of the page's own.
+    expect(foldStateText({ ...appraisal, state: { fresh: false, computed: true, label: null } })).toBeNull();
+    expect(foldStateText({ ...appraisal, state: undefined })).toBeNull();
+  });
+
+  it('reads the live reader shape that has no label key yet (labor_fold_v1)', () => {
+    // Verbatim shape of the live vehicle_labor_appraisal for an in-scope car with no stored read.
+    const live = { vehicle_id: 'v', status: 'not_yet_computed', segments: [], state: { fresh: false, computed: false, error: null } } as unknown as LaborAppraisal;
+    expect(text(renderToStaticMarkup(<LaborAppraisalView appraisal={live} />)).trim()).toMatch(/^Labor appraisal: not yet computed$/i);
+    // A stored read that is not fresh, live shape: dated, never shown as current.
+    const stale = { ...appraisal, as_of: '2026-11-25T18:00:00Z', state: { fresh: false, queued: true, computed: true, computed_at: '2026-11-25T18:00:00Z', key_current: true, error: null } };
+    expect(foldStateText(stale)).toBe('As of Nov 25, 2026, recomputing');
+    const fresh = { ...appraisal, state: { fresh: true, queued: false, computed: true, key_current: true, error: null } };
+    expect(foldStateText(fresh)).toBeNull();
+  });
+
+  it('prints the sums by basis in the reader words for each basis, else the basis key', () => {
+    const a = { ...appraisal, totals: { ...appraisal.totals!, by_basis: { uncited_seed: { hours_min: 10, hours_typical: 12, hours_max: 14 }, shop_paper: { hours_min: 3, hours_typical: 3, hours_max: 3 } } },
+      names: { ...appraisal.names, bases: { uncited_seed: { label: 'book estimate, no cited source' } } } };
+    const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={a as LaborAppraisal} />));
+    expect(page).toContain('Hours by basis');
+    expect(page).toContain('book estimate, no cited source');
+    expect(page).toContain('10 h to 14 h, typical 12 h');
+    expect(page).toContain('shop paper');
   });
 });

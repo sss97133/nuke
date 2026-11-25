@@ -1,5 +1,5 @@
 import React from 'react';
-import { Section, Rows, Row, Text, codeText } from '../../kit';
+import { Section, Rows, Row, Text, codeText, day } from '../../kit';
 import { useLaborAppraisal, type LaborAppraisal as Appraisal, type LaborNames, type LaborPart, type LaborRange, type LaborSegment, type LaborStageStep } from './hooks/useLaborAppraisal';
 
 /**
@@ -32,6 +32,9 @@ export const stepText = (s: LaborStageStep, names?: LaborNames | null) => [
 /** A part line as the reader names it: the catalog part's name, else the reader's own words. Without them it is counted. */
 const partWords = (p: LaborPart, names?: LaborNames | null) => p.part?.name || p.name || p.description
   || (p.operation_code ? names?.operations?.[p.operation_code]?.name : null) || null;
+
+/** A basis key in the reader's words (names.bases), else the key itself. */
+const basisWords = (key: string, names?: LaborNames | null) => names?.bases?.[key]?.label || codeText(key);
 
 /** The reassembly parts: each named part with its hours, the rest counted. Operation codes are the book's keys, not
  *  words, so they are not printed; a part the reader does not name is counted, never flagged. */
@@ -121,7 +124,7 @@ export function SegmentRows({ segment, names }: { segment: LaborSegment; names?:
   const known = [
     segment.evidence_grade ? `Evidence: ${codeText(segment.evidence_grade)}` : 'Ungraded by the reader',
     segment.counts_in === 'unwitnessed' || segment.counts_in === 'unwitnessed_purchase' ? 'counted with work not witnessed' : null,
-    segment.hours_basis ? `hours from ${codeText(segment.hours_basis)}` : null,
+    segment.hours_basis ? `hours from ${basisWords(segment.hours_basis, names)}` : null,
     segment.paper_hours != null ? `${h(segment.paper_hours)} on shop paper` : null,
     segment.book_hours ? `book range ${rangeText(segment.book_hours)}` : null,
     segment.hours_counted_elsewhere != null ? `${h(segment.hours_counted_elsewhere)} counted in other segments` : null,
@@ -144,27 +147,57 @@ export function SegmentRows({ segment, names }: { segment: LaborSegment; names?:
   </div>;
 }
 
+/** The stored fold's state in the reader's words (state.label), or null when it sends none. The page adds only the date
+ *  to 'recomputing': "As of Nov 25, 2026, recomputing", so a stored read is never shown as current.
+ *  A reader that has no label key yet (the live labor_fold_v1 shape, before #3947) is read by its own keys: a status
+ *  other than a result prints as that status, and a computed read that is not fresh prints as recomputing. */
+export function foldStateText(appraisal: Appraisal): string | null {
+  const st = appraisal.state;
+  const at = appraisal.as_of ?? st?.computed_at;
+  const recomputing = (label: string) => (at ? `As of ${day(at)}, ${label}` : label);
+  if (st && 'label' in st) {
+    const label = st.label;
+    if (!label) return null;
+    return label === 'recomputing' ? recomputing(label) : label;
+  }
+  if (appraisal.status === 'not_yet_computed') return codeText(appraisal.status);
+  if (st?.computed && st.fresh === false) return recomputing('recomputing');
+  return null;
+}
+
 export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
+  const stateLine = foldStateText(appraisal);
+  // The stored fold has no read yet: say so, never a zero and never a cold computation on the page.
+  if ((appraisal.status === 'not_yet_computed' || appraisal.status === 'recomputing') && !appraisal.segments.length) {
+    // A status line like the loading one, not a section: the reader returned no segments to count.
+    return stateLine ? <p role="status" className="vp-labor-status" data-fresh="false">Labor appraisal: {stateLine}</p> : null;
+  }
   // A segment the reader gives no hours is not printed (no empty rows); the coverage line still counts every segment it returned.
   const priced = appraisal.segments.filter(s => s.hours_typical != null);
   const coverage = { n: priced.length, of: appraisal.segments.length, grain: 'segments with hours', as_of: appraisal.as_of };
   // The reader says "nothing priced" with priced_segments = 0: that is an answer, printed as one.
   if (appraisal.applicable && appraisal.totals?.priced_segments === 0 && appraisal.segments.length) {
     return <Section title="Labor appraisal by segment" coverage={coverage}>
+      {stateLine && <Text role="caption" as="p" className="vp-labor-state" data-fresh="false">{stateLine}</Text>}
       <Text role="caption" as="p">Not appraised: the reader has no segment with hours for this car yet.</Text>
       {appraisal.logic_version && <Text role="caption" as="p" className="vp-reader-version">Reader: vehicle_labor_appraisal · {appraisal.logic_version}</Text>}
     </Section>;
   }
   if (!appraisal.applicable || !priced.length) return null;
   const byGrade = appraisal.totals?.by_grade ? Object.entries(appraisal.totals.by_grade) : [];
+  const byBasis = appraisal.totals?.by_basis ? Object.entries(appraisal.totals.by_basis) : [];
   const witnessedTotal = witnessedTotalText(appraisal.totals?.witnessed);
   const withPurchases = rangeText(appraisal.totals?.with_unwitnessed ?? appraisal.totals?.with_unwitnessed_purchases);
   return <Section title="Labor appraisal by segment" coverage={coverage}>
+    {stateLine && <Text role="caption" as="p" className="vp-labor-state" data-fresh="false">{stateLine}</Text>}
     <Text role="caption" as="p">Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.</Text>
     {appraisal.totals?.witnessed && withPurchases && <div title={appraisal.totals?.rule ?? undefined}><Rows title="Hours, two totals side by side">
       <Row label="Witnessed" role="measure">{witnessedTotal ?? 'none established'}{witnessedUnknownText(appraisal.totals?.witnessed)}</Row>
       <Row label="With work not witnessed" role="measure">{withPurchases}</Row>
     </Rows></div>}
+    {byBasis.length > 0 && <Rows title="Hours by basis">
+      {byBasis.map(([basis, range]) => <Row key={basis} label={basisWords(basis, appraisal.names)} role="measure">{rangeText(range) ?? 'No hours'}</Row>)}
+    </Rows>}
     {byGrade.length > 0 && <Rows title="Hours by evidence grade">
       {byGrade.map(([grade, range]) => <Row key={grade} label={codeText(grade)} role="measure">{rangeText(range) ?? 'No hours'}</Row>)}
     </Rows>}

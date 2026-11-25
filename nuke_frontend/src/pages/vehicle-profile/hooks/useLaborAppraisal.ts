@@ -50,13 +50,31 @@ export interface LaborAppraisal {
     /** with_unwitnessed is the renamed with_unwitnessed_purchases (kept by the reader as an alias for one release). */
     with_unwitnessed?: LaborRange | null; with_unwitnessed_purchases?: LaborRange | null;
     priced_segments?: number | null; unwitnessed_purchase_segments?: number | null; rule?: string | null;
+    /** The reader's sums by where the book hours come from (labor_hours_bases key), beside by_grade. */
+    by_basis?: Record<string, LaborRange> | null;
+    uncited_segments?: number | null;
   }) | null;
   /** The keys' words, read from their own rows (20261125073000): transitions by transition_id, operations by code. */
   names?: LaborNames | null;
+  /** 'not_yet_computed' (or 'recomputing') with no segments: the stored fold has no read for this car yet. */
+  status?: string | null;
+  /** The stored fold's state (20261125153000). Absent when the read was computed at read time. */
+  state?: LaborFoldState | null;
+}
+export interface LaborFoldState {
+  /** true: the hours are current. false with computed true: the last good read, served while the fold recomputes. */
+  fresh?: boolean | null; computed?: boolean | null; computed_at?: string | null; evidence_changed_at?: string | null;
+  key_current?: boolean | null; queued?: boolean | null; error?: string | null;
+  /** The words to print: null (print nothing), 'recomputing' (printed with as_of), 'not yet computed'. */
+  label?: string | null;
+  /** 'stored' (a fresh fold), 'computed_now' (computed at read; the stored row's time in stored_at), null (not yet computed). */
+  basis?: string | null; stored_at?: string | null;
 }
 export interface LaborNames {
   transitions?: Record<string, { label?: string | null; category?: string | null; from_stage?: string | null; to_stage?: string | null }> | null;
   operations?: Record<string, { name?: string | null }> | null;
+  /** labor_hours_bases rows by basis_key: the reader's words for each basis. */
+  bases?: Record<string, { label?: string | null; meaning?: string | null; rank?: number | null }> | null;
 }
 
 /** The labor appraisal by segment, computed by the database. No arithmetic happens here. */
