@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.model_fold_priority_tiers (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE public.model_fold_priority_tiers IS
-  'model_fold_signal_tiers_v1: a car outside the fold scopes gets the lowest tier whose min_keyed_witnesses it meets (sum of data_set_member_grades.n_witnesses). Admitted when tier <= model_fold_config.signal_tiers_max.';
+  'model_fold_signal_tiers_v1: queue order only. A car outside the fold scopes gets the lowest tier whose min_keyed_witnesses it meets (sum of data_set_member_grades.n_witnesses, all witness classes, mostly text mentions and claims). Admitted when tier <= model_fold_config.signal_tiers_max.';
 ALTER TABLE public.model_fold_priority_tiers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS model_fold_priority_tiers_read ON public.model_fold_priority_tiers;
 CREATE POLICY model_fold_priority_tiers_read ON public.model_fold_priority_tiers FOR SELECT TO anon, authenticated USING (true);
@@ -47,7 +47,7 @@ REVOKE ALL ON public.model_fold_priority_tiers FROM anon, authenticated;
 GRANT SELECT ON public.model_fold_priority_tiers TO anon, authenticated;
 GRANT ALL ON public.model_fold_priority_tiers TO service_role;
 INSERT INTO public.model_fold_priority_tiers (tier, min_keyed_witnesses, note) VALUES
-  (2, 20, 'queue priority, not truth. Basis: sum of data_set_member_grades.n_witnesses per car, measured 2026-11-25 over 180,154 graded cars (backfill ~25%): 869 at 100+, 4,546 at 20+, 74,328 at 5+, p50 4, p90 10. 20+ is the top ~2.5%, a first lap a day of fold capacity covers.'),
+  (2, 20, 'queue priority, not truth. Basis: sum of data_set_member_grades.n_witnesses per car, measured 2026-11-25 over 180,154 graded cars (backfill ~25%): 869 at 100+, 4,546 at 20+, 74,328 at 5+, p50 4, p90 10. That count is every witness class: fleet-wide the grade witness entries are 436,638 mentioned, 249,929 claim, 4,621 decode, 41 photo reading, so this orders by text attention, not by photo or paper evidence. 20+ is the top ~2.5%.'),
   (3, 5, 'queue priority, not truth. Basis: same 2026-11-25 measurement; 74,328 of 180,154 graded cars hold 5+ keyed witnesses (p90 is 10), so this tier is the next ~41%.'),
   (4, 0, 'queue priority, not truth. Basis: every remaining car, including those with no keyed witness; folded last, on change only.')
 ON CONFLICT (tier) DO NOTHING;
