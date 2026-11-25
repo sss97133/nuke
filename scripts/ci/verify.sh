@@ -123,6 +123,24 @@ if node --test "$ROOT/scripts/ci/typecheck-ratchet.test.mjs" >"$CI_TMP_DIR/ci_ty
 else red "  ✗ typecheck ratchet contract FAILED"; cat "$CI_TMP_DIR/ci_typecheck_ratchet_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" "$ROOT/scripts/discovery/buying-evidence-matching.test.mjs" "$ROOT/scripts/discovery/buying-evidence-plan.test.mjs" >"$CI_TMP_DIR/ci_buying_evidence_tests.out" 2>&1; then grn "  ✓ buying-evidence source, matching, plan and refusal contracts"
 else red "  ✗ buying-evidence source and refusal contracts FAILED"; cat "$CI_TMP_DIR/ci_buying_evidence_tests.out"; fail=1; fi
+# Keys and witnesses (2026-11-24, after #3707): the migrations a change ADDS (against HEAD^1 in Actions, the merge-base
+# with origin/main locally) may not write testimony outside a sanctioned writer, ratify vocabulary without a
+# schema_proposals row, or create a center-id column with no foreign key. Exit 2 (no base found) fails in Actions and
+# warns locally, so a broken checkout cannot switch the check off unseen.
+keys_gate(){ # label command...
+  local label=$1; shift
+  "$@" >"$CI_TMP_DIR/ci_keys.out" 2>&1; local rc=$?
+  if [ $rc = 0 ]; then grn "  ✓ $label"
+  elif [ $rc = 2 ] && [ -z "${GITHUB_ACTIONS:-}" ]; then ylw "  ! $label: no base revision to compare with (fetch origin/main)"
+  else red "  ✗ $label"; cat "$CI_TMP_DIR/ci_keys.out"; fail=1; fi
+}
+if node --test "$GD/no-raw-testimony-insert.test.mjs" "$GD/no-new-photo-reader.test.mjs" >"$CI_TMP_DIR/ci_keys_tests.out" 2>&1; then grn "  ✓ testimony-writer, vocabulary and center-key detector contracts"
+else red "  ✗ testimony-writer, vocabulary and center-key detector contracts FAILED"; cat "$CI_TMP_DIR/ci_keys_tests.out"; fail=1; fi
+keys_gate "no added migration writes testimony outside a sanctioned writer" node "$GD/no-raw-testimony-insert.mjs" --changes
+keys_gate "no added migration ratifies vocabulary without a proposal or adds an unkeyed center column (no-new-photo-reader)" node "$GD/no-new-photo-reader.mjs"
+counts_warn="$(node "$GD/no-pii-exposure.mjs" --counts 2>/dev/null | grep -c '^WARN' || true)"
+if [ "${counts_warn:-0}" -gt 0 ]; then ylw "  • ungraded public counts: $counts_warn (advisory: no-pii-exposure.mjs --counts)"; node "$GD/no-pii-exposure.mjs" --counts 2>/dev/null | grep '^WARN' | sed 's/^/    /'
+else grn "  ✓ no added public reader counts memberships without a grade (advisory)"; fi
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
 ratchet "raw-fetch"        "$(count_rawfetch)"  "$(b no-raw-fetch violations)"
 ratchet "testimony-insert" "$(count_testimony)" "$(b no-raw-testimony-insert violations)"

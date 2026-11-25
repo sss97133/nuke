@@ -29,12 +29,22 @@
  * text_redact_contact, with separators required), and reports each column with hits that pii-freeform-columns.json does
  * not list. Rolled back; counts only.
  *
- * Exit: 0 clean, 1 exposure, 2 setup error. Flags: --live [--content], --refresh, --json.
+ * Ungraded counts (--counts, WARN only, added 2026-11-24): a public reader (SECURITY DEFINER, executable by anon) that
+ * counts over data_set_members, data_set_public_counts or vehicle_code_readings and never names a grade.
+ * Owner order 2026-11-24: memberships are graded by their witnesses' classes and readers count by grade, so a cohort
+ * size built from text mentions reads as fact. Static mode reads the migrations a change adds (--base <rev> | --files
+ * <f>...); execute rights are read from the same file (an explicit GRANT to anon or PUBLIC, or no REVOKE from PUBLIC,
+ * since functions are executable by PUBLIC by default), which a grant made in another migration can contradict, so
+ * --counts --live asks production (has_function_privilege('anon', ...)) for the exact list. Never fails: a hit prints
+ * WARN; make it blocking once the false-positive rate is known.
+ *
+ * Exit: 0 clean, 1 exposure, 2 setup error. Flags: --live [--content], --refresh, --json, --counts [--live].
  */
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { splitStatements, addedMigrations } from './no-raw-testimony-insert.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
@@ -262,8 +272,52 @@ function contentHits(listed) {
     statement: `contact details in ${r.email + r.phone} of ${r.n} sampled rows (e-mail ${r.email}, phone ${r.phone})` }));
 }
 
+export const COUNTED_TABLES = /\b(data_set_members|data_set_public_counts|vehicle_code_readings)\b/i;
+
+/** Public readers in one migration that count graded tables with no grade split: [{ fn, anon, line }]. */
+export function ungradedCounts(sql) {
+  const src = String(sql);
+  const text = src.replace(/\/\*[\s\S]*?\*\//g, (t) => t.replace(/[^\n]/g, ' ')).replace(/--[^\n]*/g, (t) => ' '.repeat(t.length));
+  const out = [];
+  for (const st of splitStatements(text)) {
+    const head = st.text.match(/^\s*create\s+(?:or\s+replace\s+)?function\s+((?:"?[a-z_][a-z0-9_]*"?\.)?"?([a-z_][a-z0-9_]*)"?)\s*\(/i);
+    if (!head) continue;
+    const outside = st.text.replace(/\$([A-Za-z_][A-Za-z0-9_]*)?\$[\s\S]*?\$\1\$/g, ' ');
+    if (!/\bsecurity\s+definer\b/i.test(outside)) continue;
+    const body = st.text;
+    if (!COUNTED_TABLES.test(body) || !/\bcount\s*\(/i.test(body) || /\bgrade/i.test(body)) continue;
+    const name = head[2].toLowerCase();
+    const fnRef = `(?:"?public"?\\.)?"?${name}"?\\s*\\([^)]*\\)`;
+    const granted = new RegExp(`grant\\s+(?:execute|all)[^;]*on\\s+function\\s+${fnRef}[^;]*\\bto\\b[^;]*\\b(anon|public)\\b`, 'i').test(text);
+    const revoked = new RegExp(`revoke\\s+(?:execute|all)[^;]*on\\s+function\\s+${fnRef}[^;]*\\bfrom\\b[^;]*\\bpublic\\b`, 'i').test(text)
+      && new RegExp(`revoke\\s+(?:execute|all)[^;]*on\\s+function\\s+${fnRef}[^;]*\\bfrom\\b[^;]*\\banon\\b`, 'i').test(text);
+    if (granted || !revoked) out.push({ fn: name, anon: granted ? 'granted' : 'default PUBLIC execute', line: src.slice(0, st.start).split('\n').length + 1 });
+  }
+  return out;
+}
+
+const COUNTS_LIVE_SQL = `SELECT p.proname AS fn FROM pg_proc p
+WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef AND has_function_privilege('anon', p.oid, 'EXECUTE')
+  AND p.prosrc ~* '\\m(data_set_members|data_set_public_counts|vehicle_code_readings)\\M'
+  AND p.prosrc ~* 'count\\s*\\(' AND p.prosrc !~* 'grade' ORDER BY 1`;
+
+function countsMain(args, argv) {
+  let hits;
+  if (args.has('--live')) hits = q(COUNTS_LIVE_SQL).map((r) => ({ file: 'production', fn: r.fn, anon: 'executable by anon' }));
+  else {
+    const files = addedMigrations(argv);
+    if (!files) { console.error('no-pii-exposure --counts: could not find the base revision (fetch origin/main, or pass --base <rev>)'); return 2; }
+    hits = files.flatMap((f) => ungradedCounts(readFileSync(f.startsWith('/') ? f : join(ROOT, f), 'utf8')).map((h) => ({ file: `${f}:${h.line}`, ...h })));
+  }
+  if (args.has('--json')) { console.log(JSON.stringify(hits, null, 1)); return 0; }
+  for (const h of hits) console.log(`WARN ungraded-count ${h.file}: ${h.fn} (${h.anon}) counts graded tables with no grade split`);
+  console.log(`no-pii-exposure --counts: ${hits.length} warning(s)${hits.length ? '. Public readers count data-set memberships by grade (established / supported / mentioned / conflict), never state alone.' : ''}`);
+  return 0;
+}
+
 function main() {
   const args = new Set(process.argv.slice(2));
+  if (args.has('--counts')) return countsMain(args, process.argv.slice(2));
   if (args.has('--refresh')) {
     const rows = q(`SELECT c.relname AS t, array_agg(a.attname::text ORDER BY a.attname) AS cols FROM pg_class c
       JOIN pg_attribute a ON a.attrelid = c.oid WHERE c.relnamespace = 'public'::regnamespace
