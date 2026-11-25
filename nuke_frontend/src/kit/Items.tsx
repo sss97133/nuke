@@ -163,6 +163,11 @@ export function ItemRow({ item, after }: { item: FacetItem; after?: React.ReactN
         item.agreement!.source_families != null ? `${item.agreement!.source_families} ${item.agreement!.source_families === 1 ? 'source family' : 'source families'}` : null,
       ].filter(Boolean).join(' · ')}
     </Text>}
+    {item.status === 'established' && item.basis?.code && <Text role="caption" as="p" className="k-item__line">
+      {[`Established by: ${item.basis.label ?? codeText(item.basis.code)}`,
+        item.basis.code.startsWith('independent.') && item.basis.sources != null ? `${item.basis.sources} sources` : null,
+      ].filter(Boolean).join(' · ')}
+    </Text>}
     {item.candidates?.length ? <ul className="k-item__sides">{item.candidates.map((c, i) => <li key={i}>
       <Text role="body">{[c.code, ratioText(c.gears), c.reverse != null ? `reverse ${ratioText(c.reverse)}` : null,
         c.countershaft_in ? `${c.countershaft_in} in countershaft` : null].filter(Boolean).join(' · ')}</Text>

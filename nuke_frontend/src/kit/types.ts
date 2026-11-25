@@ -101,6 +101,10 @@ export type FacetItem = {
    *  stated item, its independent sources and their source families (a claim keeps how many sources agree). */
   agreement?: { readings?: number | null; photos?: number | null; families?: number | null;
     sources?: number | null; source_families?: number | null } | null;
+  /** What establishes an established item, from the establishment rule row (establishment_basis): a code such as
+   *  vin_decode.listing_text or independent.claims, its label, and the VIN's standing when a decode carries it. */
+  basis?: { code: string; label?: string | null; vin?: string | null; sources?: number | null;
+    source_families?: number | null; rule?: string | null; reads?: string[] | null } | null;
   candidates?: Array<Record<string, unknown>>; examined?: Array<Record<string, unknown>>;
   /** Cited factory availability rows (model_availability) for the car's decoded series and engine; every source kept. */
   availability?: Array<Record<string, unknown>>;
