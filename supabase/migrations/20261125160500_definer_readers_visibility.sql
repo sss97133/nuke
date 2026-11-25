@@ -25,12 +25,15 @@
 --   A vehicle is named (fleet entry, vehicle_name, session) only when it is_public AND deleted_at IS NULL, or
 --   vehicle_viewer_tied. A session is also listed to its own author (work_sessions.user_id = auth.uid()).
 --
--- WHAT CHANGES. Only the WHERE of each read and the vehicle join; the selected columns, their order, the
--- arguments, return types, language, volatility (get_image_deep_analysis VOLATILE, intake_live_state STABLE), SECURITY
--- DEFINER, search_path ('' and public) and grants are unchanged (CREATE OR REPLACE keeps grants). The feed test is
--- inside the subquery, before LIMIT, so a caller still gets the newest p_feed_limit frames it may see.
--- analyzed_last_30m stays a fleet-wide count (a number, no row about a photo). fleet totals still count every
--- approved upload of a listed vehicle.
+-- WHAT CHANGES. The caller test in each read and the vehicle joins. The fleet's vehicle join becomes an inner join with
+-- the vehicle test (a vehicle_id with no vehicles row is no longer listed). The feed picks frames newest first and tests
+-- them above the sort (OFFSET 0), stopping at p_feed_limit, then reads the analysis jsonb for the frames returned
+-- (join back on vehicle_images.id). The shown test is a scalar subquery, not EXISTS, so it cannot become a hashed scan
+-- of every photo. Unchanged: the selected keys and their order, the arguments, return types, language, volatility
+-- (get_image_deep_analysis VOLATILE, intake_live_state STABLE), SECURITY DEFINER, search_path ('' and public) and
+-- grants (CREATE OR REPLACE keeps grants). analyzed_last_30m stays a fleet-wide count (a number, no row about a
+-- photo). fleet totals still count every approved upload of a listed vehicle. A session with no request claims (cron,
+-- psql) is treated as anon: shown rows only.
 --
 -- GUARD. One DO block: it refuses unless each live body is the one read 2026-11-25 (sha256 of prosrc) or already
 -- carries this version's marker, so a concurrent rewrite is never overwritten, and a refused body changes nothing.

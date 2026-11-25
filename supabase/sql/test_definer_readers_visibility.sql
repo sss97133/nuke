@@ -3,7 +3,7 @@
 -- DEFINER, executable by anon) return a row about a photo only where the photo is shown (gallery-eligible, not
 -- sensitive, on a public undeleted vehicle), to its uploader, or to a caller tied to its vehicle; and name a vehicle
 -- only where it is public and undeleted or the caller is tied. service_role keeps every row.
--- The fixture mirrors production as read on 2026-11-25 (information_schema.columns, pg_constraint, pg_policies,
+-- The fixture mirrors production as read on 2026-11-25 (information_schema.columns, pg_constraint, a subset of pg_policies,
 -- role_table_grants, pg_get_functiondef): the columns these bodies and their helpers touch with their types, NOT NULLs,
 -- defaults, checks and foreign keys; the live bodies of vehicle_image_gallery_eligible(vehicle_images_public),
 -- vehicle_image_privacy_withheld, image_stage_custody_external, vehicle_viewer_tied, vehicle_user_has_access, and of the
@@ -393,8 +393,9 @@ GRANT SELECT ON public.vehicle_images TO authenticated;
 GRANT SELECT ON public.vehicle_images_public, public.image_privacy_rules TO anon, authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
 
--- Live SELECT policies (pg_policies, 2026-11-25). The readers run as their owner and bypass them; they are here so the
--- fixture holds what production holds.
+-- A subset of the live SELECT policies (pg_policies, 2026-11-25): vehicles' two, two of vehicle_images' five, one of
+-- work_sessions' four, image_privacy_rules' one. The readers run as their owner and bypass every one, so the policies
+-- are inert here; they are kept so that a reader changed to run as invoker would meet them.
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY vehicles_public_select ON public.vehicles FOR SELECT USING ((is_public = true) OR (auth.role() = 'service_role'::text));
 CREATE POLICY vehicles_private_select ON public.vehicles FOR SELECT USING ((is_public = false) AND ((SELECT auth.uid()) IS NOT NULL)
