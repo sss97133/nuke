@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 interface AnalysisStats {
   total: number;
@@ -37,13 +38,13 @@ export default function LiveImageAnalysisMonitor() {
 
       // Get analyzed images (have appraiser primary_label)
       const { count: analyzed } = await supabase
-        .from('vehicle_images')
+        .from(VEHICLE_IMAGES_READ)
         .select('id', { count: 'exact', head: true })
         .not('ai_scan_metadata->appraiser->primary_label', 'is', null);
 
       // Get pending images
       const { count: pending } = await supabase
-        .from('vehicle_images')
+        .from(VEHICLE_IMAGES_READ)
         .select('id', { count: 'exact', head: true })
         .is('ai_scan_metadata->appraiser->primary_label', null);
 

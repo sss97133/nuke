@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
+import { vehicleImageRowColumns, VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 interface ValidationSource {
   validation_source: string;
@@ -73,7 +73,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
 
       // 2. Get vehicle images tagged as title/registration/VIN plate
       const { data: docImages } = await supabase
-        .from('vehicle_images')
+        .from(VEHICLE_IMAGES_READ)
         .select(await vehicleImageRowColumns())
         .eq('vehicle_id', vehicleId)
         .in('sensitive_type', ['title', 'registration', 'vin_plate', 'bill_of_sale'])

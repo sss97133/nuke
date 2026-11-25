@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { VEHICLE_IMAGES_READ } from '../lib/vehicleImageColumns';
 
 export interface EventImageAnalysis {
   imageId: string;
@@ -42,7 +43,7 @@ export async function generateTimelineEventDescription(
   try {
     // 1. Fetch all images for this event date
     const { data: images } = await supabase
-      .from('vehicle_images')
+      .from(VEHICLE_IMAGES_READ)
       .select(`
         id,
         image_url,

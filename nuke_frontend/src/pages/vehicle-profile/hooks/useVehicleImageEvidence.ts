@@ -165,7 +165,7 @@ export function useVehicleImageEvidence(vehicleId: string | undefined, field?: s
       signal.addEventListener('abort', abort, { once: true });
       const timeout = setTimeout(abort, 12_000);
       try {
-        const gallerySource = await vehicleImageGallerySource();
+        const gallerySource = await vehicleImageGallerySource(SELECT);
         let query = supabase.from(gallerySource)
           .select(SELECT, { count: 'exact' }).eq('vehicle_id', vehicleId!)
           .eq('vehicle_image_gallery_eligible', true)
@@ -204,7 +204,7 @@ export function useVehicleImageEvidence(vehicleId: string | undefined, field?: s
       const citationIds = [...new Set(citations.map(citation => citation.imageId))];
       if (citationIds.length > 100) throw new Error('Facet citation read exceeds bounded image selection');
       if (!citationIds.length) return { citations, citedImages: [] as CitedFieldImage[] };
-      const { data: images, error: imageError } = await supabase.from(await vehicleImageGallerySource()).select(SELECT)
+      const { data: images, error: imageError } = await supabase.from(await vehicleImageGallerySource(SELECT)).select(SELECT)
         .eq('vehicle_id', vehicleId!).in('id', citationIds)
         .eq('vehicle_image_gallery_eligible', true).not('is_sensitive', 'is', true)
         .not('is_document', 'is', true).not('is_duplicate', 'is', true)

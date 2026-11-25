@@ -8,6 +8,16 @@ export const VEHICLE_IMAGE_ANON_EXCLUDED_COLUMNS = [
 
 export const VEHICLE_IMAGE_PUBLIC_COLUMNS = 'id, vehicle_id, user_id, image_url, image_type, category, position, caption, is_primary, created_at, updated_at, timeline_event_id, image_context, file_hash, file_name, file_size, taken_at, source, source_url, is_external, mime_type, is_sensitive, sensitive_type, storage_path, safe_preview_url, process_stage, workflow_role, area, part, damage_type, operation, materials, labels, task_id, event_id, angle, perspective, thumbnail_url, medium_url, large_url, optimization_status, optimized_at, variants, spatial_tags, ai_scan_metadata, ai_last_scanned, ai_component_count, ai_avg_confidence, filename, temp_session_id, is_approved, approved_by, approved_at, imported_by, ghost_user_id, verification_status, pending_submission_id, image_category, approval_status, submitted_by, redaction_level, redacted_by, redacted_at, redaction_reason, uploaded_at, analysis_history, context_score, processing_models_used, total_processing_cost, rotation, document_classification, is_document, document_category, manual_priority, display_order, user_tags, user_notes, ai_processing_status, ai_processing_started_at, ai_processing_completed_at, ai_suggestions, organization_status, organized_at, ai_detected_vehicle, ai_detected_angle, ai_detected_angle_confidence, suggested_vehicle_id, perceptual_hash, dhash, duplicate_of, is_duplicate, documented_by_user_id, photographer_attribution, user_confirmed_vehicle, user_confirmed_vehicle_by, user_confirmed_vehicle_at, auto_suggested_vehicle_id, auto_suggestion_confidence, auto_suggestion_reasons, angle_confidence, yaw_deg, yaw_confidence, angle_source, bbox, doc_flag, doc_confidence, components, vehicle_vin, vehicle_vin_confidence, vehicle_make, vehicle_model, vehicle_year, vehicle_confidence, vehicle_source, stale, last_rerun_at, tags, ai_extractions, ai_extraction_consensus, phash, condition_score, damage_flags, modification_flags, photo_quality_score, vision_analyzed_at, vision_model_version, surface_coord_v, surface_coord_u, camera_pose, vehicle_zone, zone_confidence, yono_queued_at, interior_quality, zone_source, fabrication_stage, stage_confidence, duration_seconds, video_codec, video_resolution, is_video, image_vehicle_match_status, image_medium, apple_ml_labels, vehicle_score, upload_batch_id, work_session_id, merged_from_vehicle_id, vision_gate_status, vision_gate_processed_at, vision_gate_agent_reasoning, vision_gate_attribution_confidence, is_superseded, superseded_by, superseded_at, ai_retry_count, image_identity_id';
 
+/**
+ * Where a read that returns ai_scan_metadata goes, for every viewer. vehicle_images_public has the table's rows (security
+ * invoker, so the same row policies) and its full column set, and strips the withheld paths of ai_scan_metadata (place
+ * hints, detected and free text, plate text) for a caller who is not the uploader or tied to the car; the uploader and
+ * tied callers get the column unchanged. The table itself keeps serving the raw column until its grant is revoked, so a
+ * read of `*`, of vehicleImageRowColumns() or of ai_scan_metadata never names vehicle_images
+ * (vehicleImageReadSource.guard.test.ts fails it). Typed as the table: the view has the same columns.
+ */
+export const VEHICLE_IMAGES_READ = 'vehicle_images_public' as 'vehicle_images';
+
 // An unknown session counts as signed out, so the read asks only for anon-granted columns.
 async function signedIn(): Promise<boolean> {
   try {
@@ -51,8 +61,10 @@ export async function vehicleImageColumnsForViewer<T extends string>(columns: T)
 /**
  * Where a gallery read goes. The gate filter `vehicle_image_gallery_eligible` takes the whole row, which anon cannot form
  * once its column grants withhold location/EXIF/device fields, so a signed-out gallery read uses vehicle_images_public (the
- * same rows and gate, without those columns) and a signed-in read keeps the table.
+ * same rows and gate, without those columns) and a signed-in read keeps the table. A read whose columns name
+ * ai_scan_metadata uses the view for every viewer (see VEHICLE_IMAGES_READ).
  */
-export async function vehicleImageGallerySource(): Promise<'vehicle_images'> {
+export async function vehicleImageGallerySource(columns = ''): Promise<'vehicle_images'> {
+  if (/ai_scan_metadata/.test(columns)) return VEHICLE_IMAGES_READ;
   return ((await signedIn()) ? 'vehicle_images' : 'vehicle_images_public') as 'vehicle_images';
 }

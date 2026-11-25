@@ -6,6 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ImageHoverPreview } from './ImageHoverPreview';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 interface IDHoverCardProps {
   id: string;
@@ -81,7 +82,7 @@ export const IDHoverCard: React.FC<IDHoverCardProps> = ({
       // Try image first (most common in admin pages)
       if (actualType === 'auto' || actualType === 'image') {
         const { data: img, error: imgError } = await supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select('id, image_url, medium_url, large_url, created_at, vehicle_id, ai_scan_metadata')
           .eq('id', id)
           .maybeSingle();

@@ -32,6 +32,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
+import { VEHICLE_IMAGES_READ } from '../../lib/vehicleImageColumns';
 
 interface UserRecentPhotosProps {
   userId: string;
@@ -203,7 +204,7 @@ const RecentPhotoLightbox: React.FC<{
     let cancelled = false;
     setAnalysis(null);
     supabase
-      .from('vehicle_images')
+      .from(VEHICLE_IMAGES_READ)
       .select('ai_processing_status, ai_component_count, vision_model_version, vision_analyzed_at, ai_last_scanned, ai_scan_metadata, caption, image_medium')
       .eq('id', img.id)
       .maybeSingle()

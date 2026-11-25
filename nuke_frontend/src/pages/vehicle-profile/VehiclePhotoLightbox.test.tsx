@@ -31,7 +31,10 @@ beforeEach(() => {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `synthetic-lightbox-${serial}` },
     global: { fetch: async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
-      expect(init?.method ?? 'GET').toBe('GET'); expect(url.pathname).toBe('/rest/v1/vehicle_images'); calls.push(url);
+      expect(init?.method ?? 'GET').toBe('GET'); calls.push(url);
+      // A read that returns ai_scan_metadata goes through the view that strips withheld paths for untied viewers.
+      expect(url.pathname).toBe((url.searchParams.get('select') ?? '').includes('ai_scan_metadata')
+        ? '/rest/v1/vehicle_images_public' : '/rest/v1/vehicle_images');
       const special = reply?.(url); if (special) return (await special).clone();
       const fields = url.searchParams.get('select')!;
       if (fields === 'id,image_url,taken_at,source') {

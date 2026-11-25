@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { VEHICLE_IMAGES_READ } from '../lib/vehicleImageColumns';
 
 export interface PersonalPhoto {
   id: string;
@@ -165,7 +166,7 @@ export class PersonalPhotoLibraryService {
     console.warn('[PhotoLibrary] RPC function not available, using fallback queries');
     
     const { data, error } = await supabase
-      .from('vehicle_images')
+      .from(VEHICLE_IMAGES_READ)
       .select('*')
       .eq('user_id', userId)
       .is('vehicle_id', null)
@@ -228,7 +229,7 @@ export class PersonalPhotoLibraryService {
     const userId = session.session.user.id;
 
     const { data, error } = await supabase
-      .from('vehicle_images')
+      .from(VEHICLE_IMAGES_READ)
       .select('*, vehicles(year, make, model)')
       .eq('user_id', userId)
       .or('vehicle_id.not.is.null,organization_status.eq.organized')
@@ -331,7 +332,7 @@ export class PersonalPhotoLibraryService {
     for (const suggestion of suggestions) {
       if (suggestion.sample_image_ids && suggestion.sample_image_ids.length > 0) {
         const { data: images } = await supabase
-          .from('vehicle_images')
+          .from(VEHICLE_IMAGES_READ)
           .select('*')
           .in('id', suggestion.sample_image_ids)
           .limit(5);
@@ -484,7 +485,7 @@ export class PersonalPhotoLibraryService {
     const userId = session.session.user.id;
 
     let query = supabase
-      .from('vehicle_images')
+      .from(VEHICLE_IMAGES_READ)
       .select('*')
       .eq('user_id', userId)
       .is('vehicle_id', null)
@@ -526,7 +527,7 @@ export class PersonalPhotoLibraryService {
     const querySafe = escapeILike(query);
 
     const { data, error } = await supabase
-      .from('vehicle_images')
+      .from(VEHICLE_IMAGES_READ)
       .select('*')
       .eq('user_id', userId)
       .is('vehicle_id', null)
@@ -630,7 +631,7 @@ export class PersonalPhotoLibraryService {
     const limit = params.limit || 200;
 
     let query = supabase
-      .from('vehicle_images')
+      .from(VEHICLE_IMAGES_READ)
       .select('*', { count: 'exact' })
       .eq('user_id', userId)
       .is('vehicle_id', null);
