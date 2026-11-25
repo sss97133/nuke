@@ -1,9 +1,11 @@
 -- Empty disposable PG17 only:
 --   createdb dm_refinement_row_read_deleted; psql -X -v ON_ERROR_STOP=1 -d dm_refinement_row_read_deleted -f this-file.sql
 --   (-v mig=<path> runs the contract against another body; the mutation runs use it.)
--- Proves 20261125214500_vehicle_row_read_deleted_gate.sql: a deleted car that is still flagged public answers NULL to
--- anon, a signed-in stranger and a caller with no claims; its owner, a tied contributor and the service role still read
--- it; every other answer is byte-identical. Fixture: the live bodies of vehicle_row_read and its helpers (sha-asserted),
+-- Proves 20261125214500_vehicle_row_read_deleted_gate.sql: a deleted, unmerged car that is still flagged public answers
+-- NULL to anon, a signed-in stranger and a caller with no claims, exactly as a missing car does; a deleted merged car
+-- answers them the redirect only ({id, merged_into_vehicle_id}); its owner, a tied contributor and the service role
+-- still read it whole; every other answer is byte-identical; vehicle_publicly_readable holds its truth table and the
+-- planner inlines it. Fixture: the live bodies of vehicle_row_read and its helpers (sha-asserted),
 -- vehicles with live column grants and user-id foreign keys, as in test_vehicle_row_projection_withheld_columns.sql.
 \set ON_ERROR_STOP on
 \if :{?mig}
@@ -35,14 +37,15 @@ $$ SELECT set_config('request.jwt.claims', CASE WHEN p_uid = '' THEN '{"role":"a
      WHEN p_uid = 'service' THEN '{"role":"service_role"}'
      ELSE json_build_object('sub', p_uid, 'role', 'authenticated')::text END, false) $$;
 
-CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean DEFAULT true, deleted_at timestamptz,
+-- guardrail-allow(center-key-fk): vehicles: disposable fixture mirroring the live table, which has no foreign key on merged_into_vehicle_id
+CREATE TABLE public.vehicles (id uuid PRIMARY KEY, merged_into_vehicle_id uuid, is_public boolean DEFAULT true, deleted_at timestamptz,
   user_id uuid, owner_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   uploaded_by uuid REFERENCES auth.users(id) ON DELETE CASCADE, created_by_user_id uuid,
   make text, model text, year integer, description text, origin_metadata jsonb,
   license_plate text, odometer_reading integer, numbers_quote text, source_listing_key text,
   owner_name text, owner_contact text, purchase_price numeric(10,2), purchase_date date, purchase_location text);
 -- Column grants as live (has_column_privilege, 2026-11-25) for these columns.
-GRANT SELECT (id, is_public, deleted_at, user_id, owner_id, uploaded_by, created_by_user_id, make, model, year,
+GRANT SELECT (id, merged_into_vehicle_id, is_public, deleted_at, user_id, owner_id, uploaded_by, created_by_user_id, make, model, year,
   description, origin_metadata) ON public.vehicles TO anon, authenticated;
 GRANT SELECT (license_plate) ON public.vehicles TO authenticated;
 GRANT SELECT ON public.vehicles TO service_role;
@@ -148,17 +151,30 @@ DO $$ BEGIN
           WHERE oid = 'public.vehicle_row_read(uuid)'::regprocedure)
     = '39f79cb8301139eedafa9d0ec9b2e73bc920484dc1149c116df4401d58b4c795', 'fixture vehicle_row_read is the live one';
 END $$;
+-- The projection live since 2026-11-25 10:49Z is 20261125202000's; apply it so the fixture matches production.
+\ir ../migrations/20261125202000_vehicle_row_projection_withheld_columns.sql
+DO $$ BEGIN
+  ASSERT (SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') FROM pg_proc
+          WHERE oid = 'public.vehicle_row_public_projection(jsonb)'::regprocedure)
+    = 'd72ab841ab9c56dea9e1e4773141e021e979d3c8c0d413057c715831d2e8514d', 'fixture projection is the live one (after 20261125202000)';
+END $$;
 
 INSERT INTO auth.users (id) VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'), ('cccccccc-cccc-4ccc-8ccc-cccccccccccc'),
   ('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
--- 1111 public; 3333 public and deleted (owner bbbb); 2222 private; 5555 private and deleted; 4444 missing.
+-- 1111 public; 3333 public and deleted (owner bbbb); 2222 private; 5555 private and deleted; 4444 missing;
+-- 6666 public, deleted, merged into 1111 (a stub); 7777 public, merged into 1111, not deleted.
 INSERT INTO public.vehicles (id, is_public, deleted_at, owner_id, uploaded_by, make, model, year) VALUES
   ('11111111-1111-4111-8111-111111111111', true, null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'Live', 1973),
   ('33333333-3333-4333-8333-333333333333', true, now(), 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'Deleted', 1970),
   ('22222222-2222-4222-8222-222222222222', false, null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'Private', 1971),
-  ('55555555-5555-4555-8555-555555555555', false, now(), 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'PrivDel', 1972);
+  ('55555555-5555-4555-8555-555555555555', false, now(), 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'PrivDel', 1972),
+  ('66666666-6666-4666-8666-666666666666', true, now(), 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'Stub', 1969),
+  ('77777777-7777-4777-8777-777777777777', true, null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture', 'MergedLive', 1968);
+UPDATE public.vehicles SET merged_into_vehicle_id = '11111111-1111-4111-8111-111111111111'
+ WHERE id IN ('66666666-6666-4666-8666-666666666666', '77777777-7777-4777-8777-777777777777');
 INSERT INTO public.vehicle_contributors (vehicle_id, user_id, status, role) VALUES
-  ('33333333-3333-4333-8333-333333333333', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'active', 'mechanic');
+  ('33333333-3333-4333-8333-333333333333', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'active', 'mechanic'),
+  ('66666666-6666-4666-8666-666666666666', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'active', 'mechanic');
 
 CREATE TABLE public.rd_answers (phase text, caller text, vehicle uuid, r jsonb, PRIMARY KEY (phase, caller, vehicle));
 GRANT INSERT, SELECT ON public.rd_answers TO anon, authenticated, service_role;
@@ -175,7 +191,8 @@ BEGIN
     INSERT INTO public.rd_answers SELECT p_phase, c.caller, v.id, public.vehicle_row_read(v.id)
       FROM (VALUES ('11111111-1111-4111-8111-111111111111'::uuid), ('33333333-3333-4333-8333-333333333333'::uuid),
                    ('22222222-2222-4222-8222-222222222222'::uuid), ('55555555-5555-4555-8555-555555555555'::uuid),
-                   ('44444444-4444-4444-8444-444444444444'::uuid)) v(id);
+                   ('44444444-4444-4444-8444-444444444444'::uuid), ('66666666-6666-4666-8666-666666666666'::uuid),
+                   ('77777777-7777-4777-8777-777777777777'::uuid)) v(id);
     RESET ROLE;
   END LOOP;
   PERFORM set_config('request.jwt.claims', '', false);
@@ -187,6 +204,8 @@ BEGIN; SELECT pg_temp.capture('before'); COMMIT;
 DO $$ BEGIN
   ASSERT pg_temp.ans('before', 'anon', '33333333-3333-4333-8333-333333333333') IS NOT NULL,
     'the defect reproduces on the prior body: anon reads a deleted public car';
+  ASSERT pg_temp.ans('before', 'anon', '66666666-6666-4666-8666-666666666666') ->> 'model' = 'Stub',
+    'the prior body hands anon a deleted stub''s whole row';
 END $$;
 
 \ir :mig
@@ -215,7 +234,48 @@ BEGIN
   -- 4. Nothing else changed: every answer except an outsider's on the deleted public car is byte-identical.
   SELECT count(*) INTO n FROM public.rd_answers a JOIN public.rd_answers b USING (caller, vehicle)
    WHERE a.phase = 'after' AND b.phase = 'before' AND a.r IS DISTINCT FROM b.r
-     AND NOT (a.vehicle = del AND a.caller IN ('anon','stranger','noclaims'));
+     AND NOT (a.vehicle IN (del, '66666666-6666-4666-8666-666666666666') AND a.caller IN ('anon','stranger','noclaims'));
   ASSERT n = 0, format('4 %s other answers changed', n);
 END $$;
-SELECT 'PASS: vehicle_row_read answers NULL to outsiders for a deleted car' AS result;
+DO $$
+DECLARE stub uuid := '66666666-6666-4666-8666-666666666666'; k text;
+BEGIN
+  -- 5. A deleted merged car answers an outsider with the redirect only; insiders read it whole as before; a merged car
+  --    that is not deleted reads as before.
+  FOREACH k IN ARRAY ARRAY['anon','stranger','noclaims'] LOOP
+    ASSERT pg_temp.ans('after', k, stub)
+         = '{"id": "66666666-6666-4666-8666-666666666666", "merged_into_vehicle_id": "11111111-1111-4111-8111-111111111111"}',
+      format('5 %s reads the stub as a redirect only', k);
+  END LOOP;
+  FOREACH k IN ARRAY ARRAY['owner','contributor','service'] LOOP
+    ASSERT pg_temp.ans('after', k, stub) = pg_temp.ans('before', k, stub) AND pg_temp.ans('after', k, stub) ->> 'model' = 'Stub',
+      format('5 %s reads the stub whole', k);
+  END LOOP;
+  ASSERT pg_temp.ans('after', 'anon', '77777777-7777-4777-8777-777777777777') ->> 'model' = 'MergedLive', '5 merged, not deleted: as before';
+  -- 6. A deleted car that was not merged answers exactly like a missing one.
+  FOREACH k IN ARRAY ARRAY['anon','stranger','noclaims'] LOOP
+    ASSERT pg_temp.ans('after', k, '33333333-3333-4333-8333-333333333333') IS NOT DISTINCT FROM
+           pg_temp.ans('after', k, '44444444-4444-4444-8444-444444444444'), format('6 %s deleted = missing', k);
+  END LOOP;
+END $$;
+
+-- 7. The predicate's truth table, and the planner inlines it (no function call left in an anon plan).
+DO $$ BEGIN
+  ASSERT public.vehicle_publicly_readable(true, null, null) AND public.vehicle_publicly_readable(true, now(), gen_random_uuid())
+     AND NOT public.vehicle_publicly_readable(true, now(), null) AND NOT public.vehicle_publicly_readable(false, null, null)
+     AND NOT public.vehicle_publicly_readable(null, null, null) AND NOT public.vehicle_publicly_readable(false, now(), gen_random_uuid()),
+    '7 truth table';
+END $$;
+BEGIN;
+SET LOCAL ROLE anon;
+CREATE TEMP TABLE rd_plan (line text);
+DO $$ DECLARE l text; BEGIN
+  FOR l IN EXPLAIN (VERBOSE, COSTS OFF) SELECT id FROM public.vehicles
+           WHERE public.vehicle_publicly_readable(is_public, deleted_at, merged_into_vehicle_id) LOOP
+    INSERT INTO rd_plan VALUES (l);
+  END LOOP;
+  ASSERT NOT EXISTS (SELECT 1 FROM rd_plan WHERE line LIKE '%vehicle_publicly_readable%')
+     AND EXISTS (SELECT 1 FROM rd_plan WHERE line LIKE '%deleted_at IS NULL%'), '7 the predicate is inlined for anon';
+END $$;
+ROLLBACK;
+SELECT 'PASS: vehicle_row_read answers NULL to outsiders for a deleted car, a redirect for a merged stub' AS result;
