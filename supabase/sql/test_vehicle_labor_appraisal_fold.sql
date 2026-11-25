@@ -662,4 +662,148 @@ DO $$ BEGIN
                         AND position('labor_fold_v1' IN pg_get_functiondef('public.model_fold_signal_ids(uuid[],text)'::regprocedure)) > 0,
                         'both model fold functions patched once');
 END $$;
+
+-- Lead follow-up on #3947: the image line is re-measured from every first fold (20261126003000). Applied after the
+-- runs above exist, so the backfill path is exercised; applied twice (idempotent).
+-- Production columns and tables the migration reads (model_fold_work.last_error as model_fold_tick writes it;
+-- job_assay_readings as 20261014090000 made it).
+ALTER TABLE public.model_fold_work ADD COLUMN IF NOT EXISTS last_error text;
+CREATE TABLE IF NOT EXISTS public.job_assay_readings (jobname text PRIMARY KEY, reading jsonb, assayed_at timestamptz,
+  elapsed_ms integer, attempted_at timestamptz, attempt_error text, refresh_every interval, fresh_for interval,
+  run_started_at timestamptz);
+\ir ../migrations/20261126003000_vehicle_labor_appraisal_read_limit_check.sql
+\ir ../migrations/20261126003000_vehicle_labor_appraisal_read_limit_check.sql
+-- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture database)
+DO $$
+DECLARE
+  g jsonb; rl jsonb; rl0 jsonb; car uuid; car2 uuid; car3 uuid; r public.vehicle_labor_appraisal_fold_runs%ROWTYPE;
+  n_img int; n2 int; n3 int; t0 timestamptz;
+BEGIN
+  PERFORM public.assert((SELECT value FROM public.labor_fold_read_limits WHERE limit_key = 'never_folded_image_line') = 679,
+                        'the image line is the 2026-11-25 anon reading (smallest image count over 7,500 ms)');
+  -- backfill: every retained run has images and warm; one first fold per folded car, its earliest run
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_labor_appraisal_fold_runs WHERE images IS NULL OR warm IS NULL),
+                        'backfill: images and warm on every retained run');
+  PERFORM public.assert((SELECT count(*) FROM public.vehicle_labor_appraisal_first_folds)
+                        = (SELECT count(DISTINCT vehicle_id) FROM public.vehicle_labor_appraisal_fold_runs), 'backfill: one first fold per car');
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_labor_appraisal_first_folds f
+                                     WHERE f.run_id <> (SELECT r2.id FROM public.vehicle_labor_appraisal_fold_runs r2
+                                                         WHERE r2.vehicle_id = f.vehicle_id ORDER BY r2.started_at, r2.id LIMIT 1)),
+                        'backfill: the first fold is the earliest retained run');
+  -- a new car's first fold: images counted, cold, recorded once; its next fold is warm and changes nothing
+  car := (SELECT b.v FROM _labor_names_before b JOIN public.vehicles v ON v.id = b.v
+           WHERE v.is_public IS TRUE ORDER BY b.v LIMIT 1);
+  n_img := (SELECT count(*) FROM public.vehicle_images WHERE vehicle_id = car);
+  DELETE FROM public.vehicle_labor_appraisal_first_folds WHERE vehicle_id = car;
+  DELETE FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = car;
+  t0 := clock_timestamp();
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  SELECT * INTO r FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = car ORDER BY id DESC LIMIT 1;
+  PERFORM public.assert(r.images = n_img AND r.warm IS FALSE, format('first run: %s images, cold: %s %s', n_img, r.images, r.warm));
+  PERFORM public.assert((SELECT run_id = r.id AND images = n_img AND warm IS FALSE FROM public.vehicle_labor_appraisal_first_folds
+                          WHERE vehicle_id = car), 'first fold recorded from the run');
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  PERFORM public.assert((SELECT warm FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = car ORDER BY id DESC LIMIT 1),
+                        'a fold within 60 minutes of the last is warm');
+  PERFORM public.assert((SELECT run_id FROM public.vehicle_labor_appraisal_first_folds WHERE vehicle_id = car) = r.id,
+                        'the first fold is kept, not replaced');
+  -- read_limit_check: a slow first fold under the line is line_too_high and fails the assay; a fast one over the line
+  -- counts nothing (cost does not follow image count); min_slow_images is the smallest slow car's image count
+  UPDATE public.labor_fold_read_limits SET value = greatest(n_img, 1) + 1 WHERE limit_key = 'never_folded_image_line';
+  UPDATE public.vehicle_labor_appraisal_first_folds SET ms = 10, images = greatest(n_img, 1), warm = false WHERE vehicle_id = car;
+  rl0 := public.vehicle_labor_appraisal_read_limit_check();
+  PERFORM public.assert((rl0 ->> 'image_line')::int = greatest(n_img, 1) + 1 AND (rl0 ->> 'slow_ms')::numeric = 7500
+                        AND NOT rl0 ? 'line_too_low', 'the check reads both rule rows and counts no line-too-low: ' || rl0::text);
+  UPDATE public.vehicle_labor_appraisal_first_folds SET ms = 9000 WHERE vehicle_id = car;
+  rl := public.vehicle_labor_appraisal_gauge() -> 'read_limit_check';
+  PERFORM public.assert((rl ->> 'line_too_high')::int = (rl0 ->> 'line_too_high')::int + 1
+                        AND (rl ->> 'line_too_high_cold')::int = (rl0 ->> 'line_too_high_cold')::int + 1
+                        AND (rl ->> 'min_slow_images')::int <= greatest(n_img, 1) AND rl ->> 'status' = 'failed',
+                        'line too high: an under-line car folded over the slow line, and the check fails: ' || rl::text);
+  UPDATE public.labor_fold_read_limits SET value = 1000 WHERE limit_key = 'read_limit_line_too_high_fails_at';
+  PERFORM public.assert(public.vehicle_labor_appraisal_read_limit_check() ->> 'status' = 'passed', 'the fail line is a rule row');
+  UPDATE public.labor_fold_read_limits SET value = 1 WHERE limit_key = 'read_limit_line_too_high_fails_at';
+  UPDATE public.vehicle_labor_appraisal_first_folds SET started_at = now() - interval '8 days' WHERE vehicle_id = car;
+  rl := public.vehicle_labor_appraisal_read_limit_check();
+  PERFORM public.assert((rl ->> 'line_too_high')::int = (rl0 ->> 'line_too_high')::int,
+                        'a first fold older than 7 days is outside the window: ' || rl::text);
+
+  -- a fold the tick lost to a timeout: its retry runs while the work row is leased with the tick's last_error; the run
+  -- and the first fold are after_cancel and warm, and the car counts as slow whatever the retry took (ta-skeptic)
+  car2 := (SELECT b.v FROM _labor_names_before b JOIN public.vehicles v ON v.id = b.v
+            WHERE v.is_public IS TRUE AND b.v <> car ORDER BY b.v LIMIT 1);
+  n2 := (SELECT count(*) FROM public.vehicle_images WHERE vehicle_id = car2);
+  DELETE FROM public.vehicle_labor_appraisal_first_folds WHERE vehicle_id = car2;
+  DELETE FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = car2;
+  DELETE FROM public.model_fold_work WHERE vehicle_id = car2;
+  INSERT INTO public.model_fold_work (vehicle_id, state, priority, attempts, dirty_at, first_dirty_at, next_attempt_at, updated_at, last_error)
+  VALUES (car2, 'leased', 1, 2, now(), now(), now(), now(), 'tick ended while folding this vehicle (timeout or cancel)');
+  rl0 := public.vehicle_labor_appraisal_read_limit_check();
+  PERFORM public.vehicle_labor_appraisal_fold(car2);
+  SELECT * INTO r FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = car2 ORDER BY id DESC LIMIT 1;
+  PERFORM public.assert(r.after_cancel AND r.warm, format('the retry run is after_cancel and warm: %s %s', r.after_cancel, r.warm));
+  PERFORM public.assert((SELECT after_cancel AND warm FROM public.vehicle_labor_appraisal_first_folds WHERE vehicle_id = car2),
+                        'the retry does not land as a cold first fold');
+  UPDATE public.labor_fold_read_limits SET value = n2 + 1 WHERE limit_key = 'never_folded_image_line';
+  rl := public.vehicle_labor_appraisal_read_limit_check();
+  PERFORM public.assert((rl ->> 'after_cancel_first_folds')::int = (rl0 ->> 'after_cancel_first_folds')::int + 1
+                        AND (rl ->> 'line_too_high')::int >= 1 AND (rl ->> 'min_slow_images')::int <= n2,
+                        'a cancelled fold under the line counts in line_too_high: ' || rl::text);
+  UPDATE public.model_fold_work SET state = 'done', last_error = NULL WHERE vehicle_id = car2;
+  PERFORM public.vehicle_labor_appraisal_fold(car2);
+  PERFORM public.assert((SELECT after_cancel IS FALSE FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = car2 ORDER BY id DESC LIMIT 1),
+                        'a fold with no lost attempt behind it is not after_cancel');
+
+  -- an in-scope car the tick keeps losing before any labor fold lands: counted from its work row
+  -- (the fixture holds two public in-scope cars; the first is reused with its labor rows cleared)
+  car3 := car;
+  PERFORM public.assert(public.vehicle_labor_appraisal_in_scope(car3), 'the reused car is in scope');
+  n3 := (SELECT count(*) FROM public.vehicle_images WHERE vehicle_id = car3);
+  DELETE FROM public.vehicle_labor_appraisal_first_folds WHERE vehicle_id = car3;
+  DELETE FROM public.vehicle_labor_appraisal_fold_runs WHERE vehicle_id = car3;
+  DELETE FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = car3;
+  DELETE FROM public.model_fold_work WHERE vehicle_id = car3;
+  UPDATE public.labor_fold_read_limits SET value = n3 + 1 WHERE limit_key = 'never_folded_image_line';
+  rl0 := public.vehicle_labor_appraisal_read_limit_check();
+  INSERT INTO public.model_fold_work (vehicle_id, state, priority, attempts, dirty_at, first_dirty_at, next_attempt_at, updated_at, last_error)
+  VALUES (car3, 'dead', 1, 5, now(), now(), now(), now(), 'tick cancelled while folding this vehicle');
+  rl := public.vehicle_labor_appraisal_read_limit_check();
+  PERFORM public.assert((rl ->> 'cancelled_unfolded')::int = (rl0 ->> 'cancelled_unfolded')::int + 1
+                        AND (rl ->> 'min_slow_images')::int <= n3
+                        AND (rl ->> 'line_too_high')::int = (rl0 ->> 'line_too_high')::int + 1,
+                        'an in-scope car lost before its first fold counts as slow: ' || rl::text);
+  UPDATE public.model_fold_work SET last_error = 'some other failure' WHERE vehicle_id = car3;
+  PERFORM public.assert((public.vehicle_labor_appraisal_read_limit_check() ->> 'cancelled_unfolded')::int = (rl0 ->> 'cancelled_unfolded')::int,
+                        'another failure is not a cancel');
+  DELETE FROM public.model_fold_work WHERE vehicle_id IN (car2, car3);
+  UPDATE public.labor_fold_read_limits SET value = 500 WHERE limit_key = 'never_folded_image_line';
+
+  -- the assay: the check lands as the seed job's own reading, which v_job_health reads
+  rl := public.vehicle_labor_appraisal_read_limit_assay();
+  PERFORM public.assert((SELECT reading = rl AND fresh_for = interval '15 minutes' AND assayed_at IS NOT NULL
+                           FROM public.job_assay_readings WHERE jobname = 'vehicle-labor-appraisal-seed'),
+                        'the assay writes the seed job''s reading');
+  UPDATE public.labor_fold_read_limits SET value = 1000 WHERE limit_key = 'read_limit_line_too_high_fails_at';
+  rl := public.vehicle_labor_appraisal_read_limit_assay();
+  UPDATE public.labor_fold_read_limits SET value = 1 WHERE limit_key = 'read_limit_line_too_high_fails_at';
+  PERFORM public.assert((SELECT count(*) FROM public.job_assay_readings WHERE jobname = 'vehicle-labor-appraisal-seed') = 1
+                        AND (SELECT reading = rl AND (reading ->> 'line_too_high_fails_at')::int = 1000
+                               FROM public.job_assay_readings WHERE jobname = 'vehicle-labor-appraisal-seed'),
+                        'one reading per job, replaced by the newest');
+  UPDATE public.labor_fold_read_limits SET value = 500 WHERE limit_key = 'never_folded_image_line';
+  -- cold factor: a cold run followed by a warm run of the same car within 60 minutes
+  INSERT INTO public.vehicle_labor_appraisal_fold_runs (vehicle_id, started_at, ms, warm)
+  VALUES (car, now() - interval '30 minutes', 4000, false), (car, now() - interval '20 minutes', 400, true);
+  rl := public.vehicle_labor_appraisal_gauge() -> 'read_limit_check';
+  rl := public.vehicle_labor_appraisal_read_limit_check();
+  PERFORM public.assert((rl ->> 'cold_factor_pairs')::int >= 1 AND (rl ->> 'cold_factor_p50') IS NOT NULL,
+                        'cold factor measured from cold/warm pairs: ' || rl::text);
+  PERFORM public.assert((SELECT basis LIKE '%min_slow_images%' AND basis LIKE '%read_limit_line_too_high_fails_at%'
+                           FROM public.labor_fold_read_limits WHERE limit_key = 'never_folded_image_line'),
+                        'the line''s basis names its re-measure');
+  PERFORM public.assert(NOT has_table_privilege('anon', 'public.vehicle_labor_appraisal_first_folds', 'SELECT'), 'anon cannot read first folds');
+  PERFORM public.assert(NOT has_function_privilege('anon', 'public.vehicle_labor_appraisal_read_limit_assay()', 'EXECUTE')
+                        AND NOT has_function_privilege('anon', 'public.vehicle_labor_appraisal_read_limit_check()', 'EXECUTE'),
+                        'anon cannot run the check or the assay');
+END $$;
 \echo labor_fold: ok
