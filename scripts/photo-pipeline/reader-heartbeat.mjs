@@ -24,7 +24,10 @@ import process from 'node:process';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export const READERS = ['subscription-document-reader', 'subscription-frame-classifier', 'fact-doubt-cycle', 'reconcile-receipt-work', 'answer-receipt-parts'];
+// subscription-frame-classifier-actions: the same frame reader on GitHub Actions (photo-keys.yml, job stages), so the two
+// hosts keep two rows (20261125171000) and the watch holds each to its own rule.
+export const READERS = ['subscription-document-reader', 'subscription-frame-classifier', 'fact-doubt-cycle', 'reconcile-receipt-work', 'answer-receipt-parts',
+  'subscription-frame-classifier-actions'];
 // record_reader_heartbeat refuses a reading over 20 kB of jsonb text, which is longer than compact JSON (a space after
 // every ':' and ','); 12 kB compact stays under it.
 export const MAX_READING_BYTES = 12000;
@@ -61,8 +64,8 @@ export function buildHeartbeatBody({ name, summary, elapsedMs, readerExit, host 
   const reading = readingFromSummary(summary);
   if (!reading) throw fail('nothing_to_post', 'no JSON summary');
   const elapsed = Number.parseInt(elapsedMs ?? '0', 10);
-  // READER_HOST: where the fire ran (github_actions for .github/workflows/photo-keys.yml; unset on the Mac). The two share
-  // one heartbeat row until record_reader_heartbeat admits a second name; this says which one wrote it. Fixed words only.
+  // READER_HOST: where the fire ran (github_actions for .github/workflows/photo-keys.yml, which posts as
+  // subscription-frame-classifier-actions; unset on the Mac). Fixed words only.
   if (typeof host === 'string' && /^[a-z_]{1,24}$/.test(host)) reading.host = host;
   return { p_jobname: name, p_reading: reading, p_elapsed_ms: Number.isFinite(elapsed) && elapsed > 0 ? elapsed : 0 };
 }
@@ -113,7 +116,8 @@ export async function postHeartbeat({ url, key, body, fetchImpl = fetch, timeout
 
 // --start: record that the batch is starting this reader (record_reader_start, 20261125003000). A start newer than the
 // reader's last heartbeat for 30 minutes makes subscription-reader-watch say "stuck" instead of "silent".
-export const START_READERS = READERS;
+// The batch on the Mac posts starts; the Actions job does not, and record_reader_start does not know its name.
+export const START_READERS = READERS.filter((name) => name !== 'subscription-frame-classifier-actions');
 export async function postStart({ url, key, name, fetchImpl = fetch, timeoutMs = 10000 }) {
   const res = await fetchImpl(`${url.replace(/\/+$/, '')}/rest/v1/rpc/record_reader_start`, {
     method: 'POST',
