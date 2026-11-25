@@ -2,7 +2,9 @@
 -- fold (20261124224500) is installed first over the reader it replaced. Asserts:
 --   * same vendor + same total within 3 days + a shared item word: one same_purchase edge, copy -> the verified paper;
 --     the copy stops counting in vehicle_spend_lines after vehicle_spend_fold;
---   * same vendor + same invoice number, no shared word, different totals: a shares_invoice_number edge that changes no spend;
+--   * same vendor + same invoice number, different dates: a shares_invoice_number edge that changes no spend;
+--   * same invoice number and date, lines of both add up to one total: the continuation page stops counting;
+--   * a copy whose kept twin is a quote still counts;
 --   * same total but no shared word, or 4 days apart: no edge;
 --   * a refund paper gets one returns edge to its best purchase; a tie between two purchases gives none;
 --   * an edge that stops being due is retired, not deleted; anon cannot read the edges or run the fold;
@@ -62,7 +64,13 @@ INSERT INTO public.receipts (id, user_id, vendor_name, total_amount, invoice_num
   ('00000000-0000-0000-0000-000000000052', '00000000-0000-0000-0000-0000000000f1', 'Shop E', -80, NULL, '2024-03-20', 'plausible', '{}'),
   ('00000000-0000-0000-0000-000000000061', '00000000-0000-0000-0000-0000000000f1', 'Shop F', 20, NULL, '2024-04-01', 'plausible', '{}'),
   ('00000000-0000-0000-0000-000000000062', '00000000-0000-0000-0000-0000000000f1', 'Shop F', 25, NULL, '2024-04-01', 'plausible', '{}'),
-  ('00000000-0000-0000-0000-000000000063', '00000000-0000-0000-0000-0000000000f1', 'Shop F', -20, NULL, '2024-04-10', 'plausible', '{}');
+  ('00000000-0000-0000-0000-000000000063', '00000000-0000-0000-0000-0000000000f1', 'Shop F', -20, NULL, '2024-04-10', 'plausible', '{}'),
+  ('00000000-0000-0000-0000-000000000071', '00000000-0000-0000-0000-0000000000f1', 'Shop G', 100, 'INV-9', '2021-05-06', 'verified', '{}'),
+  ('00000000-0000-0000-0000-000000000072', '00000000-0000-0000-0000-0000000000f1', 'Shop G', 25, 'INV-9', '2021-05-06', 'verified', '{}'),
+  ('00000000-0000-0000-0000-000000000081', '00000000-0000-0000-0000-0000000000f1', 'Shop H', 70, NULL, '2024-05-01', 'verified', '{}'),
+  ('00000000-0000-0000-0000-000000000082', '00000000-0000-0000-0000-0000000000f1', 'Shop H', 70, NULL, '2024-05-02', 'plausible', '{}');
+-- 81 is a quote: its twin 82 is the copy by rank, but 81 never counts, so 82 must
+UPDATE public.receipts SET document_kind = 'quote' WHERE id = '00000000-0000-0000-0000-000000000081';
 INSERT INTO public.receipt_items (receipt_id, line_number, description, total_price) VALUES
   ('00000000-0000-0000-0000-000000000011', 1, 'HARMONIC BALANCER', 100),
   ('00000000-0000-0000-0000-000000000012', 1, 'Harmonic balancer OEM', 100),
@@ -76,7 +84,11 @@ INSERT INTO public.receipt_items (receipt_id, line_number, description, total_pr
   ('00000000-0000-0000-0000-000000000052', 1, 'Return fuel pump', -80),
   ('00000000-0000-0000-0000-000000000061', 1, 'Brake hose', 20),
   ('00000000-0000-0000-0000-000000000062', 1, 'Brake hose', 25),
-  ('00000000-0000-0000-0000-000000000063', 1, 'Brake hose return', -20);
+  ('00000000-0000-0000-0000-000000000063', 1, 'Brake hose return', -20),
+  ('00000000-0000-0000-0000-000000000071', 1, 'Tie rod end', 40),
+  ('00000000-0000-0000-0000-000000000072', 1, 'Brake rotor', 60),
+  ('00000000-0000-0000-0000-000000000081', 1, 'Clutch kit', 70),
+  ('00000000-0000-0000-0000-000000000082', 1, 'Clutch kit', 70);
 INSERT INTO public.receipt_vehicle_links (receipt_id, vehicle_id, status) SELECT id, '00000000-0000-0000-0000-0000000000a1', 'linked' FROM public.receipts;
 SELECT public.vehicle_spend_fold('before');
 CREATE TABLE public.spend_before AS SELECT count(*) n FROM public.vehicle_spend_lines WHERE receipt_id = '00000000-0000-0000-0000-000000000012';
@@ -87,7 +99,7 @@ CREATE TABLE public.spend_before AS SELECT count(*) n FROM public.vehicle_spend_
 CREATE FUNCTION pg_temp.edges() RETURNS text LANGUAGE sql AS $$
   SELECT string_agg(right(receipt_id::text, 2) || '>' || right(related_receipt_id::text, 2) || ':' || rule_key, ',' ORDER BY right(receipt_id::text, 2))
     FROM public.receipt_relations WHERE retired_at IS NULL $$;
-SELECT public.assert(pg_temp.edges() = '12>11:same_vendor_total_items,21>22:same_vendor_invoice_number,52>51:return_same_vendor_items',
+SELECT public.assert(pg_temp.edges() = '12>11:same_vendor_total_items,21>22:same_vendor_invoice_number,52>51:return_same_vendor_items,71>72:same_vendor_invoice_number,72>71:same_vendor_invoice_pages,82>81:same_vendor_total_items',
                      'edges: ' || coalesce(pg_temp.edges(), 'none'));
 SELECT public.assert((SELECT n FROM public.spend_before) = 1, 'the copy counted before');
 SELECT public.vehicle_spend_fold('after');
@@ -96,6 +108,11 @@ SELECT public.assert(EXISTS (SELECT 1 FROM public.vehicle_spend_lines WHERE rece
                      AND EXISTS (SELECT 1 FROM public.vehicle_spend_lines WHERE receipt_id = '00000000-0000-0000-0000-000000000022')
                      AND EXISTS (SELECT 1 FROM public.vehicle_spend_lines WHERE receipt_id = '00000000-0000-0000-0000-000000000052'),
                      'kept paper, invoice-number pair and the refund still count');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_spend_lines WHERE receipt_id = '00000000-0000-0000-0000-000000000072')
+                     AND (SELECT sum(amount) FROM public.vehicle_spend_lines WHERE receipt_id = '00000000-0000-0000-0000-000000000071') = 100,
+                     'invoice pages: the continuation page stops counting, the grand total counts once');
+SELECT public.assert(EXISTS (SELECT 1 FROM public.vehicle_spend_lines WHERE receipt_id = '00000000-0000-0000-0000-000000000082'),
+                     'a copy whose kept twin does not count (a quote) still counts: never zero times');
 -- the copy is superseded: its edge retires, and a second run adds nothing
 UPDATE public.receipts SET is_superseded = true WHERE id = '00000000-0000-0000-0000-000000000012';
 SELECT public.assert((public.receipt_relations_fold('t2') ->> 'retired')::int = 1, 'an edge no longer due is retired');
@@ -106,7 +123,7 @@ DO $$ BEGIN
   BEGIN PERFORM count(*) FROM public.receipt_relations; RAISE EXCEPTION 'contract failed: anon read edges'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM public.receipt_relations_fold('x'); RAISE EXCEPTION 'contract failed: anon ran the fold'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
-SELECT public.assert((SELECT count(*) FROM public.receipt_relation_rules) = 3, 'anon reads the rule rows');
+SELECT public.assert((SELECT count(*) FROM public.receipt_relation_rules) = 4, 'anon reads the rule rows');
 RESET ROLE;
 \ir revert_20261125013000_receipt_relations.sql
 SELECT public.assert(md5(pg_get_viewdef('public.vehicle_spend_lines_due'::regclass)) = (SELECT h FROM public.before_def), 'revert restores the view');
