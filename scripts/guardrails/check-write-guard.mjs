@@ -46,6 +46,14 @@ const ALLOWLIST = {
   "universal-search": "public read; its one write (register_make_model_subject) is idempotent and bounded to canonical make/model/year",
 };
 
+// Functions that write with the service client on ids or text the caller supplies, and so must refuse an ordinary
+// signed-in caller too (sign-up is open and anonymous sign-in is on): each must call requireOwnerOrService,
+// requireAdminOrService or isServiceCaller. Say which rows a stranger could otherwise write.
+const SERVICE_SCOPED = {
+  "deal-jacket-pipeline": "moves a caller-named vehicle_images row onto a car picked from caller text, creates cars, overwrites vehicles.vin/mileage/sale_price/origin_metadata, runs paid extraction (2026-11-25)",
+  "forensic-deal-jacket": "stores extractions on a caller-named image and writes vehicles.origin_metadata; runs paid AI (2026-09-29)",
+};
+const STRONG_GATE = /\b(requireOwnerOrService|requireAdminOrService|isServiceCaller)\(/;
 const WRITE_RPCS = new Set(["persist_auction_readiness", "register_make_model_subject", "exec_sql", "execute_sql"]);
 const RAW_PG = /deno\.land\/x\/postgres|postgresjs|npm:postgres|NUKE_DB_POOL_URL|SUPABASE_DB_URL/;
 const RAW_WRITE = /\b(INSERT\s+INTO|UPDATE\s+[a-z_."]+\s+SET|DELETE\s+FROM|TRUNCATE)\b/i;
@@ -125,6 +133,12 @@ while (changed) {
 const writers = [...info].filter(([, i]) => i.reasons.length);
 const unguarded = writers.filter(([fn, i]) => !i.guarded && !(fn in ALLOWLIST));
 const preflightRuns = [...info].filter(([, i]) => i.usesGuard && i.preflight);
+const scopedOpen = Object.keys(SERVICE_SCOPED).filter((fn) => {
+  if (!info.has(fn)) return false;
+  return !readdirSync(path.join(FN_DIR, fn)).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+    .some((f) => STRONG_GATE.test(readFileSync(path.join(FN_DIR, fn, f), "utf8")));
+});
+const scopedStale = Object.keys(SERVICE_SCOPED).filter((fn) => !info.has(fn));
 const stale = Object.keys(ALLOWLIST).filter((fn) => !info.has(fn));
 const idle = Object.keys(ALLOWLIST).filter((fn) => info.has(fn) && !info.get(fn).reasons.length);
 
@@ -143,6 +157,12 @@ console.log(
 );
 for (const fn of stale) console.log(`  note: allowlist entry '${fn}' has no function directory (stale)`);
 for (const fn of idle) console.log(`  note: allowlist entry '${fn}' no longer writes (drop it)`);
+for (const fn of scopedStale) console.log(`  note: service-scoped entry '${fn}' has no function directory (stale)`);
+if (scopedOpen.length) {
+  console.error(`\n✗ ${scopedOpen.length} service-scoped function(s) admit any signed-in caller:`);
+  for (const fn of scopedOpen) console.error(`  ${fn}  (${SERVICE_SCOPED[fn]})`);
+  console.error("\nAfter requireWriteAuth, add `const notOwner = await requireOwnerOrService(req); if (notOwner) return notOwner;`\n(or requireAdminOrService / isServiceCaller), as forensic-deal-jacket does.");
+}
 if (preflightRuns.length) {
   console.error(`\n✗ ${preflightRuns.length} guarded function(s) run their handler for an anonymous OPTIONS request:`);
   for (const [fn, i] of preflightRuns) console.error(`  ${fn}  (${i.preflight})`);
@@ -153,5 +173,5 @@ if (unguarded.length) {
   for (const [fn, i] of unguarded) console.error(`  ${fn}  (${i.reasons.join("; ")})`);
   console.error("\nAdd `const denied = await requireWriteAuth(req); if (denied) return denied;` as the first statement of the handler\n(import from ../_shared/writeGuard.ts), or allowlist it in scripts/guardrails/check-write-guard.mjs with the auth that refuses anonymous callers.");
 }
-if (unguarded.length || preflightRuns.length) process.exit(1);
+if (unguarded.length || preflightRuns.length || scopedOpen.length) process.exit(1);
 console.log("✓ every writing function refuses anonymous callers");

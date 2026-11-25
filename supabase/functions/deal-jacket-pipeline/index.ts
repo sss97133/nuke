@@ -11,7 +11,7 @@
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
@@ -49,6 +49,12 @@ Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Every mode but status writes with the service client on a caller-named image or on a car chosen from
+  // caller-supplied extraction text (moving the photo, creating cars, overwriting vin, mileage and sale price),
+  // and scan/process run paid extraction. Like forensic-deal-jacket: the owner or the service key only, because
+  // "signed in" is anyone while sign-up is open (2026-11-25).
+  const notOwner = await requireOwnerOrService(req);
+  if (notOwner) return notOwner;
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
