@@ -33,12 +33,13 @@
 --     labor_system_key / names_no_one_system (the ratified text's 'a job that names no one system: teardown,
 --     detailing, general'); labor_speaker_role / source_does_not_establish_speaker (the role is derived from the source
 --     row; a speaker it cannot establish is NULL with this reason, the weakest weight, never a value: lead ruling).
---   labor_stated_subject_key(subject) -> {kind, key, token} | NULL: the make or model key the subject names
---     (canonical_makes, make_alias_ref, canonical_models), written with a capital or a digit.
+--   labor_stated_subject_key(subject, text_before) -> {kind, key, token} | NULL: the make or model key the subject
+--     names (canonical_makes, make_alias_ref, canonical_models), written with a digit or with a capital that does not
+--     open its sentence, and not directly after a preposition (text_before is the row text before the subject).
 --   reported_labor_statement_check(source_table, source_row_id, quote, low, high, qualifiers) -> jsonb
 --     {ok, disposition, reasons[], held_reasons[], contract, quote_hash, text_md5, page_vehicle_id, speaker_role,
 --     speaker_role_null_reason, speaker_role_basis, speaker_role_read, stated_subject_key}.
---     disposition refused (any reason; nothing lands), held (well formed, but no work word in the figure's sentence or a
+--     disposition refused (any reason; nothing lands), held (well formed, but no work word in the figure's clause (its sentence cut at then / and then / but) or a
 --     stated subject that names no key: held_reasons no_labor_context / stated_subject_unresolved; it lands, admits
 --     nothing and reaches no baseline) or admitted (ok true).
 --     Same source rules as gate A (schema_proposal_witness_sources: allowed table, row exists, not generated) and the
@@ -76,13 +77,13 @@ ALTER TABLE public.schema_proposal_quote_rules
   ADD COLUMN IF NOT EXISTS stated_subject_basis text;
 UPDATE public.schema_proposal_quote_rules
    SET figure_term_pattern = '\m([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)\+?\s*(?:(?:-|to)\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)\+?\s*)?(?:man[- ]?)?(?:hours?|hrs?)\M',
-       exclude_pattern = '\m(?:ends?|ending|closes?|closing|over|starts?|starting)\s+in\s+(?:about\s+|around\s+|less than\s+|under\s+)?[0-9][0-9.,]*\s*(?:hours?|hrs?)\M|\m[0-9][0-9.,]*\s*(?:more\s+)?(?:hours?|hrs?)\s+(?:left|remaining|remain|to\s+go|ago|from\s+now|until|till|before|away|drive|driving|trip|flight|between|of\s+(?:use|sleep|idling|driving)|on\s+the\s+(?:engine|clock|meter))\M',
-       exclude_basis = 'auction_comments TABLESAMPLE SYSTEM (0.2) REPEATABLE (7), sentences split on .!?; read 2026-11-25: 142 hold a figure directly before an hour term; 70 match this pattern (time left or since in an auction, distance or travel time, run interval, hours on a meter), 0 of them labor on ta-labor''s read. Cases: Bidding ends in 2 hours (ta-skeptic2), N hours until / remain (ta-skeptic2), N hours between rebuilds.',
+       exclude_pattern = '\m(?:ends?|ending|closes?|closing|over|starts?|starting)\s+in\s+(?:about\s+|around\s+|less than\s+|under\s+)?[0-9][0-9.,]*\s*(?:hours?|hrs?)\M|\m[0-9][0-9.,]*\s*(?:more\s+)?(?:hours?|hrs?)\s+(?:left|remaining|remain|to\s+go|ago|from\s+now|until|till|before|away|drive|driving|trip|flight|between|of\s+(?:use|sleep|idling|driving)|on\s+the\s+(?:engine|clock|meter))\M|\m[0-9][0-9.,]*\s*(?:hours?|hrs?)\s+(?:on\s+(?:it|her|him|the\s+\w+)\s+)?since\M',
+       exclude_basis = 'auction_comments TABLESAMPLE SYSTEM (0.2) REPEATABLE (7), sentences split on .!?; read 2026-11-25: 142 hold a figure directly before an hour term; 70 match this pattern (time left or since in an auction, distance or travel time, run interval, hours on a meter), 0 of them labor on ta-labor''s read. Cases: Bidding ends in 2 hours (ta-skeptic2), N hours until / remain (ta-skeptic2), N hours between rebuilds, N hours on it since the rebuild (ta-skeptic2; the since alternative matches 0 more of the 142). ta-skeptic2''s read of the same 142 (01:42 PT): 70 excluded, 0 labor.',
        labor_context_pattern = '\m(labou?r\w*|man[- ]?hours?|(re)?build\w*|(re)?built|restor\w*|resto|fabricat\w*|weld\w*|paint(ed|ing|work)?|bodywork|sand(ed|ing)|install\w*|swap\w*|conver(sion|ted|ting)|replac\w*|repair\w*|(dis)?assembl\w*|tear(ing)?\s+down|tore\s+down|detail(ed|ing)|polish\w*|machin\w*|fix\w*|rewir\w*|wir(ed|ing)|upholster\w*|chang(ed|ing)\s+out|servic\w*|test(ed|ing)|overhaul\w*|refinish\w*)\M',
-       labor_context_basis = 'same sample: of the 72 sentences the exclude pattern leaves, 12 hold a work word in the sentence of the figure (10 labor on ta-labor''s read; 2 not: a test mode, a pressure test) and 60 hold none (2 labor on ta-labor''s read: N hours with one person, a shop N hours to do; 1 unclear). A statement with no work word lands held (no_labor_context) and admits nothing (lead ruling 2026-11-25). A skeptic''s read of the same 142 replaces these counts.'
+       labor_context_basis = 'same sample: of the 72 sentences the exclude pattern leaves, 12 hold a work word in the sentence of the figure (10 labor on ta-labor''s read; 2 not: a test mode, a pressure test) and 60 hold none (2 labor on ta-labor''s read: N hours with one person, a shop N hours to do; 1 unclear). A statement with no work word lands held (no_labor_context) and admits nothing (lead ruling 2026-11-25). The work word is read in the figure''s clause: its sentence cut at then / and then / but (0 of the 142 change). ta-skeptic2''s read of the same 142 (01:42 PT, own sentence split): 10 with a work word, 9 labor; 62 without, 2 labor, 1 unclear.'
  WHERE category = 'labor';
 UPDATE public.schema_proposal_quote_rules
-   SET stated_subject_basis = 'labor_stated_subject_key: a word run of the subject equal to a make or model key (canonical_makes names and aliases, make_alias_ref aliases not retired, canonical_models names and aliases; 13,664 distinct keys holding a letter, read 2026-11-25), written as the subject writes it starting with a capital or a digit. Sample: possessive phrases (my/our/his/her and up to four words) in auction_comments TABLESAMPLE SYSTEM (0.5) REPEATABLE (11) holding an hour figure, 256 distinct; 46 resolve, of which 33 name a car on ta-labor''s read and 13 do not (a place, a site, a collection, a dealer); of 60 unresolved sampled, 6 name a car (a digits-only model, or a model written in lower case). Without the capital test, car, motor, engine, truck, project and one resolve as canonical_models names. One call reads the key tables in 98 ms (EXPLAIN ANALYZE). A skeptic''s read of the same 256 replaces these counts.'
+   SET stated_subject_basis = 'labor_stated_subject_key: a word run of the subject equal to a make or model key (canonical_makes names and aliases, make_alias_ref aliases not retired, canonical_models names and aliases; 13,664 distinct keys holding a letter, read 2026-11-25), written as the subject writes it starting with a digit or with a capital that does not open its sentence in the row text, and not directly after a preposition (at, in, to, of, for, from, with, near, by; optionally the/a/an); both rules are ta-skeptic2''s (01:42 PT). Sample: possessive phrases (my/our/his/her and up to four words) in auction_comments TABLESAMPLE SYSTEM (0.5) REPEATABLE (11) holding an hour figure, 256 distinct; 46 resolve, of which 33 name a car on ta-labor''s read and 13 do not (a place, a site, a collection, a dealer); of 60 unresolved sampled, 6 name a car (a digits-only model, or a model written in lower case). Without the capital test, car, motor, engine, truck, project and one resolve as canonical_models names. One call reads the key tables in 98 ms (EXPLAIN ANALYZE). ta-skeptic2''s read (live key tables loaded into PG17: 403 makes, 169 aliases, 4,497 models; 269 possessive phrases, TABLESAMPLE SYSTEM (0.5) REPEATABLE (11), hour-bearing): before the two rules 47 resolve, 32 a vehicle, 13 not, 2 unclear; the preposition rule removes 6 of the 13 and 0 vehicles; projected after both rules 41 resolve, 7 not a vehicle. canonical_models holds BAT, FL, Junior, Speed, Touring, Truck, One and Car as model keys; a false resolution would set commenter_other_car, so an unresolved subject is held.'
  WHERE category = 'labor';
 
 INSERT INTO public.receipt_line_systems (system_key, label, expects_operation)
@@ -96,7 +97,10 @@ SELECT 'claude-reported-labor-hours', 'modify_property', 'open', o.proposed_by_p
          'property_key', 'labor_system_key',
          'field', 'description',
          'values_from', 'receipt_line_systems.system_key',
+         'stored_in', 'labor_statement_values.system_key',
          'null_reasons_from', 'labor_statement_null_reasons',
+         'qualifier_of', jsonb_build_array('labor_hours_reported_low', 'labor_hours_reported_high'),
+         'dropped_values', jsonb_build_object('unplaced', 'names_no_one_system'),
          'description', 'The car system the hours were spent on: a receipt_line_systems.system_key (the key table is the list; '
            || 'no values are named here). Required for labor_scope=task unless the sentence names no one system (teardown, '
            || 'detailing, general), in which case it is absent and the statement carries labor_system_key_null_reason = '
@@ -225,32 +229,51 @@ REVOKE ALL ON FUNCTION public.labor_statement_value_admitted(text, text) FROM PU
 GRANT EXECUTE ON FUNCTION public.labor_statement_value_admitted(text, text) TO service_role;
 
 -- labor_stated_subject must name a car by a key (ta-skeptic2 must-fix 5, 2026-11-25): a run of whole words of the
--- subject (punctuation folded to spaces) equal to a key of canonical_makes (canonical_name, display_name, short_name,
--- aliases), make_alias_ref (alias_text, not retired) or canonical_models (canonical_model, aliases), holding a letter,
--- and written in the subject starting with a capital or a digit. Basis: schema_proposal_quote_rules.stated_subject_basis.
--- Returns {kind, key, token} for the longest key, or NULL.
-CREATE OR REPLACE FUNCTION public.labor_stated_subject_key(p_subject text)
-RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
-  WITH s AS (SELECT ' ' || btrim(regexp_replace(p_subject, '[^A-Za-z0-9]+', ' ', 'g')) || ' ' AS cs),
-  c(kind, key, token) AS (
-    SELECT 'canonical_makes', m.id::text, t FROM public.canonical_makes m,
-           unnest(array_remove(ARRAY[m.canonical_name, m.display_name, m.short_name] || coalesce(m.aliases, '{}'::text[]), NULL)) t
-    UNION ALL
-    SELECT 'make_alias_ref', a.id::text, a.alias_text FROM public.make_alias_ref a WHERE a.retired_at IS NULL
-    UNION ALL
-    SELECT 'canonical_models', cm.id::text, t FROM public.canonical_models cm,
-           unnest(array_remove(ARRAY[cm.canonical_model] || coalesce(cm.aliases, '{}'::text[]), NULL)) t),
-  k AS MATERIALIZED (SELECT kind, key, btrim(regexp_replace(lower(token), '[^a-z0-9]+', ' ', 'g')) AS token
-                       FROM c WHERE token ~ '[A-Za-z]')
-  SELECT jsonb_build_object('kind', k.kind, 'key', k.key, 'token', k.token)
-    FROM k, s
-   WHERE length(k.token) >= 2 AND strpos(lower(s.cs), ' ' || k.token || ' ') > 0
-     AND substr(s.cs, strpos(lower(s.cs), ' ' || k.token || ' ') + 1, 1) ~ '[A-Z0-9]'
-   ORDER BY length(k.token) DESC, k.kind, k.key
-   LIMIT 1
-$fn$;
-REVOKE ALL ON FUNCTION public.labor_stated_subject_key(text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.labor_stated_subject_key(text) TO service_role;
+-- subject equal to a key of canonical_makes (canonical_name, display_name, short_name, aliases), make_alias_ref
+-- (alias_text, not retired) or canonical_models (canonical_model, aliases), holding a letter, written starting with a
+-- digit, or with a capital that does not open its sentence ('A very clean...', 'Truck took...' do not count), and not
+-- directly after a preposition (at, in, to, of, for, from, with, near, by; optionally the/a/an: 'in Phoenix', 'era of
+-- Porsche'). p_before is the row text before the subject (the check passes it). Basis:
+-- schema_proposal_quote_rules.stated_subject_basis. Returns {kind, key, token} for the longest key, or NULL.
+CREATE OR REPLACE FUNCTION public.labor_stated_subject_key(p_subject text, p_before text DEFAULT '')
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
+DECLARE
+  cand record;
+  st int;
+  before text;
+  first text;
+BEGIN
+  IF p_subject IS NULL THEN RETURN NULL; END IF;
+  FOR cand IN
+    WITH s AS (SELECT ' ' || btrim(regexp_replace(lower(p_subject), '[^a-z0-9]+', ' ', 'g')) || ' ' AS cs),
+    c(kind, key, token) AS (
+      SELECT 'canonical_makes', m.id::text, t FROM public.canonical_makes m,
+             unnest(array_remove(ARRAY[m.canonical_name, m.display_name, m.short_name] || coalesce(m.aliases, '{}'::text[]), NULL)) t
+      UNION ALL
+      SELECT 'make_alias_ref', a.id::text, a.alias_text FROM public.make_alias_ref a WHERE a.retired_at IS NULL
+      UNION ALL
+      SELECT 'canonical_models', cm.id::text, t FROM public.canonical_models cm,
+             unnest(array_remove(ARRAY[cm.canonical_model] || coalesce(cm.aliases, '{}'::text[]), NULL)) t),
+    k AS MATERIALIZED (SELECT kind, key, btrim(regexp_replace(lower(token), '[^a-z0-9]+', ' ', 'g')) AS token
+                         FROM c WHERE token ~ '[A-Za-z]')
+    SELECT k.kind, k.key, k.token FROM k, s
+     WHERE length(k.token) >= 2 AND strpos(s.cs, ' ' || k.token || ' ') > 0
+     GROUP BY k.kind, k.key, k.token
+     ORDER BY length(k.token) DESC, k.kind, k.key
+  LOOP
+    st := regexp_instr(p_subject, '\m' || replace(cand.token, ' ', '[^[:alnum:]]+') || '\M', 1, 1, 0, 'i');
+    CONTINUE WHEN st = 0;
+    first := substr(p_subject, st, 1);
+    before := coalesce(p_before, '') || substr(p_subject, 1, st - 1);
+    CONTINUE WHEN first !~ '[A-Z0-9]';
+    CONTINUE WHEN first ~ '[A-Z]' AND before ~ '(^|[.!?;:])["'')\]]*\s*$';
+    CONTINUE WHEN before ~* '\m(at|in|to|of|for|from|with|near|by)\s+((the|a|an)\s+)?$';
+    RETURN jsonb_build_object('kind', cand.kind, 'key', cand.key, 'token', cand.token);
+  END LOOP;
+  RETURN NULL;
+END $fn$;
+REVOKE ALL ON FUNCTION public.labor_stated_subject_key(text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.labor_stated_subject_key(text, text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.reported_labor_statement_check(
   p_source_table text, p_source_row_id uuid, p_quote text, p_low numeric, p_high numeric, p_qualifiers jsonb)
@@ -281,6 +304,8 @@ DECLARE
   sent_start int;
   sent_end int;
   e int;
+  k2 int;
+  cl_start int;
   subj text;
   subj_key jsonb;
   role_null_reason text;
@@ -358,6 +383,19 @@ BEGIN
               sent_start := CASE WHEN e = 0 THEN 1 ELSE ms - e + 1 END;
               e := regexp_instr(substr(txt, me), '[.!?;](\s|$)');
               sent_end := CASE WHEN e = 0 THEN length(txt) + 1 ELSE me + e END;
+              -- the figure's clause: the sentence cut at then / and then / but around the figure
+              k2 := 1;
+              LOOP
+                e := regexp_instr(substr(txt, sent_start, ms - sent_start), '\m(?:and\s+)?then\M|\mbut\M', 1, k2, 1, 'i');
+                EXIT WHEN e = 0 OR k2 > 50;
+                cl_start := sent_start + e - 1;
+                k2 := k2 + 1;
+              END LOOP;
+              cl_start := coalesce(cl_start, sent_start);
+              e := regexp_instr(substr(txt, me, greatest(sent_end - me, 0)), '\m(?:and\s+)?then\M|\mbut\M', 1, 1, 0, 'i');
+              sent_end := CASE WHEN e = 0 THEN sent_end ELSE me + e - 1 END;
+              sent_start := cl_start;
+              cl_start := NULL;
               IF qr.labor_context_pattern IS NOT NULL
                  AND substr(txt, sent_start, sent_end - sent_start) ~* qr.labor_context_pattern THEN
                 ctx := true;
@@ -424,7 +462,10 @@ BEGIN
        OR substr(p_quote, pos - 1, 1) ~ '[[:alnum:]]' OR substr(p_quote, pos + length(subj), 1) ~ '[[:alnum:]]' THEN
       reasons := reasons || 'stated_subject_not_in_quote'::text;
     ELSE
-      subj_key := public.labor_stated_subject_key(subj);
+      -- the row text before the subject, so a capital opening its sentence and a preceding preposition are seen
+      subj_key := public.labor_stated_subject_key(subj,
+                    CASE WHEN txt IS NOT NULL AND position(p_quote IN txt) > 0
+                         THEN substr(txt, 1, position(p_quote IN txt) + pos - 2) ELSE '' END);
       IF subj_key IS NULL OR (qr.figure_term_pattern IS NOT NULL AND subj ~* qr.figure_term_pattern) THEN
         held := held || 'stated_subject_unresolved'::text;
         subj_key := NULL;

@@ -47,7 +47,12 @@ INSERT INTO public.auction_comments (id, comment_text, vehicle_id, is_seller) VA
   ('33000000-0000-0000-0000-000000000005', 'Only 3 hours until this one closes. Good luck.', '30000000-0000-0000-0000-000000000001', true),
   ('33000000-0000-0000-0000-000000000006', 'Just 4 hours remain on this auction!', '30000000-0000-0000-0000-000000000001', true),
   ('33000000-0000-0000-0000-000000000007', 'I drove 6 hours to see this car in person.', '30000000-0000-0000-0000-000000000001', false),
-  ('33000000-0000-0000-0000-000000000008', 'Sat in it for 30 hours over the show weekend. Then I rebuilt my own carb.', '30000000-0000-0000-0000-000000000001', true);
+  ('33000000-0000-0000-0000-000000000008', 'Sat in it for 30 hours over the show weekend. Then I rebuilt my own carb.', '30000000-0000-0000-0000-000000000001', true),
+  ('33000000-0000-0000-0000-000000000010', 'Wow. A very clean example, 400 hours of bodywork went into mine too.', '30000000-0000-0000-0000-000000000001', false),
+  ('33000000-0000-0000-0000-000000000011', 'Nice. Truck took 300 hours of bodywork to finish.', '30000000-0000-0000-0000-000000000001', false),
+  ('33000000-0000-0000-0000-000000000012', 'I spent 200 hours welding the one I keep in Pontiac. I spent 90 hours welding my Pontiac too.', '30000000-0000-0000-0000-000000000001', false),
+  ('33000000-0000-0000-0000-000000000013', 'I painted for 8 hours straight and then drove 12 hours home.', '30000000-0000-0000-0000-000000000001', true),
+  ('33000000-0000-0000-0000-000000000014', 'Rebuilt engine has only 40 hours on it since the rebuild.', '30000000-0000-0000-0000-000000000001', true);
 
 DO $$
 DECLARE r jsonb;
@@ -257,6 +262,36 @@ BEGIN
   PERFORM pg_temp.ok('an alias resolves, a retired alias does not', public.labor_stated_subject_key('my 66 Chevelle') ->> 'kind' = 'make_alias_ref'
     AND public.labor_stated_subject_key('my Gremlin') IS NULL);
   PERFORM pg_temp.ok('the longest key wins', public.labor_stated_subject_key('my GTO Judge') ->> 'token' = 'gto judge');
+  -- ta-skeptic2 01:42 PT: a capital opening its sentence, and a key right after a preposition, name no car
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000010',
+         'A very clean example, 400 hours of bodywork went into mine too', 400, NULL,
+         '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"A very"}');
+  PERFORM pg_temp.ok('A very at sentence start is not the alias a very: ' || r::text, r->>'disposition' = 'held'
+    AND r->'held_reasons' = '["stated_subject_unresolved"]'::jsonb);
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000011',
+         'Truck took 300 hours of bodywork to finish', 300, NULL,
+         '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"Truck"}');
+  PERFORM pg_temp.ok('Truck at sentence start is not the model Truck: ' || r::text, r->'held_reasons' = '["stated_subject_unresolved"]'::jsonb);
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000012',
+         'I spent 200 hours welding the one I keep in Pontiac', 200, NULL,
+         '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"Pontiac"}');
+  PERFORM pg_temp.ok('in Pontiac is a place, not the make: ' || r::text, r->'held_reasons' = '["stated_subject_unresolved"]'::jsonb);
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000012',
+         'I spent 90 hours welding my Pontiac too', 90, NULL,
+         '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"Pontiac"}');
+  PERFORM pg_temp.ok('my Pontiac, mid-sentence, is the make: ' || r::text, r->>'disposition' = 'admitted'
+    AND r->'stated_subject_key'->>'token' = 'pontiac' AND r->>'speaker_role' = 'commenter_other_car');
+  -- the work word is read in the figure's clause; hours on it since is a meter
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000013',
+         'I painted for 8 hours straight and then drove 12 hours home', 12, NULL, ok_q);
+  PERFORM pg_temp.ok('drove 12 hours after and then: held, the work word is in the other clause: ' || r::text,
+    r->>'disposition' = 'held' AND r->'held_reasons' = '["no_labor_context"]'::jsonb);
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000013',
+         'I painted for 8 hours straight and then drove 12 hours home', 8, NULL, ok_q);
+  PERFORM pg_temp.ok('painted for 8 hours: admitted: ' || r::text, r->>'disposition' = 'admitted');
+  r := public.reported_labor_statement_check('auction_comments', '33000000-0000-0000-0000-000000000014',
+         'Rebuilt engine has only 40 hours on it since the rebuild', 40, NULL, task_q);
+  PERFORM pg_temp.ok('hours on it since the rebuild is a meter: refused: ' || r::text, r->'reasons' ? 'quote_time_phrase');
   r := public.reported_labor_statement_check('auction_comments', ac, q3, 2500, NULL,
          '{"labor_scope":"whole_build","labor_speaker_role":"commenter_other_car","labor_statement_kind":"actual","labor_time_basis":"own","labor_stated_subject":"1970 Pontiac G"}');
   PERFORM pg_temp.ok('a subject cut inside a word refused', r->'reasons' ? 'stated_subject_not_in_quote');
