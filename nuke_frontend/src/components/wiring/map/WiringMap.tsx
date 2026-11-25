@@ -92,8 +92,9 @@ type View = 'plan' | '3d' | 'face' | 'sch' | 'lib';
 const TRUCK_VIEWS: [View, string][] = [['plan', 'PLAN'], ['3d', '3D']];
 const MANUAL_VIEWS: [View, string][] = [['sch', 'WIRING DIAGRAM'], ['face', 'CONNECTOR END VIEW'], ['lib', 'PARTS']];
 
-type Door = 'truck' | 'wire' | 'manual' | 'missing';
+type Door = 'schedule' | 'truck' | 'wire' | 'manual' | 'missing';
 const DOORS: { id: Door; title: string; line: string }[] = [
+  { id: 'schedule', title: 'Wiring schedule', line: 'Recorded circuits, connector ends and an Excel workbook.' },
   { id: 'truck', title: 'See the truck', line: 'Where every part and loom run sits, on the plan or in 3D.' },
   { id: 'wire', title: 'Follow a wire', line: 'Search a part or a wire and read its card: both ends, gauge, colour, length, terminals.' },
   { id: 'manual', title: 'Read the manual', line: 'The wiring diagram system by system, the connector end views and the parts.' },
@@ -138,7 +139,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   // previews it on the dev server only (import.meta.env.DEV), for local screenshots; a build never honours it.
   const { session } = useAuth();
   const { isOwner: isRowOwner } = useVehiclePermissions(vehicleId ?? null, session, null);
-  const isOwner = isRowOwner || (import.meta.env.DEV && params.get('asOwner') === '1');
+  const isOwner = (!!session?.user && isRowOwner) || (import.meta.env.DEV && params.get('asOwner') === '1');
 
   const raw = useWiringMap(vehicleId);
   const facts = useWiringFacts(isOwner ? vehicleId : undefined);
@@ -162,7 +163,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const rawDoor = params.get('door'), rawView = params.get('view');
   const door: Door | null = isDoor(rawDoor) ? rawDoor
     : rawView ? (MANUAL_VIEWS.some(x => x[0] === rawView) ? 'manual' : 'truck')
-    : sel ? (k === 'w' ? 'wire' : 'truck') : null;
+    : sel ? (k === 'w' ? 'wire' : 'truck') : 'schedule';
   useEffect(() => { if (door && !isDoor(rawDoor)) set({ door }); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const doorViews = door === 'manual' ? MANUAL_VIEWS : TRUCK_VIEWS;
   const view: View = doorViews.find(x => x[0] === rawView)?.[0] ?? doorViews[0][0];
@@ -245,7 +246,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
           : <AtRest cw={cw} map={map} ix={ix} site={site} vehicleId={vehicleId} isOwner={isOwner} rollupFacts={facts} calls={raw.calls} />}
     </div>
   );
-  const tables = <WorkspaceTables cw={cw} map={map} ix={ix} site={site} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} />;
+  const tables = <WorkspaceTables cw={cw} map={map} ix={ix} site={site} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} vehicleId={vehicleId} />;
 
   // the landing: four doors, each a sentence; "What's still missing" says how much, counted the way its list counts
   const missingCount = useMemo(() => (map.loaded && site.loaded ? missingOf(map, ix, site).length : null), [map, ix, site]);
@@ -271,16 +272,18 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   // switch waits here too, off the first screen
   const doorBar = door && (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px 8px', flexWrap: 'wrap', padding: '5px 12px', borderBottom: frame(cw), background: cw.bg, flexShrink: 0 }}>
-      <button onClick={() => go(null, null)} style={barBtn(false)}>◂ ALL FOUR</button>
-      <span style={{ fontSize: 15, fontWeight: 700 }}>{DOORS.find(d => d.id === door)?.title}</span>
+      <nav aria-label="Wiring views" style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+        {DOORS.map(d => <button key={d.id} onClick={() => go(d.id)} aria-current={door === d.id ? 'page' : undefined}
+          style={{ ...barBtn(door === d.id), minHeight: 44, fontSize: 13, letterSpacing: 0 }}>{d.title}</button>)}
+      </nav>
       <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {door !== 'missing' && (
+        {door !== 'missing' && door !== 'schedule' && (
           <>
             <button onClick={() => setTreeOpen(true)} style={barBtn(treeOpen)}>TREE ▸</button>
             <button onClick={() => setTablesOpen(o => !o)} aria-expanded={tablesOpen} style={barBtn(tablesOpen)}>{tablesOpen ? 'TABLES ▾' : 'TABLES ▴'}</button>
           </>
         )}
-        {COLORWAY_LIST.map(c => (
+        {door !== 'schedule' && COLORWAY_LIST.map(c => (
           <button key={c.id} onClick={() => setColorway(c.id)} title={`${c.label} colours`} style={{
             background: c.id === colorwayId ? cw.accent : cw.surface, color: c.id === colorwayId ? cw.onAccent : cw.ink,
             border: frame(cw), fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer',
@@ -308,10 +311,10 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
     <ColorwayContext.Provider value={cw}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: cw.bg, color: cw.ink, fontFamily: cw.fontBody,
         overflowY: narrow || !door ? 'auto' : 'hidden', overflowX: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '6px 12px', borderBottom: frame(cw), background: cw.surface, flexShrink: 0 }}>
+        {door !== 'schedule' && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '6px 12px', borderBottom: frame(cw), background: cw.surface, flexShrink: 0 }}>
           <Summary cw={cw} map={map} ix={ix} site={site} cov={cov} isOwner={isOwner} />
-        </div>
-        {needCalls.length > 0 && (
+        </div>}
+        {door !== 'schedule' && needCalls.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', padding: '5px 12px', borderBottom: `2px solid ${cw.warn}`, background: cw.bg, flexShrink: 0 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, color: cw.warn, whiteSpace: 'nowrap' }}>NEEDS YOU ({needCalls.length}) · OWNER ONLY</span>
             {needCalls.slice(0, 10).map(c => (
@@ -326,7 +329,14 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
         {!loading && !map.error && door && (
           <>
             {doorBar}
-            {door === 'missing' ? (
+            {door === 'schedule' ? (
+              <div style={{ flex: 1, minHeight: narrow ? 540 : 0, display: 'grid',
+                gridTemplateColumns: sel && !narrow ? 'minmax(0, 1fr) 360px' : 'minmax(0, 1fr)',
+                gridTemplateRows: sel && narrow ? 'minmax(420px, 65vh) auto' : 'minmax(0, 1fr)' }}>
+                <div style={{ minWidth: 0, minHeight: 0, background: cw.surface }}>{tables}</div>
+                {sel && <aside aria-label="Selected record" style={{ overflowY: 'auto', minWidth: 0, borderLeft: rule(cw), background: cw.bg }}>{props}</aside>}
+              </div>
+            ) : door === 'missing' ? (
               <div style={{ flex: narrow ? undefined : 1, minHeight: 0, overflowY: narrow ? undefined : 'auto' }}>{missing}</div>
             ) : narrow ? (
               <>
