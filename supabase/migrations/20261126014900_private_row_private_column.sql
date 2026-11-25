@@ -16,7 +16,7 @@
 --   reader '' and no reader_args".
 -- The assay is patched by anchors, guarded: only over the body 20261125235500 left (prosrc md5 146b7575..., read live
 -- 2026-11-26) or this one (marker).
--- TEST. supabase/sql/test_private_row_private_column.sql.
+-- TEST. supabase/sql/test_private_row_reader_private_column.sql.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';
