@@ -12,11 +12,15 @@ DECLARE
 t AS ($a$;
   cte_new constant text := $a$),
 
--- retained_projection_verdict_v1: this car's stored retained-listing verdicts that still count (one call)
+-- retained_projection_verdict_v1: this car's stored retained-listing verdicts that still count (one call). The verdict
+-- stands in for the matcher's row terms only; the viewer term stays here, under the caller: a projection is offered to
+-- the verdict only when the caller can read its source observation.
 rpv AS MATERIALIZED (
   SELECT r.projection_id, r.admitted
-    FROM public.retained_projection_verdicts_for(ARRAY(SELECT ow.id FROM obs_w ow
-                                                         WHERE ow.method = 'retained_listing_property_projection_v1')) r
+    FROM public.retained_projection_verdicts_for(ARRAY(
+           SELECT ow.id FROM obs_w ow
+            WHERE ow.method = 'retained_listing_property_projection_v1'
+              AND EXISTS (SELECT 1 FROM public.vehicle_observations vp WHERE vp.id = ow.source_observation_id))) r
 ),
 
 -- Every testimony row: item key, raw value, comparison kind, class, source key (one per independent source),

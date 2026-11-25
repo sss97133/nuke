@@ -6,6 +6,8 @@
 --      cars (they gain the admitted projections); a private car's anon reading is unchanged;
 --   2. with every verdict stale (property deprecated, a source row superseded, no regrade), each caller reads exactly
 --      what the gated reader reads; after regrading, anon reads the owner's answer again;
+--   1b. the verdict replaces only the matcher's row terms: a projection whose source observation the caller cannot
+--      read stays hidden although its verdict counts (and a reader without that viewer term fails);
 --   3. the guard refuses a body it does not know; apply twice is idempotent; the revert restores the gated body byte
 --      for byte.
 \set ON_ERROR_STOP on
@@ -355,6 +357,13 @@ VALUES ('00000000-0000-0000-0000-00000000f001', '00000000-0000-0000-0000-0000000
 INSERT INTO cron.job (jobname) VALUES ('bat-live-pull');
 CALL public.retained_projection_grade_tick();
 
+-- The viewer term: anon and authenticated cannot read source observation d003 (a row policy, as live's private-read
+-- policies hide rows by method or speaker). Its projection e003 is admitted by the matcher as owner and its verdict
+-- counts; it must stay hidden from every caller who cannot read d003.
+ALTER TABLE public.vehicle_observations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY fixture_read ON public.vehicle_observations FOR SELECT TO anon, authenticated
+  USING (id <> '00000000-0000-0000-0000-00000000d003');
+
 -- One reading per caller and car, by dynamic SQL (a fresh plan per role).
 CREATE FUNCTION pg_temp.read(p_fn text, p_role text, p_car uuid) RETURNS jsonb LANGUAGE plpgsql AS $f$
 DECLARE r jsonb;
@@ -395,13 +404,16 @@ BEGIN
     -- anon: the owner's answer, less projections with no counting verdict (they fall back to the gate, closed to anon;
     -- projection 9's p is ingested after its grading, so the clock rule keeps it from counting). The stranger passes
     -- the gate, so the fallback gives them the owner's whole answer.
-    owner_out := CASE WHEN r.role = 'authenticated' THEN (SELECT b.out FROM pg_temp.before_read b WHERE b.role = 'postgres' AND b.car = r.car) ELSE (SELECT coalesce(jsonb_agg(x ORDER BY x), '[]'::jsonb)
+    -- Both: less d003, which they cannot read, and its projection e003.
+    owner_out := CASE WHEN r.role = 'authenticated' THEN (SELECT coalesce(jsonb_agg(x ORDER BY x), '[]'::jsonb)
                     FROM jsonb_array_elements_text((SELECT b.out FROM pg_temp.before_read b WHERE b.role = 'postgres' AND b.car = r.car)) x
-                   WHERE x::uuid NOT IN (SELECT o.id FROM public.vehicle_observations o
+                   WHERE x NOT IN ('00000000-0000-0000-0000-00000000d003', '00000000-0000-0000-0000-00000000e003')) ELSE (SELECT coalesce(jsonb_agg(x ORDER BY x), '[]'::jsonb)
+                    FROM jsonb_array_elements_text((SELECT b.out FROM pg_temp.before_read b WHERE b.role = 'postgres' AND b.car = r.car)) x
+                   WHERE x NOT IN ('00000000-0000-0000-0000-00000000d003', '00000000-0000-0000-0000-00000000e003') AND (x::uuid NOT IN (SELECT o.id FROM public.vehicle_observations o
                                           WHERE o.extraction_method = 'retained_listing_property_projection_v1')
                       OR x::uuid IN (SELECT v.projection_id FROM public.retained_projection_verdicts_for(
                                        ARRAY(SELECT o.id FROM public.vehicle_observations o
-                                              WHERE o.extraction_method = 'retained_listing_property_projection_v1')) v)) END;
+                                              WHERE o.extraction_method = 'retained_listing_property_projection_v1')) v))) END;
     IF r.car <> '00000000-0000-0000-0000-0000000000b1' AND r.role <> 'postgres' AND pg_temp.read('vehicle_facet_items', r.role, r.car) IS DISTINCT FROM owner_out THEN
       RAISE EXCEPTION 'FAIL % does not read the owner''s answer on public car %: % vs %', r.role, r.car,
         pg_temp.read('vehicle_facet_items', r.role, r.car), owner_out; END IF;
@@ -412,6 +424,33 @@ BEGIN
      IS DISTINCT FROM (SELECT b.out FROM pg_temp.before_read b WHERE b.role = 'anon' AND b.car = '00000000-0000-0000-0000-0000000000b1') THEN
     RAISE EXCEPTION 'FAIL the private car''s anon reading changed'; END IF;
   RAISE NOTICE 'PASS owner unchanged on 3 cars; anon and stranger read the owner''s answer on 2 public cars wherever a verdict counts (% readings gained); private car unchanged', n_gain;
+END $$;
+
+-- 1b. The verdict replaces only the matcher's row terms, never the viewer term: e003 is admitted, its verdict counts,
+--     the owner reads it, and anon and the stranger, who cannot read its source d003, do not.
+DO $$ DECLARE e constant text := '00000000-0000-0000-0000-00000000e003'; BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.retained_projection_verdicts_for(ARRAY[e::uuid]) v WHERE v.admitted) THEN
+    RAISE EXCEPTION 'FAIL vacuous: e003 has no counting admitted verdict'; END IF;
+  IF NOT pg_temp.read('vehicle_facet_items', 'postgres', '00000000-0000-0000-0000-0000000000a1') ? e THEN
+    RAISE EXCEPTION 'FAIL vacuous: the owner does not read e003'; END IF;
+  IF pg_temp.read('vehicle_facet_items', 'anon', '00000000-0000-0000-0000-0000000000a1') ? e
+     OR pg_temp.read('vehicle_facet_items', 'authenticated', '00000000-0000-0000-0000-0000000000a1') ? e THEN
+    RAISE EXCEPTION 'FAIL viewer term: a caller who cannot read the source observation reads its projection'; END IF;
+  RAISE NOTICE 'PASS viewer term: e003 (admitted, verdict counts) read by the owner, hidden from anon and the stranger';
+END $$;
+-- Mutant: the reader without the viewer term in rpv must show e003 to anon.
+DO $$
+DECLARE d text := pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure);
+  term constant text := '
+              AND EXISTS (SELECT 1 FROM public.vehicle_observations vp WHERE vp.id = ow.source_observation_id)';
+  leaked boolean;
+BEGIN
+  IF position(term IN d) = 0 THEN RAISE EXCEPTION 'mutant anchor missing'; END IF;
+  EXECUTE replace(d, term, '');
+  leaked := pg_temp.read('vehicle_facet_items', 'anon', '00000000-0000-0000-0000-0000000000a1') ? '00000000-0000-0000-0000-00000000e003';
+  EXECUTE d;
+  IF NOT leaked THEN RAISE EXCEPTION 'FAIL mutant survived: dropping the viewer term hid nothing more'; END IF;
+  RAISE NOTICE 'PASS mutant killed: without the viewer term anon reads e003';
 END $$;
 
 -- 2. Stale verdicts fall back: drift without regrading, and every caller reads exactly what the gated reader reads.
@@ -432,7 +471,9 @@ END $$;
 CALL public.retained_projection_grade_tick();
 DO $$ BEGIN
   IF pg_temp.read('vehicle_facet_items', 'anon', '00000000-0000-0000-0000-0000000000a1')
-     IS DISTINCT FROM pg_temp.read('vehicle_facet_items_gated', 'postgres', '00000000-0000-0000-0000-0000000000a1') THEN
+     IS DISTINCT FROM (SELECT coalesce(jsonb_agg(x ORDER BY x), '[]'::jsonb)   -- less d003 and e003, hidden from anon
+                         FROM jsonb_array_elements_text(pg_temp.read('vehicle_facet_items_gated', 'postgres', '00000000-0000-0000-0000-0000000000a1')) x
+                        WHERE x NOT IN ('00000000-0000-0000-0000-00000000d003', '00000000-0000-0000-0000-00000000e003')) THEN
     RAISE EXCEPTION 'FAIL after regrading anon does not read the owner''s gated answer'; END IF;
   RAISE NOTICE 'PASS after regrading anon reads the owner''s answer again: %', pg_temp.read('vehicle_facet_items', 'anon', '00000000-0000-0000-0000-0000000000a1');
 END $$;

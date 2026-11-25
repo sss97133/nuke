@@ -8,7 +8,8 @@
 --
 -- WHAT. Two anchored edits on the body 20261126001500 leaves (prosrc sha256 XhslPUT5..., computed 2026-11-25 from the
 -- live body RPIxtoEH... with that migration's replacement):
---   1. a CTE rpv, before t: (projection_id, admitted) for this car's projection rows in obs_w, one call;
+--   1. a CTE rpv, before t: (projection_id, admitted) for this car's projection rows in obs_w whose source
+--      observation the caller can read (the viewer term, kept under the caller), one call;
 --   2. the projection filter: coalesce(the counted verdict, the gated matcher). A missing or stale verdict is NULL, so
 --      the row is decided exactly as before; the gate stays as the fallback's guard (removing it would send every
 --      ungraded row back to the 15 s anon matcher while the backfill runs).
@@ -30,11 +31,15 @@ DECLARE
 t AS ($a$;
   cte_new constant text := $a$),
 
--- retained_projection_verdict_v1: this car's stored retained-listing verdicts that still count (one call)
+-- retained_projection_verdict_v1: this car's stored retained-listing verdicts that still count (one call). The verdict
+-- stands in for the matcher's row terms only; the viewer term stays here, under the caller: a projection is offered to
+-- the verdict only when the caller can read its source observation.
 rpv AS MATERIALIZED (
   SELECT r.projection_id, r.admitted
-    FROM public.retained_projection_verdicts_for(ARRAY(SELECT ow.id FROM obs_w ow
-                                                         WHERE ow.method = 'retained_listing_property_projection_v1')) r
+    FROM public.retained_projection_verdicts_for(ARRAY(
+           SELECT ow.id FROM obs_w ow
+            WHERE ow.method = 'retained_listing_property_projection_v1'
+              AND EXISTS (SELECT 1 FROM public.vehicle_observations vp WHERE vp.id = ow.source_observation_id))) r
 ),
 
 -- Every testimony row: item key, raw value, comparison kind, class, source key (one per independent source),
