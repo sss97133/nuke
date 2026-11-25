@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Decode-rule producer: reads indexed factory manual chunks (service_manual_chunks) one at a time with the owner's
 // subscription CLI and sends every code it finds to vehicle_decode_rule_propose, which keeps a rule only when the
-// gate in 20261125120000_decode_rule_proposals_gate.sql passes (factory document, code and printed value within
-// 160 characters of the cited chunk, a measured consumer, fills >= 1 reader row and removes none).
+// gate in 20261125120000_decode_rule_proposals_gate.sql passes (on one printed line of the cited chunk: the code once,
+// value_text starting at the next token, every value leaf printed after the code; a measured consumer; fills >= 1
+// reader row and removes none). A code printed on several lines is refused; this script names no line.
 // The model's answer is a proposal, never a rule: this script writes nothing else.
 //
 //   dotenvx run -q -- node scripts/decode-rules/propose-from-chunks.mjs --make Chevrolet --years 1974-1980 \
@@ -28,7 +29,8 @@ export function taskFor(chunk, make, years) {
       `This is one page of a ${make} factory manual (${years[0]}-${years[1]}). List every VIN decode code printed in it.`,
       'Use only the text in "page". Do not use anything you know about these vehicles. If the page prints no VIN code table, answer {"items": []}.',
       'For each code give: rule_key (one of the keys below), code (exactly as printed), value_text (the meaning exactly as printed, copied',
-      'character for character from the page, at most 60 characters, and printed near the code), value (an object as described).',
+      'character for character from the page, at most 60 characters, printed on the same line right after the code), value (an object',
+      'as described whose strings are copied from that same line; no label the page does not print).',
       'Keys: ' + Object.entries(RULE_KEYS).map(([k, d]) => `${k}: ${d}`).join('; '),
       'Answer: {"items": [{"rule_key": "...", "code": "...", "value_text": "...", "value": {...}}]}',
     ].join('\n'),
@@ -36,12 +38,19 @@ export function taskFor(chunk, make, years) {
   };
 }
 
+const tokens = (t) => String(t ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+const leaves = (v) => (v && typeof v === 'object' ? Object.values(v).flatMap(leaves) : [v]);
+
+// A pre-filter only; the gate decides. Every leaf must be a string or number whose tokens the page prints.
 export function validItems(answer, chunkText) {
   const page = String(chunkText ?? '').toUpperCase().replace(/\s+/g, ' ');
+  const pageTokens = ` ${tokens(chunkText)} `;
   return (Array.isArray(answer?.items) ? answer.items : []).filter((it) =>
     it && RULE_KEYS[it.rule_key] && typeof it.code === 'string' && it.code.trim() && typeof it.value_text === 'string'
     && it.value_text.trim().length > 0 && it.value_text.length <= 60 && it.value && typeof it.value === 'object' && !Array.isArray(it.value)
-    && page.includes(it.value_text.toUpperCase().replace(/\s+/g, ' ').trim()));
+    && page.includes(it.value_text.toUpperCase().replace(/\s+/g, ' ').trim())
+    && leaves(it.value).length > 0
+    && leaves(it.value).every((l) => (typeof l === 'string' || typeof l === 'number') && tokens(l) && pageTokens.includes(` ${tokens(l)} `)));
 }
 
 async function main(argv) {
