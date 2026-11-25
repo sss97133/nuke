@@ -21,7 +21,13 @@
 -- is already false. It names no role and reads the policies as they are, so it stays exact if anon is ever given a
 -- read policy on observation_sources (all rows or some): wherever the registry row is readable the gate is true and the
 -- matcher decides as before. Signed-in callers are unchanged. Marker: retained_matcher_caller_gate_v1.
--- Which cars a logged-out visitor sees retained listing claims on is unchanged (none); that question is the lead's.
+-- Which cars a logged-out visitor sees retained listing claims on is unchanged (none).
+-- RLS DEPENDENCY AND THE REAL FIX. The gate's speed for anon rests on observation_sources' row policy (no anon read
+-- policy; the lead ruled 2026-11-25 that the registry stays closed to anon). Its correctness does not: it tests the
+-- policy as it stands. This is a stopgap. The fix is the stored matcher verdict: a verdict keyed by projection id, with
+-- the logic version and the inputs' high-water mark, written when the projection is written and re-graded by a fold
+-- when an input changes; readers filter on it, it is a fact about the row (not the viewer), anon reads it without a
+-- registry grant, and that PR removes this gate.
 -- Contract: supabase/sql/test_facet_retained_matcher_caller_gate.sql (the live matcher family; anon reading the
 -- registry none, all and some; NOT gate => NOT matcher on every row; reader output md5-identical; two mutants fail).
 --

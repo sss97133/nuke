@@ -13,7 +13,10 @@
 --   4. two mutants fail check 2 under the fixtures where anon can read the registry: the gate replaced by false, and
 --      by a role-name test;
 --   5. the migration refuses a body it does not know, refuses when a matcher becomes SECURITY DEFINER, is idempotent,
---      and the revert restores the body byte for byte.
+--      and the revert restores the body byte for byte;
+--   6. a matcher whose own observation_sources join is dropped is caught twice: the truth table finds rows the gate
+--      would hide, and the migration's premise guard refuses.
+-- 'authenticated' below has no subject: a signed-in stranger. 'postgres' owns the tables: the owner's full view.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF to_regclass('public.vehicle_observations') IS NOT NULL THEN RAISE EXCEPTION 'Requires an empty disposable database'; END IF;
@@ -423,3 +426,36 @@ DO $$ BEGIN
   END IF;
   RAISE NOTICE 'PASS revert restores the body';
 END $$;
+
+-- 6. A matcher that no longer depends on the registry (its own observation_sources join replaced by a constant row)
+--    breaks the premise: the per-row truth table must then find rows the gate would hide (anon, registry none and
+--    bat only), and the migration's premise guard must refuse to gate it (the matcher's hash changed).
+CREATE TEMP TABLE matcher_live AS
+  SELECT pg_get_functiondef('public.retained_listing_property_result_matches(uuid,uuid,uuid)'::regprocedure) AS d;
+DO $$
+DECLARE d text := (SELECT d FROM matcher_live);
+  a constant text := $a$JOIN public.observation_sources s ON s.id=p.source_id AND (s.slug='bat' OR public.retained_native_listing_source(p))$a$;
+BEGIN
+  IF position(a IN d) = 0 THEN RAISE EXCEPTION 'matcher mutant: registry join not found'; END IF;
+  EXECUTE replace(d, a, $m$JOIN LATERAL (SELECT p.source_id AS id, 'bat'::text AS slug) s ON s.id=p.source_id AND (s.slug='bat' OR public.retained_native_listing_source(p))$m$);
+END $$;
+SELECT pg_temp.read_all('matcher_without_registry');
+SET nuke.facet_gate_contract = 'on';
+\set ON_ERROR_STOP off
+\ir ../migrations/20261126001500_facet_retained_matcher_caller_gate.sql
+\set ON_ERROR_STOP on
+RESET nuke.facet_gate_contract;
+DO $$
+DECLARE h_none int; h_some int;
+BEGIN
+  SELECT hidden INTO h_none FROM reading WHERE phase = 'matcher_without_registry' AND state = 'none' AND who = 'anon';
+  SELECT hidden INTO h_some FROM reading WHERE phase = 'matcher_without_registry' AND state = 'some' AND who = 'anon';
+  IF h_none <> 3 OR h_some <> 2 THEN
+    RAISE EXCEPTION 'FAIL matcher mutant not detected: hidden rows anon none % (want 3), bat only % (want 2)', h_none, h_some;
+  END IF;
+  IF (SELECT prosrc FROM pg_proc WHERE oid = 'public.vehicle_facet_items(uuid,text)'::regprocedure) <> (SELECT prosrc FROM body_before) THEN
+    RAISE EXCEPTION 'FAIL premise guard: gated a matcher that does not read the registry';
+  END IF;
+  RAISE NOTICE 'PASS a matcher without its registry join is caught: gate would hide 3 / 2 anon rows, and the migration refuses';
+END $$;
+DO $$ BEGIN EXECUTE (SELECT d FROM matcher_live); END $$;
