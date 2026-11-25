@@ -191,8 +191,11 @@ COMMENT ON FUNCTION public.supersede_untyped_cached_image_properties(uuid, integ
 --    Each reader admits a keyed projection row on the same terms it admitted the untyped one, nothing wider:
 --    get_field_provenance already gates every projection row on its source reading (the `a` join: current, public,
 --    same vehicle and photo, value equal); the new disjunct only requires the key to be that same reading.
---    vehicle_canonical never tested the reading of an untyped row; the new disjunct requires the key to be the
---    image_deep_byok reading of the same vehicle and photo that structured_data names (776 of 776 on the proof car).
+--    vehicle_canonical never tested the reading of an untyped row; the new disjunct requires a projection row's key to be
+--    the reading its structured_data names (776 of 776 on the proof car). It reads no parent row: that the key is the
+--    image_deep_byok reading of the same vehicle and photo is proved once, at insert, by branch (1), and the guard keeps a
+--    keyed row's source link immutable; a parent read per row cost +36 ms warm / 3.1 s cold on the proof car and
+--    +130 ms / 9.0 s on 07124fb6 (ta-skeptic, 2026-11-25 02:41 PT).
 --    Whether canonical should also require a public reading (75 of 776 proof readings pass observation_is_public) is a
 --    visibility change, not this fix; it is on the board as a question.
 --    A contract database that carries neither reader (the writer contract) sets nuke.contract_without_readers = on;
@@ -219,9 +222,7 @@ END $reader_provenance$;
 DO $reader_canonical$
 DECLARE d text; path text := current_setting('search_path'); shape_before text; shape_after text;
  anchor text := $a$((o.source_observation_id IS NULL) OR (EXISTS ( SELECT$a$;
- keyed text := $k$((o.source_observation_id IS NULL) OR ((o.extraction_method = 'cached_byok_property_projection_v1'::text) AND (EXISTS ( SELECT 1
-                   FROM vehicle_observations xp
-                  WHERE ((xp.id = o.source_observation_id) AND (xp.vehicle_id = o.vehicle_id) AND ((xp.structured_data ->> 'analysis_kind'::text) = 'image_deep_byok'::text) AND ((xp.structured_data ->> 'image_id'::text) = (o.structured_data ->> 'image_id'::text)) AND ((o.structured_data ->> 'source_observation_id'::text) = (xp.id)::text))))) OR (EXISTS ( SELECT$k$;
+ keyed text := $k$((o.source_observation_id IS NULL) OR ((o.extraction_method = 'cached_byok_property_projection_v1'::text) AND ((o.structured_data ->> 'source_observation_id'::text) = (o.source_observation_id)::text)) OR (EXISTS ( SELECT$k$;
 BEGIN
  IF to_regclass('public.vehicle_canonical') IS NULL THEN
   IF current_setting('nuke.contract_without_readers', true) = 'on' THEN RETURN; END IF;

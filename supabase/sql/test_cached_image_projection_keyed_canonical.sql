@@ -3,7 +3,7 @@
 -- Proves the vehicle_canonical part of 20261125211500_cached_image_projection_source_key.sql: a cached image property
 -- projection row that carries the typed source_observation_id (as every row re-landed or newly landed after that
 -- migration does) stays canonical exactly where its untyped original was, and nothing wider is admitted: a keyed row
--- naming another photo's or another vehicle's reading, or a keyed row of another extraction method, still needs a
+-- whose key is not the reading its structured_data names, or a keyed row of another extraction method, still needs a
 -- retained-listing matcher. Before the migration the keyed row is dropped (the defect). Owner, options, grants, comment,
 -- columns and a dependent view are unchanged. Every id below is invented.
 -- Shapes: helpers/vehicle_observations_rls_fixture.sql, helpers/vehicle_canonical_live_20261121.sql and
@@ -55,8 +55,8 @@ CREATE FUNCTION pg_temp.is_canonical(p_id uuid) RETURNS boolean LANGUAGE sql AS 
 -- ALLOW_RAW_TESTIMONY_WRITE: fixture rows in an empty disposable PG17 database, never production.
 -- Two vehicles; the paint key, discriminated by photo as production registers it.
 INSERT INTO public.vehicles (id, is_public) VALUES ('10000000-0000-4000-8000-00000000000a', true), ('10000000-0000-4000-8000-00000000000b', true);
-INSERT INTO public.observation_properties (id, property_key, label, data_type, applies_to_kinds, discriminator_key, ratified_at) VALUES
-  ('40000000-0000-4000-8000-000000000002', 'image_visible_paint_stage', 'Visible paint stage', 'enum', '{condition}', 'image_id', '2026-10-01');
+INSERT INTO public.observation_properties (id, property_key, label, data_type, applies_to_kinds, discriminator_key) VALUES
+  ('40000000-0000-4000-8000-000000000002', 'image_visible_paint_stage', 'Visible paint stage', 'enum', '{condition}', 'image_id');
 -- Deep readings: a1 photo 1 and a2 photo 2 on vehicle a; b1 photo 3 and b2 photo 6 on vehicle b.
 INSERT INTO public.vehicle_observations (id, vehicle_id, observed_at, kind, structured_data, extraction_method) VALUES
   ('50000000-0000-4000-8000-0000000000a1', '10000000-0000-4000-8000-00000000000a', '2026-11-10', 'condition',
@@ -115,17 +115,15 @@ SELECT pg_temp.ok('applied: the dependent view still reads it, and the view is s
 
 -- ===== 3. nothing wider =====
 -- Each would be canonical if it were admitted (a photo of its own, or ranked above the row it competes with).
--- e1: names a reading of another photo (key and structured_data agree on a2, photo 2; the row says photo 4)
-SELECT pg_temp.row('20000000-0000-4000-8000-0000000000e1', '10000000-0000-4000-8000-00000000000a', '60000000-0000-4000-8000-000000000004', 'aged', '50000000-0000-4000-8000-0000000000a2', '50000000-0000-4000-8000-0000000000a2');
--- e2: filed on vehicle b, keyed to vehicle a's reading of photo 1
-SELECT pg_temp.row('20000000-0000-4000-8000-0000000000e2', '10000000-0000-4000-8000-00000000000b', '60000000-0000-4000-8000-000000000001', 'primer', '50000000-0000-4000-8000-0000000000a1', '50000000-0000-4000-8000-0000000000a1');
+-- A keyed row naming another photo's or another vehicle's reading never lands: the insert guard refuses it
+-- (test_cached_image_projection_source_key.sql 1d2, 1d3) and keeps a keyed row's link immutable, so the view reads no
+-- parent row. This database has no guard; the view's own terms are the two below.
 -- e3: on photo 1 of vehicle a and keyed to a1 (that photo's reading), but its structured_data names a2; ranked above d1
 -- (confidence 0.9), so if it were admitted it would replace d1
 SELECT pg_temp.row('20000000-0000-4000-8000-0000000000e3', '10000000-0000-4000-8000-00000000000a', '60000000-0000-4000-8000-000000000001', 'aged', '50000000-0000-4000-8000-0000000000a2', '50000000-0000-4000-8000-0000000000a1', 'cached_byok_property_projection_v1', 0.9);
 -- e4: another extraction method keyed to a deep reading of its photo (only a retained matcher admits it; stubbed false)
 SELECT pg_temp.row('20000000-0000-4000-8000-0000000000e4', '10000000-0000-4000-8000-00000000000b', '60000000-0000-4000-8000-000000000006', 'clear', '50000000-0000-4000-8000-0000000000b2', '50000000-0000-4000-8000-0000000000b2', 'made_up_method_v1');
-SELECT pg_temp.ok('nothing wider: a keyed row naming another photo''s or vehicle''s reading, a key that is not the named reading, or another method stays out',
-  NOT pg_temp.is_canonical('20000000-0000-4000-8000-0000000000e1') AND NOT pg_temp.is_canonical('20000000-0000-4000-8000-0000000000e2')
-  AND NOT pg_temp.is_canonical('20000000-0000-4000-8000-0000000000e3') AND NOT pg_temp.is_canonical('20000000-0000-4000-8000-0000000000e4')
+SELECT pg_temp.ok('nothing wider: a key that is not the reading structured_data names, or a keyed row of another method, stays out',
+  NOT pg_temp.is_canonical('20000000-0000-4000-8000-0000000000e3') AND NOT pg_temp.is_canonical('20000000-0000-4000-8000-0000000000e4')
   AND pg_temp.canon() = :'canon_before');
 SELECT 'PASS test_cached_image_projection_keyed_canonical' AS result;

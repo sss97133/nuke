@@ -104,4 +104,25 @@ DO $$ BEGIN
           FROM public.vehicle_observations WHERE id = 'f0f0f0f0-0000-4000-8000-000000000001'), 'the forged row exists';
   ASSERT pg_temp.diff('k2', 'k3') = 0, 'nothing wider: a key that is not the named reading is not read; every answer as before';
 END $$;
+
+-- Nothing wider: a keyed row of another method (a retained listing projection) whose structured_data names its key.
+-- It carries none of the image projection markers, so the reader's image gate does not apply to it; only a
+-- retained-listing matcher may admit it, and none does (its key is a photo reading, not a listing).
+-- ALLOW_RAW_TESTIMONY_WRITE: fixture rows in an empty disposable PG17 database, never production.
+INSERT INTO public.vehicle_observations
+SELECT (jsonb_populate_record(NULL::public.vehicle_observations, to_jsonb(o) || jsonb_build_object(
+  'id', 'f0f0f0f0-0000-4000-8000-000000000002', 'source_id', NULL,
+  'extraction_method', 'retained_listing_property_projection_v1',
+  'structured_data', o.structured_data - 'analysis_kind' - 'projection_version'))).*
+  FROM public.vehicle_observations o
+ WHERE o.id = (SELECT k.new_id FROM public.kp_ids k
+                WHERE EXISTS (SELECT 1 FROM public.wc_answers w WHERE w.phase = 'k2' AND strpos(w.p::text, k.new_id::text) > 0)
+                ORDER BY k.new_id LIMIT 1);
+BEGIN; SELECT pg_temp.capture('k4'); COMMIT;
+DO $$ BEGIN
+  ASSERT (SELECT source_observation_id::text = structured_data->>'source_observation_id' AND NOT is_superseded
+            AND extraction_method = 'retained_listing_property_projection_v1'
+          FROM public.vehicle_observations WHERE id = 'f0f0f0f0-0000-4000-8000-000000000002'), 'the retained row exists';
+  ASSERT pg_temp.diff('k2', 'k4') = 0, 'nothing wider: a keyed row of another method is not admitted by the image branch';
+END $$;
 SELECT 'PASS test_cached_image_projection_keyed_provenance' AS result;
