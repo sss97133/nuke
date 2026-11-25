@@ -12,6 +12,7 @@ CREATE TABLE public.observation_properties (id uuid PRIMARY KEY DEFAULT gen_rand
 INSERT INTO public.observation_properties (id, property_key) VALUES
   ('f0000000-0000-0000-0000-000000000001', 'image_visible_paint_stage'),
   ('f0000000-0000-0000-0000-000000000002', 'image_visible_assembly_state');
+-- guardrail-allow(center-key-fk): vehicle_observations.vehicle_id: synthetic fixture table in a disposable test database
 CREATE TABLE IF NOT EXISTS public.vehicle_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, property_id uuid, structured_data jsonb,
   is_superseded boolean DEFAULT false);
