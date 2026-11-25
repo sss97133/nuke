@@ -11,20 +11,27 @@
 --   DELETE  : n = n - count (never below 0);
 --   UPDATE OF vehicle_id, posted_at : the old key loses, the new key gains.
 -- Errors are caught and raised as warnings (as model_fold_rows_signal does), so comment intake never fails on it.
--- A comment on a car missing from vehicles is not counted (the key is a foreign key).
+-- A comment on a car missing from vehicles is not counted (the key is a foreign key). A comment posted more than 14 UTC
+-- days before today is not counted either: no reader looks back that far, so such buckets would only grow.
 --
 -- COMPLETENESS. Buckets from 8 UTC days ago are backfilled here from idx_auction_comments_created_at: a comment is
 -- stored after it is posted (0 of 12,009 rows in the 24 h to 2026-11-25 have created_at < posted_at), so every comment
 -- posted since then was created since then. Older buckets hold only comments that land from now on and are never read.
 -- auction_comment_day_counts_reconcile(p_days) recounts the closed UTC days (yesterday back p_days) and returns one row
--- per bucket it corrected (n_was -> n_now); the nightly job auction-comment-day-counts-reconcile runs it at 04:20 UTC,
--- after refresh-market-views-nightly, so v_job_health shows "N rows" = buckets corrected. Any N > 0 is a finding.
+-- per bucket it corrected (n_was -> n_now), and logs the run in auction_comment_day_counts_runs (buckets in the window,
+-- buckets corrected) in the same transaction. The nightly job auction-comment-day-counts-reconcile runs it at 04:20 UTC,
+-- after refresh-market-views-nightly, so v_job_health shows "N rows" = buckets corrected; any N > 0 is a finding.
+-- Because the trigger swallows its errors as warnings, a drifting fold would still leave that job green, so
+-- auction-comment-day-counts-check at 04:25 UTC runs auction_comment_day_counts_check(20), which raises (the job fails in
+-- v_job_health) when the newest nightly run corrected more than 20 buckets or no nightly run logged in 26 hours. The
+-- corrections are already committed by then.
 --
 -- COST. Added per insert statement, PG17 bench (300k vehicles, median of 5 x 3,000 statements, 2026-11-25):
 -- 1 row +0.025 ms, 10 rows +0.016 ms, 100 rows +0.047 ms.
 --
--- READER. hero_heat.comment_velocity sums n over posted_day after the UTC date 7 days ago, joined to vehicles with
--- the full visibility test. hero_heat's other blocks are unchanged from 20261125134500.
+-- READER. hero_heat.comment_velocity sums n over posted_day after the UTC date 7 days ago (today plus the 6 whole UTC
+-- days before it: up to one day shorter than the rolling 168 hours the scan used), joined to vehicles with the full
+-- visibility test. hero_heat's other blocks are unchanged from 20261125134500.
 -- Contract: supabase/sql/test_auction_comment_day_counts.sql.
 SET lock_timeout = '2s';  -- fail rather than queue comment writers behind this file's locks
 SET statement_timeout = '60s';  -- deploy bound; measured: the 8-day recount 0.9 s, today's count 0.5-0.9 s (2026-11-25)
@@ -45,6 +52,22 @@ ALTER TABLE public.auction_comment_day_counts ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.auction_comment_day_counts FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.auction_comment_day_counts TO service_role;
 
+CREATE TABLE IF NOT EXISTS public.auction_comment_day_counts_runs (
+  id bigserial PRIMARY KEY,
+  run_at timestamptz NOT NULL DEFAULT now(),
+  kind text NOT NULL CHECK (kind IN ('install', 'nightly')),
+  window_from date NOT NULL,
+  window_to date NOT NULL,
+  buckets_in_window integer NOT NULL CHECK (buckets_in_window >= 0),
+  buckets_fixed integer NOT NULL CHECK (buckets_fixed >= 0)
+);
+COMMENT ON TABLE public.auction_comment_day_counts_runs IS
+  'One row per auction_comment_day_counts_reconcile run: the closed UTC days recounted [window_from, window_to), the '
+  'buckets compared and the buckets corrected. Read by auction_comment_day_counts_check.';
+ALTER TABLE public.auction_comment_day_counts_runs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.auction_comment_day_counts_runs FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.auction_comment_day_counts_runs TO service_role;
+
 CREATE OR REPLACE FUNCTION public.auction_comment_day_counts_fold()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -59,7 +82,8 @@ begin
       select d.vehicle_id, d.posted_day, d.dn, clock_timestamp()
         from (select r.vehicle_id, (r.posted_at at time zone 'UTC')::date as posted_day, count(*)::int as dn
                 from new_rows r where r.vehicle_id is not null and r.posted_at is not null group by 1, 2) d
-       where exists (select 1 from public.vehicles v where v.id = d.vehicle_id)
+       where d.posted_day >= (now() at time zone 'UTC')::date - 14
+         and exists (select 1 from public.vehicles v where v.id = d.vehicle_id)
        order by d.vehicle_id, d.posted_day
       on conflict (vehicle_id, posted_day) do update set n = c.n + excluded.n, folded_at = excluded.folded_at;
     elsif tg_op = 'DELETE' then
@@ -85,7 +109,8 @@ begin
                  and (o.vehicle_id is distinct from n.vehicle_id
                       or (o.posted_at at time zone 'UTC')::date is distinct from (n.posted_at at time zone 'UTC')::date)
                group by 1, 2) d
-       where exists (select 1 from public.vehicles v where v.id = d.vehicle_id)
+       where d.posted_day >= (now() at time zone 'UTC')::date - 14
+         and exists (select 1 from public.vehicles v where v.id = d.vehicle_id)
        order by d.vehicle_id, d.posted_day
       on conflict (vehicle_id, posted_day) do update set n = c.n + excluded.n, folded_at = excluded.folded_at;
     end if;
@@ -99,7 +124,8 @@ REVOKE ALL ON FUNCTION public.auction_comment_day_counts_fold() FROM PUBLIC, ano
 -- Recounts the closed UTC days from yesterday back p_days (1..14); returns each bucket it corrected.
 -- A comment stored while this runs can be overwritten by the absolute count on its closed day; the next run corrects it.
 DROP FUNCTION IF EXISTS public.auction_comment_day_counts_reconcile(integer);
-CREATE OR REPLACE FUNCTION public.auction_comment_day_counts_reconcile(p_days integer DEFAULT 8)
+DROP FUNCTION IF EXISTS public.auction_comment_day_counts_reconcile(integer, text);
+CREATE OR REPLACE FUNCTION public.auction_comment_day_counts_reconcile(p_days integer DEFAULT 8, p_kind text DEFAULT 'nightly')
  RETURNS TABLE (fix_vehicle_id uuid, fix_posted_day date, n_was integer, n_now integer)
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -139,10 +165,37 @@ begin
   select f.vehicle_id, f.posted_day, f.n_now, clock_timestamp() from acdc_fix f
    order by f.vehicle_id, f.posted_day
   on conflict (vehicle_id, posted_day) do update set n = excluded.n, folded_at = excluded.folded_at;
+  insert into public.auction_comment_day_counts_runs (kind, window_from, window_to, buckets_in_window, buckets_fixed)
+  select p_kind, v_from, v_today,
+         (select count(*) from public.auction_comment_day_counts k where k.posted_day >= v_from and k.posted_day < v_today),
+         (select count(*) from acdc_fix);
   return query select f.vehicle_id, f.posted_day, f.n_was, f.n_now from acdc_fix f order by f.vehicle_id, f.posted_day;
 end $function$;
-REVOKE ALL ON FUNCTION public.auction_comment_day_counts_reconcile(integer) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.auction_comment_day_counts_reconcile(integer) TO service_role;
+REVOKE ALL ON FUNCTION public.auction_comment_day_counts_reconcile(integer, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.auction_comment_day_counts_reconcile(integer, text) TO service_role;
+
+-- Raises when the newest nightly reconcile corrected more than p_max_fixed buckets, or none logged in 26 hours.
+CREATE OR REPLACE FUNCTION public.auction_comment_day_counts_check(p_max_fixed integer DEFAULT 20)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare r public.auction_comment_day_counts_runs%rowtype;
+begin
+  select * into r from public.auction_comment_day_counts_runs
+   where kind = 'nightly' and run_at > now() - interval '26 hours' order by run_at desc, id desc limit 1;
+  if not found then
+    raise exception 'auction_comment_day_counts: no nightly reconcile logged in 26 hours';
+  end if;
+  if r.buckets_fixed > p_max_fixed then
+    raise exception 'auction_comment_day_counts drifted: the % reconcile corrected % of % buckets (limit %)',
+      r.run_at, r.buckets_fixed, r.buckets_in_window, p_max_fixed;
+  end if;
+  return jsonb_build_object('run_at', r.run_at, 'buckets_in_window', r.buckets_in_window, 'buckets_fixed', r.buckets_fixed);
+end $function$;
+REVOKE ALL ON FUNCTION public.auction_comment_day_counts_check(integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.auction_comment_day_counts_check(integer) TO service_role;
 
 -- Triggers and today's bucket in one statement (one transaction): CREATE TRIGGER holds its lock on auction_comments
 -- until the block commits, so no comment is stored between the trigger appearing and today's count (exact, and the
@@ -171,7 +224,7 @@ BEGIN
   ON CONFLICT (vehicle_id, posted_day) DO UPDATE SET n = excluded.n, folded_at = excluded.folded_at;
 END
 $install$;
-SELECT count(*) AS backfilled_buckets FROM public.auction_comment_day_counts_reconcile(8);
+SELECT count(*) AS backfilled_buckets FROM public.auction_comment_day_counts_reconcile(8, 'install');
 
 DO $job$
 BEGIN
@@ -179,6 +232,10 @@ BEGIN
   PERFORM cron.schedule('auction-comment-day-counts-reconcile', '20 4 * * *',
     'SET client_min_messages = error; SET statement_timeout = ''10s''; SET lock_timeout = ''5s''; '
     'SELECT * FROM public.auction_comment_day_counts_reconcile(8);');
+  PERFORM cron.unschedule(jobid) FROM cron.job WHERE jobname = 'auction-comment-day-counts-check';
+  PERFORM cron.schedule('auction-comment-day-counts-check', '25 4 * * *',
+    'SET client_min_messages = error; SET statement_timeout = ''10s''; SET lock_timeout = ''5s''; '
+    'SELECT public.auction_comment_day_counts_check(20);');
 END
 $job$;
 

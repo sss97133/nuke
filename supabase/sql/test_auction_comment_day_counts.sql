@@ -153,6 +153,15 @@ SELECT t_assert((SELECT count(*) FROM public.auction_comment_day_counts WHERE po
 SELECT t_assert((SELECT count(*) FROM cron.job WHERE jobname = 'auction-comment-day-counts-reconcile' AND schedule = '20 4 * * *'
     AND command LIKE 'SET client_min_messages = error; SET statement_timeout = ''10s''; SET lock_timeout = ''5s''; SELECT * FROM %') = 1,
   'job: one nightly reconcile job at 04:20 UTC with the cron prefix, returning one row per corrected bucket');
+SELECT t_assert((SELECT count(*) FROM cron.job WHERE jobname = 'auction-comment-day-counts-check' AND schedule = '25 4 * * *'
+    AND command = 'SET client_min_messages = error; SET statement_timeout = ''10s''; SET lock_timeout = ''5s''; SELECT public.auction_comment_day_counts_check(20);') = 1,
+  'job: the drift check runs at 04:25 UTC with the cron prefix');
+SELECT t_assert((SELECT count(*) FROM public.auction_comment_day_counts_runs WHERE kind = 'install' AND buckets_fixed > 0) = 1
+  AND (SELECT count(*) FROM public.auction_comment_day_counts_runs WHERE kind = 'nightly') = 0,
+  'runs: the install backfill is logged as kind install');
+DO $$ BEGIN PERFORM public.auction_comment_day_counts_check(20); RAISE EXCEPTION 'FAIL: check passed with no nightly run';
+EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE 'FAIL%' THEN RAISE; END IF;
+  IF SQLERRM NOT LIKE '%no nightly reconcile%' THEN RAISE; END IF; RAISE NOTICE 'PASS: check fails when no nightly reconcile logged (the install run does not count)'; END $$;
 SET ROLE anon;
 SELECT t_assert(t_velocity() = 'pub_a=5,pub_c=1', 'after: velocity read from the fold equals the scan (pub_a=5, pub_c=1)');
 SELECT t_assert(NOT has_table_privilege('anon', 'public.auction_comment_day_counts', 'SELECT'), 'anon cannot read the fold table directly');
@@ -174,6 +183,9 @@ SELECT t_assert(t_drift() = 0, 'trigger: moves between cars and days (and a text
 DELETE FROM public.auction_comments WHERE id = (SELECT id FROM public.auction_comments
   WHERE vehicle_id = 'c0000000-0000-0000-0000-00000000000c' AND posted_at = t_day0() + interval '2 hours' LIMIT 1);
 SELECT t_assert(t_drift() = 0, 'trigger: a delete keeps every bucket equal to a recount');
+INSERT INTO public.auction_comments (vehicle_id, posted_at) VALUES ('a0000000-0000-0000-0000-00000000000a', t_day0() - interval '20 days');
+SELECT t_assert((SELECT count(*) FROM public.auction_comment_day_counts WHERE posted_day < (now() AT TIME ZONE 'UTC')::date - 14) = 0,
+  'trigger: a comment posted 20 days back writes no bucket (bound: 14 UTC days)');
 SET ROLE anon;
 SELECT t_assert(t_velocity() = 'pub_a=5,pub_c=3', 'after edits: pub_a = 3 today + 1 yesterday + 1 two days ago; pub_c = 1 + 2 - 1 today + 1 moved from pub_a');
 RESET ROLE;
@@ -187,6 +199,13 @@ VALUES ('b0000000-0000-0000-0000-00000000000b', (now() AT TIME ZONE 'UTC')::date
 SELECT t_assert((SELECT string_agg(n_was || '->' || n_now, ',' ORDER BY n_was) FROM public.auction_comment_day_counts_reconcile(8)) = '4->0,99->1'
   AND t_drift() = 0,
   'reconcile: corrects a wrong closed day and zeroes a phantom one, and returns both (99->1, 4->0)');
+SELECT t_assert((SELECT buckets_fixed FROM public.auction_comment_day_counts_runs WHERE kind = 'nightly' ORDER BY id DESC LIMIT 1) = 2,
+  'runs: the nightly run is logged with 2 buckets corrected');
+SELECT t_assert((public.auction_comment_day_counts_check(20) ->> 'buckets_fixed')::int = 2, 'check: 2 corrected buckets pass a limit of 20');
+DO $$ BEGIN PERFORM public.auction_comment_day_counts_check(1); RAISE EXCEPTION 'FAIL: check passed 2 corrections over a limit of 1';
+EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE 'FAIL%' THEN RAISE; END IF;
+  IF SQLERRM NOT LIKE '%drifted%' THEN RAISE; END IF; RAISE NOTICE 'PASS: check fails the job when a run corrected more than the limit'; END $$;
+SELECT t_assert((SELECT count(*) FROM public.auction_comment_day_counts WHERE n = 99) = 0, 'check: the corrections stay written when the check fails');
 SELECT t_assert((SELECT count(*) FROM public.auction_comment_day_counts_reconcile(8)) = 0, 'reconcile: a second run corrects nothing');
 DO $$ BEGIN PERFORM * FROM public.auction_comment_day_counts_reconcile(30); RAISE EXCEPTION 'FAIL: reconcile accepted 30 days';
 EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE 'FAIL%' THEN RAISE; END IF; RAISE NOTICE 'PASS: reconcile refuses a window over 14 days'; END $$;
@@ -198,6 +217,7 @@ RESET statement_timeout; RESET lock_timeout;
 SELECT t_assert((SELECT count(*) FROM ((SELECT vehicle_id, posted_day, n FROM t_snap EXCEPT SELECT vehicle_id, posted_day, n FROM public.auction_comment_day_counts)
   UNION ALL (SELECT vehicle_id, posted_day, n FROM public.auction_comment_day_counts EXCEPT SELECT vehicle_id, posted_day, n FROM t_snap)) x) = 0
   AND (SELECT count(*) FROM cron.job WHERE jobname = 'auction-comment-day-counts-reconcile') = 1
+  AND (SELECT count(*) FROM cron.job WHERE jobname = 'auction-comment-day-counts-check') = 1
   AND (SELECT count(*) FROM pg_trigger WHERE tgrelid = 'public.auction_comments'::regclass AND tgname LIKE 'auction_comment_day_counts_%') = 3,
-  'applied twice: no count changes, one job, three triggers');
-SELECT t_assert((SELECT count(*) FROM public.auction_comments) = 14, 'no comment changed by the migration (14 = 12 seeded + 3 inserted - 1 deleted)');
+  'applied twice: no count changes, one job each, three triggers');
+SELECT t_assert((SELECT count(*) FROM public.auction_comments) = 15, 'no comment changed by the migration (15 = 12 seeded + 3 inserted - 1 deleted + 1 posted 20 days back)');
