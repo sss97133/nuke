@@ -129,7 +129,8 @@ READER_PATH_FIRST="$HOME/.local/bin" run_reader fact-doubt-cycle "$MAIN/scripts/
 #    linked receipts, re-derive receipt line x dated photo x work session rows and raise receipt_part_visible questions
 #    where a photographed zone after purchase needs a look; unchanged rows and identical questions are left alone. Until
 #    2026-11-24 nothing ran it after its hand runs of 11-09/10, so receipts and photos landed since raised no question.
-run_reader reconcile-receipt-work "$MAIN/scripts/receipt-work/reconcile-receipt-work.mjs" --user-id "$OWNER"
+#    --keep-answered: an answered line keeps its answer until its receipt, line or frame is withdrawn.
+run_reader reconcile-receipt-work "$MAIN/scripts/receipt-work/reconcile-receipt-work.mjs" --user-id "$OWNER" --keep-answered
 LAST_CLEAN="$FRAME_CLEAN"
 # fast fires run only after a full fire whose first reads ended clean; a full fire that holds them says so
 if [ "$LAST_CLEAN" -eq 1 ]; then rm -f "$FAST_HOLD"; else
