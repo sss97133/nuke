@@ -113,7 +113,7 @@ export async function postHeartbeat({ url, key, body, fetchImpl = fetch, timeout
 
 // --start: record that the batch is starting this reader (record_reader_start, 20261125003000). A start newer than the
 // reader's last heartbeat for 30 minutes makes subscription-reader-watch say "stuck" instead of "silent".
-export const START_READERS = [...READERS, 'reconcile-receipt-work'];
+export const START_READERS = READERS;
 export async function postStart({ url, key, name, fetchImpl = fetch, timeoutMs = 10000 }) {
   const res = await fetchImpl(`${url.replace(/\/+$/, '')}/rest/v1/rpc/record_reader_start`, {
     method: 'POST',
