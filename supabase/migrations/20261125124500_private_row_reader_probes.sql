@@ -12,8 +12,14 @@
 --                  else = feed reader: called once with these constant arguments; reader_ids (a jsonpath over the
 --                  jsonb_agg of its result) picks the subject ids it returned, and those that are private by the
 --                  probe's subject_kind (judged as postgres against relation.row_key) are the visible count.
+--   reader_tail    keyed readers only: constant quoted arguments after the key, e.g. , 'owner_name'.
+--   reader_ids     feed readers: the ids to judge. Keyed readers: optional jsonpath into each answer; when set, an
+--                  answer counts as visible only when the path yields a non-null value (a reader that always answers
+--                  with a shell, such as get_field_provenance, is judged by its value).
 --   sample_filter  an extra predicate on the sampled source rows (alias x), so a keyed reader is probed with keys
 --                  it has something to answer for.
+-- subject_kind gains 'withheld_column': the row is private in that column when the column holds a value and anon has
+-- no column privilege on it (the column grants on vehicles are the rule; the probe reads them, it types no list).
 --   The primary key becomes (relation, subject_kind, subject_column, reader).
 -- Three probe rows are added (owner lane ta-pipeline), anon only: a definer reader answers every caller alike unless
 -- its body tests the caller, and anon is the wider audience. The table stays postgres-only, so these SQL fragments
@@ -33,14 +39,21 @@ ALTER TABLE public.private_row_probes
   ADD COLUMN IF NOT EXISTS reader text NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS reader_args text,
   ADD COLUMN IF NOT EXISTS reader_ids text,
-  ADD COLUMN IF NOT EXISTS sample_filter text;
+  ADD COLUMN IF NOT EXISTS sample_filter text,
+  ADD COLUMN IF NOT EXISTS reader_tail text;
+
+ALTER TABLE public.private_row_probes DROP CONSTRAINT IF EXISTS private_row_probes_subject_kind_check;
+ALTER TABLE public.private_row_probes ADD CONSTRAINT private_row_probes_subject_kind_check
+  CHECK (subject_kind IN ('image', 'vehicle', 'user', 'flag', 'visibility', 'withheld_column'));
 
 ALTER TABLE public.private_row_probes DROP CONSTRAINT IF EXISTS private_row_probes_reader_shape;
 ALTER TABLE public.private_row_probes ADD CONSTRAINT private_row_probes_reader_shape CHECK (
   reader ~ '^([a-z_][a-z0-9_]*)?$'
-  AND (reader_args IS NULL) = (reader_ids IS NULL)
-  AND (reader_args IS NULL OR (reader <> '' AND reader_args ~ '^[0-9, ]*$' AND reader_ids::jsonpath IS NOT NULL))
-  AND (sample_filter IS NULL OR (reader_args IS NULL AND position(';' IN sample_filter) = 0)));
+  AND (reader_args IS NULL OR (reader <> '' AND reader_args ~ '^[0-9, ]*$' AND reader_ids IS NOT NULL))
+  AND (reader_ids IS NULL OR (reader <> '' AND reader_ids::jsonpath IS NOT NULL))
+  AND (reader_tail IS NULL OR (reader <> '' AND reader_args IS NULL AND reader_tail ~ '^(, *''[a-z_]+'')+$'))
+  AND (sample_filter IS NULL OR (reader_args IS NULL AND position(';' IN sample_filter) = 0))
+  AND (subject_kind <> 'withheld_column' OR (reader <> '' AND reader_args IS NULL)));
 
 ALTER TABLE public.private_row_probes DROP CONSTRAINT IF EXISTS private_row_probes_pkey;
 ALTER TABLE public.private_row_probes ADD CONSTRAINT private_row_probes_pkey
@@ -50,14 +63,19 @@ COMMENT ON COLUMN public.private_row_probes.reader IS
   'private_row_reader_probes_v1: '''' probes the relation''s rows; a public function name probes that reader as each audience.';
 
 INSERT INTO public.private_row_probes (rank, relation, row_key, subject_kind, subject_column, reader, reader_args, reader_ids,
-                                       sample_filter, owner_lane, note, audiences, active) VALUES
+                                       sample_filter, owner_lane, note, audiences, active, reader_tail, sample_size) VALUES
   (20, 'image_observations', 'image_id', 'image', 'image_id', 'get_image_deep_analysis', NULL, NULL,
    'x.observed_by = ''caller-byok'' AND x.is_active', 'ta-pipeline',
-   'definer reader: a photo''s deep analysis (narrative, intent, scene, place hint) by image id', '{anon}', true),
+   'definer reader: a photo''s deep analysis (narrative, intent, scene, place hint) by image id', '{anon}', true, NULL, 50),
   (21, 'vehicle_images', 'id', 'image', 'id', 'intake_live_state', '50, 10', '$[*].feed[*].id', NULL, 'ta-pipeline',
-   'definer feed: newest analysed photos with url and narrative line (inactive: cost)', '{anon}', false),
+   'definer feed: newest analysed photos with url and narrative line (inactive: cost)', '{anon}', false, NULL, 50),
   (22, 'vehicles', 'id', 'vehicle', 'id', 'intake_live_state', '50, 10', '$[*].fleet[*].vehicle_id', NULL, 'ta-pipeline',
-   'definer feed: per-car burn progress naming year, make and model (inactive: cost)', '{anon}', false)
+   'definer feed: per-car burn progress naming year, make and model (inactive: cost)', '{anon}', false, NULL, 50),
+  (23, 'vehicles', 'id', 'withheld_column', 'owner_name', 'get_field_provenance', NULL, '$.value',
+   'x.is_public AND x.deleted_at IS NULL', 'ta-readers',
+   'definer reader: any vehicles column by name, read as the owner; anon lacks owner_name (2026-11-25: leaked). owner_name, '
+   'not purchase_price: a 5-row purchase_price sample on public cars passed 10 s, owner_name took 0.9 s', '{anon}', true,
+   ', ''owner_name''', 5)
 ON CONFLICT (relation, subject_kind, subject_column, reader) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.assay_private_row_exposure()
@@ -76,6 +94,8 @@ BEGIN
       WHEN 'user' THEN format('x.%I IS NOT NULL', p.subject_column)
       WHEN 'flag' THEN format('coalesce(x.%I, false)', p.subject_column)
       WHEN 'visibility' THEN format('coalesce(x.%I, ''public'') <> ''public''', p.subject_column)
+      WHEN 'withheld_column' THEN format('x.%1$I IS NOT NULL AND NOT has_column_privilege(''anon'', %2$L, %3$L, ''SELECT'')',
+                                         p.subject_column, 'public.' || p.relation, p.subject_column)
     END;
     ktype := NULL;
     SELECT format_type(a.atttypid, a.atttypmod) INTO ktype FROM pg_attribute a
@@ -102,7 +122,11 @@ BEGIN
             EXECUTE format('SELECT count(*) FROM public.%I x WHERE x.%I = ANY ($1::%s[])', p.relation, p.row_key, ktype)
                INTO seen USING keys;
           ELSIF p.reader_args IS NULL THEN
-            EXECUTE format('SELECT count(*) FROM unnest($1::%s[]) k, LATERAL public.%I(k) r', ktype, p.reader)
+            EXECUTE format('SELECT count(*) FROM unnest($1::%s[]) k, LATERAL public.%I(k%s) r %s', ktype, p.reader,
+                           coalesce(p.reader_tail, ''),
+                           CASE WHEN p.reader_ids IS NULL THEN ''
+                                ELSE format('WHERE coalesce(jsonb_path_query_first(to_jsonb(r), %L::jsonpath), ''null''::jsonb) <> ''null''::jsonb',
+                                            p.reader_ids) END)
                INTO seen USING keys;
           ELSE
             EXECUTE format('SELECT jsonb_path_query_array(coalesce(jsonb_agg(t), ''[]''), %L::jsonpath) FROM public.%I(%s) t',

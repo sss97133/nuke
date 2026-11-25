@@ -22,12 +22,14 @@ CREATE FUNCTION cron.schedule(n text, s text, c text) RETURNS bigint LANGUAGE sq
 $$ INSERT INTO cron.job VALUES (n, s, c) ON CONFLICT (jobname) DO UPDATE SET schedule = excluded.schedule, command = excluded.command RETURNING 1 $$;
 
 -- live shapes, reduced to the columns the probes read
-CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean NOT NULL, deleted_at timestamptz);
+CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean NOT NULL, deleted_at timestamptz, owner_name text);
+GRANT SELECT (id, is_public, deleted_at) ON public.vehicles TO anon, authenticated;  -- column grants, as live
 CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles (id), analysis jsonb);
 CREATE FUNCTION public.vehicle_image_gallery_eligible(vehicle_images) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 CREATE TABLE public.image_observations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), image_id uuid REFERENCES public.vehicle_images (id),
                                         observed_by text, is_active boolean);
-INSERT INTO public.vehicles VALUES ('10000000-0000-0000-0000-000000000001', true, NULL), ('10000000-0000-0000-0000-000000000002', false, NULL);
+INSERT INTO public.vehicles VALUES ('10000000-0000-0000-0000-000000000001', true, NULL, 'a'), ('10000000-0000-0000-0000-000000000002', false, NULL, 'b'),
+  ('10000000-0000-0000-0000-000000000003', true, NULL, NULL);
 INSERT INTO public.vehicle_images VALUES
   ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '{"line": "shown"}'),     -- public car
   ('20000000-0000-0000-0000-000000000002', NULL, '{"line": "unfiled"}'),                                      -- unfiled
@@ -45,7 +47,12 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS
 $$ SELECT jsonb_build_object('feed', coalesce((SELECT jsonb_agg(jsonb_build_object('id', vi.id, 'vehicle_id', vi.vehicle_id))
                                                 FROM (SELECT * FROM public.vehicle_images ORDER BY id LIMIT p_feed_limit) vi), '[]'),
                             'fleet', jsonb_build_array(jsonb_build_object('vehicle_id', '10000000-0000-0000-0000-000000000002'))) $$;
-GRANT EXECUTE ON FUNCTION public.get_image_deep_analysis(uuid), public.intake_live_state(integer, integer) TO anon, authenticated;
+-- the plate/owner defect: any vehicles column by name, read as the owner, past the column grants
+CREATE FUNCTION public.get_field_provenance(p_vehicle_id uuid, p_field text) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS
+$$ SELECT jsonb_build_object('field', p_field, 'value', to_jsonb(v) -> p_field) FROM public.vehicles v WHERE v.id = p_vehicle_id $$;
+GRANT EXECUTE ON FUNCTION public.get_image_deep_analysis(uuid), public.intake_live_state(integer, integer),
+  public.get_field_provenance(uuid, text) TO anon, authenticated;
 
 \ir ../migrations/20261125100000_private_row_exposure_watch.sql
 \ir ../migrations/20261125124500_private_row_reader_probes.sql
@@ -54,7 +61,7 @@ GRANT EXECUTE ON FUNCTION public.get_image_deep_analysis(uuid), public.intake_li
 DO $$
 DECLARE r jsonb; x jsonb; me text := current_user; bad boolean;
 BEGIN
-  IF (SELECT count(*) FROM public.private_row_probes WHERE reader <> '') <> 3
+  IF (SELECT count(*) FROM public.private_row_probes WHERE reader <> '') <> 4
      OR (SELECT count(*) FROM public.private_row_probes WHERE reader = 'intake_live_state' AND active) <> 0 THEN
     RAISE EXCEPTION 'reader rows: % (intake active %)', (SELECT count(*) FROM public.private_row_probes WHERE reader <> ''),
       (SELECT count(*) FROM public.private_row_probes WHERE reader = 'intake_live_state' AND active); END IF;
@@ -68,6 +75,12 @@ BEGIN
      OR x->'visible' ? 'authenticated' THEN
     RAISE EXCEPTION 'keyed reader not seen exposed: %', x; END IF;
   IF NOT r->'exposed' ? 'get_image_deep_analysis()' THEN RAISE EXCEPTION 'exposed list: %', r->'exposed'; END IF;
+
+  -- withheld column through a keyed reader: 1 public car holds an owner name anon may not select; the reader hands it out
+  SELECT e INTO x FROM jsonb_array_elements(r->'relations') e WHERE e->>'relation' = 'get_field_provenance()';
+  IF x IS NULL OR (x->>'private_sampled')::int <> 1 OR (x#>>'{visible,anon}')::int <> 1 OR NOT (x->>'exposed')::boolean
+     OR x->>'kind' <> 'withheld_column' THEN
+    RAISE EXCEPTION 'withheld column probe: %', x; END IF;
 
   -- feed readers (switched on here): 2 of 3 feed photos are private; the fleet names 1 private car
   UPDATE public.private_row_probes SET active = true WHERE reader = 'intake_live_state';
@@ -83,6 +96,10 @@ BEGIN
   $f$ SELECT vi.id, vi.analysis->>'line' FROM public.vehicle_images vi JOIN public.vehicles v ON v.id = vi.vehicle_id
        WHERE vi.id = p_image_id AND v.is_public AND v.deleted_at IS NULL $f$;
   REVOKE EXECUTE ON FUNCTION public.intake_live_state(integer, integer) FROM PUBLIC, anon, authenticated;
+  -- the shell still answers, with no value: judged by the value, not the row
+  CREATE OR REPLACE FUNCTION public.get_field_provenance(p_vehicle_id uuid, p_field text) RETURNS jsonb
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS
+  $f$ SELECT jsonb_build_object('field', p_field, 'value', NULL) FROM public.vehicles v WHERE v.id = p_vehicle_id $f$;
   r := public.assay_private_row_exposure();
   IF current_user <> me THEN RAISE EXCEPTION 'role leaked after a denied reader: %', current_user; END IF;
   SELECT bool_or((e->>'exposed')::boolean) INTO bad FROM jsonb_array_elements(r->'relations') e WHERE e->>'relation' LIKE '%()';
@@ -104,6 +121,16 @@ BEGIN
     INSERT INTO public.private_row_probes (rank, relation, row_key, subject_kind, subject_column, reader, reader_args, owner_lane, note)
     VALUES (99, 'vehicles', 'id', 'vehicle', 'id', 'x', '1', 'test', 'args without an id path');
     RAISE EXCEPTION 'reader_args without reader_ids admitted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO public.private_row_probes (rank, relation, row_key, subject_kind, subject_column, reader_tail, reader, owner_lane, note)
+    VALUES (99, 'vehicles', 'id', 'withheld_column', 'vin', ', ''vin''); select (1', 'get_field_provenance', 'test', 'injected tail');
+    RAISE EXCEPTION 'reader_tail CHECK admitted SQL';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO public.private_row_probes (rank, relation, row_key, subject_kind, subject_column, owner_lane, note)
+    VALUES (99, 'vehicles', 'id', 'withheld_column', 'vin', 'test', 'withheld column without a reader');
+    RAISE EXCEPTION 'withheld_column without a reader admitted';
   EXCEPTION WHEN check_violation THEN NULL; END;
 END $$;
 
