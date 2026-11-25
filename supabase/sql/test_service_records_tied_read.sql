@@ -22,7 +22,7 @@ GRANT EXECUTE ON FUNCTION public.assert(boolean, text) TO anon, authenticated;
 
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, owner_id uuid, user_id uuid, created_by_user_id uuid, uploaded_by uuid,
   is_public boolean, deleted_at timestamptz);
-CREATE TABLE public.access_grants (vehicle_id uuid, user_id uuid);
+CREATE TABLE public.access_grants (vehicle_id uuid REFERENCES public.vehicles(id), user_id uuid);
 CREATE FUNCTION public.vehicle_user_has_access(p_vehicle uuid, p_user uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS
   $$ SELECT EXISTS (SELECT 1 FROM public.access_grants g WHERE g.vehicle_id = p_vehicle AND g.user_id = p_user) $$;
 -- vehicle_viewer_tied as live (20261124211500).
@@ -39,7 +39,7 @@ $$;
 REVOKE ALL ON FUNCTION public.vehicle_viewer_tied(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_viewer_tied(uuid) TO anon, authenticated, service_role;
 
-CREATE TABLE public.service_records (id uuid PRIMARY KEY, vehicle_id uuid, service_date date, mileage integer, shop_name text,
+CREATE TABLE public.service_records (id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles(id), service_date date, mileage integer, shop_name text,
   shop_location text, work_performed text, cost numeric, parts_replaced text[], service_type text, documentation_available boolean,
   source text, confidence_score numeric, created_at timestamptz DEFAULT now(), updated_at timestamptz);
 ALTER TABLE public.service_records ENABLE ROW LEVEL SECURITY;
