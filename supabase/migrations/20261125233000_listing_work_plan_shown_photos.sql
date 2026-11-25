@@ -29,7 +29,11 @@
 --      pass, walking at most the first cand_cap ids. cand_cap is the rule row platform_config 'listing_work_plan_read'
 --      .condition_candidate_cap (2,000, bounded 500..8,000 in the body; basis in the row). When fewer than 500 pass and
 --      the car has more candidates than the cap, the excess is counted in exclusions.condition_candidates_beyond_cap and
---      gaps gets {family: condition, reason: candidate_cap}.
+--      gaps gets {family: condition, reason: candidate_cap}. The cap bounds the walk (detoast and public test per row),
+--      not the id scan: prod plans the candidate ids as an index scan of idx_vobs_engagement_contrib (vehicle_id, kind,
+--      is_superseded, ...) plus a sort of ids, which reads every candidate id. Read-only EXPLAIN ANALYZE 2026-11-25 on the
+--      public car with the most condition rows (14,081): id scan + walk of 502 rows, 5,780 buffers, 66 ms warm; the
+--      cap did not bind there. The beyond-cap count repeats the id scan only when fewer than 500 rows pass.
 --   d. each term of the visibility test is COALESCEd to false. Without it a signed-in stranger reading a hidden photo
 --      with user_id NULL got NOT (false OR NULL OR false) = NULL, IF did not exclude, and the claim was returned.
 -- The copy of the vehicle_images read policy is registered in private_row_policy_copies (hash 3af9ebbc..., live).
