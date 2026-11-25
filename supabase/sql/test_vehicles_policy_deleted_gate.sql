@@ -39,6 +39,35 @@ CREATE TABLE public.private_row_probes (relation text NOT NULL, subject_kind tex
   sample_filter text CHECK (sample_filter IS NULL OR (reader_args IS NULL AND position(';' IN sample_filter) = 0)), reader_tail text,
   CHECK (subject_kind IN ('image', 'vehicle', 'user', 'flag', 'visibility', 'withheld_column')),
   PRIMARY KEY (relation, subject_kind, subject_column, reader));
+-- The live copy registry and hash (20261125204500, #3925, live 2026-11-25), verbatim, with two rows: one current at the
+-- live hash (re-recorded by the migration) and one stale (left alone, still counted as drift).
+CREATE TABLE IF NOT EXISTS public.private_row_policy_copies (
+  reader        text NOT NULL CHECK (reader ~ '^[a-z_][a-z0-9_]*\(([a-z_][a-z0-9_ ]*(\[\])?(, *[a-z_][a-z0-9_ ]*(\[\])?)*)?\)$'),
+  relation      text NOT NULL CHECK (relation ~ '^[a-z_][a-z0-9_]*$'),
+  policy_filter text NOT NULL CHECK (policy_filter <> '' AND position(';' IN policy_filter) = 0),
+  recorded_hash text NOT NULL CHECK (recorded_hash ~ '^[0-9a-f]{32}$'),
+  owner_lane    text NOT NULL,
+  note          text NOT NULL CHECK (note <> ''),
+  recorded_at   timestamptz NOT NULL DEFAULT now(),
+  active        boolean NOT NULL DEFAULT true,
+  PRIMARY KEY (reader, relation, policy_filter)
+);
+CREATE OR REPLACE FUNCTION public.private_row_policy_hash(p_relation text, p_policy_filter text)
+RETURNS TABLE (policy_hash text, policies int) LANGUAGE plpgsql STABLE SET search_path = pg_catalog, public AS $f$
+BEGIN
+  IF p_relation !~ '^[a-z_][a-z0-9_]*$' OR position(';' IN p_policy_filter) > 0 THEN
+    RAISE EXCEPTION 'private_row_policy_hash: bad relation or filter';
+  END IF;
+  RETURN QUERY EXECUTE format(
+    'SELECT md5(string_agg(p.policyname || '':'' || p.permissive || '':'' || p.cmd || '':'' || p.roles::text || '':'' || coalesce(p.qual, ''''),
+                           ''|'' ORDER BY p.policyname)), count(*)::int
+       FROM pg_catalog.pg_policies p WHERE p.schemaname = ''public'' AND p.tablename = %L AND (%s)', p_relation, p_policy_filter);
+END $f$;
+INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
+SELECT 'vehicle_plates_read(uuid[])', 'vehicles', 'p.cmd IN (''SELECT'', ''ALL'')',
+       (SELECT policy_hash FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')')), 'ta-provenance', 'fixture: current copy'
+UNION ALL
+SELECT 'stale_reader(uuid)', 'vehicles', 'p.cmd IN (''SELECT'', ''ALL'')', repeat('0', 32), 'ta-provenance', 'fixture: stale copy';
 -- The live assay that reads it (pg_get_functiondef, 2026-11-25), verbatim.
 CREATE OR REPLACE FUNCTION public.assay_private_row_exposure()
  RETURNS jsonb
@@ -273,12 +302,28 @@ BEGIN
      AND (e -> 'visible' ->> 'authenticated')::int = 0 AND NOT (e ->> 'exposed')::boolean, format('6b assay after: %s', e);
 END $$;
 
+-- 6c. Copies: the current one follows the change, the stale one stays stale, and both readers are registered at the
+--     live hash.
+DO $$ DECLARE live text := (SELECT policy_hash FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')'));
+BEGIN
+  ASSERT (SELECT recorded_hash FROM public.private_row_policy_copies WHERE reader = 'vehicle_plates_read(uuid[])') = live,
+    '6c current copy re-recorded';
+  ASSERT (SELECT recorded_hash FROM public.private_row_policy_copies WHERE reader = 'stale_reader(uuid)') = repeat('0', 32),
+    '6c stale copy left alone';
+  ASSERT (SELECT count(*) FROM public.private_row_policy_copies
+          WHERE reader IN ('vehicle_row_read(uuid)', 'get_vehicle_profile_data(uuid)') AND relation = 'vehicles' AND recorded_hash = live) = 2,
+    '6c both readers registered at the live hash';
+  ASSERT (SELECT rank FROM public.private_row_probes WHERE relation = 'vehicles' AND owner_lane = 'ta-provenance') = 26, '6c probe rank 26';
+END $$;
+
 -- 7. The revert restores the live policies exactly.
 \ir revert_20261125225000_vehicles_policy_deleted_gate.sql
 DO $$ BEGIN
   ASSERT (SELECT md5(qual) FROM pg_policies WHERE tablename = 'vehicles' AND policyname = 'vehicles_public_select') = 'bff26993e09e17fa0a65c86b36a7634a'
      AND (SELECT md5(qual) FROM pg_policies WHERE tablename = 'vehicles' AND policyname = 'vehicles_private_select') = '9f5079189d0163734d6fa1e83a2a388b',
     '7 revert gives the live quals back';
+  ASSERT (SELECT recorded_hash FROM public.private_row_policy_copies WHERE reader = 'vehicle_plates_read(uuid[])')
+       = (SELECT policy_hash FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')')), '7 revert re-records current copies';
 END $$;
 -- 7b. With the live policies back, the same row run by the same assay reports the exposure (both audiences).
 UPDATE public.private_row_probes SET active = true WHERE relation = 'vehicles' AND owner_lane = 'ta-provenance';

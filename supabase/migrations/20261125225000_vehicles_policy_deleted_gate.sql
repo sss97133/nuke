@@ -33,7 +33,7 @@
 -- supabase/sql/revert_20261125225000_vehicles_policy_deleted_gate.sql.
 BEGIN;
 SET LOCAL statement_timeout = '30s';
-SET LOCAL lock_timeout = '5s';
+SET LOCAL lock_timeout = '3s';  -- ALTER POLICY holds vehicles ACCESS EXCLUSIVE; deploy in a quiet window
 
 DO $guard$
 DECLARE pub text; priv text;
@@ -96,6 +96,14 @@ DO $a$ BEGIN
      WHERE c.relation = 'vehicles' AND c.reader = b.reader AND c.policy_filter = b.policy_filter
        AND c.recorded_hash = b.h
        AND b.h IS DISTINCT FROM (SELECT policy_hash FROM public.private_row_policy_hash('vehicles', c.policy_filter));
+    -- The two definer readers restate this rule through the same predicate: register them as copies of the vehicles
+    -- read policies at the hash just written, so a later policy change counts as drift until they are re-read.
+    INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
+    SELECT r.reader, 'vehicles', 'p.cmd IN (''SELECT'', ''ALL'')',
+           (SELECT policy_hash FROM public.private_row_policy_hash('vehicles', 'p.cmd IN (''SELECT'', ''ALL'')')), 'ta-provenance', r.note
+      FROM (VALUES ('vehicle_row_read(uuid)', '20261125214500 restates vehicles_public_select / vehicles_private_select through vehicle_publicly_readable; recorded by 20261125225000'),
+                   ('get_vehicle_profile_data(uuid)', '20261125225500 restates vehicles_public_select / vehicles_private_select through vehicle_publicly_readable; recorded by 20261125225000')) r(reader, note)
+    ON CONFLICT (reader, relation, policy_filter) DO NOTHING;
   END IF;
 END $a$;
 DROP TABLE _vehicles_copy_before;
@@ -104,7 +112,7 @@ DO $w$ BEGIN
   IF to_regclass('public.private_row_probes') IS NOT NULL THEN
     INSERT INTO public.private_row_probes (rank, relation, row_key, subject_kind, subject_column, reader, sample_filter,
                                            owner_lane, note, audiences, active, sample_size)
-    VALUES (24, 'vehicles', 'id', 'vehicle', 'id', '',
+    VALUES (26, 'vehicles', 'id', 'vehicle', 'id', '',
             'x.is_public AND x.deleted_at IS NOT NULL AND x.merged_into_vehicle_id IS NULL', 'ta-provenance',
             'deleted, unmerged cars still flagged public: none readable outside their insiders (20261125225000)',
             '{anon,authenticated}', true, 50)
