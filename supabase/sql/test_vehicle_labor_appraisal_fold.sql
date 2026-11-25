@@ -11,6 +11,13 @@
 \ir test_vehicle_labor_appraisal_names.sql
 
 -- Inputs the fold signals on, as stubs where the reader fixture has none.
+-- guardrail-allow(center-key-fk): receipts.vehicle_id: synthetic fixture table in a disposable test database
+-- guardrail-allow(center-key-fk): receipt_items.receipt_id: synthetic fixture table in a disposable test database
+-- guardrail-allow(center-key-fk): receipt_vehicle_links.receipt_id: synthetic fixture table in a disposable test database
+-- guardrail-allow(center-key-fk): receipt_vehicle_links.vehicle_id: synthetic fixture table in a disposable test database
+-- guardrail-allow(center-key-fk): model_fold_work.vehicle_id: synthetic fixture table in a disposable test database
+-- guardrail-allow(center-key-fk): model_fold_signal.vehicle_id: synthetic fixture table in a disposable test database
+-- guardrail-allow(center-key-fk): vehicle_facet_grade_folds.vehicle_id: synthetic fixture table in a disposable test database
 CREATE TABLE IF NOT EXISTS public.receipts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid);
 CREATE TABLE IF NOT EXISTS public.receipt_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_id uuid);
 CREATE TABLE IF NOT EXISTS public.receipt_vehicle_links (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_id uuid,
