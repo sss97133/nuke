@@ -109,6 +109,11 @@ DO $w$ BEGIN
             'deleted, unmerged cars still flagged public: none readable outside their insiders (20261125225000)',
             '{anon,authenticated}', true, 50)
     ON CONFLICT (relation, subject_kind, subject_column, reader) DO NOTHING;
+    IF NOT EXISTS (SELECT 1 FROM public.private_row_probes WHERE relation = 'vehicles' AND subject_kind = 'vehicle'
+                     AND subject_column = 'id' AND reader = '' AND active
+                     AND sample_filter = 'x.is_public AND x.deleted_at IS NOT NULL AND x.merged_into_vehicle_id IS NULL') THEN
+      RAISE EXCEPTION 'private_row_probes already holds (vehicles, vehicle, id, '''') with another filter or inactive; review';
+    END IF;
   END IF;
 END $w$;
 

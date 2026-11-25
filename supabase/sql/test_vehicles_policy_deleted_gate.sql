@@ -39,6 +39,89 @@ CREATE TABLE public.private_row_probes (relation text NOT NULL, subject_kind tex
   sample_filter text CHECK (sample_filter IS NULL OR (reader_args IS NULL AND position(';' IN sample_filter) = 0)), reader_tail text,
   CHECK (subject_kind IN ('image', 'vehicle', 'user', 'flag', 'visibility', 'withheld_column')),
   PRIMARY KEY (relation, subject_kind, subject_column, reader));
+-- The live assay that reads it (pg_get_functiondef, 2026-11-25), verbatim.
+CREATE OR REPLACE FUNCTION public.assay_private_row_exposure()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  p record; aud text; keys text[]; ktype text; seen bigint; per jsonb := '[]'::jsonb; exposed text[] := '{}'; hit boolean;
+  priv text; sub text; t0 timestamptz := clock_timestamp(); err text; aud_out jsonb; label text; ids jsonb; returned int;
+BEGIN
+  -- private_row_reader_probes_v1
+  FOR p IN SELECT * FROM public.private_row_probes WHERE active ORDER BY rank, relation, reader LOOP
+    label := CASE WHEN p.reader = '' THEN p.relation ELSE p.reader || '()' END;
+    priv := CASE p.subject_kind
+      WHEN 'image' THEN format('x.%1$I IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.vehicle_images vi JOIN public.vehicles v ON v.id = vi.vehicle_id
+                                 WHERE vi.id = x.%1$I AND v.is_public AND v.deleted_at IS NULL AND public.vehicle_image_gallery_eligible(vi))', p.subject_column)
+      WHEN 'vehicle' THEN format('x.%1$I IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = x.%1$I AND v.is_public AND v.deleted_at IS NULL)', p.subject_column)
+      WHEN 'user' THEN format('x.%I IS NOT NULL', p.subject_column)
+      WHEN 'flag' THEN format('coalesce(x.%I, false)', p.subject_column)
+      WHEN 'visibility' THEN format('coalesce(x.%I, ''public'') <> ''public''', p.subject_column)
+      WHEN 'withheld_column' THEN format('x.%1$I IS NOT NULL AND NOT has_column_privilege(''anon'', %2$L, %3$L, ''SELECT'')',
+                                         p.subject_column, 'public.' || p.relation, p.subject_column)
+    END;
+    ktype := NULL;
+    SELECT format_type(a.atttypid, a.atttypmod) INTO ktype FROM pg_attribute a
+     WHERE a.attrelid = to_regclass(format('public.%I', p.relation)) AND a.attname = p.row_key AND NOT a.attisdropped;
+    IF ktype IS NULL OR (p.reader <> '' AND NOT EXISTS (
+        SELECT 1 FROM pg_proc f WHERE f.pronamespace = 'public'::regnamespace AND f.proname = p.reader)) THEN
+      per := per || jsonb_build_object('relation', label, 'kind', p.subject_kind, 'owner', p.owner_lane, 'missing', true);
+      CONTINUE;
+    END IF;
+    keys := NULL;
+    IF p.reader_args IS NULL THEN
+      EXECUTE format('SELECT array_agg(k) FROM (SELECT x.%I::text AS k FROM public.%I x WHERE %s AND (%s) LIMIT %s) s',
+                     p.row_key, p.relation, priv, coalesce(p.sample_filter, 'true'), p.sample_size) INTO keys;
+    END IF;
+    aud_out := '{}'::jsonb; hit := false; returned := NULL;
+    FOREACH aud IN ARRAY p.audiences LOOP
+      seen := NULL; err := NULL; ids := NULL;
+      IF p.reader_args IS NOT NULL OR coalesce(cardinality(keys), 0) > 0 THEN
+        sub := CASE aud WHEN 'authenticated' THEN gen_random_uuid()::text END;
+        BEGIN
+          PERFORM set_config('request.jwt.claims', jsonb_build_object('role', aud, 'sub', sub)::text, true);
+          PERFORM set_config('role', aud, true);
+          IF p.reader = '' THEN
+            EXECUTE format('SELECT count(*) FROM public.%I x WHERE x.%I = ANY ($1::%s[])', p.relation, p.row_key, ktype)
+               INTO seen USING keys;
+          ELSIF p.reader_args IS NULL THEN
+            EXECUTE format('SELECT count(*) FROM unnest($1::%s[]) k, LATERAL public.%I(k%s) r %s', ktype, p.reader,
+                           coalesce(p.reader_tail, ''),
+                           CASE WHEN p.reader_ids IS NULL THEN ''
+                                ELSE format('WHERE coalesce(jsonb_path_query_first(to_jsonb(r), %L::jsonpath), ''null''::jsonb) <> ''null''::jsonb',
+                                            p.reader_ids) END)
+               INTO seen USING keys;
+          ELSE
+            EXECUTE format('SELECT jsonb_path_query_array(coalesce(jsonb_agg(t), ''[]''), %L::jsonpath) FROM public.%I(%s) t',
+                           p.reader_ids, p.reader, p.reader_args) INTO ids;
+          END IF;
+          PERFORM set_config('role', 'none', true);
+        EXCEPTION WHEN insufficient_privilege THEN
+          seen := 0; ids := NULL; err := 'denied';  -- the subtransaction's rollback also restores the role
+        END;
+        PERFORM set_config('role', 'none', true);
+        PERFORM set_config('request.jwt.claims', '', true);
+        IF ids IS NOT NULL THEN                      -- feed reader: judge what it returned, as postgres
+          returned := greatest(coalesce(returned, 0), jsonb_array_length(ids));
+          EXECUTE format('SELECT count(*) FROM jsonb_array_elements_text($1) e(k) JOIN public.%I x ON x.%I::text = e.k WHERE %s',
+                         p.relation, p.row_key, priv) INTO seen USING ids;
+        END IF;
+      END IF;
+      hit := hit OR coalesce(seen, 0) > 0;
+      aud_out := aud_out || jsonb_build_object(aud, coalesce(seen, 0));
+    END LOOP;
+    IF hit AND NOT label = ANY (exposed) THEN exposed := exposed || label; END IF;
+    per := per || jsonb_build_object('relation', label, 'kind', p.subject_kind, 'owner', p.owner_lane,
+                                     'private_sampled', coalesce(returned, cardinality(keys), 0), 'visible', aud_out, 'exposed', hit);
+  END LOOP;
+  RETURN jsonb_build_object('exposed_relations', cardinality(exposed), 'exposed', to_jsonb(exposed),
+                            'probed_relations', (SELECT count(DISTINCT CASE WHEN reader = '' THEN relation ELSE reader || '()' END)
+                                                   FROM public.private_row_probes WHERE active),
+                            'probes', jsonb_array_length(per), 'relations', per,
+                            'ms', (extract(epoch FROM clock_timestamp() - t0) * 1000)::int, 'assayed_at', now());
+END $function$;
 -- The predicate as 20261125214500 left it live: revoked from PUBLIC.
 CREATE FUNCTION public.vehicle_publicly_readable(p_is_public boolean, p_deleted_at timestamptz, p_merged_into_vehicle_id uuid)
  RETURNS boolean LANGUAGE sql IMMUTABLE PARALLEL SAFE
@@ -182,11 +265,27 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', false);
 END $$;
 
+-- 6b. The live assay reads the row without raising, and finds nothing exposed.
+DO $$ DECLARE r jsonb := public.assay_private_row_exposure(); e jsonb;
+BEGIN
+  SELECT x INTO e FROM jsonb_array_elements(r -> 'relations') x WHERE x ->> 'relation' = 'vehicles' AND x ->> 'kind' = 'vehicle';
+  ASSERT e IS NOT NULL AND (e ->> 'private_sampled')::int = 1 AND (e -> 'visible' ->> 'anon')::int = 0
+     AND (e -> 'visible' ->> 'authenticated')::int = 0 AND NOT (e ->> 'exposed')::boolean, format('6b assay after: %s', e);
+END $$;
+
 -- 7. The revert restores the live policies exactly.
 \ir revert_20261125225000_vehicles_policy_deleted_gate.sql
 DO $$ BEGIN
   ASSERT (SELECT md5(qual) FROM pg_policies WHERE tablename = 'vehicles' AND policyname = 'vehicles_public_select') = 'bff26993e09e17fa0a65c86b36a7634a'
      AND (SELECT md5(qual) FROM pg_policies WHERE tablename = 'vehicles' AND policyname = 'vehicles_private_select') = '9f5079189d0163734d6fa1e83a2a388b',
     '7 revert gives the live quals back';
+END $$;
+-- 7b. With the live policies back, the same row run by the same assay reports the exposure (both audiences).
+UPDATE public.private_row_probes SET active = true WHERE relation = 'vehicles' AND owner_lane = 'ta-provenance';
+DO $$ DECLARE r jsonb := public.assay_private_row_exposure(); e jsonb;
+BEGIN
+  SELECT x INTO e FROM jsonb_array_elements(r -> 'relations') x WHERE x ->> 'relation' = 'vehicles' AND x ->> 'kind' = 'vehicle';
+  ASSERT (e -> 'visible' ->> 'anon')::int = 1 AND (e -> 'visible' ->> 'authenticated')::int = 1 AND (e ->> 'exposed')::boolean,
+    format('7b assay before the gate: %s', e);
 END $$;
 SELECT 'PASS: vehicles read policies hide deleted unmerged cars from outsiders and keep stubs and insiders' AS result;
