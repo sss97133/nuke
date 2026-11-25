@@ -54,3 +54,12 @@ test('the shipped fixes pass and the live 526 command, unprefixed, would have wa
   assert.equal(w.length, 1);
   assert.match(w[0].path.join('>'), /snapshot_stack_dominoes_begin: drop table if exists/);
 });
+
+test('a guardrail-allow(cron-notice) marker naming the first called function lets one command through', () => {
+  const sql = `-- guardrail-allow(cron-notice): dominoes_begin: the drop notice is read by the operator on purpose
+select cron.schedule('a', '* * * * *', $$SET statement_timeout = '1s'; SELECT dominoes_begin(); SELECT 1;$$);
+select cron.schedule('b', '* * * * *', $$SET statement_timeout = '1s'; SELECT fold_outer();$$);`;
+  const w = warnings(sql, idx);
+  assert.equal(w.length, 1);
+  assert.equal(w[0].path[0], 'fold_outer');
+});
