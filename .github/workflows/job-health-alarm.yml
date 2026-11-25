@@ -1,0 +1,64 @@
+name: Job health alarm
+
+# Is any scheduled job failing past its alarm_after? Reads public.job_health_alarms_due() (migration
+# 20261125090700: open episodes in job_health_failures older than job_health_alarm_rules.alarm_after) every 15 minutes,
+# opens or comments one issue per (job, check) that is due, and closes the issues whose episode has cleared.
+# Issue bodies carry the reader's numbers and keys only: the repository is public.
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: job-health-alarm
+  cancel-in-progress: false
+
+jobs:
+  alarm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read the alarms that are due
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          CODE=$(curl -sS --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 -o "$RUNNER_TEMP/due.json" -w '%{http_code}' \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/job_health_alarms_due" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H 'Content-Type: application/json' -d '{}')
+          echo "http_code=$CODE"
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ] || ! jq -e 'type == "array"' "$RUNNER_TEMP/due.json" >/dev/null; then
+            echo "::error::job_health_alarms_due answered HTTP $CODE"
+            echo '[{"jobname":"job-health-alarm","check_key":"reader","numbers":{"http_code":'"$CODE"'}}]' > "$RUNNER_TEMP/due.json"
+          fi
+          jq -c '.[]' "$RUNNER_TEMP/due.json"
+      - name: Open, update or close the issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          PREFIX="Job failing:"
+          WANT=$(jq -r '.[] | "\(.jobname) (\(.check_key))"' "$RUNNER_TEMP/due.json")
+          jq -c '.[]' "$RUNNER_TEMP/due.json" | while read -r row; do
+            T="$PREFIX $(jq -r '"\(.jobname) (\(.check_key))"' <<<"$row")"
+            BODY=$(printf 'Run: %s\n\n```json\n%s\n```\n' "$RUN_URL" "$(jq '.' <<<"$row")")
+            NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$T\" in:title" --json number,title \
+                  | jq -r --arg t "$T" '[.[] | select(.title == $t)][0].number // empty')
+            if [ -n "$NUM" ]; then gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body "$BODY"
+            else gh issue create --repo "$GITHUB_REPOSITORY" --title "$T" --body "$BODY"; fi
+          done
+          gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$PREFIX\" in:title" --json number,title --limit 100 \
+            --jq '.[] | "\(.number)\t\(.title)"' | while IFS=$'\t' read -r num title; do
+            case "$title" in "$PREFIX "*) ;; *) continue ;; esac
+            key="${title#"$PREFIX "}"
+            if ! grep -qxF "$key" <<<"$WANT"; then
+              gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment "Cleared: $RUN_URL"
+            fi
+          done
