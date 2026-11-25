@@ -1,4 +1,4 @@
--- Disposable PG17: receipt line classification as rows (migration 20261124163000_receipt_line_rules).
+-- Disposable PG17: receipt line classification as rows (migration 20261124163000_receipt_line_rules, later 20261124221500).
 -- Covers: the legacy CASE bodies, loaded verbatim from migration 20261119200000, and the rule reader return the same
 -- system and labor operation for a fixture set that hits every seeded rule plus the order collisions; the migration's
 -- own proof block runs over the fixture lines; scoped and proposed rules never reach the text-only wrappers; a pattern
@@ -329,5 +329,96 @@ SELECT public.assert(m->>'decision' = 'promoted', 'decal rule: ' || m::text)
          ARRAY['00000000-0000-0000-0000-000000000c10']::uuid[], p_scope_make => 'Pontiac') m;
 SELECT public.assert(gap = 'operation_no_hours' AND operation_code = 'TRIM-DECALS' AND base_hours IS NULL, 'decal after')
   FROM public.receipt_line_gaps WHERE item_id = '00000000-0000-0000-0000-000000000c10';
+
+-- narrowing + line_kind (migration 20261124221500): filling rules are gated as before; a narrowing that unkeys exactly
+-- its evidence lines is promoted; one that unkeys a line it did not cite, cites a line it does not unkey, or lets another
+-- rule re-key a line is refused and the superseded rule stays active; line_kind rules key return lines through the same
+-- gate; the output CHECK holds per classifier.
+RESET ROLE;
+\i supabase/migrations/20261124221500_receipt_line_narrowing_and_kind.sql
+\i supabase/migrations/20261124221500_receipt_line_narrowing_and_kind.sql
+
+SELECT public.assert((SELECT count(*) FROM pg_proc WHERE proname IN ('receipt_line_rule_hit', 'receipt_line_rule_propose')
+                        AND prosrc LIKE '%receipt_line_kind_rule_v1%') = 2, 'hit and propose patched once');
+SELECT public.assert((length(prosrc) - length(replace(prosrc, 'receipt_line_rule_narrowing_v1', ''))) / 30 = 2,
+                     'promote patched once') FROM pg_proc WHERE proname = 'receipt_line_rule_promote';
+
+INSERT INTO public.receipt_items (id, receipt_id, description, total_price) VALUES
+  ('00000000-0000-0000-0000-000000000d01', '00000000-0000-0000-0000-0000000000b1', 'wing to bumper brace', 1),
+  ('00000000-0000-0000-0000-000000000d02', '00000000-0000-0000-0000-0000000000b1', 'returned wing mount', -10),
+  ('00000000-0000-0000-0000-000000000d03', '00000000-0000-0000-0000-0000000000b1', 'core return credit', -5);
+
+-- Filling is unchanged and says its mode.
+SELECT public.assert(m->>'decision' = 'promoted' AND m->>'mode' = 'filling', 'filling rule: ' || m::text)
+  FROM public.receipt_line_rule_propose('op.910.bolts', 'labor_operation', 910, '\ybolts\y', 'TRIM-WING-RR', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-0000000000c4']::uuid[]) m;
+DO $$
+DECLARE m jsonb;
+BEGIN
+  -- The brace is keyed by the clutch-wing rule before.
+  PERFORM public.assert((SELECT output_key FROM public.receipt_line_rule_hit('labor_operation', 'wing to bumper brace')) = 'TRIM-WING-RR',
+                        'brace keyed before');
+  -- A narrowing that would unkey a line it did not cite is refused; the superseded rule stays active.
+  m := public.receipt_line_rule_propose('op.131.clutch-wing.no-wing', 'labor_operation', 131, '\yclutch kit\y', 'TRIM-WING-RR',
+         'test', 'test', ARRAY['00000000-0000-0000-0000-000000000d01']::uuid[], p_supersedes_rule_id => 'op.131.clutch-wing');
+  PERFORM public.assert(m->>'decision' = 'rejected' AND m->>'mode' = 'narrowing'
+                        AND m->'reasons' ? 'unclassifies_lines_not_in_evidence', 'wide narrowing: ' || m::text);
+  PERFORM public.assert((SELECT status FROM public.receipt_line_rules WHERE rule_id = 'op.131.clutch-wing') = 'active',
+                        'refused narrowing left the old rule active');
+  -- A narrowing whose cited line is still keyed (another rule re-keys it) is refused.
+  INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, operation_code, status, source,
+                                         proposed_by_agent_key, promoted_at)
+  VALUES ('op.950.brace', 'labor_operation', 950, '\ybrace\y', 'TRIM-SPOILER-RR', 'active', 'test fixture', 'test', now());
+  m := public.receipt_line_rule_propose('op.131.clutch-wing.no-brace-a', 'labor_operation', 131,
+         '^(?!.*\ybrace\y).*\y(clutch kit|wing)\y', 'TRIM-WING-RR', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-000000000d01']::uuid[], p_supersedes_rule_id => 'op.131.clutch-wing');
+  PERFORM public.assert(m->>'decision' = 'rejected' AND m->'reasons' ? 'narrowing_reclassifies', 'reclassifying narrowing: ' || m::text);
+  UPDATE public.receipt_line_rules SET status = 'retired', retired_at = now() WHERE rule_id = 'op.950.brace';
+  -- Citing a line the narrowing does not unkey is refused.
+  m := public.receipt_line_rule_propose('op.131.clutch-wing.no-brace-b', 'labor_operation', 131,
+         '^(?!.*\ybrace\y).*\y(clutch kit|wing)\y', 'TRIM-WING-RR', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-000000000d01', '00000000-0000-0000-0000-0000000000c3']::uuid[],
+         p_supersedes_rule_id => 'op.131.clutch-wing');
+  PERFORM public.assert(m->>'decision' = 'rejected' AND m->'reasons' ? 'evidence_line_not_unclassified', 'over-cited narrowing: ' || m::text);
+  -- The exact narrowing is promoted: the brace loses its key, every other line keeps it.
+  m := public.receipt_line_rule_propose('op.131.clutch-wing.no-brace', 'labor_operation', 131,
+         '^(?!.*\ybrace\y).*\y(clutch kit|wing)\y', 'TRIM-WING-RR', 'test', 'test',
+         ARRAY['00000000-0000-0000-0000-000000000d01']::uuid[], p_supersedes_rule_id => 'op.131.clutch-wing');
+  PERFORM public.assert(m->>'decision' = 'promoted' AND m->>'mode' = 'narrowing' AND (m->>'lines_changed')::int = 1
+                        AND (m->>'lines_filled')::int = 0, 'narrowing: ' || m::text);
+  PERFORM public.assert((SELECT status FROM public.receipt_line_rules WHERE rule_id = 'op.131.clutch-wing') = 'retired', 'old rule retired');
+  PERFORM public.assert(NOT EXISTS (SELECT FROM public.receipt_line_rule_hit('labor_operation', 'wing to bumper brace')), 'brace unkeyed');
+  PERFORM public.assert((SELECT output_key FROM public.receipt_line_rule_hit('labor_operation', 'wing mount')) = 'TRIM-WING-RR', 'wing kept');
+  PERFORM public.assert(public.receipt_line_labor_operation('clutch kit') = 'TRIM-WING-RR', 'clutch kept (text wrapper)');
+
+  -- line_kind: a return rule keys the return line and not the core deposit, through the same gate.
+  m := public.receipt_line_rule_propose('line_kind.100.return', 'line_kind', 100, '^(?!.*\mcore\M).*\mreturn', 'return',
+         'test', 'test', ARRAY['00000000-0000-0000-0000-000000000d02']::uuid[]);
+  PERFORM public.assert(m->>'decision' = 'promoted' AND (m->>'lines_filled')::int = 1, 'return rule: ' || m::text);
+  PERFORM public.assert((SELECT line_kind FROM public.receipt_line_rules WHERE rule_id = 'line_kind.100.return') = 'return'
+                        AND (SELECT operation_code IS NULL AND system_key IS NULL FROM public.receipt_line_rules
+                              WHERE rule_id = 'line_kind.100.return'), 'propose wrote line_kind only');
+  PERFORM public.assert((SELECT output_key FROM public.receipt_line_rule_hit('line_kind', 'returned wing mount')) = 'return', 'return keyed');
+  PERFORM public.assert(NOT EXISTS (SELECT FROM public.receipt_line_rule_hit('line_kind', 'core return credit')), 'core not a return');
+  PERFORM public.assert(public.receipt_line_labor_operation('returned wing mount') = 'TRIM-WING-RR', 'operation classifier unaffected');
+  BEGIN
+    INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, line_kind, operation_code, source, proposed_by_agent_key)
+    VALUES ('line_kind.200.bad', 'line_kind', 200, 'x', 'return', 'TRIM-WING-RR', 'test', 'test');
+    RAISE EXCEPTION 'FAIL: line_kind rule with an operation accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, line_kind, source, proposed_by_agent_key)
+    VALUES ('line_kind.201.bad', 'line_kind', 201, 'x', 'refund', 'test', 'test');
+    RAISE EXCEPTION 'FAIL: unknown line_kind accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.receipt_line_rules (rule_id, classifier, priority, pattern, operation_code, line_kind, source, proposed_by_agent_key)
+    VALUES ('op.202.bad', 'labor_operation', 202, 'x', 'TRIM-WING-RR', 'return', 'test', 'test');
+    RAISE EXCEPTION 'FAIL: operation rule carrying a line_kind accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END $$;
 
 \echo 'test_receipt_line_rules: PASS'
