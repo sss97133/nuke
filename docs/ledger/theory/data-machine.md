@@ -865,6 +865,44 @@ successful integration on the iOS that helps me know it's moving forward or stal
 (The elision `[...]` and the omitted messages are remarks about the session itself. `[in]` restores a word the phone
 dropped.)
 
+## The owner's words, 2026-11-24 (typed to the lead during the Trans Am session)
+
+> the system is pattern recognition based, free data first, contextual grouping and intelligence passes in laayers
+> continuous writing and prograammmatic triggering of writes of data along with recursive agentic self improvement of
+> the structuree side
+
+> they should be gated to receive data only from like an image read, or a cited type of documentation, so basically
+> they should be multi key verified, visually, on paper and if theres other docs like receipts, build sheet etc. that
+> would collapse false values because the values can only come from being cited thru the computer vision passes done
+> by an agent. [...] i need keyed rows i need folds i need edges all working in perfect unison
+
+The lead's reading of it, as seven layers. Each names the objects that carry it; the measured state of each is in
+`v_schema_atlas` and `v_job_health`, not here.
+
+1. **Pattern recognition, free data first.** Before a model looks at a photo the system uses what costs nothing:
+   capture time, place, device, album, file hash, neighbouring frames, part numbers, VIN structure, casting formats.
+   They are matched against rule rows (`vehicle_decode_rules`, `receipt_line_rules`, `observation_properties`), never
+   against code.
+2. **Contextual grouping.** Nothing is judged alone. Photos group into capture sets; a set attaches to a car through
+   scored candidate edges and presence; a close-up files only when its neighbours or the car's record explain it;
+   every photo bounds every other car. The outcome is filed, or held with a reason row.
+3. **Intelligence passes in layers.** Paid reading runs only where the free layers left a specific question, each
+   pass narrower than the last (`image_stage_work`: first read, deep reading, keyed values; then one question, one
+   answer, one witness in `evidence_judgment_requests`).
+4. **Continuous writing.** Evidence is added and superseded, never edited. Folds run on a clock and recompute a
+   subject only when its inputs changed.
+5. **Programmatic triggering.** A row landing is the trigger for the next write: a photo queues its own stages, a
+   receipt line gets its operation edge (`receipt_line_edges`), a conflict raises its own question. The gap in the
+   table decides what happens next, not an agent.
+6. **Values are graded.** Text is a mention, one reading is support, cited paper or two independent witnesses
+   establish, and two established values for one exclusive property cannot exist (`data_set_kind_properties`,
+   `data_set_member_grades`, `evidence_class_rank`). Independence is a different reader family or a different
+   physical source; two readings of one object are one witness. Every reader returns the grade with the number.
+7. **Recursive improvement of the structure.** The system measures its own holes as rows (unclassified lines,
+   operations with no book hours, photos no stage closed, cars no witness covers). Agents propose rule rows against
+   them; a proposal goes live only through a gate that measures what it changes; a skeptic re-benches each deploy and
+   files what it finds as the next hole. Schema, rules and checks improve; evidence is never rewritten to fit.
+
 ## Additions, 2026-10-01 (from the owner's phone session of 2026-09-30)
 
 - **The case ledger.** `data-machine-cases.md` beside this card holds the open cases, the extended vocabulary
