@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { Rows, Row, itemLabel, valueText } from '../../kit';
+import { Rows, Row, day, itemLabel, valueText } from '../../kit';
 import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
@@ -95,7 +95,7 @@ function FieldContext({ field, label, value, context, answer, reports, images, r
     <div className="vp-field-context__answer" aria-label={`${label} source`}>{answer}</div>
     {specific.filter(report => report.content?.trim()).slice(0, 2).map(report => <article key={report.id} className="vp-field-context__report">
       {report.content && <p>{report.content}</p>}
-      <small>{(report.source_slug || 'Retained report').replace(/_/g, ' ')}{report.observed_at && <> · {new Date(report.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}</>}</small>
+      <small>{(report.source_slug || 'Retained report').replace(/_/g, ' ')}{report.observed_at && <> · {day(report.observed_at)}</>}</small>
     </article>)}
     {images.length > 0 && <section aria-label={`${value} related photographs`}>
       <h3>Related photographs</h3>
@@ -375,7 +375,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
                     {obs.image_region?.label && <p>Visible region: {obs.image_region.label}</p>}
                     {obs.limitation && <p className="ev-proof-limitation">{obs.limitation}</p>}
                     {obs.reference?.url && /^https:\/\//.test(obs.reference.url) && <a href={`${obs.reference.url}#page=${obs.reference.pdf_page || 1}`} target="_blank" rel="noopener noreferrer">Manufacturer reference · PDF page {obs.reference.pdf_page || 'unknown'} ↗</a>}
-                    <p className="ev-footnote">Agent review · {obs.observed_at ? new Date(obs.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' }) : 'Review time unknown'} · Capture time unknown{obs.agent_model ? ` · ${obs.agent_model}` : ' · Model identifier not recorded'}</p>
+                    <p className="ev-footnote">Agent review · {obs.observed_at ? day(obs.observed_at) : 'Review time unknown'} · Capture time unknown{obs.agent_model ? ` · ${obs.agent_model}` : ' · Model identifier not recorded'}</p>
                   </div>
                 ))}
                 {imageObservations.every(obs => obs.image_id !== image.id) && <p>Legacy recorded image citation. Its observation detail is not available here.</p>}
@@ -484,7 +484,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   // First line of the click: the value, who recorded it and when, or that nothing does.
   const leadClaim = sortedSources[0];
   const leadReport = provenanceCoverageUnavailable(provenance.data) ? undefined : provenance.data?.observations?.[0];
-  const shortDay = (at?: string | null) => at ? new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+  const shortDay = (at?: string | null) => at ? day(at) : null;
   const subject = context?.subject as (Partial<Vehicle> & { is_replica?: boolean | null }) | undefined;
   // A tribute's trim is the record's trim under tribute_badge_rule_v1 (migration 20261110090000): no factory badge.
   const tribute = field === 'trim' && !!subject?.is_replica && !!subject?.trim;

@@ -329,7 +329,7 @@ const ObservationsList: React.FC<ObservationsListProps> = ({ observations, vehic
         const visibleData = publicObservationData(obs.structured_data);
         const isOpen = !!expanded[obs.id];
         const time = obs.observed_at
-          ? new Date(obs.observed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })
+          ? new Date(obs.observed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
           : '—';
         const conf = obs.confidence_score !== null
           ? `${Math.round((obs.confidence_score || 0) * 100)}%`

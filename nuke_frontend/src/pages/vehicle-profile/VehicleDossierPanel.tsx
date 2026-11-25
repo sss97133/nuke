@@ -19,7 +19,7 @@ import { readProfileSourcePage, sourceValueText, physicalRecordedValue, PHYSICAL
   type PhysicalReadingField, type StructuredClaim } from './profileSourceClaims';
 import { currentBidEvidenceAmount } from './auctionEvidenceDisplay';
 import { useProfileRead } from './profileDocument';
-import { ItemList, valueText } from '../../kit';
+import { ItemList, day, valueText } from '../../kit';
 import type { FacetItem, TokenItems } from '../../kit/types';
 import { FIELD_TOKEN } from './hooks/facetImageCitations';
 
@@ -847,7 +847,7 @@ const VehicleDossierPanel: React.FC = () => {
                 let fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
                 if (field === 'sale_price') {
                   const on = priceFacts?.price_as_of
-                    ? new Date(priceFacts.price_as_of).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+                    ? day(priceFacts.price_as_of)
                     : null;
                   displayValue = priceKind && priceFacts ? (priceFacts.price_kind === 'bid'
                     ? currentBidEvidenceAmount(priceFacts, auctionPulse)

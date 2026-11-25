@@ -92,7 +92,7 @@ it.each([10000, 25000, 50000])('preserves the stored range without interpreting 
   expect(host.textContent).toContain('Stored appraisal range: $20k–$30k USD');
   expect(host.textContent).toContain('reported condition: Driver');
   expect(host.textContent).toContain('INPUT COUNT79 reported');
-  expect(host.textContent).toContain('COMPUTED (UTC)Jul 14, 2026');
+  expect(host.textContent).toContain('COMPUTEDJul 14, 2026');
   expect(host.textContent).toContain('Input IDs, count meaning and calibration unavailable. Condition matching unverified.');
   expect(host.textContent).not.toMatch(/what the evidence proves|Evidence read:|BELOW|IN BAND|FRAMES|READ ON/);
   expect(host.querySelector('[style*="vp-brg"], [style*="vp-danger"]')).toBeNull();
@@ -102,7 +102,7 @@ it.each([0, null, undefined])('distinguishes reported input count %s from unavai
   fixture.condition = { descriptor_summary: { as_is_band_usd: [20000, 30000] }, observation_count: count, computed_at: null };
   await mount(null);
   expect(host.textContent).toContain(count === 0 ? 'INPUT COUNT0 reported' : 'INPUT COUNTUnknown');
-  expect(host.textContent).toContain('COMPUTED (UTC)Unknown');
+  expect(host.textContent).toContain('COMPUTEDUnknown');
   expect(host.textContent).not.toContain('Invalid Date');
   expect(host.textContent).not.toContain('1970');
 });
@@ -134,7 +134,7 @@ it.each([
   await mount(null);
   expect(host.textContent).toContain(`Stored appraisal range: ${range} USD`);
   expect(host.textContent).toContain('INPUT COUNT79 reported');
-  expect(host.textContent).toContain('COMPUTED (UTC)Jul 14, 2026');
+  expect(host.textContent).toContain('COMPUTEDJul 14, 2026');
   expect(host.textContent).toContain('Input IDs, count meaning and calibration unavailable. Condition matching unverified.');
 });
 
@@ -195,7 +195,7 @@ it('shows only the current B stored appraisal and preserves its reported qualifi
   expectNoAppraisalA();
   expect(host.textContent).toContain('Stored appraisal range: $40k–$50k USD · reported condition: Restored');
   expect(host.textContent).toContain('INPUT COUNT12 reported');
-  expect(host.textContent).toContain('COMPUTED (UTC)Aug 15, 2026');
+  expect(host.textContent).toContain('COMPUTEDAug 15, 2026');
   expect(host.textContent).toContain('Input IDs, count meaning and calibration unavailable. Condition matching unverified.');
   await renderSubject(subjectB);
   expect(host.textContent).toContain('Stored appraisal range: $40k–$50k USD');
