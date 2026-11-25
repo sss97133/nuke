@@ -36,8 +36,8 @@ process.stdin.on('end', () => {
 });
 `;
 
-async function withStandIns(frameNames, fn, { blocked = [], ledger = true, extraArgs = [] } = {}) {
-  const calls = { receipts: [], lands: [], queries: [] };
+async function withStandIns(frameNames, fn, { blocked = [], ledger = true, extraArgs = [], rereads = null } = {}) {
+  const calls = { receipts: [], lands: [], queries: [], rereads: [] };
   let port;
   const url = (n) => `http://127.0.0.1:${port}/img/${n}`;
   const server = createServer((req, res) => {
@@ -47,6 +47,8 @@ async function withStandIns(frameNames, fn, { blocked = [], ledger = true, extra
       const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body)); };
       const path = decodeURIComponent(req.url);
       if (path.startsWith('/img/')) return path.includes('gone') ? res.writeHead(404).end() : res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+      if (path.startsWith('/rest/v1/receipt_reread_worklist')) { calls.queries.push(path); return rereads ? json(200, rereads(url)) : json(404, { code: 'PGRST205' }); }
+      if (path === '/rest/v1/rpc/receipt_record_reread') { const b = JSON.parse(data); calls.rereads.push(b); return json(200, { stored: true, lines: 0 }); }
       if (path.startsWith('/rest/v1/capture_document_pages_to_land')) return json(200, []);
       if (path.startsWith('/rest/v1/capture_document_pages')) return json(200, [{ image_id: 'z-already-read.jpg' }]);
       if (path.startsWith('/rest/v1/image_stage_current')) {
@@ -136,4 +138,34 @@ test('every read starts lean: no session file, the Read tool scoped to the page\
     assert.equal(claudeArgs[0][claudeArgs[0].indexOf('--model') + 1], 'sonnet', '--model still overrides');
     assert.equal(calls.lands[0].reader, 'claude-cli sonnet subscription');
   }, { extraArgs: ['--model', 'sonnet'] });
+});
+
+test('held receipts: storage and local papers are re-read and stored through the writer; a missing local file is reported', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'reread-local-'));
+  const local = join(dir, 'IMG_1.jpeg'); writeFileSync(local, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+  const rows = (url) => [
+    { receipt_id: 'r-storage', source_kind: 'storage', source: url('IMG_2.jpeg'), file_name: 'IMG_2.jpeg', reason: 'no_lines_held' },
+    { receipt_id: 'r-local', source_kind: 'local', source: local, file_name: 'IMG_1.json', reason: 'held_unreconciled' },
+    { receipt_id: 'r-missing', source_kind: 'local', source: join(dir, 'nope.jpeg'), file_name: 'nope.json', reason: 'no_lines_held' },
+  ];
+  try {
+    await withStandIns([], ({ calls, summary }) => {
+      assert.equal(summary.rereads, 3);
+      assert.equal(summary.reread_stored, 2);
+      assert.equal(summary.reread_errors, 1);
+      assert.equal(summary.error_classes.local_file_missing, 1);
+      assert.deepEqual(calls.rereads.map((c) => c.p_receipt).sort(), ['r-local', 'r-storage']);
+      for (const c of calls.rereads) { assert.equal(c.p_extraction.document_type, 'receipt'); assert.match(c.p_reader, /subscription$/); }
+      assert.ok(calls.queries.some((q) => q.includes('receipt_reread_worklist') && q.includes('user_id=eq.')));
+      assert.equal(calls.lands.length, 0, 'a re-read never lands a new receipt through the frame route');
+    }, { rereads: rows });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('without the work list (view not deployed) the reader runs as before', async () => {
+  await withStandIns(['a.jpg'], ({ summary, calls }) => {
+    assert.equal(summary.rereads, 0);
+    assert.equal(calls.rereads.length, 0);
+    assert.equal(summary.read, 1);
+  });
 });

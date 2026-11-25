@@ -17,7 +17,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { mkdtempSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inputFingerprint, receiptForResult, recordStageReceipt } from './stage-queue.mjs';
@@ -35,6 +35,8 @@ const conc = args.concurrency && args.concurrency !== true ? Number(args.concurr
 // The full model name, not the 'sonnet' alias: an older CLI on the PATH resolved the alias to an older model (2026-11-20).
 const model = args.model && args.model !== true ? String(args.model) : DEFAULT_MODEL;
 const dry = args['dry-run'] === true;
+// Held receipts whose own paper is re-read after the frames (receipt_reread_worklist, 20261124207000).
+const rereadLimit = args.rereads && args.rereads !== true ? Number(args.rereads) : 10;
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 
 const TYPES = ['receipt', 'invoice', 'work_order', 'packing_slip', 'order_confirmation', 'estimate', 'statement', 'alignment_report', 'title', 'registration', 'sale_sheet', 'manual', 'shipping_bill', 'other'];
@@ -97,9 +99,14 @@ async function readFrame(f, dir) {
   const res = await fetch(f.image_url);
   if (!res.ok) throw new Error(`download ${res.status}`);
   writeFileSync(raw, Buffer.from(await res.arrayBuffer()));
+  return readFile(f.id, raw, ext, dir);
+}
+
+// Read one stored page (image or PDF) already in its own directory.
+async function readFile(id, raw, ext, dir) {
   let img = raw;
   if (ext === 'heic' || ext === 'heif') {
-    img = join(dir, `${f.id}.jpg`);
+    img = join(dir, `${id}.jpg`);
     await run('sips', ['-s', 'format', 'jpeg', '-Z', '2200', raw, '--out', img]);
   }
   // Lean start (leanClaudeArgs, as the frame reader's): no CLAUDE.md, memory, plugins, MCP servers or hooks, the one Read
@@ -120,6 +127,26 @@ async function land(f, extraction) {
   const text = await r.text();
   let j; try { j = JSON.parse(text); } catch { j = { error: text.slice(0, 200) }; }
   return { http: r.status, ...j };
+}
+
+// The held receipts' own papers. A storage file is fetched with the service key (the bucket may be private); a local file
+// is read from this Mac's disk. A read the OS refuses is reported as local_file_denied, never retried silently.
+async function rereadList() {
+  if (!(rereadLimit > 0)) return [];
+  try { return await rest(`receipt_reread_worklist?select=receipt_id,source_kind,source,file_name,reason&user_id=eq.${OWNER}&order=receipt_id&limit=${rereadLimit}`); }
+  catch (e) { console.error(`reread work list unavailable: ${String(e.message || e).slice(0, 120)}`); return []; }
+}
+async function rereadBytes(w) {
+  if (w.source_kind === 'storage') {
+    const r = await fetch(w.source, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } });
+    if (!r.ok) throw Object.assign(new Error(`download ${r.status}`), { cls: 'storage_download_failed' });
+    return Buffer.from(await r.arrayBuffer());
+  }
+  try { return readFileSync(w.source); }
+  catch (e) {
+    const cls = e.code === 'EPERM' || e.code === 'EACCES' ? 'local_file_denied' : e.code === 'ENOENT' ? 'local_file_missing' : 'local_file_error';
+    throw Object.assign(new Error(`${cls} ${e.code || ''}`.trim()), { cls });
+  }
 }
 
 const frames = await worklist();
@@ -181,6 +208,31 @@ if (!dry) {
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, conc) }, worker));
+  // Held receipts: read the receipt's own paper and store the reading beside the old one (receipt_record_reread). The
+  // itemise fold (cron :17) then decides again from it; nothing here writes a line.
+  const held = stop ? [] : await rereadList();
+  Object.assign(summary, { rereads: held.length, reread_stored: 0, reread_refused: 0, reread_errors: 0 });
+  for (const w of held) {
+    if (stop) break;
+    const own = realpathSync(mkdtempSync(join(dir, 'paper_')));
+    try {
+      const ext = String(w.source || w.file_name || '').toLowerCase().match(/\.(heic|heif|png|webp|jpe?g|pdf)(?:$|\?)/)?.[1] || 'jpg';
+      const raw = join(own, `${w.receipt_id}.${ext}`);
+      writeFileSync(raw, await rereadBytes(w));
+      const { extraction } = await readFile(w.receipt_id, raw, ext, own);
+      const res = await rpc('receipt_record_reread', { p_receipt: w.receipt_id, p_extraction: extraction, p_reader: `claude-cli ${model} subscription`, p_source: w.source_kind });
+      if (res?.stored) summary.reread_stored++; else summary.reread_refused++;
+      out.push({ receipt_id: w.receipt_id, reread: true, source_kind: w.source_kind, stored: !!res?.stored, reason: res?.reason, lines: res?.lines });
+      console.error(`${w.receipt_id} reread(${w.source_kind}) ${res?.stored ? 'stored ' + res.lines + ' lines' : res?.reason}`);
+    } catch (e) {
+      summary.reread_errors++;
+      const cls = e.cls || (e.apiStatus || e.invalidOutput ? 'reader_error' : 'reread_error');
+      summary.error_classes[cls] = (summary.error_classes[cls] || 0) + 1;
+      if (e.apiStatus === 429 || /limit/i.test(String(e.message))) { stop = true; summary.stopped = 'subscription_limit'; }
+      out.push({ receipt_id: w.receipt_id, reread: true, source_kind: w.source_kind, error: String(e.message || e).slice(0, 200) });
+      console.error(`${w.receipt_id} reread ERROR ${String(e.message || e).slice(0, 160)}`);
+    } finally { rmSync(own, { recursive: true, force: true }); }
+  }
   rmSync(dir, { recursive: true, force: true });
 
   // Pages recorded earlier whose frame now holds a vehicle: the route lands them from the stored page (no read).
