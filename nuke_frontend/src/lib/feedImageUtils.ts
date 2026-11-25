@@ -1,4 +1,5 @@
 import { supabase, SUPABASE_URL } from './supabase';
+import { bucketForStoragePath } from './ownStorage';
 
 /**
  * Image URL normalization for feed cards.
@@ -58,6 +59,10 @@ export const getPublicUrlFromStoragePath = (storagePath: any): string | null => 
   const path = String(storagePath).replace(/^\/+/, '').trim();
   if (!path) return null;
 
+  // A user's own upload (users/<uid>/…, web and iOS) is in vehicle-photos; a paper has no public URL.
+  const known = bucketForStoragePath(path);
+  if (known === 'vehicle-photos') return supabase.storage.from(known).getPublicUrl(path).data?.publicUrl || null;
+  if (known === 'user-documents') return null;
   const preferBucket = path.startsWith('vehicles/') ? 'vehicle-data' : 'vehicle-images';
   const altBucket = preferBucket === 'vehicle-data' ? 'vehicle-images' : 'vehicle-data';
 
