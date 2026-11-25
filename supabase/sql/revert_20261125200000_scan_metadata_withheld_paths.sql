@@ -248,12 +248,21 @@ AS $function$
      OR public.vehicle_viewer_tied(vi.vehicle_id));
 $function$;
 
+DROP FUNCTION IF EXISTS public.vehicle_image_scan_metadata(uuid);
 DROP FUNCTION IF EXISTS public.image_scan_text_path_gaps(jsonb, integer, text);
 DROP FUNCTION IF EXISTS public.image_scan_metadata_for_viewer(jsonb, uuid, uuid);
 DROP FUNCTION IF EXISTS public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[]);
+DROP TABLE IF EXISTS public.image_scan_rules_compiled;
+DROP TABLE IF EXISTS public.image_scan_withheld_paths;
+DROP FUNCTION IF EXISTS public.image_scan_rules_recompile_trg();
+DROP FUNCTION IF EXISTS public.image_scan_rules_compile();
 DROP FUNCTION IF EXISTS public.image_scan_rules(text);
 DROP TYPE IF EXISTS public.image_scan_rule;
-DROP TABLE IF EXISTS public.image_scan_withheld_paths;
+DO $r$ BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    EXECUTE $d$DELETE FROM public.private_row_policy_copies WHERE reader = 'vehicle_image_scan_metadata(uuid)'$d$;
+  END IF;
+END $r$;
 
 DO $verify$
 BEGIN

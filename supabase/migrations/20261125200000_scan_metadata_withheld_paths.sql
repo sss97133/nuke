@@ -29,35 +29,48 @@
 --      any string that survives, by [withheld] (letters and digits in order, spaces and dashes between, either case,
 --      at least min_alnum 4 of them, the threshold image_privacy_rules already uses for plates; plates in a 0.05% sample
 --      ran 5 to 11); reviewed_keep: a long-string path read and kept.
---   2. image_scan_rules(surface): the rows that apply to this request, read once per statement (an InitPlan in the view),
---      the removals as a tree so a photo is rewritten once per level it touches.
---   3. image_scan_metadata_for_viewer(meta, uploader, vehicle, rules): meta unchanged for service_role, a direct
---      database session (no request claims, not PostgREST's authenticator: the idiom of vehicle_image_privacy_withheld),
---      the photo's uploader, or a caller tied to its vehicle (vehicle_viewer_tied, looked up only for a row the rules
---      change); otherwise the rules applied. A plate redaction that would break the JSON text withholds the whole
---      analysis. COST 1, so a whole-row use of the view (vehicle_image_gallery_eligible(vehicle_images_public), the #3868
---      policies) still inlines and never calls it. A 3-argument form reads the rules itself, for single-photo readers.
---      The helper is executable by anon (the view runs as the caller), so a caller can pass their own text and learn
---      whether it equals the car's plate; the plate is printed on the car in its own photos, so the value rule is
---      limited to license_plate (the CHECK and the helper both), and the photo-id reader below closes it.
+--   2. image_scan_rules(surface): the rows of a surface as one array, the removals as a tree so a photo is rewritten
+--      once per level it touches (vehicle_value rows included; the worker skips one whose column the request role may
+--      select). image_scan_rules_compiled holds that array per surface, recompiled by a statement trigger on the rule
+--      table, so a reader takes it with one key lookup instead of rebuilding it per photo. Both service_role only.
+--   3. image_scan_metadata_for_viewer(meta, uploader, vehicle, rules), the worker, INTERNAL: EXECUTE revoked from PUBLIC,
+--      anon and authenticated, both forms. A function that takes a document and a vehicle id from its caller and answers
+--      with or without [withheld] is an oracle for that car's plate (guess a plate, see whether it is replaced), so no
+--      anon- or authenticated-executable function takes scan text, a jsonb document or a rule array. It returns meta
+--      unchanged for service_role, a direct database session (no request claims, not PostgREST's authenticator: the
+--      idiom of vehicle_image_privacy_withheld), the photo's uploader, or a caller tied to its vehicle
+--      (vehicle_viewer_tied, looked up only for a row the rules change); otherwise the rules applied. A plate redaction
+--      that would break the JSON text withholds the whole analysis. The plate scan has no early exit: a car with no
+--      plate on file runs the same serialisation and regex over a decoy that jsonb text never contains, so the time
+--      taken does not say whether a plate is on file. The plate pattern also matches after a JSON escape (\n, \t, ...)
+--      and with spaces, dashes, slashes, dots or escaped newlines and tabs between its characters.
+--   3b. vehicle_image_scan_metadata(image_id), the callable surface (SECURITY DEFINER, search_path pg_catalog, public;
+--      anon, authenticated, service_role): reads the photo's row and metadata itself, re-checks the shown-photo test
+--      (definer_readers_visibility_v1: shown on a public, non-deleted car and gallery-eligible by the vehicle_images
+--      overload, or the caller uploaded it, or the caller is tied; each term COALESCEd) and returns NULL when it fails,
+--      then applies the worker with the compiled rules. It restates the vehicle_images read policy, so the copy is
+--      registered in private_row_policy_copies. COST 1, so a whole-row use of the view still inlines and never calls it.
+--      Cost of the re-check, read-only on prod 2026-11-25 (claims anon, a 481-photo public car): the gallery test per
+--      photo took 279 ms over the 481 rows, almost all of it vehicle_image_privacy_withheld (274 ms with the row fetch);
+--      on PG17 the 468-row fixture gallery with the column projected went from 36 to 94 ms (anon) and 47 to 106 ms (a
+--      signed-in stranger); a whole-row gallery test alone never calls it.
 --   4. image_scan_text_path_gaps(meta, 40): long strings no rule covers, service_role only, for the hourly probe. 40: in
 --      the string-leaf census (0.03% sample) every label, enum, id and timestamp path tops out at 40 characters while
 --      model sentences run longer (classification.description p90 107, agent_notes p90 161); three 3,000-row prod
 --      samples on 2026-11-25 held 1,481 to 1,753 long strings, 0 uncovered.
 --   5. CREATE OR REPLACE VIEW vehicle_images_public: the live column list, names, order and types unchanged,
---      security_invoker kept; ai_scan_metadata is the helper's result, computed once per row (lateral). No DDL on
---      vehicle_images.
---   6. vehicle_image_findings reads vehicle_images_public and states the gallery test; get_image_deep_analysis reads
---      byok_deep_analysis through the helper (place_hint, notes, questions, narrative and damage text withheld from an
---      untied caller; the uploader and a tied caller unchanged).
+--      security_invoker kept; ai_scan_metadata is vehicle_image_scan_metadata(vi.id), once per row (lateral). The view no
+--      longer names vi.ai_scan_metadata. No DDL on vehicle_images.
+--   6. vehicle_image_findings reads vehicle_images_public and states the gallery test; get_image_deep_analysis
+--      (SECURITY DEFINER) reads byok_deep_analysis through the worker (place_hint, notes, questions, narrative and damage
+--      text withheld from an untied caller; the uploader and a tied caller unchanged).
 --
 -- Not in this migration (named in the PR): the table itself still serves the raw jsonb. anon holds a column grant on
 -- vehicle_images.ai_scan_metadata and authenticated holds table SELECT, and logged-out pages (the lightbox, the
--- analysis stream) select it from the table. The grant cannot simply be revoked: this view is security_invoker and
--- reads vi.ai_scan_metadata, so without the grant anon's read of the view fails 42501 (checked on PG17). Closing the
--- table path needs the helper to read the jsonb itself by photo id (SECURITY DEFINER), so the view no longer names the
--- column; then those pages move to the view, then the grant is revoked. The same deep verdict is copied into
--- vehicle_observations.structured_data (image_deep_byok), which anon also reads; that is a table and gets its own fix.
+-- analysis stream) select it from the table. Since the view now reads the jsonb through the id-keyed definer function,
+-- the grant can be revoked once those pages read the view (order: this migration live, the web move merged and live,
+-- then the revoke). The same deep verdict is copied into vehicle_observations.structured_data (image_deep_byok), which
+-- anon also reads; that is a table and gets its own fix.
 
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -232,19 +245,65 @@ AS $function$
     SELECT row_number() OVER (ORDER BY (r.rule_kind = 'vehicle_value'), r.path, r.match_key, r.match_value) AS i,
            ROW(r.rule_kind, r.path, '{}'::text[], 0, r.match_key, r.match_value, r.min_alnum)::public.image_scan_rule AS rule
       FROM public.image_scan_withheld_paths r
-     WHERE r.surface = p_surface
-       AND (r.rule_kind = 'array_element'
-            OR (r.rule_kind = 'vehicle_value'
-                AND NOT has_column_privilege((SELECT CASE auth.role() WHEN 'authenticated' THEN 'authenticated' ELSE 'anon' END),
-                                             'public.vehicles', r.match_key, 'SELECT')))
+     WHERE r.surface = p_surface AND r.rule_kind IN ('array_element', 'vehicle_value')
   )
   SELECT coalesce((SELECT array_agg(t.rule ORDER BY t.i) FROM tree t), '{}')
          || coalesce((SELECT array_agg(o.rule ORDER BY o.i) FROM other o), '{}')
 $function$;
-REVOKE ALL ON FUNCTION public.image_scan_rules(text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.image_scan_rules(text) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.image_scan_rules(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.image_scan_rules(text) TO service_role;
 COMMENT ON FUNCTION public.image_scan_rules(text) IS
-  'The image_scan_withheld_paths rows that apply to this request (reviewed_keep left out; vehicle_value only for columns the request role cannot select), vehicle_value last. Read once per statement by vehicle_images_public.';
+  'The image_scan_withheld_paths rows of a surface as one array (reviewed_keep left out), removals as a tree, vehicle_value last. Compiled into image_scan_rules_compiled by the rule table''s trigger.';
+
+-- The compiled rules: one row per surface, rebuilt whenever the rule table changes (statement trigger).
+CREATE TABLE IF NOT EXISTS public.image_scan_rules_compiled (
+  surface text PRIMARY KEY CHECK (surface IN ('vehicle_images.ai_scan_metadata', 'vehicle_observations.structured_data')),
+  rules public.image_scan_rule[] NOT NULL,
+  rule_rows integer NOT NULL,
+  compiled_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.image_scan_rules_compiled ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.image_scan_rules_compiled FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.image_scan_rules_compiled TO service_role;
+COMMENT ON TABLE public.image_scan_rules_compiled IS
+  'image_scan_rules(surface) per surface, rebuilt by the image_scan_withheld_paths statement trigger (grain: one surface). Read by vehicle_image_scan_metadata so the rules are one key lookup per photo. Written only by image_scan_rules_compile().';
+
+CREATE OR REPLACE FUNCTION public.image_scan_rules_compile()
+RETURNS integer
+LANGUAGE sql
+VOLATILE SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public'
+AS $function$
+  WITH s(surface) AS (VALUES ('vehicle_images.ai_scan_metadata'), ('vehicle_observations.structured_data')),
+  up AS (
+    INSERT INTO public.image_scan_rules_compiled (surface, rules, rule_rows, compiled_at)
+    SELECT s.surface, public.image_scan_rules(s.surface),
+           (SELECT count(*) FROM public.image_scan_withheld_paths w WHERE w.surface = s.surface), now()
+      FROM s
+    ON CONFLICT (surface) DO UPDATE SET rules = EXCLUDED.rules, rule_rows = EXCLUDED.rule_rows, compiled_at = EXCLUDED.compiled_at
+    RETURNING 1)
+  SELECT count(*)::integer FROM up
+$function$;
+REVOKE ALL ON FUNCTION public.image_scan_rules_compile() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.image_scan_rules_compile() TO service_role;
+
+CREATE OR REPLACE FUNCTION public.image_scan_rules_recompile_trg()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public'
+AS $function$
+BEGIN
+  PERFORM public.image_scan_rules_compile();
+  RETURN NULL;
+END
+$function$;
+REVOKE ALL ON FUNCTION public.image_scan_rules_recompile_trg() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS image_scan_withheld_paths_recompile ON public.image_scan_withheld_paths;
+CREATE TRIGGER image_scan_withheld_paths_recompile
+  AFTER INSERT OR UPDATE OR DELETE OR TRUNCATE ON public.image_scan_withheld_paths
+  FOR EACH STATEMENT EXECUTE FUNCTION public.image_scan_rules_recompile_trg();
+SELECT public.image_scan_rules_compile();
 
 CREATE OR REPLACE FUNCTION public.image_scan_metadata_for_viewer(p_meta jsonb, p_user_id uuid, p_vehicle_id uuid, p_rules public.image_scan_rule[])
 RETURNS jsonb
@@ -274,6 +333,7 @@ DECLARE
   v_x jsonb;
   v_pat text;
   v_ch text;
+  v_real boolean;
 BEGIN
   IF p_meta IS NULL OR jsonb_typeof(p_meta) <> 'object' OR p_rules IS NULL THEN
     RETURN p_meta;
@@ -342,6 +402,9 @@ BEGIN
         v_hit := true;
       END IF;
     ELSIF r.kind = 'vehicle_value' THEN
+      -- a vehicles column the request role may select is not withheld (role mapping as in #3926)
+      CONTINUE WHEN has_column_privilege(CASE v_role WHEN 'authenticated' THEN 'authenticated' ELSE 'anon' END,
+                                         'public.vehicles', r.match_key, 'SELECT');
       IF NOT v_veh_read THEN
         SELECT v.license_plate INTO v_plate FROM public.vehicles v WHERE v.id = p_vehicle_id;
         v_veh_read := true;
@@ -349,22 +412,28 @@ BEGIN
       -- license_plate only, whatever the caller passed as rules (see the table's CHECK)
       v_val := CASE r.match_key WHEN 'license_plate' THEN v_plate END;
       v_alnum := regexp_replace(upper(coalesce(v_val, '')), '[^A-Z0-9]', '', 'g');
-      IF length(v_alnum) >= coalesce(r.min_alnum, 4) THEN
-        v_base := coalesce(v_txt, v_base, v_out::text);
-        -- the value's letters and digits in order, spaces or dashes allowed between them, either case (spelled as
-        -- [Xx] classes: the 'i' flag ran 4x slower on a 4.7 KB verdict), not inside a longer token and not right after
-        -- a backslash (a JSON escape)
-        v_pat := '';
-        FOR v_i IN 1 .. length(v_alnum) LOOP
-          v_ch := substr(v_alnum, v_i, 1);
-          v_pat := v_pat || CASE WHEN v_i > 1 THEN '[\s-]*' ELSE '' END
-                         || CASE WHEN v_ch BETWEEN 'A' AND 'Z' THEN '[' || v_ch || lower(v_ch) || ']' ELSE v_ch END;
-        END LOOP;
-        v_new := regexp_replace(v_base, '(?<![[:alnum:]\\])' || v_pat || '(?![[:alnum:]])', '[withheld]', 'g');
-        IF v_new <> v_base THEN
-          v_txt := v_new;
-          v_hit := true;
-        END IF;
+      -- No early exit: with no plate on file (or one shorter than min_alnum) the same serialisation and regex run over
+      -- a decoy of seven U+0001 characters, which jsonb text output never holds (it escapes control characters), so
+      -- the time taken does not say whether a plate is on file.
+      v_real := length(v_alnum) >= coalesce(r.min_alnum, 4);
+      IF NOT v_real THEN
+        v_alnum := repeat(chr(1), 7);
+      END IF;
+      v_base := coalesce(v_txt, v_base, v_out::text);
+      -- the value's letters and digits in order, either case (spelled as [Xx] classes: the 'i' flag ran 4x slower on a
+      -- 4.7 KB verdict), with spaces, dashes, slashes, dots or an escaped newline or tab between them; not inside a
+      -- longer token; after the start, a non-word character other than a backslash, or a JSON escape (\n, \t, ...),
+      -- which is captured and put back
+      v_pat := '';
+      FOR v_i IN 1 .. length(v_alnum) LOOP
+        v_ch := substr(v_alnum, v_i, 1);
+        v_pat := v_pat || CASE WHEN v_i > 1 THEN '(?:[\s./-]|\\[nt])*' ELSE '' END
+                       || CASE WHEN v_ch BETWEEN 'A' AND 'Z' THEN '[' || v_ch || lower(v_ch) || ']' ELSE v_ch END;
+      END LOOP;
+      v_new := regexp_replace(v_base, '(^|[^[:alnum:]\\]|\\[bfnrt])' || v_pat || '(?![[:alnum:]])', '\1[withheld]', 'g');
+      IF v_new <> v_base AND v_real THEN
+        v_txt := v_new;
+        v_hit := true;
       END IF;
     END IF;
   END LOOP;
@@ -385,10 +454,11 @@ BEGIN
   RETURN v_out;
 END
 $function$;
-REVOKE ALL ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[]) TO anon, authenticated, service_role;
+-- Internal: a caller-supplied document would make it a plate oracle.
+REVOKE ALL ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[]) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[]) TO service_role;
 COMMENT ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[]) IS
-  'A photo''s ai_scan_metadata as the caller may read it, under the given rules (image_scan_rules): unchanged for service_role, a direct database session, the uploader (p_user_id) or a caller tied to the vehicle; otherwise path and free_text values removed, matching array elements dropped and the car''s private vehicles values replaced by [withheld]. COST 1 so whole-row uses of vehicle_images_public keep inlining.';
+  'Internal (not executable by anon or authenticated). A photo''s ai_scan_metadata as the caller may read it, under the given rules (image_scan_rules): unchanged for service_role, a direct database session, the uploader (p_user_id) or a caller tied to the vehicle; otherwise path and free_text values removed, matching array elements dropped and the car''s private vehicles values replaced by [withheld]. Reached by anon and authenticated only through vehicle_image_scan_metadata(image_id) and get_image_deep_analysis.';
 
 CREATE OR REPLACE FUNCTION public.image_scan_metadata_for_viewer(p_meta jsonb, p_user_id uuid, p_vehicle_id uuid)
 RETURNS jsonb
@@ -398,10 +468,62 @@ SET search_path TO 'pg_catalog', 'public'
 AS $function$
   SELECT public.image_scan_metadata_for_viewer(p_meta, p_user_id, p_vehicle_id, public.image_scan_rules('vehicle_images.ai_scan_metadata'))
 $function$;
-REVOKE ALL ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid) TO service_role;
 COMMENT ON FUNCTION public.image_scan_metadata_for_viewer(jsonb, uuid, uuid) IS
-  'One photo''s ai_scan_metadata as the caller may read it, reading the rules itself (for single-photo readers such as get_image_deep_analysis).';
+  'Internal. One photo''s ai_scan_metadata as the caller may read it, reading the rules itself (for definer readers such as get_image_deep_analysis).';
+
+-- The callable surface: keyed by photo id, reads the metadata itself, re-checks the shown-photo test.
+CREATE OR REPLACE FUNCTION public.vehicle_image_scan_metadata(p_image_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER COST 1
+SET search_path TO 'pg_catalog', 'public'
+AS $function$
+DECLARE
+  vi public.vehicle_images;
+  v_role text := auth.role();
+  v_uid uuid := auth.uid();
+  v_rules public.image_scan_rule[];
+BEGIN
+  SELECT * INTO vi FROM public.vehicle_images i WHERE i.id = p_image_id;
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+  IF v_role = 'service_role' OR (v_role IS NULL AND session_user <> 'authenticator') THEN
+    RETURN vi.ai_scan_metadata;
+  END IF;
+  -- definer_readers_visibility_v1 (scan_metadata_withheld_paths): the uploader, or shown on a public non-deleted car
+  -- and gallery-eligible, or tied; every term COALESCEd so a NULL never admits
+  IF NOT (COALESCE(v_uid IS NOT NULL AND vi.user_id = v_uid, false)
+          OR COALESCE(COALESCE(vi.is_sensitive, false) = false
+                      AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vi.vehicle_id AND v.is_public = true AND v.deleted_at IS NULL)
+                      AND public.vehicle_image_gallery_eligible(vi), false)
+          OR COALESCE(public.vehicle_viewer_tied(vi.vehicle_id), false)) THEN
+    RETURN NULL;
+  END IF;
+  SELECT c.rules INTO v_rules FROM public.image_scan_rules_compiled c WHERE c.surface = 'vehicle_images.ai_scan_metadata';
+  IF v_rules IS NULL THEN
+    v_rules := public.image_scan_rules('vehicle_images.ai_scan_metadata');
+  END IF;
+  RETURN public.image_scan_metadata_for_viewer(vi.ai_scan_metadata, vi.user_id, vi.vehicle_id, v_rules);
+END
+$function$;
+REVOKE ALL ON FUNCTION public.vehicle_image_scan_metadata(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.vehicle_image_scan_metadata(uuid) TO anon, authenticated, service_role;
+COMMENT ON FUNCTION public.vehicle_image_scan_metadata(uuid) IS
+  'One photo''s ai_scan_metadata as the caller may read it, by photo id: NULL unless the caller may see the photo (shown on a public, non-deleted car and gallery-eligible, or the uploader, or tied); then withheld paths removed for an untied caller. Takes no document from the caller. ai_scan_metadata of vehicle_images_public.';
+
+DO $reg$
+BEGIN
+  IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    EXECUTE $i$INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
+      VALUES ('vehicle_image_scan_metadata(uuid)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')',
+              '3af9ebbc1bebf423e3bd1e0b7c45a194', 'ta-policies',
+              '20261125200000 restates the vehicle_images read policy (shown, uploader, tied) before returning a photo''s analysis')
+      ON CONFLICT (reader, relation, policy_filter) DO NOTHING$i$;
+  END IF;
+END $reg$;
 
 -- Long strings that no rule covers: the check that a new model-written text path gets a rule row. A string leaf longer
 -- than p_min_len whose path (array steps as []) has no path, free_text or reviewed_keep rule as a prefix. 40: in the
@@ -600,8 +722,7 @@ CREATE OR REPLACE VIEW public.vehicle_images_public WITH (security_invoker = tru
     vi.ai_retry_count,
     vi.image_identity_id
    FROM public.vehicle_images vi
-     CROSS JOIN LATERAL (SELECT public.image_scan_metadata_for_viewer(vi.ai_scan_metadata, vi.user_id, vi.vehicle_id,
-       (SELECT public.image_scan_rules('vehicle_images.ai_scan_metadata'))) AS ai_scan_metadata OFFSET 0) s;
+     CROSS JOIN LATERAL (SELECT public.vehicle_image_scan_metadata(vi.id) AS ai_scan_metadata OFFSET 0) s;
 
 
 -- vehicle_image_findings: the same {total, rows} shape and keys, read from the view (rule paths removed for untied
@@ -728,8 +849,24 @@ BEGIN
     RAISE EXCEPTION 'image_scan_withheld_paths is missing rule rows';
   END IF;
   IF NOT (SELECT prosecdef AND procost = 1 AND provolatile = 's' FROM pg_proc
-            WHERE oid = 'public.image_scan_metadata_for_viewer(jsonb,uuid,uuid,public.image_scan_rule[])'::regprocedure) THEN
-    RAISE EXCEPTION 'image_scan_metadata_for_viewer is not SECURITY DEFINER, STABLE, COST 1';
+            WHERE oid = 'public.vehicle_image_scan_metadata(uuid)'::regprocedure)
+     OR NOT has_function_privilege('anon', 'public.vehicle_image_scan_metadata(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'vehicle_image_scan_metadata is not SECURITY DEFINER, STABLE, COST 1, anon-executable';
+  END IF;
+  -- no anon- or authenticated-executable function takes a document, scan text or rules and reaches the worker
+  IF EXISTS (SELECT 1 FROM pg_proc p, unnest(ARRAY['anon', 'authenticated']) r(role)
+              WHERE p.pronamespace = 'public'::regnamespace
+                AND (p.proname IN ('image_scan_metadata_for_viewer', 'image_scan_rules', 'image_scan_rules_compile')
+                     OR p.prosrc LIKE '%image_scan_metadata_for_viewer%')
+                AND has_function_privilege(r.role, p.oid, 'EXECUTE')
+                AND EXISTS (SELECT 1 FROM unnest(p.proargtypes::oid[]) t
+                             WHERE t IN ('jsonb'::regtype, 'json'::regtype, 'text'::regtype, 'public.image_scan_rule[]'::regtype))) THEN
+    RAISE EXCEPTION 'an anon- or authenticated-executable function takes a document or rules and reaches the worker';
+  END IF;
+  IF position('vehicle_image_scan_metadata(vi.id)' IN pg_get_viewdef('public.vehicle_images_public'::regclass)) = 0
+     OR position('ai_scan_metadata, vi.user_id' IN pg_get_viewdef('public.vehicle_images_public'::regclass)) > 0
+     OR NOT EXISTS (SELECT 1 FROM public.image_scan_rules_compiled WHERE surface = 'vehicle_images.ai_scan_metadata' AND cardinality(rules) > 0) THEN
+    RAISE EXCEPTION 'vehicle_images_public does not read through vehicle_image_scan_metadata, or the rules are not compiled';
   END IF;
   IF NOT has_function_privilege('anon', 'public.vehicle_image_findings(uuid)', 'EXECUTE')
      OR NOT has_function_privilege('authenticated', 'public.vehicle_image_findings(uuid)', 'EXECUTE')
