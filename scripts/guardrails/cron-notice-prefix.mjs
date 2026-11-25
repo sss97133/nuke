@@ -11,13 +11,15 @@
 //
 // A command can raise a notice when it, or a public function it calls (up to three levels, using the newest
 // definition in supabase/migrations), contains DDL with IF [NOT] EXISTS, ADD COLUMN IF NOT EXISTS or
-// RAISE NOTICE / WARNING / INFO. Advisory: prints WARN lines and exits 0.
+// RAISE NOTICE / WARNING / INFO. Blocking since 20261125060000 cleared the live list (v_cron_notice_risk = 0): prints
+// WARN lines and exits 1; exit 2 when no base revision is found. Exception, for a command whose notices are wanted:
+// -- guardrail-allow(cron-notice): <first called function>: <reason of 12+ characters>
 //
 //   node scripts/guardrails/cron-notice-prefix.mjs [--base <rev> | --files a.sql b.sql] [--json]
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { addedMigrations } from "./no-raw-testimony-insert.mjs";
+import { addedMigrations, allowMarkers } from "./no-raw-testimony-insert.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MIG = path.join(REPO, "supabase", "migrations");
@@ -128,25 +130,27 @@ export function noticePath(command, idx, depth = 3) {
 }
 
 export function warnings(sql, idx) {
+  const allowed = allowMarkers(sql).get("cron-notice") || new Set();
   return cronCommands(sql)
     .filter((c) => statementCount(c.command) > 1 && !PREFIX_RE.test(c.command))
     .map((c) => ({ ...c, path: noticePath(c.command, idx) }))
-    .filter((c) => c.path.length);
+    .filter((c) => c.path.length && !allowed.has(c.path[0].split(":")[0]));
 }
 
 function main(argv) {
   const files = addedMigrations(argv);
-  if (!files) { console.error("cron-notice-prefix: could not find the base revision (fetch origin/main, or pass --base <rev>)"); process.exit(0); }
+  if (!files) { console.error("cron-notice-prefix: could not find the base revision (fetch origin/main, or pass --base <rev>)"); process.exit(2); }
   const idx = functionIndex();
   const hits = [];
   for (const f of files) {
     const abs = path.isAbsolute(f) ? f : path.join(REPO, f);
     for (const w of warnings(fs.readFileSync(abs, "utf8"), idx)) hits.push({ file: f, ...w });
   }
-  if (argv.includes("--json")) { console.log(JSON.stringify({ files: files.length, hits }, null, 2)); return; }
+  if (argv.includes("--json")) { console.log(JSON.stringify({ files: files.length, hits }, null, 2)); process.exit(hits.length ? 1 : 0); }
   for (const h of hits) {
     console.log(`WARN  ${h.file}:${h.line}  ${h.via} command of ${statementCount(h.command)} statements can raise a notice (${h.path.join(" > ")}); begin it with SET client_min_messages = error;`);
   }
+  if (hits.length) process.exit(1);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) main(process.argv.slice(2));

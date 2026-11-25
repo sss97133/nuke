@@ -141,9 +141,7 @@ keys_gate "no added migration ratifies vocabulary without a proposal or adds an 
 counts_warn="$(node "$GD/no-pii-exposure.mjs" --counts 2>/dev/null | grep -c '^WARN' || true)"
 if [ "${counts_warn:-0}" -gt 0 ]; then ylw "  • ungraded public counts: $counts_warn (advisory: no-pii-exposure.mjs --counts)"; node "$GD/no-pii-exposure.mjs" --counts 2>/dev/null | grep '^WARN' | sed 's/^/    /'
 else grn "  ✓ no added public reader counts memberships without a grade (advisory)"; fi
-cron_warn="$(node "$GD/cron-notice-prefix.mjs" 2>/dev/null | grep -c '^WARN' || true)"
-if [ "${cron_warn:-0}" -gt 0 ]; then ylw "  • cron commands that can stall the pg_cron launcher: $cron_warn (advisory: cron-notice-prefix.mjs)"; node "$GD/cron-notice-prefix.mjs" 2>/dev/null | grep '^WARN' | sed 's/^/    /'
-else grn "  ✓ no added cron command can raise a notice mid-run without the client_min_messages prefix (advisory)"; fi
+keys_gate "no added cron command can raise a notice mid-run without the client_min_messages prefix (cron-notice-prefix)" node "$GD/cron-notice-prefix.mjs"
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
 ratchet "raw-fetch"        "$(count_rawfetch)"  "$(b no-raw-fetch violations)"
 ratchet "testimony-insert" "$(count_testimony)" "$(b no-raw-testimony-insert violations)"
