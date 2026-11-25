@@ -130,9 +130,26 @@ final class LaborAppraisalTests: XCTestCase {
         computedNow.state = .init(fresh: true, computed: true, label: nil, basis: "computed_now", stored_at: "2026-11-24T10:00:00+00:00")
         XCTAssertNil(LaborWords.foldState(computedNow))
         var unlabelledStale = try appraisal()
-        unlabelledStale.state = .init(fresh: false, computed: true)
+        unlabelledStale.state = .init(fresh: false, computed: true, labelSent: true)
         XCTAssertNil(LaborWords.foldState(unlabelledStale))
         XCTAssertNil(LaborWords.foldState(try appraisal()))
+    }
+
+    func testLiveReaderShapeWithNoLabelKey() throws {
+        let zone = ProfileClock.timeZone
+        defer { ProfileClock.timeZone = zone }
+        ProfileClock.timeZone = TimeZone(identifier: "UTC")!
+        // Verbatim shape of the live vehicle_labor_appraisal (labor_fold_v1) for an in-scope car with no stored read.
+        let live = try decode(#"{"vehicle_id":"v","status":"not_yet_computed","segments":[],"state":{"fresh":false,"computed":false,"error":null}}"#)
+        XCTAssertFalse(live.state?.labelSent ?? true)
+        XCTAssertEqual(LaborWords.foldState(live)?.lowercased(), "not yet computed")
+        let nullLabel = try decode(#"{"vehicle_id":"v","status":"ok","segments":[],"state":{"fresh":false,"computed":true,"label":null}}"#)
+        XCTAssertTrue(nullLabel.state?.labelSent ?? false)
+        XCTAssertNil(LaborWords.foldState(nullLabel))
+        var stale = try appraisal()
+        stale.as_of = "2026-11-25T18:00:00+00:00"
+        stale.state = .init(fresh: false, computed: true, key_current: true, queued: true)
+        XCTAssertEqual(LaborWords.foldState(stale), "As of Nov 25, 2026, recomputing")
     }
 
     func testBasisInTheReadersWordsElseTheKey() {

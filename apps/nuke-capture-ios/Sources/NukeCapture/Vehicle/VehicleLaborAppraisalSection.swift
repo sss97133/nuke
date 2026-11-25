@@ -131,6 +131,28 @@ struct LaborAppraisal: Decodable, Equatable {
         /// "stored" (a fresh fold), "computed_now" (computed at read; the stored row's time in stored_at), nil.
         var basis: String?
         var stored_at: String?
+        /// The reader sent a label key (even null). The live labor_fold_v1 reader sends none; #3947's does.
+        var labelSent: Bool = false
+    }
+}
+
+extension LaborAppraisal.FoldState {
+    private enum Keys: String, CodingKey {
+        case fresh, computed, computed_at, evidence_changed_at, key_current, queued, error, label, basis, stored_at
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        fresh = try c.decodeIfPresent(Bool.self, forKey: .fresh)
+        computed = try c.decodeIfPresent(Bool.self, forKey: .computed)
+        computed_at = try c.decodeIfPresent(String.self, forKey: .computed_at)
+        evidence_changed_at = try c.decodeIfPresent(String.self, forKey: .evidence_changed_at)
+        key_current = try c.decodeIfPresent(Bool.self, forKey: .key_current)
+        queued = try c.decodeIfPresent(Bool.self, forKey: .queued)
+        error = try c.decodeIfPresent(String.self, forKey: .error)
+        label = try c.decodeIfPresent(String.self, forKey: .label)
+        basis = try c.decodeIfPresent(String.self, forKey: .basis)
+        stored_at = try c.decodeIfPresent(String.self, forKey: .stored_at)
+        labelSent = c.contains(.label)
     }
 }
 
@@ -291,10 +313,19 @@ enum LaborWords {
 
     /// The stored fold's state in the reader's words (state.label), or nil when it sends none. The page adds only the
     /// date to "recomputing": "As of Nov 25, 2026, recomputing", so a stored read is never shown as current.
+    /// A reader with no label key yet (the live labor_fold_v1 shape, before #3947) is read by its own keys: status
+    /// not_yet_computed prints as that status, and a computed read that is not fresh prints as recomputing.
     static func foldState(_ a: LaborAppraisal) -> String? {
-        guard let label = a.state?.label, !label.isEmpty else { return nil }
-        guard label == "recomputing" else { return label }
-        return ProfileClock.day(a.as_of ?? a.state?.computed_at).map { "As of \($0), \(label)" } ?? label
+        let recomputing = { (label: String) -> String in
+            ProfileClock.day(a.as_of ?? a.state?.computed_at).map { "As of \($0), \(label)" } ?? label
+        }
+        if let st = a.state, st.labelSent || st.label != nil {
+            guard let label = st.label, !label.isEmpty else { return nil }
+            return label == "recomputing" ? recomputing(label) : label
+        }
+        if a.status == "not_yet_computed" { return ItemText.codeText("not_yet_computed") }
+        if a.state?.computed == true && a.state?.fresh == false { return recomputing("recomputing") }
+        return nil
     }
 
     /// No stored read yet: the reader returned no segments and says so in its status.

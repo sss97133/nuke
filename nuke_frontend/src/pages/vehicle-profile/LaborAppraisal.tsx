@@ -148,13 +148,21 @@ export function SegmentRows({ segment, names }: { segment: LaborSegment; names?:
 }
 
 /** The stored fold's state in the reader's words (state.label), or null when it sends none. The page adds only the date
- *  to 'recomputing': "As of Nov 25, 2026, recomputing", so a stored read is never shown as current. */
+ *  to 'recomputing': "As of Nov 25, 2026, recomputing", so a stored read is never shown as current.
+ *  A reader that has no label key yet (the live labor_fold_v1 shape, before #3947) is read by its own keys: a status
+ *  other than a result prints as that status, and a computed read that is not fresh prints as recomputing. */
 export function foldStateText(appraisal: Appraisal): string | null {
-  const label = appraisal.state?.label;
-  if (!label) return null;
-  if (label !== 'recomputing') return label;
-  const at = appraisal.as_of ?? appraisal.state?.computed_at;
-  return at ? `As of ${day(at)}, ${label}` : label;
+  const st = appraisal.state;
+  const at = appraisal.as_of ?? st?.computed_at;
+  const recomputing = (label: string) => (at ? `As of ${day(at)}, ${label}` : label);
+  if (st && 'label' in st) {
+    const label = st.label;
+    if (!label) return null;
+    return label === 'recomputing' ? recomputing(label) : label;
+  }
+  if (appraisal.status === 'not_yet_computed') return codeText(appraisal.status);
+  if (st?.computed && st.fresh === false) return recomputing('recomputing');
+  return null;
 }
 
 export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
