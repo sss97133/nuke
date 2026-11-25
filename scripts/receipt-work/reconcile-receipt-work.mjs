@@ -19,7 +19,7 @@
 // Undo a run: rollback_garage_derivation_run(run_id, reason, false) and rollback_evidence_judgment_run(run_id, reason, false).
 //
 //   node scripts/receipt-work/reconcile-receipt-work.mjs --user-id <uuid> [--vehicle-id <uuid> ...] [--window-days 90]
-//        [--run-id <uuid>] [--no-db] [--out scratch.jsonl]
+//        [--run-id <uuid>] [--no-db] [--keep-answered] [--out scratch.jsonl]
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -116,6 +116,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const userId = opt('--user-id');
   if (!userId) throw new Error('--user-id required');
   const noDb = argv.includes('--no-db');
+  const keepAnswered = argv.includes('--keep-answered');
   const windowDays = Number(opt('--window-days', 90));
   const runId = opt('--run-id', randomUUID());
   const out = opt('--out');
@@ -128,7 +129,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   let vehicles = many('--vehicle-id');
   if (!vehicles.length) vehicles = await discoverVehicles(db, userId);
   const summary = { run_id: runId, producer_version: version, window_days: windowDays, dry_run: noDb, vehicles: {}, written: 0, unchanged: 0,
-    superseded: 0, retracted: 0, judgments: 0, judgments_inserted: 0, judgments_revived: 0, judgments_unchanged: 0, judgments_retired: {}, errors: [] };
+    superseded: 0, retracted: 0, judgments: 0, judgments_inserted: 0, judgments_revived: 0, judgments_unchanged: 0, judgments_kept_answered: 0, judgments_retired: {}, errors: [] };
   const scratch = [];
   const rpc = (fn, body) => db.req(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(body) });
   const supersede = (priorId, newId, reason) => db.req(`garage_derivation_evidence?id=eq.${priorId}&superseded_at=is.null`, { method: 'PATCH',
@@ -166,6 +167,11 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         if (ins?.id) { await supersede(w.evidence_id, ins.id, `source withdrawn (${w.reason}), run ${runId}`); summary.retracted++; }
       }
       if (noDb) continue;
+      // --keep-answered (the scheduled run): a receipt line whose question is answered keeps that answer. Its question is not
+      // re-asked when only its content changed (a vendor label, a frame added), and the answer is retired only when its
+      // receipt, line or frame was withdrawn. Until an answerer runs on a schedule, re-asking would leave the line unwitnessed.
+      const answeredSubjects = new Set(keepAnswered ? (await db.req(`evidence_judgment_requests?select=subject_id&department=eq.${DEPARTMENT}&question_kind=eq.${QUESTION}&vehicle_id=eq.${vid}&status=eq.answered&limit=100000`)).map((r) => r.subject_id) : []);
+      for (const [k, jr] of wanted) if (answeredSubjects.has(jr.subject_id)) { wanted.delete(k); summary.judgments_kept_answered++; }
       const raised = new Map();
       for (const jr of wanted.values()) {
         const [r] = await rpc('raise_evidence_judgment', { p_row: jr, p_run_id: runId });
@@ -178,6 +184,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         const problems = await rpc('evidence_judgment_ineligibility', { p_id: s.id });
         const replacement = replacementFor.get(s.subject_id) ?? null;
         const { kind, reason } = retireKind(problems, replacement);
+        if (keepAnswered && s.status === 'answered' && !['source_withdrawn', 'frame_withdrawn'].includes(kind)) continue;
         const to = await rpc('retire_evidence_judgment', { p_id: s.id, p_run_id: runId, p_kind: kind, p_reason: `${reason} (run ${runId})`,
           p_superseded_by: kind === 'content_changed' ? replacement : null });
         if (to !== 'unchanged') summary.judgments_retired[`${kind}:${to}`] = (summary.judgments_retired[`${kind}:${to}`] ?? 0) + 1;
