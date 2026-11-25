@@ -21,14 +21,14 @@ CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT nullif
 CREATE TYPE public.observation_kind AS ENUM ('listing','sale_result','comment','specification','condition','activity');
 CREATE TYPE public.confidence_level AS ENUM ('low','medium','high','verified');
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY, is_public boolean, deleted_at timestamptz, listing_kind text);
-CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid, image_url text, source text, is_sensitive boolean,
+CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles(id), image_url text, source text, is_sensitive boolean,
  is_superseded boolean, is_duplicate boolean, is_document boolean, vision_gate_status text, image_vehicle_match_status text);
 CREATE TABLE public.observation_sources(id uuid PRIMARY KEY, slug text, base_trust_score numeric,
  supported_observations public.observation_kind[]);
 CREATE TABLE public.observation_properties(id uuid PRIMARY KEY, property_key text, namespace text, data_type text,
  discriminator_key text, applies_to_kinds public.observation_kind[], deprecated_at timestamptz);
 CREATE TABLE public.vehicle_observations(
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, vehicle_match_confidence numeric, observed_at timestamptz,
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles(id), vehicle_match_confidence numeric, observed_at timestamptz,
  ingested_at timestamptz DEFAULT now(), source_id uuid, source_url text, source_identifier text, kind public.observation_kind,
  content_text text, content_hash text, structured_data jsonb DEFAULT '{}', confidence public.confidence_level,
  confidence_score numeric, confidence_factors jsonb DEFAULT '{}', is_superseded boolean DEFAULT false, superseded_by uuid,
@@ -39,7 +39,8 @@ CREATE TABLE public.vehicle_observations(
  CONSTRAINT unique_observation UNIQUE (source_id, source_identifier, kind, content_hash));
 ALTER TABLE public.vehicle_observations ADD CONSTRAINT vehicle_observations_source_observation_id_fkey
  FOREIGN KEY (source_observation_id) REFERENCES public.vehicle_observations(id) NOT VALID;
-CREATE TABLE public.observation_witnesses(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), observation_id uuid, image_id uuid,
+CREATE TABLE public.observation_witnesses(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), observation_id uuid REFERENCES public.vehicle_observations(id),
+ image_id uuid REFERENCES public.vehicle_images(id),
  witness_role text, UNIQUE (observation_id, image_id, witness_role));
 CREATE FUNCTION public.observation_is_public(k public.observation_kind, d jsonb) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 -- the witness projection, as trg_project_observation_image_witness does for any row naming an image
