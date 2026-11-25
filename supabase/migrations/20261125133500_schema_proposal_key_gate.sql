@@ -14,9 +14,14 @@
 --             CHECKs (data_type, cardinality, namespace, scope) decide at apply, inside a subtransaction: a refusal there
 --             rolls back every status and registration of the call and is stored as 'apply_refused: <message>'.
 --   WITNESS   at least one evidence entry of role prototype_row, and for each: its source_table has a row in
---             schema_proposal_witness_sources, the cited row exists, the quote has at least that row's min_quote_words,
---             the row's text column holds the quote verbatim on word boundaries,
---             and every number the entry reads (low=N, high=N) occurs as a number in the quote.
+--             schema_proposal_witness_sources (ingested tables only; a proposal or registry table cannot be one), the
+--             cited row exists and is not machine-written (its generated marker column, if the rule row names one, is
+--             NULL), the quote holds what the category's schema_proposal_quote_rules row asks (labor: an hour term and a
+--             figure, at least 21 characters, the shortest real quote on file), the row's text holds the quote verbatim
+--             as a whole-token match, and every number the entry reads (low=N, high=N) occurs as a number in the quote.
+--             A proposal whose category has no quote rule is refused. Each verbatim citation stores md5 of the cited text.
+--   AMENDED   two filed citations stopped short of their own figure; each is extended to the clause in the same row that
+--             holds it (6c61e4d4: '... over 1000 hours in it'; 53857788: the hours sentence of the same comment).
 --   NOTHING RATIFIED MOVES  observation_properties rows other than the new keys: same count and same content hash
 --             before and after the apply.
 --   Not assessed (reported in the measure, not passed): enum allowed values, which live only in description text
@@ -26,8 +31,10 @@
 -- means no person reviewed. On refusal: status unchanged, gate_measure holds the reasons.
 -- Test: supabase/sql/test_schema_proposal_key_gate.sql (PG17).
 --
--- REVERT. DROP FUNCTION public.schema_proposal_key_gate(uuid[]); DROP TABLE public.schema_proposal_witness_sources;
--- ALTER TABLE public.schema_proposals DROP COLUMN gate_measure. Keys it registered stay (deprecate them by proposal).
+-- REVERT. DROP FUNCTION public.schema_proposal_key_gate(uuid[]); DROP TRIGGER schema_proposal_gate_measure_guard ON
+-- public.schema_proposals; DROP FUNCTION public.schema_proposal_gate_measure_guard(); DROP TABLE
+-- public.schema_proposal_witness_sources, public.schema_proposal_quote_rules; ALTER TABLE public.schema_proposals DROP
+-- COLUMN gate_measure. The two amended quotes may stay (they are the same rows' words). Keys it registered stay (deprecate them by proposal).
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
@@ -38,21 +45,68 @@ COMMENT ON COLUMN public.schema_proposals.gate_measure IS
 CREATE TABLE IF NOT EXISTS public.schema_proposal_witness_sources (
   source_table text PRIMARY KEY CHECK (source_table ~ '^[a-z][a-z0-9_]*$'),
   text_column text NOT NULL CHECK (text_column ~ '^[a-z][a-z0-9_]*$'),
-  min_quote_words integer NOT NULL CHECK (min_quote_words > 0),
-  note text
+  generated_marker_column text CHECK (generated_marker_column ~ '^[a-z][a-z0-9_]*$'),
+  note text,
+  CONSTRAINT schema_proposal_witness_sources_not_agent_written CHECK (source_table NOT IN
+    ('schema_proposals', 'schema_proposal_reviews', 'observation_properties', 'schema_proposal_witness_sources',
+     'schema_proposal_quote_rules'))
 );
 COMMENT ON TABLE public.schema_proposal_witness_sources IS
-  'schema_proposal_key_gate_v1: tables a proposal''s prototype_row citation may name, and the column holding the cited text. A citation to any other table is refused.';
+  'schema_proposal_key_gate_v1: ingested tables a proposal''s prototype_row citation may name, the column holding the cited text, and the column that marks a machine-written row (a cited row with it set is refused). A citation to any other table, or to a proposal or registry table, is refused.';
 ALTER TABLE public.schema_proposal_witness_sources ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.schema_proposal_witness_sources FROM anon, authenticated;
 GRANT SELECT ON public.schema_proposal_witness_sources TO service_role;
--- min_quote_words 4: the shortest of the 25 prototype quotes the first gated proposals cite (measured 2026-11-25;
--- longest 12). A shorter quote (one character passed the verbatim test in ta-skeptic's probe) is refused.
-INSERT INTO public.schema_proposal_witness_sources (source_table, text_column, min_quote_words, note) VALUES
-  ('auction_comments', 'comment_text', 4, 'auction comment body'),
-  ('build_posts', 'content_text', 4, 'forum build post body'),
-  ('vehicles', 'description', 4, 'listing description held on the vehicle')
+INSERT INTO public.schema_proposal_witness_sources (source_table, text_column, generated_marker_column, note) VALUES
+  ('auction_comments', 'comment_text', NULL, 'auction comment body, as ingested'),
+  ('build_posts', 'content_text', NULL, 'forum build post body, as ingested'),
+  ('vehicles', 'description', 'description_generated_at', 'listing description held on the vehicle; a generated description is refused')
 ON CONFLICT (source_table) DO NOTHING;
+
+-- What a quote must hold, per proposal category (lead, 2026-11-25: structure, not length). A quote for a labor key
+-- holds a figure and an hour term, as a whole-token match; the length floor sits beside it with its basis.
+CREATE TABLE IF NOT EXISTS public.schema_proposal_quote_rules (
+  category text PRIMARY KEY,
+  term_pattern text NOT NULL,
+  figure_required boolean NOT NULL,
+  min_quote_chars integer NOT NULL CHECK (min_quote_chars > 0),
+  basis text NOT NULL
+);
+COMMENT ON TABLE public.schema_proposal_quote_rules IS
+  'schema_proposal_key_gate_v1: per observation_properties category, the term (case-insensitive regex) and figure a cited quote must hold and its length floor, with the basis. A proposal whose category has no row is refused.';
+ALTER TABLE public.schema_proposal_quote_rules ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.schema_proposal_quote_rules FROM anon, authenticated;
+GRANT SELECT ON public.schema_proposal_quote_rules TO service_role;
+INSERT INTO public.schema_proposal_quote_rules (category, term_pattern, figure_required, min_quote_chars, basis) VALUES
+  ('labor', '(hours?|hrs?)([^[:alpha:]]|$)|man[- ]?hours?', true, 21,
+   'terms: the unit the two hours keys carry (hour) in its written forms (hour, hours, hr, hrs, man-hours); figure: the reported hours number; 21 characters: the shortest of the 25 prototype quotes on file, 2026-11-25')
+ON CONFLICT (category) DO NOTHING;
+
+-- Two filed citations were cut short of their own figure (the hours sentence sits in the same row): extend each to
+-- the clause in that row that holds it. The proposals are open; the cited rows do not change.
+UPDATE public.schema_proposals p
+   SET evidence = (SELECT jsonb_agg(CASE
+                     WHEN e->>'row_id' = '6c61e4d4-587f-4faa-9e33-a17dcde4e639' AND e->>'quote' = 'said he had over 1000'
+                       THEN e || '{"quote": "said he had over 1000 hours in it"}'::jsonb
+                     WHEN e->>'row_id' = '53857788-0d95-48ec-bcc4-e5e70e745da3' AND e->>'quote' = 'the last one being a 1970 GTO'
+                       THEN e || '{"quote": "I had 2500 hours in it without the new paint", "reads": "low=2500; stated subject: the 1970 GTO named earlier in the same comment, a different car than the listing"}'::jsonb
+                     ELSE e END ORDER BY o)
+                   FROM jsonb_array_elements(p.evidence) WITH ORDINALITY x(e, o))
+ WHERE p.proposed_by_agent_key = 'claude-reported-labor-hours' AND p.status = 'open'
+   AND p.evidence::text ~ '(said he had over 1000"|the last one being a 1970 GTO")';
+
+-- gate_measure is written by the gate only.
+CREATE OR REPLACE FUNCTION public.schema_proposal_gate_measure_guard()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $g$
+BEGIN
+  IF NEW.gate_measure IS DISTINCT FROM (CASE WHEN TG_OP = 'UPDATE' THEN OLD.gate_measure END)
+     AND coalesce(current_setting('nuke.schema_proposal_key_gate', true), '') <> 'on' THEN
+    RAISE EXCEPTION 'schema_proposals.gate_measure is written only by schema_proposal_key_gate' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $g$;
+DROP TRIGGER IF EXISTS schema_proposal_gate_measure_guard ON public.schema_proposals;
+CREATE TRIGGER schema_proposal_gate_measure_guard BEFORE INSERT OR UPDATE OF gate_measure ON public.schema_proposals
+  FOR EACH ROW EXECUTE FUNCTION public.schema_proposal_gate_measure_guard();
 
 CREATE OR REPLACE FUNCTION public.schema_proposal_key_gate(p_proposal_ids uuid[])
 RETURNS jsonb
@@ -64,6 +118,8 @@ DECLARE
   pr public.schema_proposals%ROWTYPE;
   ev jsonb;
   src public.schema_proposal_witness_sources%ROWTYPE;
+  qr public.schema_proposal_quote_rules%ROWTYPE;
+  generated boolean;
   txt text;
   num text;
   reasons text[];
@@ -119,6 +175,9 @@ BEGIN
       reasons := reasons || 'source_categories_unknown'::text;
     END IF;
 
+    SELECT * INTO qr FROM public.schema_proposal_quote_rules WHERE category = pr.payload->>'category';
+    IF NOT FOUND THEN reasons := reasons || 'no_quote_rule'::text; END IF;
+
     n_proto := 0;
     FOR ev IN SELECT e FROM jsonb_array_elements(coalesce(pr.evidence, '[]'::jsonb)) e WHERE e->>'role' = 'prototype_row' LOOP
       n_proto := n_proto + 1;
@@ -141,11 +200,31 @@ BEGIN
         reasons := reasons || 'citation_row_missing'::text;
         CONTINUE;
       END IF;
-      IF coalesce(array_length(regexp_split_to_array(btrim(coalesce(ev->>'quote', '')), '\s+'), 1), 0) < src.min_quote_words
-         OR btrim(coalesce(ev->>'quote', '')) = '' THEN
-        cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'quote_too_short');
-        reasons := reasons || 'citation_quote_too_short'::text;
-        CONTINUE;
+      IF src.generated_marker_column IS NOT NULL THEN
+        EXECUTE format('SELECT %I IS NOT NULL FROM public.%I WHERE id = $1', src.generated_marker_column, src.source_table)
+           INTO generated USING (ev->>'row_id')::uuid;
+        IF generated THEN
+          cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'row_generated');
+          reasons := reasons || 'citation_row_generated'::text;
+          CONTINUE;
+        END IF;
+      END IF;
+      IF qr.category IS NOT NULL THEN
+        IF length(btrim(coalesce(ev->>'quote', ''))) < qr.min_quote_chars THEN
+          cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'quote_too_short');
+          reasons := reasons || 'citation_quote_too_short'::text;
+          CONTINUE;
+        END IF;
+        IF ev->>'quote' !~* qr.term_pattern THEN
+          cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'quote_no_term');
+          reasons := reasons || 'citation_quote_no_term'::text;
+          CONTINUE;
+        END IF;
+        IF qr.figure_required AND ev->>'quote' !~ '[0-9]' THEN
+          cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'quote_no_figure');
+          reasons := reasons || 'citation_quote_no_figure'::text;
+          CONTINUE;
+        END IF;
       END IF;
       -- verbatim, on word boundaries: the characters either side of the quote are not letters or digits
       IF position(ev->>'quote' IN txt) = 0
@@ -163,7 +242,8 @@ BEGIN
         END IF;
       END LOOP;
       IF NOT (cites @> jsonb_build_array(jsonb_build_object('row_id', ev->>'row_id'))) THEN
-        cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'verbatim');
+        cites := cites || jsonb_build_object('row_id', ev->>'row_id', 'source_table', src.source_table, 'check', 'verbatim',
+                                             'text_md5', md5(txt));
       END IF;
     END LOOP;
     IF n_proto = 0 THEN reasons := reasons || 'no_prototype_row'::text; END IF;
@@ -175,6 +255,7 @@ BEGIN
   END LOOP;
 
   decision := CASE WHEN cardinality(all_reasons) = 0 THEN 'ratified' ELSE 'refused' END;
+  PERFORM set_config('nuke.schema_proposal_key_gate', 'on', true);
   measure := jsonb_build_object(
     'basis', 'schema_proposal_key_gate_v1', 'measured_at', now(), 'decision', decision,
     'proposals', per,
@@ -208,6 +289,7 @@ BEGIN
     -- a refusal never overwrites the measure that ratified an approved row
     UPDATE public.schema_proposals SET gate_measure = measure WHERE id = ANY (p_proposal_ids) AND status = 'open';
   END IF;
+  PERFORM set_config('nuke.schema_proposal_key_gate', 'off', true);
   RETURN measure;
 END $fn$;
 COMMENT ON FUNCTION public.schema_proposal_key_gate(uuid[]) IS
