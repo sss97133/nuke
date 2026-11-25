@@ -18,7 +18,7 @@ DO $$ BEGIN
 END $$;
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, vin text, year int, make text, model text, description text, highlights text,
   equipment text, modifications text, numbers_quote text, title text, listing_title text, bat_listing_title text,
-  deleted_at timestamptz, merged_into_vehicle_id uuid REFERENCES public.vehicles (id));
+  deleted_at timestamptz, merged_into_vehicle_id uuid REFERENCES public.vehicles (id), image_count int);
 CREATE TABLE public.auction_comments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles (id),
   comment_text text, comment_type text, has_question boolean);
 CREATE TABLE public.auction_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles (id));
@@ -36,7 +36,8 @@ CREATE TABLE public.model_fold_work (vehicle_id uuid PRIMARY KEY REFERENCES publ
 CREATE TABLE public.platform_config (config_key text PRIMARY KEY, config_value jsonb, description text, updated_at timestamptz);
 INSERT INTO public.platform_config VALUES ('model_fold', '{"scopes": ["pontiac_f_body"], "signals_enabled": true, "enabled": true}', NULL, now());
 CREATE TABLE public.data_set_member_grades (vehicle_id uuid REFERENCES public.vehicles (id), set_id uuid, n_witnesses int,
-  PRIMARY KEY (vehicle_id, set_id));
+  witness_classes text[], PRIMARY KEY (vehicle_id, set_id));
+CREATE TABLE public.vehicle_field_evidence (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles (id), field_name text);
 CREATE TABLE public.vehicle_facet_grade_folds (vehicle_id uuid PRIMARY KEY REFERENCES public.vehicles (id),
   folded_at timestamptz NOT NULL DEFAULT now(), evidence_changed_at timestamptz);
 CREATE TABLE public.model_fold_ticks (tick_id uuid PRIMARY KEY, status text, started_at timestamptz, folded int, signals int, ms int);
@@ -233,11 +234,48 @@ CREATE TRIGGER model_fold_signal_upd AFTER UPDATE OF status, proposed_value, veh
 CREATE TRIGGER model_fold_signal_upd AFTER UPDATE OF vin, year, make, model, description, highlights, equipment, modifications, numbers_quote, title, listing_title, bat_listing_title, deleted_at, merged_into_vehicle_id ON public.vehicles FOR EACH ROW WHEN (((old.vin IS DISTINCT FROM new.vin) OR (old.year IS DISTINCT FROM new.year) OR (old.make IS DISTINCT FROM new.make) OR (old.model IS DISTINCT FROM new.model) OR (old.description IS DISTINCT FROM new.description) OR (old.highlights IS DISTINCT FROM new.highlights) OR (old.equipment IS DISTINCT FROM new.equipment) OR (old.modifications IS DISTINCT FROM new.modifications) OR (old.numbers_quote IS DISTINCT FROM new.numbers_quote) OR (old.title IS DISTINCT FROM new.title) OR (old.listing_title IS DISTINCT FROM new.listing_title) OR (old.bat_listing_title IS DISTINCT FROM new.bat_listing_title) OR (old.deleted_at IS DISTINCT FROM new.deleted_at) OR (old.merged_into_vehicle_id IS DISTINCT FROM new.merged_into_vehicle_id))) EXECUTE FUNCTION model_fold_vehicles_signal();
 CREATE TRIGGER model_fold_signal_upd AFTER UPDATE ON public.auction_comments REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION model_fold_rows_signal();
 CREATE TRIGGER model_fold_signal_upd AFTER UPDATE ON public.auction_events REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION model_fold_rows_signal();
+CREATE OR REPLACE FUNCTION public.vehicle_facet_grades_evidence_changed()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_ids uuid[];
+BEGIN
+  IF tg_op = 'INSERT' THEN
+    SELECT array_agg(DISTINCT n.vehicle_id) INTO v_ids FROM new_rows n WHERE n.vehicle_id IS NOT NULL;
+  ELSIF tg_op = 'DELETE' THEN
+    SELECT array_agg(DISTINCT o.vehicle_id) INTO v_ids FROM old_rows o WHERE o.vehicle_id IS NOT NULL;
+  ELSE
+    SELECT array_agg(DISTINCT x) INTO v_ids
+      FROM (SELECT o.vehicle_id AS x FROM old_rows o UNION SELECT n.vehicle_id FROM new_rows n) z WHERE x IS NOT NULL;
+  END IF;
+  IF v_ids IS NULL THEN RETURN NULL; END IF;
+  UPDATE public.vehicle_facet_grade_folds SET evidence_changed_at = clock_timestamp() WHERE vehicle_id = ANY (v_ids);
+  BEGIN
+    IF public.model_fold_signals_on() THEN
+      INSERT INTO public.model_fold_signal (vehicle_id, reason)
+      SELECT v.id, 'vehicle_field_evidence_' || lower(tg_op) FROM public.vehicles v WHERE v.id = ANY (v_ids);
+    END IF;
+  EXCEPTION WHEN others THEN
+    RAISE WARNING 'facet grade refold signal skipped: %', sqlerrm;
+  END;
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION public.vehicle_facet_grades_evidence_changed() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS vehicle_facet_grades_changed_ins ON public.vehicle_field_evidence;
+DROP TRIGGER IF EXISTS vehicle_facet_grades_changed_upd ON public.vehicle_field_evidence;
+DROP TRIGGER IF EXISTS vehicle_facet_grades_changed_del ON public.vehicle_field_evidence;
+CREATE TRIGGER vehicle_facet_grades_changed_ins AFTER INSERT ON public.vehicle_field_evidence
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.vehicle_facet_grades_evidence_changed();
+CREATE TRIGGER vehicle_facet_grades_changed_upd AFTER UPDATE ON public.vehicle_field_evidence
+  REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.vehicle_facet_grades_evidence_changed();
+CREATE TRIGGER vehicle_facet_grades_changed_del AFTER DELETE ON public.vehicle_field_evidence
+  REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public.vehicle_facet_grades_evidence_changed();
+
+
 
 RESET check_function_bodies;
 
--- fixtures (disposable database only): P an F-body car, A/B/C Fords with 25 / 6 / 0 keyed witnesses, G a Ford with
--- 0 witnesses that holds a facet fold row, X the excluded id (50 witnesses).
+-- fixtures (disposable database only): P an F-body car; A a Ford with a keyed grade row (decode); B a Ford with 25
+-- photos and only mentioned/claim/unregistered witnesses (40); C a Ford with 3 photos; D a Ford with nothing that holds
+-- a facet fold row; X the excluded id (keyed).
 INSERT INTO public.vehicles (id, year, make, model) VALUES
  ('00000000-0000-0000-0000-00000000000a', 1973, 'Pontiac', 'Firebird'),
  ('00000000-0000-0000-0000-0000000000a1', 1968, 'Ford', 'Mustang'),
@@ -245,9 +283,13 @@ INSERT INTO public.vehicles (id, year, make, model) VALUES
  ('00000000-0000-0000-0000-0000000000c1', 1999, 'Ford', 'Ranger'),
  ('00000000-0000-0000-0000-0000000000d1', 1988, 'Ford', 'Bronco'),
  ('9cf5b7a4-0000-0000-0000-000000000001', 1972, 'Ford', 'Maverick');
+UPDATE public.vehicles SET image_count = 25 WHERE id = '00000000-0000-0000-0000-0000000000b1';
+UPDATE public.vehicles SET image_count = 3 WHERE id = '00000000-0000-0000-0000-0000000000c1';
 INSERT INTO public.data_set_member_grades VALUES
- ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), 15), ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), 10),
- ('00000000-0000-0000-0000-0000000000b1', gen_random_uuid(), 6), ('9cf5b7a4-0000-0000-0000-000000000001', gen_random_uuid(), 50);
+ ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), 2, ARRAY['decode', 'mentioned']),
+ ('00000000-0000-0000-0000-0000000000b1', gen_random_uuid(), 30, ARRAY['mentioned', 'claim']),
+ ('00000000-0000-0000-0000-0000000000b1', gen_random_uuid(), 10, ARRAY['reading_unregistered']),
+ ('9cf5b7a4-0000-0000-0000-000000000001', gen_random_uuid(), 50, ARRAY['decode']);
 INSERT INTO public.vehicle_facet_grade_folds (vehicle_id, folded_at) VALUES ('00000000-0000-0000-0000-0000000000d1', now() - interval '1 hour');
 
 -- one observation on every car, through the live statement trigger (disposable database only)
@@ -271,7 +313,7 @@ CREATE FUNCTION pg_temp.sig() RETURNS jsonb LANGUAGE sql AS $f$
 
 DO $$ DECLARE d text; s jsonb; BEGIN
   d := pg_get_functiondef('public.model_fold_rows_signal()'::regprocedure);
-  IF (length(d) - length(replace(d, 'model_fold_signal_tiers_v1', ''))) / length('model_fold_signal_tiers_v1') <> 1 THEN
+  IF (length(d) - length(replace(d, 'model_fold_signal_tiers_v1', ''))) / length('model_fold_signal_tiers_v1') <> 2 THEN
     RAISE EXCEPTION 'comment-edit branch patched wrong'; END IF;
   IF (SELECT config_value->>'signal_tiers_max' FROM public.platform_config WHERE config_key = 'model_fold') <> '1' THEN
     RAISE EXCEPTION 'signal_tiers_max not written as 1'; END IF;
@@ -327,5 +369,33 @@ DO $$ DECLARE d text; s jsonb; BEGIN
      OR (SELECT evidence_changed_at FROM public.vehicle_facet_grade_folds WHERE vehicle_id = '00000000-0000-0000-0000-0000000000d1') IS NULL THEN
     RAISE EXCEPTION 'facet-fold car not signalled or stamped on a vehicles update'; END IF;
   RAISE NOTICE 'gauge %', public.model_fold_queue_gauge();
+
+  -- M2: the vehicle_field_evidence trigger (#3862) asks for the car's tier, 9 when none is admitted, and skips X
+  UPDATE public.platform_config SET config_value = config_value || '{"signal_tiers_max": 1}' WHERE config_key = 'model_fold';
+  DELETE FROM public.model_fold_signal;
+  INSERT INTO public.vehicle_field_evidence (vehicle_id, field_name) VALUES
+    ('00000000-0000-0000-0000-00000000000a', 'vin'), ('00000000-0000-0000-0000-0000000000a1', 'vin'),
+    ('00000000-0000-0000-0000-0000000000d1', 'vin'), ('9cf5b7a4-0000-0000-0000-000000000001', 'vin');
+  s := pg_temp.sig();
+  IF s <> '{"00000000-0000-0000-0000-00000000000a": 1, "00000000-0000-0000-0000-0000000000a1": 9,
+           "00000000-0000-0000-0000-0000000000d1": 9}'::jsonb THEN
+    RAISE EXCEPTION 'vfe trigger priorities at max 1: %', s; END IF;
+
+  -- default: a writer that names no priority queues last
+  DELETE FROM public.model_fold_signal;
+  INSERT INTO public.model_fold_signal (vehicle_id, reason) VALUES ('00000000-0000-0000-0000-0000000000c1', 'forgot');
+  IF (SELECT priority FROM public.model_fold_signal) <> 9 THEN RAISE EXCEPTION 'default priority is not 9'; END IF;
+
+  -- M1: signals off, a row-trigger table still stamps the facet fold and writes no signal
+  DELETE FROM public.model_fold_signal;
+  UPDATE public.vehicle_facet_grade_folds SET evidence_changed_at = NULL;
+  UPDATE public.platform_config SET config_value = config_value || '{"signals_enabled": false}' WHERE config_key = 'model_fold';
+  INSERT INTO public.vehicle_observations (vehicle_id, content_text) VALUES ('00000000-0000-0000-0000-0000000000d1', 'y');
+  INSERT INTO public.auction_comments (vehicle_id, comment_text) VALUES ('00000000-0000-0000-0000-0000000000d1', 'z');
+  UPDATE public.auction_comments SET comment_text = 'z2' WHERE vehicle_id = '00000000-0000-0000-0000-0000000000d1';
+  IF (SELECT evidence_changed_at FROM public.vehicle_facet_grade_folds WHERE vehicle_id = '00000000-0000-0000-0000-0000000000d1') IS NULL THEN
+    RAISE EXCEPTION 'signals off: observation insert did not stamp the facet fold'; END IF;
+  IF EXISTS (SELECT 1 FROM public.model_fold_signal) THEN
+    RAISE EXCEPTION 'signals off but a signal was written: %', pg_temp.sig(); END IF;
 END $$;
 \echo model_fold_signal_tiers: ok
