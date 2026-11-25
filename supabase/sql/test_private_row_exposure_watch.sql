@@ -2,8 +2,8 @@
 -- private_row_exposure_watch raises while any relation is exposed and returns the reading once none is. Synthetic rows.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
-  IF current_database() NOT LIKE 'dm_private_row_exposure%' OR to_regclass('public.private_row_probes') IS NOT NULL THEN
-    RAISE EXCEPTION 'Requires empty disposable dm_private_row_exposure* database';
+  IF current_database() NOT LIKE 'dm_%private_row_exposure%' OR to_regclass('public.private_row_probes') IS NOT NULL THEN
+    RAISE EXCEPTION 'Requires empty disposable dm_*private_row_exposure* database';
   END IF;
 END $$;
 DO $$ BEGIN
