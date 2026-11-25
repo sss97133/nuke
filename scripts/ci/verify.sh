@@ -138,6 +138,12 @@ if node --test "$GD/no-raw-testimony-insert.test.mjs" "$GD/no-new-photo-reader.t
 else red "  ✗ testimony-writer, vocabulary and center-key detector contracts FAILED"; cat "$CI_TMP_DIR/ci_keys_tests.out"; fail=1; fi
 keys_gate "no added migration writes testimony outside a sanctioned writer" node "$GD/no-raw-testimony-insert.mjs" --changes
 keys_gate "no added migration ratifies vocabulary without a proposal or adds an unkeyed center column (no-new-photo-reader)" node "$GD/no-new-photo-reader.mjs"
+# Public Actions logs (after #3823): a workflow step that runs a photo or document reader prints counts only, through a jq
+# filter probed for row text, and names the subscription secret once (scripts/ci/subscription-token.sh).
+if node --test "$GD/workflow-log-counts-only.test.mjs" "$ROOT/scripts/ci/subscription-token.test.mjs" >"$CI_TMP_DIR/ci_workflow_log_tests.out" 2>&1; then grn "  ✓ workflow-log counts-only detector and subscription-token contracts"
+else red "  ✗ workflow-log counts-only detector or subscription-token contract FAILED"; cat "$CI_TMP_DIR/ci_workflow_log_tests.out"; fail=1; fi
+if node "$GD/workflow-log-counts-only.mjs" >"$CI_TMP_DIR/ci_workflow_log.out" 2>&1; then grn "  ✓ no workflow step prints reader output beyond counts (workflow-log-counts-only)"
+else red "  ✗ a workflow step can print reader output (scripts/guardrails/workflow-log-counts-only.mjs)"; cat "$CI_TMP_DIR/ci_workflow_log.out"; fail=1; fi
 counts_warn="$(node "$GD/no-pii-exposure.mjs" --counts 2>/dev/null | grep -c '^WARN' || true)"
 if [ "${counts_warn:-0}" -gt 0 ]; then ylw "  • ungraded public counts: $counts_warn (advisory: no-pii-exposure.mjs --counts)"; node "$GD/no-pii-exposure.mjs" --counts 2>/dev/null | grep '^WARN' | sed 's/^/    /'
 else grn "  ✓ no added public reader counts memberships without a grade (advisory)"; fi

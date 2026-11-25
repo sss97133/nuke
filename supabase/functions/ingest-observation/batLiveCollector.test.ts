@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import fixture from "../_shared/batLiveEvents.fixture.json" with { type: "json" };
 import { BatLiveAdmissionError, type BatLiveFrame } from "../_shared/batLiveEvents.ts";
 import { withCollectorClock } from "../_shared/batLiveTestClock.ts";
-import { batStreamIO, BAT_LIVE_COLLECT_MODE } from "./batLiveCollector.ts";
+import { batStreamIO, BAT_LIVE_COLLECT_MODE, streamLookbackMinutes } from "./batLiveCollector.ts";
 
 const monitor = "00000000-0000-0000-0000-000000000001";
 const vehicle = "00000000-0000-0000-0000-000000000002";
@@ -20,7 +20,8 @@ function nativeFixture() {
   Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-key");
   Deno.env.delete("SUPABASE_SECRET_KEYS"); Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS"); Deno.env.delete("SUPABASE_JWKS");
   const fetch = globalThis.fetch, socket = globalThis.WebSocket, runtime = (globalThis as any).EdgeRuntime;
-  const state = { empty: false, sourceId: source, deleted: false, postId: fixture.post_id, url: fixture.source_url };
+  const state = { empty: false, sourceId: source, deleted: false, postId: fixture.post_id, url: fixture.source_url,
+    stale: 0, recentEnded: 0, config: undefined as any, selections: [] as URLSearchParams[] };
   const tasks: Promise<unknown>[] = [], rpcs: any[] = [], requests: { path: string; method: string }[] = [];
   let sourceReads = 0, sockets = 0, pings = 0;
   let afterRpc: (() => void) | undefined;
@@ -54,7 +55,22 @@ function nativeFixture() {
     }
     assert.equal(url.hostname, "db.test");
     assert.ok(!url.pathname.startsWith("/functions/v1/"), "canonical-owned batches must not invoke another Edge function");
-    if (url.pathname === "/rest/v1/live_auction_sources") return Response.json({ id: source });
+    if (url.pathname === "/rest/v1/live_auction_sources") return Response.json(
+      state.config === undefined ? { id: source } : { id: source, scraping_config: state.config });
+    if (url.pathname === "/rest/v1/monitored_auctions" && (state.stale || state.recentEnded) && !url.searchParams.has("id")) {
+      // Stale is_live rows (ended 1-13 days ago, as on 2026-11-25) beside the closing lot; PostgREST's end-time
+      // filters and limit are applied as sent, so the selection's own bounds decide what comes back.
+      state.selections.push(url.searchParams);
+      const row = (id: string, end: number) => ({ id, source_id: state.sourceId, vehicle_id: vehicle,
+        external_auction_url: fixture.source_url, stream_state: {}, end });
+      const rows = [row(monitor, Date.now() + 5 * 60000),
+        ...Array.from({ length: state.recentEnded }, (_, i) => row(`00000000-0000-0000-0001-${String(i).padStart(12, "0")}`, Date.now() - 30 * 60000)),
+        ...Array.from({ length: state.stale }, (_, i) => row(`00000000-0000-0000-0002-${String(i).padStart(12, "0")}`,
+          Date.now() - (1 + i % 13) * 86400000))];
+      const bounds = url.searchParams.getAll("auction_end_time").map(f => f.match(/^(lte|gte)\.(.+)$/)!);
+      const kept = rows.filter(r => bounds.every(([, op, at]) => op === "lte" ? r.end <= Date.parse(at) : r.end >= Date.parse(at)));
+      return Response.json(kept.slice(0, Number(url.searchParams.get("limit") ?? kept.length)).map(({ end: _end, ...r }) => r));
+    }
     if (url.pathname === "/rest/v1/monitored_auctions") return Response.json(state.empty ? [] : [{ id: monitor,
       source_id: state.sourceId, vehicle_id: vehicle, external_auction_url: fixture.source_url, stream_state: {} }]);
     if (url.pathname === "/rest/v1/vehicles") return Response.json(state.deleted ? [] : [{ id: vehicle,
@@ -112,6 +128,31 @@ Deno.test("canonical collector dry-run and idle preserve target preview without 
     assert.equal(f.sourceReads, 0); assert.equal(f.sockets, 0); assert.equal(f.tasks.length, 0);
     assert.equal(f.rpcs.length, 0); assert.ok(f.requests.every(r => r.method === "GET"));
   } finally { f.restore(); }
+});
+
+Deno.test("closing selection reads its lower bound from the stored stream window; 1,655 stale lots do not refuse coverage", async () => {
+  const f = nativeFixture();
+  try {
+    f.state.stale = 1655; f.state.recentEnded = 1;
+    // Before the row: no lower bound, the stale rows fill the 201-row probe and the selection refuses (the 500 of 2026-11-25).
+    assert.equal((await f.request({ dry_run: true })).status, 500);
+    f.state.config = { live_pull: { stream_window: { lookback_minutes: 120, basis: "fixture" } } };
+    const dry = await f.request({ dry_run: true }), preview = await dry.json();
+    assert.equal(dry.status, 200); assert.equal(preview.selected_lots, 2, "closing lot + lot ended 30 min ago; none ended a day or more ago");
+    const bounds = f.state.selections.at(-1)!.getAll("auction_end_time");
+    assert.equal(bounds.length, 2); assert.ok(bounds.some(b => b.startsWith("gte.")) && bounds.some(b => b.startsWith("lte.")));
+    const lower = Date.parse(bounds.find(b => b.startsWith("gte."))!.slice(4));
+    assert.ok(Math.abs(Date.now() - 120 * 60000 - lower) < 5000, "bound is now minus the stored lookback");
+    f.state.config = { live_pull: { stream_window: { lookback_minutes: "not a number" } } };
+    assert.equal((await f.request({ dry_run: true })).status, 500, "a malformed row is no row: the bound is not invented");
+    assert.equal(f.sockets, 0); assert.equal(f.tasks.length, 0);
+  } finally { f.restore(); }
+});
+
+Deno.test("stream lookback accepts the same digits the puller's SQL accepts", () => {
+  for (const [raw, want] of [[120, 120], ["120", 120], [0, 0], ["99999", 99999]] as const) assert.equal(streamLookbackMinutes({ live_pull: { stream_window: { lookback_minutes: raw } } }), want);
+  for (const raw of [-1, 1.5, "1e3", "", "100000", null, undefined, {}]) assert.equal(streamLookbackMinutes({ live_pull: { stream_window: { lookback_minutes: raw } } }), null);
+  assert.equal(streamLookbackMinutes(undefined), null); assert.equal(streamLookbackMinutes({}), null);
 });
 
 Deno.test("one accepted canonical HTTP launch processes over sixty coverage batches after incoming request ends", () => withCollectorClock(async () => {

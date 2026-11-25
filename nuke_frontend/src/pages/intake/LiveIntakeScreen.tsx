@@ -421,7 +421,7 @@ const LiveIntakeScreen: React.FC = () => {
                       DAY {dayOf(fr.taken_at)}
                     </Link>
                     <Link to={`/vehicle/${fr.vehicle_id}`} style={S.link}>
-                      {fr.vehicle_name ?? fr.vehicle_id.slice(0, 8)}
+                      {fr.vehicle_name ?? fr.vehicle_id?.slice(0, 8) ?? 'UNFILED'}
                     </Link>
                     <span>ANALYZED {clockOf(fr.analyzed_at)}</span>
                   </div>
