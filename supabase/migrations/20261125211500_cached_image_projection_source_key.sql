@@ -25,8 +25,12 @@
 --      trg_project_observation_image_witness as for any child.
 -- The edge function ingest-observation sets the column on the single route (same commit); the job path that calls (3) is
 -- scripts/deep-image-analysis-byok.mjs project-cached (photo-keys.yml step=properties).
--- Both owners are patched by anchor on their live definitions, refused if either changed since 2026-11-25.
--- Contract: supabase/sql/test_cached_image_projection_source_key.sql.
+--   4. get_field_provenance and vehicle_canonical admit a keyed projection row on the terms they admitted it untyped.
+-- All four are patched by anchor on their live definitions, refused if any changed since 2026-11-25.
+-- A call of (3) is bounded by its caller (project-cached aborts it at 40 s) and the role's statement_timeout.
+-- Contracts: supabase/sql/test_cached_image_projection_source_key.sql (guard, writer, batch),
+-- test_cached_image_projection_keyed_provenance.sql (get_field_provenance),
+-- test_cached_image_projection_keyed_canonical.sql (vehicle_canonical).
 
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -108,7 +112,6 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO ''
-SET statement_timeout TO '30s'
 SET lock_timeout TO '5s'
 AS $function$
 DECLARE
@@ -180,6 +183,73 @@ REVOKE ALL ON FUNCTION public.supersede_untyped_cached_image_properties(uuid, in
 GRANT EXECUTE ON FUNCTION public.supersede_untyped_cached_image_properties(uuid, integer) TO service_role;
 COMMENT ON FUNCTION public.supersede_untyped_cached_image_properties(uuid, integer) IS
  'Re-lands one vehicle''s current cached image property projections (cached_byok_property_projection_v1) that lack the typed source_observation_id: a successor identical but for that column, a new ingested_at and content_hash sha256(old || '':typed_source_v1''), and the old row superseded by it. Rows whose source reading is superseded or missing are left and counted held_source_not_current; remaining counts the rows still to re-land after the call. One row at a time: a row the guard refuses is left and counted by SQLSTATE (refused, refused_by_sqlstate) without undoing the others. Service role only; at most p_limit (1..500) successors a call; returns succeeded, refused, refused_by_sqlstate, held_source_not_current, remaining. Caller: scripts/deep-image-analysis-byok.mjs project-cached.';
+
+-- 4. The two readers that drop any row with source_observation_id set unless a retained-listing matcher admits it
+--    (prod scan 2026-11-25 02:20 PT of pg_proc, pg_views, pg_matviews, pg_policies for 'source_observation_id IS NULL':
+--    only these two read vehicle_observations that way). Without (4) every re-landed or newly keyed projection row would
+--    leave them: proof car 20d21fb0, read-only simulation with the key set, 0 of 776 rows passed either filter.
+--    Each reader admits a keyed projection row on the same terms it admitted the untyped one, nothing wider:
+--    get_field_provenance already gates every projection row on its source reading (the `a` join: current, public,
+--    same vehicle and photo, value equal); the new disjunct only requires the key to be that same reading.
+--    vehicle_canonical never tested the reading of an untyped row; the new disjunct requires the key to be the
+--    image_deep_byok reading of the same vehicle and photo that structured_data names (776 of 776 on the proof car).
+--    Whether canonical should also require a public reading (75 of 776 proof readings pass observation_is_public) is a
+--    visibility change, not this fix; it is on the board as a question.
+--    A contract database that carries neither reader (the writer contract) sets nuke.contract_without_readers = on;
+--    production never does, and an absent reader there refuses the migration.
+DO $reader_provenance$
+DECLARE s text; d text;
+ anchor text := $a$ AND (o.source_observation_id IS NULL OR EXISTS (SELECT FROM public.vehicle_observations dp WHERE dp.id=o.source_observation_id AND ($a$;
+ keyed text := $k$ AND (o.source_observation_id IS NULL OR (o.extraction_method='cached_byok_property_projection_v1' AND o.source_observation_id=a.id) OR EXISTS (SELECT FROM public.vehicle_observations dp WHERE dp.id=o.source_observation_id AND ($k$;
+BEGIN
+ IF to_regprocedure('public.get_field_provenance(uuid,text)') IS NULL THEN
+  IF current_setting('nuke.contract_without_readers', true) = 'on' THEN RETURN; END IF;
+  RAISE EXCEPTION 'get_field_provenance is missing; it must admit keyed image projections before they are keyed';
+ END IF;
+ SELECT p.prosrc INTO s FROM pg_proc p WHERE p.oid = 'public.get_field_provenance(uuid,text)'::regprocedure;
+ d := pg_get_functiondef('public.get_field_provenance(uuid,text)'::regprocedure);
+ -- the live body (20261125175500), read 2026-11-25 02:20 PT
+ IF encode(sha256(convert_to(s,'UTF8')),'hex') IS DISTINCT FROM 'f9fa67c39786adb2872c2836766a19b74f891b31d0fa0f31a56c750f02bc025a'
+  OR (length(d)-length(replace(d,anchor,'')))/length(anchor) <> 1 THEN
+  RAISE EXCEPTION 'get_field_provenance changed since 2026-11-25 02:20 PT; re-read it before admitting keyed image projections';
+ END IF;
+ EXECUTE replace(d, anchor, keyed);
+END $reader_provenance$;
+
+DO $reader_canonical$
+DECLARE d text; path text := current_setting('search_path'); shape_before text; shape_after text;
+ anchor text := $a$((o.source_observation_id IS NULL) OR (EXISTS ( SELECT$a$;
+ keyed text := $k$((o.source_observation_id IS NULL) OR ((o.extraction_method = 'cached_byok_property_projection_v1'::text) AND (EXISTS ( SELECT 1
+                   FROM vehicle_observations xp
+                  WHERE ((xp.id = o.source_observation_id) AND (xp.vehicle_id = o.vehicle_id) AND ((xp.structured_data ->> 'analysis_kind'::text) = 'image_deep_byok'::text) AND ((xp.structured_data ->> 'image_id'::text) = (o.structured_data ->> 'image_id'::text)) AND ((o.structured_data ->> 'source_observation_id'::text) = (xp.id)::text))))) OR (EXISTS ( SELECT$k$;
+BEGIN
+ IF to_regclass('public.vehicle_canonical') IS NULL THEN
+  IF current_setting('nuke.contract_without_readers', true) = 'on' THEN RETURN; END IF;
+  RAISE EXCEPTION 'vehicle_canonical is missing; it must admit keyed image projections before they are keyed';
+ END IF;
+ -- the fingerprint 20261122003000 names: plain pg_get_viewdef printed with search_path = public
+ PERFORM set_config('search_path', 'public', true);
+ d := pg_get_viewdef('public.vehicle_canonical'::regclass);
+ IF md5(d) IS DISTINCT FROM '4d1a2e57a880181691e5bd8eb0c30002' OR (length(d)-length(replace(d,anchor,'')))/length(anchor) <> 1 THEN
+  RAISE EXCEPTION 'vehicle_canonical changed since 2026-11-25 (md5 %); re-read it before admitting keyed image projections', md5(d);
+ END IF;
+ SELECT concat_ws(E'\n', pg_get_userbyid(c.relowner), coalesce(c.reloptions::text,'-'), coalesce(c.relacl::text,'-'),
+          coalesce(obj_description(c.oid,'pg_class'),'-'),
+          (SELECT string_agg(a.attname||' '||format_type(a.atttypid,a.atttypmod), ', ' ORDER BY a.attnum)
+             FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped))
+   INTO shape_before FROM pg_class c WHERE c.oid = 'public.vehicle_canonical'::regclass;
+ EXECUTE 'CREATE OR REPLACE VIEW public.vehicle_canonical AS ' || replace(d, anchor, keyed);
+ SELECT concat_ws(E'\n', pg_get_userbyid(c.relowner), coalesce(c.reloptions::text,'-'), coalesce(c.relacl::text,'-'),
+          coalesce(obj_description(c.oid,'pg_class'),'-'),
+          (SELECT string_agg(a.attname||' '||format_type(a.atttypid,a.atttypmod), ', ' ORDER BY a.attnum)
+             FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped))
+   INTO shape_after FROM pg_class c WHERE c.oid = 'public.vehicle_canonical'::regclass;
+ IF shape_after IS DISTINCT FROM shape_before
+  OR strpos(pg_get_viewdef('public.vehicle_canonical'::regclass), 'cached_byok_property_projection_v1') = 0 THEN
+  RAISE EXCEPTION 'vehicle_canonical replace changed its owner, options, grants, comment or columns, or lost the branch';
+ END IF;
+ PERFORM set_config('search_path', path, true);
+END $reader_canonical$;
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;

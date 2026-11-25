@@ -70,7 +70,8 @@ DO $$ BEGIN
 END $$;
 
 -- BEFORE: a projection row carrying the key is refused by the guard's fall-through
-INSERT INTO public.vehicles VALUES ('11111111-1111-4111-8111-111111111111', true, NULL, NULL);
+INSERT INTO public.vehicles VALUES ('11111111-1111-4111-8111-111111111111', true, NULL, NULL),
+ ('11111111-1111-4111-8111-222222222222', true, NULL, NULL);
 INSERT INTO public.observation_sources VALUES ('22222222-2222-4222-8222-222222222222','photo_pipeline',0.5,ARRAY['condition']::public.observation_kind[]);
 INSERT INTO public.observation_properties VALUES
  ('33333333-3333-4333-8333-000000000001','image_visible_rust_severity','core','enum','image_id',ARRAY['condition']::public.observation_kind[],NULL),
@@ -124,7 +125,11 @@ SELECT pg_temp.land('55555555-5555-4555-8555-000000000003','image_visible_paint_
 UPDATE public.vehicle_observations SET is_superseded=true, superseded_by='55555555-5555-4555-8555-000000000002'
  WHERE id='55555555-5555-4555-8555-000000000003';
 
+-- this database carries neither reader the migration also patches; their own contracts are
+-- test_cached_image_projection_keyed_provenance.sql and test_cached_image_projection_keyed_canonical.sql
+SET nuke.contract_without_readers = 'on';
 \ir ../migrations/20261125211500_cached_image_projection_source_key.sql
+RESET nuke.contract_without_readers;
 
 -- 1. the guard branch
 DO $$ DECLARE r uuid; BEGIN
@@ -145,9 +150,25 @@ DO $$ DECLARE r uuid; BEGIN
    FROM public.vehicle_observations WHERE id=r;
   RAISE EXCEPTION '1c: a value the source reading does not hold must be refused';
  EXCEPTION WHEN check_violation THEN IF SQLERRM NOT LIKE 'image property projection must name%' THEN RAISE; END IF; END;
- -- stale parent
- BEGIN PERFORM pg_temp.land('55555555-5555-4555-8555-000000000003','image_visible_assembly_state','assembled',true);
+ -- stale parent: the value is the one that reading holds (paint clear), so only its supersession refuses it
+ BEGIN PERFORM pg_temp.land('55555555-5555-4555-8555-000000000003','image_visible_paint_stage','clear',true);
   RAISE EXCEPTION '1d: a superseded source reading must be refused';
+ EXCEPTION WHEN check_violation THEN IF SQLERRM NOT LIKE 'image property projection must name%' THEN RAISE; END IF;
+  WHEN unique_violation THEN RAISE EXCEPTION '1d: a superseded source reading must be refused (it passed the guard and reached the unique index)';
+ END;
+ -- another vehicle: the row as 1a landed it, filed on a second vehicle
+ BEGIN
+  INSERT INTO public.vehicle_observations(vehicle_id,source_id,source_identifier,kind,content_hash,structured_data,extraction_method,raw_source_ref,property_id,source_observation_id)
+  SELECT '11111111-1111-4111-8111-222222222222',source_id,source_identifier||':v','condition',content_hash,structured_data,extraction_method,raw_source_ref,property_id,source_observation_id
+   FROM public.vehicle_observations WHERE id=r;
+  RAISE EXCEPTION '1d2: a reading of another vehicle must be refused';
+ EXCEPTION WHEN check_violation THEN IF SQLERRM NOT LIKE 'image property projection must name%' THEN RAISE; END IF; END;
+ -- another photo: the row as 1a landed it, naming photo 1 while its reading is of photo 2
+ BEGIN
+  INSERT INTO public.vehicle_observations(vehicle_id,source_id,source_identifier,kind,content_hash,structured_data,extraction_method,raw_source_ref,property_id,source_observation_id)
+  SELECT vehicle_id,source_id,source_identifier||':i','condition',content_hash,jsonb_set(structured_data,'{image_id}','"44444444-4444-4444-8444-000000000001"'),extraction_method,raw_source_ref,property_id,source_observation_id
+   FROM public.vehicle_observations WHERE id=r;
+  RAISE EXCEPTION '1d3: a reading of another photo must be refused';
  EXCEPTION WHEN check_violation THEN IF SQLERRM NOT LIKE 'image property projection must name%' THEN RAISE; END IF; END;
  -- property id of another key
  BEGIN PERFORM pg_temp.land('55555555-5555-4555-8555-000000000002','image_visible_assembly_state','assembled',true,'33333333-3333-4333-8333-000000000001');
