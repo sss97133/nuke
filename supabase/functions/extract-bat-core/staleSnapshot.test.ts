@@ -39,3 +39,13 @@ Deno.test("a closed page carrying the sale or the reserve-not-met record is used
 Deno.test("a page with no end of its own is used as before", () => {
   equal(staleClosedSnapshot(page([bid], null), END_MS + 3_600_000), null);
 });
+
+Deno.test("the reader's snapshot lookup is gated by the refusal", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const call = src.indexOf("staleClosedSnapshot(String(snap.html), Date.now())");
+  const gate = src.indexOf("if (!snapErr && !staleReason && snap?.html && String(snap.html).length > 1000) {");
+  const use = src.indexOf('htmlSource = "snapshot";');
+  if (call < 0 || gate < 0 || use < 0 || !(call < gate && gate < use)) {
+    throw new Error(`snapshot lookup no longer refuses a pre-close page (call ${call}, gate ${gate}, use ${use})`);
+  }
+});
