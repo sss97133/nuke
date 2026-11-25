@@ -47,9 +47,9 @@ REVOKE ALL ON public.model_fold_priority_tiers FROM anon, authenticated;
 GRANT SELECT ON public.model_fold_priority_tiers TO anon, authenticated;
 GRANT ALL ON public.model_fold_priority_tiers TO service_role;
 INSERT INTO public.model_fold_priority_tiers (tier, min_keyed_witnesses, note) VALUES
-  (2, 20, 'cars with 20+ keyed witnesses: 4,546 of 180,154 graded on 2026-11-25'),
-  (3, 5, 'cars with 5+ keyed witnesses: 74,328 of 180,154 graded on 2026-11-25'),
-  (4, 0, 'every other car')
+  (2, 20, 'queue priority, not truth. Basis: sum of data_set_member_grades.n_witnesses per car, measured 2026-11-25 over 180,154 graded cars (backfill ~25%): 869 at 100+, 4,546 at 20+, 74,328 at 5+, p50 4, p90 10. 20+ is the top ~2.5%, a first lap a day of fold capacity covers.'),
+  (3, 5, 'queue priority, not truth. Basis: same 2026-11-25 measurement; 74,328 of 180,154 graded cars hold 5+ keyed witnesses (p90 is 10), so this tier is the next ~41%.'),
+  (4, 0, 'queue priority, not truth. Basis: every remaining car, including those with no keyed witness; folded last, on change only.')
 ON CONFLICT (tier) DO NOTHING;
 
 UPDATE public.platform_config SET config_value = config_value || '{"signal_tiers_max": 1}'::jsonb, updated_at = now()
