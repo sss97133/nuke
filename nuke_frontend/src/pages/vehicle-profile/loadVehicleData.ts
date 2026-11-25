@@ -83,6 +83,12 @@ function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {})
 }
 
 /** The record a merged-away vehicle was folded into, or null: the vehicle's own id (a loop) is not a target. */
+// The vehicles row a non-insider may open, as a PostgREST filter: not deleted, or a merged stub. It is
+// vehicle_publicly_readable (20261125214500) minus is_public, which the table's read policy already applies; the fallback
+// below must answer like get_vehicle_profile_data, which applies the same predicate (20261125225500), and
+// loadVehicleData.test.ts fails if this and the SQL body disagree.
+export const PUBLIC_ROW_OR = 'deleted_at.is.null,merged_into_vehicle_id.not.is.null';
+
 export function mergedTargetOf(vehicle: { id?: unknown; merged_into_vehicle_id?: unknown } | null | undefined): string | null {
   const to = vehicle?.merged_into_vehicle_id;
   return typeof to === 'string' && to.length >= 20 && to !== vehicle?.id ? to : null;
@@ -476,6 +482,7 @@ export async function loadVehicleImpl({
           .from('vehicles')
           .select('id,merged_into_vehicle_id,year,make,model,normalized_model,series,trim,is_replica,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,import_metadata,provenance_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
           .eq('id', vehicleId)
+          .or(PUBLIC_ROW_OR)
           .single();
 
 
@@ -492,6 +499,19 @@ export async function loadVehicleImpl({
           setVehicle(null);
           setLoading(false);
           return rpcLoaded;
+        }
+
+        // A deleted stub redirects only to a car the public may open, as the reader answers: a stub whose target is
+        // private (or deleted and unmerged) is a missing car, so its address never names the target.
+        const stubTarget = data.deleted_at ? mergedTargetOf(data) : null;
+        if (stubTarget) {
+          const { data: target } = await supabase.from('vehicles').select('id')
+            .eq('id', stubTarget).eq('is_public', true).or(PUBLIC_ROW_OR).maybeSingle();
+          if (!target) {
+            setVehicle(null);
+            setLoading(false);
+            return rpcLoaded;
+          }
         }
 
         vehicleData = data;

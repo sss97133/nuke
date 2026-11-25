@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
-import { loadVehicleImpl, mergedTargetOf, selectBestHeroImage } from './loadVehicleData';
+import { readFileSync } from 'node:fs';
+import { loadVehicleImpl, mergedTargetOf, PUBLIC_ROW_OR, selectBestHeroImage } from './loadVehicleData';
 
 describe('profile fallback transport', () => {
   const id = '00000000-0000-0000-0000-0000000000a1';
   const target = '00000000-0000-0000-0000-0000000000b2';
   const vin = '1GCEK14K8EJ123456';
   async function load(row: Row | null, emptyRpc = false, options: {
-    address?: string; vinRows?: unknown; vinStatus?: number; vinNetworkError?: boolean; rpc?: unknown;
+    address?: string; vinRows?: unknown; vinStatus?: number; vinNetworkError?: boolean; rpc?: unknown; target?: Row | null;
   } = {}) {
     const requests: URL[] = [];
     const bodies: unknown[] = [];
@@ -27,10 +28,19 @@ describe('profile fallback transport', () => {
         return emptyRpc ? json({ vehicle: null }) : json({ code: '57014', message: 'statement timeout' }, 500);
       }
       if (url.pathname === '/rest/v1/vehicles') {
+        // Apply the filters the loader sends, as PostgREST does: or=(deleted_at.is.null,merged_into_vehicle_id.not.is.null)
+        // and is_public=eq.true.
+        const passes = (r: Row) => (url.searchParams.get('or') !== `(${PUBLIC_ROW_OR})`
+            || r.deleted_at == null || r.merged_into_vehicle_id != null)
+          && (url.searchParams.get('is_public') !== 'eq.true' || r.is_public === true);
+        if (url.searchParams.get('id') === `eq.${target}` && options.target !== undefined) {
+          const t = options.target && passes(options.target) ? options.target : null;
+          return t ? json({ id: t.id }) : json({ code: 'PGRST116', message: 'No visible row' }, 406);
+        }
         if (url.searchParams.get('id') !== `eq.${id}`) {
           return json({ code: '22P02', message: 'invalid input syntax for type uuid' }, 400);
         }
-        if (!row) return json({ code: 'PGRST116', message: 'No visible row' }, 406);
+        if (!row || !passes(row)) return json({ code: 'PGRST116', message: 'No visible row' }, 406);
         // Return only the requested columns, as PostgREST does: merge routing must carry its field.
         const columns = new Set(url.searchParams.get('select')?.split(','));
         return json(Object.fromEntries(Object.entries(row).filter(([key]) => columns.has(key))));
@@ -69,6 +79,36 @@ describe('profile fallback transport', () => {
     expect(out.navigate).toHaveBeenCalledWith(`/vehicle/${target}`, { replace: true });
     expect(out.setVehicle).not.toHaveBeenCalled();
     expect(out.requests.map(url => url.pathname)).toEqual(['/rest/v1/rpc/get_vehicle_profile_data']);
+  });
+
+  it('the fallback opens a car only where vehicle_publicly_readable does (same filter as the SQL body)', () => {
+    const sql = readFileSync(new URL('../../../../supabase/migrations/20261125214500_vehicle_row_read_deleted_gate.sql', import.meta.url), 'utf8');
+    const body = sql.match(/SELECT coalesce\(p_is_public, false\) AND \((.+)\)\n/)?.[1];
+    expect(body).toBe('p_deleted_at IS NULL OR p_merged_into_vehicle_id IS NOT NULL');
+    const asFilter = body!.split(' OR ').map(t => t.replace(/^p_/, '').replace(/ IS NOT NULL$/, '.not.is.null').replace(/ IS NULL$/, '.is.null'));
+    expect(asFilter.join(',')).toBe(PUBLIC_ROW_OR);
+  });
+
+  it('a deleted, unmerged car the reader answers as missing stays missing through the fallback', async () => {
+    const out = await load({ id, is_public: true, deleted_at: '2026-11-01T00:00:00Z', merged_into_vehicle_id: null }, true);
+    expect(out.requests[1].searchParams.get('or')).toBe(`(${PUBLIC_ROW_OR})`);
+    expect(out.setVehicle).toHaveBeenLastCalledWith(null);
+    expect(out.navigate).not.toHaveBeenCalled();
+  });
+
+  it('a deleted stub whose target is private is missing through the fallback, never routed', async () => {
+    const out = await load({ id, is_public: true, deleted_at: '2026-11-01T00:00:00Z', merged_into_vehicle_id: target }, true,
+      { target: { id: target, is_public: false, deleted_at: null, merged_into_vehicle_id: null } });
+    expect(out.navigate).not.toHaveBeenCalled();
+    expect(out.setVehicle).toHaveBeenLastCalledWith(null);
+    expect(out.requests[2].searchParams.get('is_public')).toBe('eq.true');
+  });
+
+  it('a deleted stub whose target is public routes there through the fallback', async () => {
+    const out = await load({ id, is_public: true, deleted_at: '2026-11-01T00:00:00Z', merged_into_vehicle_id: target }, true,
+      { target: { id: target, is_public: true, deleted_at: null, merged_into_vehicle_id: null } });
+    expect(out.navigate).toHaveBeenCalledWith(`/vehicle/${target}`, { replace: true });
+    expect(out.setVehicle).not.toHaveBeenCalled();
   });
 
   it('routes a merged fallback record to its target before displaying the stub', async () => {

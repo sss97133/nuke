@@ -28,7 +28,7 @@ function load(vehicleId: string, rpc: { data: unknown; error: unknown }, row: Re
     rpc: vi.fn(() => Promise.resolve(rpc)),
     from: vi.fn(() => {
       const q: any = {
-        select: () => q, eq: () => q, order: () => q, limit: () => q,
+        select: () => q, eq: () => q, or: () => q, order: () => q, limit: () => q,
         single: () => Promise.resolve({ data: { ...VEHICLE, ...row, id: vehicleId }, error: null }),
         then: (resolve: any, reject: any) => Promise.resolve({ data: [], error: null }).then(resolve, reject),
       };

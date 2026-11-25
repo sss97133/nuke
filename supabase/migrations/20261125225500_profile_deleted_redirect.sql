@@ -9,8 +9,10 @@
 -- WHAT. The same predicate as vehicle_row_read (20261125214500): public.vehicle_publicly_readable(is_public, deleted_at,
 -- merged_into_vehicle_id), created here too with the identical body (whichever deploys first creates it; the contract
 -- pins its sha) so this applies in either order. A non-insider now reads a car only when it holds. A deleted merged car
--- answers a non-insider {"vehicle": {"id", "merged_into_vehicle_id"}} and nothing else, which is all the redirect reads;
--- a deleted car that was not merged answers NULL, exactly like a missing one. Insiders and the service role are
+-- answers a non-insider {"vehicle": {"id", "merged_into_vehicle_id"}} and nothing else, which is all the redirect reads,
+-- when its target is publicly readable; a stub whose target is not (prod 2026-11-25, 8 of 256 pk slices: 280 of 1,050
+-- public stubs, 26.7%, about 9.0k for the table, every one a private target) and a deleted car that was not merged answer
+-- NULL, exactly like a missing one. The page's fallback select (loadVehicleData.ts, PUBLIC_ROW_OR) applies the same rule. Insiders and the service role are
 -- unchanged. Built on 20261125221500: the guard accepts only that body (or this one on a re-run).
 -- CONTRACT: supabase/sql/test_profile_deleted_redirect.sql (PG17). REVERSAL:
 -- supabase/sql/revert_20261125225500_profile_deleted_redirect.sql (the 20261125221500 body).
@@ -79,6 +81,12 @@ BEGIN
     RETURN NULL;
   END IF;
   IF v_redirect IS NOT NULL AND NOT v_insider THEN
+    -- A redirect to a car that is not publicly readable (private, or deleted and unmerged) would name it to an outsider:
+    -- answer as missing (2026-11-25, 2% sample: 194 of 748 public stubs point at one).
+    IF NOT EXISTS (SELECT 1 FROM public.vehicles t WHERE t.id = v_redirect
+                   AND public.vehicle_publicly_readable(t.is_public, t.deleted_at, t.merged_into_vehicle_id)) THEN
+      RETURN NULL;
+    END IF;
     RETURN json_build_object('vehicle', json_build_object('id', p_vehicle_id, 'merged_into_vehicle_id', v_redirect));
   END IF;
 
