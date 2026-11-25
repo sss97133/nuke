@@ -232,6 +232,19 @@ DO $r$ BEGIN
   END IF;
 END $r$;
 
+-- The worker's plate separator back to newline and tab only (anchored edit, one occurrence).
+DO $sep$
+DECLARE
+  d text := pg_get_functiondef('public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[])'::regprocedure);
+  a text := $b$'(?:[\s./-]|\\[nrt])*'$b$;
+  b text := $a$'(?:[\s./-]|\\[nt])*'$a$;
+BEGIN
+  IF (length(d) - length(replace(d, a, ''))) / length(a) = 1 THEN
+    EXECUTE replace(d, a, b);
+  END IF;
+END
+$sep$;
+
 DO $verify$
 BEGIN
   IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.get_user_day_receipt(uuid, date)'::regprocedure) <> 'da8b99c06758ca0da01b10e37ac4b287'

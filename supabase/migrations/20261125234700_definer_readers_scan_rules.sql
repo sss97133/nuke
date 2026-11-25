@@ -22,7 +22,10 @@
 --      component label (rank 1) they were read from, with the photo's uploader and the car: a text region is withheld
 --      from an untied caller (printed NULL, the axle type and image id kept); a label keeps its words.
 --   3. private_row_probes: get_analysis_stream (feed of private photos, both audiences) and vehicle_axle_type_evidence
---      (rows for a car that is not public), when the table exists.
+--      (rows for a car that is not public), when the table exists. Ranks 30 and 31 (26 and 27 are #3955 and #3973).
+--   4. The worker's plate separator (ta-skeptic, #3935 review): between the plate's letters it also skips an escaped
+--      carriage return, so "TST<CR>PL89" is withheld like "TST<LF>PL89". An anchored edit of the live worker: exactly
+--      one occurrence of the old separator literal is replaced; an already-applied worker is left alone.
 -- Needs 20261125200000 live (the worker, the rule type and the compiled rules); the guard refuses otherwise.
 -- Contract: supabase/sql/test_definer_readers_scan_rules.sql. Revert: supabase/sql/revert_20261125234700_definer_readers_scan_rules.sql.
 
@@ -42,6 +45,21 @@ BEGIN
   END IF;
 END
 $guard$;
+
+-- 4. The worker's plate separator also skips an escaped carriage return (anchored edit, one occurrence).
+DO $sep$
+DECLARE
+  d text := pg_get_functiondef('public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[])'::regprocedure);
+  a text := $a$'(?:[\s./-]|\\[nt])*'$a$;
+  b text := $b$'(?:[\s./-]|\\[nrt])*'$b$;
+BEGIN
+  IF (length(d) - length(replace(d, a, ''))) / length(a) = 1 THEN
+    EXECUTE replace(d, a, b);
+  ELSIF position(b IN d) = 0 THEN
+    RAISE EXCEPTION 'worker plate separator: anchor not found';
+  END IF;
+END
+$sep$;
 
 CREATE OR REPLACE FUNCTION public.get_user_day_receipt(p_user_id uuid, p_date date)
  RETURNS jsonb
@@ -291,10 +309,10 @@ BEGIN
   IF to_regclass('public.private_row_probes') IS NOT NULL THEN
     EXECUTE $i$INSERT INTO public.private_row_probes (relation, subject_kind, subject_column, row_key, rank, owner_lane, note,
                                                     reader, reader_args, reader_ids)
-      VALUES ('vehicle_images', 'image', 'id', 'id', 26, 'ta-policies',
+      VALUES ('vehicle_images', 'image', 'id', 'id', 30, 'ta-policies',
               'definer feed: the caller''s own deep-read photos with narrative and text regions; anon and a stranger get none',
               'get_analysis_stream', '', '$[*].image_id'),
-             ('vehicles', 'vehicle', 'id', 'id', 27, 'ta-policies',
+             ('vehicles', 'vehicle', 'id', 'id', 31, 'ta-policies',
               'definer reader: axle type evidence (paper lines, photo text) for a car; none for a car that is not public',
               'vehicle_axle_type_evidence', NULL, NULL)
       ON CONFLICT DO NOTHING$i$;
@@ -311,6 +329,10 @@ BEGIN
   IF NOT (has_function_privilege('anon', 'public.get_user_day_receipt(uuid, date)', 'EXECUTE')
           AND has_function_privilege('anon', 'public.vehicle_axle_type_evidence(uuid)', 'EXECUTE')) THEN
     RAISE EXCEPTION 'a reader lost its grants';
+  END IF;
+  IF position($b$'(?:[\s./-]|\\[nrt])*'$b$ IN (SELECT prosrc FROM pg_proc
+       WHERE oid = 'public.image_scan_metadata_for_viewer(jsonb, uuid, uuid, public.image_scan_rule[])'::regprocedure)) = 0 THEN
+    RAISE EXCEPTION 'the worker plate separator was not widened';
   END IF;
 END
 $verify$;

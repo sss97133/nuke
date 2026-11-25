@@ -10,11 +10,15 @@
 --     After, anon and a stranger get the photo row with its axle type and image id and printed NULL; a component label
 --     keeps its words with the plate withheld; the owner, a tied viewer and service_role read the text.
 --   * get_analysis_stream (live body, unchanged): anon and a stranger get no rows; the uploader gets their own reading.
---   * two private_row_probes rows; the revert restores both live bodies (md5) and removes the probe rows.
+--   * two private_row_probes rows (ranks 30, 31); the revert restores both live bodies (md5) and removes the probe rows.
+--   * ta-skeptic's #3935 should-fixes: the worker withholds a plate split by a carriage return; the id-keyed reader
+--     returns NULL to anon for a sensitive approved photo on a public car and for a photo on a deleted public car.
 -- Which assertion fails if the fix is removed (mutation run 2026-11-25): the worker call removed from the day receipt
 -- -> "day receipt: anon ..."; v_is_owner IS TRUE replaced by true -> "day receipt: anon ..."; the axle lateral replaced
 -- by the raw words -> "axle: anon ..."; the rules read as an empty array -> "day receipt: anon ..."; the probe block
--- skipped -> "probes: ...".
+-- skipped -> "probes: ..."; the separator edit skipped -> "worker: a plate split by a carriage return ..."; the
+-- reader's is_sensitive term removed -> "scan reader: anon gets NULL for a sensitive approved photo ..."; its deleted_at
+-- term removed -> "scan reader: anon gets NULL for a photo on a deleted public car".
 -- Fixture: fixtures/scan_metadata_schema.sql (the #3935 schema), then the tables and live helper bodies these readers
 -- read. Fixture rows only, in a disposable database. -- ALLOW_RAW_TESTIMONY_WRITE
 \ir fixtures/scan_metadata_schema.sql
@@ -239,7 +243,42 @@ SELECT public.t_assert(:'g_anon' = '0' AND :'g_str' = '0' AND :'g_own' = 'TSTNAR
 
 -- 6. The probe rows.
 SELECT public.t_assert((SELECT count(*) FROM public.private_row_probes WHERE owner_lane = 'ta-policies'
-  AND reader IN ('get_analysis_stream', 'vehicle_axle_type_evidence') AND active) = 2, 'probes: two private_row_probes rows');
+  AND reader IN ('get_analysis_stream', 'vehicle_axle_type_evidence') AND active) = 2
+  AND (SELECT array_agg(rank ORDER BY rank) FROM public.private_row_probes WHERE owner_lane = 'ta-policies'
+       AND reader IN ('get_analysis_stream', 'vehicle_axle_type_evidence')) = '{30,31}'::smallint[],
+  'probes: two private_row_probes rows, ranks 30 and 31');
+
+-- 6b. ta-skeptic's #3935 should-fixes. A component label whose plate is split by a carriage return (jsonb text: \r).
+BEGIN;
+UPDATE public.vehicle_images SET ai_scan_metadata = jsonb_build_object('byok_deep_analysis', jsonb_build_object('components_seen',
+    jsonb_build_array(jsonb_build_object('label', E'tag TST\rPL89 on the bumper'))))
+ WHERE id = '10000000-0000-0000-0000-000000000001';
+SELECT public.t_claims(''); SET LOCAL ROLE anon;
+SELECT coalesce(public.vehicle_image_scan_metadata('10000000-0000-0000-0000-000000000001')
+                #>> '{byok_deep_analysis,components_seen,0,label}', 'null') AS cr_label \gset
+ROLLBACK;
+SELECT public.t_assert(:'cr_label' = 'tag [withheld] on the bumper', 'worker: a plate split by a carriage return is withheld');
+
+-- The id-keyed reader: the photo reads for anon as it is (control); approved but sensitive, or on a deleted public car,
+-- it reads NULL. The fixture's gallery test admits an approved photo whatever is_sensitive says, so only the reader's
+-- own terms stand between anon and these documents.
+BEGIN;
+SELECT public.t_claims(''); SET LOCAL ROLE anon;
+SELECT (public.vehicle_image_scan_metadata('10000000-0000-0000-0000-000000000001') IS NOT NULL)::text AS sr_ctl \gset
+RESET ROLE;
+UPDATE public.vehicle_images SET is_sensitive = true, vision_gate_status = 'approved' WHERE id = '10000000-0000-0000-0000-000000000001';
+SET LOCAL ROLE anon;
+SELECT (public.vehicle_image_scan_metadata('10000000-0000-0000-0000-000000000001') IS NULL)::text AS sr_sens \gset
+ROLLBACK;
+BEGIN;
+UPDATE public.vehicles SET deleted_at = now()
+ WHERE id = (SELECT vehicle_id FROM public.vehicle_images WHERE id = '10000000-0000-0000-0000-000000000001') AND is_public;
+SELECT public.t_claims(''); SET LOCAL ROLE anon;
+SELECT (public.vehicle_image_scan_metadata('10000000-0000-0000-0000-000000000001') IS NULL)::text AS sr_del \gset
+ROLLBACK;
+SELECT public.t_assert(:'sr_ctl' = 'true', 'scan reader: anon reads the shown photo on a public car (control)');
+SELECT public.t_assert(:'sr_sens' = 'true', 'scan reader: anon gets NULL for a sensitive approved photo on a public car');
+SELECT public.t_assert(:'sr_del' = 'true', 'scan reader: anon gets NULL for a photo on a deleted public car');
 
 -- 7. The revert restores the live bodies (its own md5 check) and the defect with them, and removes the probe rows.
 \ir revert_20261125234700_definer_readers_scan_rules.sql
@@ -247,7 +286,9 @@ BEGIN;
 SELECT public.t_receipt('', 'narrative') AS v_narr2 \gset
 ROLLBACK;
 SELECT public.t_assert(:'v_narr2' = 'TSTNARR at TSTPLACE-H'
-  AND NOT EXISTS (SELECT 1 FROM public.private_row_probes WHERE owner_lane = 'ta-policies'),
-  'revert: the live bodies are back (anon reads the narrative again) and the probe rows are gone');
+  AND NOT EXISTS (SELECT 1 FROM public.private_row_probes WHERE owner_lane = 'ta-policies')
+  AND position('\\[nrt]' IN (SELECT prosrc FROM pg_proc WHERE proname = 'image_scan_metadata_for_viewer' AND pronargs = 4)) = 0
+  AND position('\\[nt]' IN (SELECT prosrc FROM pg_proc WHERE proname = 'image_scan_metadata_for_viewer' AND pronargs = 4)) > 0,
+  'revert: the live bodies are back (anon reads the narrative again), the probe rows are gone, the separator is newline and tab again');
 
 SELECT 'definer_readers_scan_rules contract: PASS' AS result;
