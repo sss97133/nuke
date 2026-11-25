@@ -40,6 +40,13 @@ export function rawScanMetadataReads(source: string, file = 'source'): string[] 
       || scanLists.has(select.trim());
     if (returnsScan) hits.push(`${file}:${source.slice(0, m.index).split('\n').length}`);
   }
+  // An embed of the table from another relation (`vehicle_images(*)`, `alias:vehicle_images!fk(ai_scan_metadata)`).
+  for (const e of source.matchAll(/(?<![\w:])(?:[A-Za-z_]\w*:)?vehicle_images(?:![\w]+)?\s*\(([^)]*)\)/g)) {
+    if (/(^|,)\s*\*\s*(,|$)/.test(e[1]) || /ai_scan_metadata/.test(e[1])) {
+      const before = source.slice(Math.max(0, e.index! - 8), e.index!);
+      if (!/from\(\s*['"`]$/.test(before)) hits.push(`${file}:${source.slice(0, e.index).split('\n').length}`);
+    }
+  }
   return hits;
 }
 
@@ -55,6 +62,10 @@ describe('ai_scan_metadata reads go through vehicle_images_public', () => {
     expect(rawScanMetadataReads(`supabase.from('vehicle_images').update({ ai_scan_metadata: m }).eq('id', x);`)).toHaveLength(0);
     expect(rawScanMetadataReads(`supabase.from('vehicle_images').update({ ai_scan_metadata: m }).select('*');`)).toHaveLength(1);
     expect(rawScanMetadataReads(`supabase.from('vehicle_images').insert(row).select().single();`)).toHaveLength(1);
+    expect(rawScanMetadataReads("supabase.from('image_set_members').select(`*, vehicle_images (*)`)")).toHaveLength(1);
+    expect(rawScanMetadataReads("supabase.from('x').select('id, img:vehicle_images!fk(ai_scan_metadata)')")).toHaveLength(1);
+    expect(rawScanMetadataReads("supabase.from('x').select('id, vehicle_images:vehicle_images_public (*)')")).toHaveLength(0);
+    expect(rawScanMetadataReads("supabase.from('x').select('id, vehicle_images(image_url, is_primary)')")).toHaveLength(0);
   });
 
   it('no file in src reads ai_scan_metadata from the table', () => {
