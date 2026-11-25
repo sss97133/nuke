@@ -354,6 +354,11 @@ export class ImageDuplicateLinker {
         });
       
       if (error) {
+        // 23505: already on record, though the check above could not read it (the read policy hides links on cars
+        // this caller may not open).
+        if (error.code === '23505') {
+          return true;
+        }
         console.error('Failed to create service relationship:', error);
         return false;
       }

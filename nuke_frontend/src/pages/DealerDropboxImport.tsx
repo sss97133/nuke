@@ -533,7 +533,11 @@ const DealerDropboxImport: React.FC = () => {
                 auto_tagged: false
               });
 
-            if (linkError) {
+            // 23505: already linked, though the check above could not read the link (the read policy hides links on
+            // cars this importer may not open).
+            if (linkError && linkError.code === '23505') {
+              console.log(`  ✓ Already linked to dealer`);
+            } else if (linkError) {
               console.warn(`  ⚠️ Could not link to dealer:`, linkError.message);
             } else {
               console.log(`  🔗 Linked to dealer inventory`);
