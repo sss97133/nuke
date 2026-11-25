@@ -1,8 +1,8 @@
 -- Contract for 20261126011500_observation_sources_viewer_columns (empty disposable PG17).
 -- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in an empty disposable PG17 database only (stub tables, not production).
 -- The table holds the live 26 columns, the live policy and the live grants. After the migration: authenticated reads the
--- 23 viewer columns (rows as before, joins as the pages embed them) and gets 42501 on notes, trust_factors,
--- species_evidence and select *; anon reads the viewer columns (0 rows, no policy) and nothing else; the guard refuses
+-- 24 viewer columns (rows as before, joins as the pages embed them) and gets 42501 on notes, trust_factors
+-- and select *; anon reads the viewer columns (0 rows, no policy) and nothing else; the guard refuses
 -- an unclassed column; a re-run changes nothing; a grant that lets an internal column through fails the check; the
 -- revert restores table-level SELECT.
 \set ON_ERROR_STOP on
@@ -39,7 +39,7 @@ CREATE FUNCTION pg_temp.check_withheld() RETURNS text LANGUAGE plpgsql AS $f$
 DECLARE r text;
 BEGIN
   FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
-    IF cardinality(pg_temp.readable(r)) <> 23 OR pg_temp.readable(r) && ARRAY['notes', 'trust_factors', 'species_evidence'] THEN
+    IF cardinality(pg_temp.readable(r)) <> 24 OR pg_temp.readable(r) && ARRAY['notes', 'trust_factors'] THEN
       RETURN format('%s reads %s columns: %s', r, cardinality(pg_temp.readable(r)), pg_temp.readable(r));
     END IF;
   END LOOP;
@@ -85,20 +85,20 @@ DO $$
 DECLARE c text; v text; bad text := pg_temp.check_withheld();
 BEGIN
   IF bad IS NOT NULL THEN RAISE EXCEPTION 'FAIL grants: %', bad; END IF;
-  RAISE NOTICE 'PASS anon and authenticated each read exactly the 23 viewer columns (applied twice)';
-  FOREACH c IN ARRAY ARRAY['notes', 'trust_factors', 'species_evidence', '*'] LOOP
+  RAISE NOTICE 'PASS anon and authenticated each read exactly the 24 viewer columns (applied twice)';
+  FOREACH c IN ARRAY ARRAY['notes', 'trust_factors', '*'] LOOP
     v := pg_temp.try('authenticated', format('SELECT count(*) FROM (SELECT %s FROM public.observation_sources) x',
                                             CASE c WHEN '*' THEN '*' ELSE quote_ident(c) END));
     IF v <> '42501' THEN RAISE EXCEPTION 'FAIL: a signed-in reader selected % (%)', c, v; END IF;
   END LOOP;
-  RAISE NOTICE 'PASS a signed-in reader gets 42501 on notes, trust_factors, species_evidence and select *';
-  v := pg_temp.try('authenticated', 'SELECT count(*) FROM (SELECT id, slug, display_name, category, base_url, url_patterns, base_trust_score, supported_observations, requires_auth, rate_limit_per_hour, makes_covered, years_covered, regions_covered, created_at, updated_at, business_id, tier, decay_half_life_days, veracity, consecration, market_slug, species, species_set FROM public.observation_sources) x');
-  IF v <> '2' THEN RAISE EXCEPTION 'FAIL: the image page''s 23-column read returned %', v; END IF;
+  RAISE NOTICE 'PASS a signed-in reader gets 42501 on notes, trust_factors and select *';
+  v := pg_temp.try('authenticated', 'SELECT count(*) FROM (SELECT id, slug, display_name, category, base_url, url_patterns, base_trust_score, supported_observations, requires_auth, rate_limit_per_hour, makes_covered, years_covered, regions_covered, created_at, updated_at, business_id, tier, decay_half_life_days, veracity, consecration, market_slug, species, species_set, species_evidence FROM public.observation_sources) x');
+  IF v <> '2' THEN RAISE EXCEPTION 'FAIL: the image page''s 24-column read returned %', v; END IF;
   v := pg_temp.try('authenticated', 'SELECT count(s.display_name) FROM public.vehicle_observations o LEFT JOIN public.observation_sources s ON s.id = o.source_id');
   IF v <> '1' THEN RAISE EXCEPTION 'FAIL: the pages'' (display_name, slug) embed returned %', v; END IF;
   v := pg_temp.try('authenticated', 'SELECT count(*) FROM public.observation_sources');
   IF v <> '2' THEN RAISE EXCEPTION 'FAIL: a signed-in count(*) returned %', v; END IF;
-  RAISE NOTICE 'PASS a signed-in reader keeps both rows through the 23-column read, the embed and count(*)';
+  RAISE NOTICE 'PASS a signed-in reader keeps both rows through the 24-column read, the embed and count(*)';
   v := pg_temp.try('anon', 'SELECT count(id) FROM public.observation_sources');
   IF v <> '0' THEN RAISE EXCEPTION 'FAIL: anon read % rows (no policy, want 0 and no error)', v; END IF;
   IF pg_temp.try('anon', 'SELECT count(notes) FROM public.observation_sources') <> '42501' THEN
