@@ -33,7 +33,8 @@
 -- in the removal tree -> the fixed list; get_image_deep_analysis left raw -> the migration's verify block; the JSON
 -- fallback -> "value redaction that would break the JSON"; both overlap prunings -> "overlapping rules"; the worker
 -- left anon-executable -> "oracle: ..."; an early exit when no plate is on file -> "timing: ..."; the old lookbehind
--- -> "plate after a JSON escape ..."; the visibility re-check removed -> "callable: a hidden photo".
+-- -> "plate after a JSON escape ..."; the visibility re-check removed -> "callable: a hidden photo"; the live
+-- vehicle_images policy-hash check removed -> "another live vehicle_images policy hash".
 -- Fixture: supabase/sql/fixtures/photo_reading_select_base.sql, then production's full vehicle_images column list and
 -- the live vehicle_images_public definition (pg_get_viewdef md5 checked) with its gallery overload re-created verbatim.
 -- Fixture rows only, in a disposable database. -- ALLOW_RAW_TESTIMONY_WRITE
@@ -561,6 +562,18 @@ SELECT public.t_assert(:'leak_before'::boolean, 'before: anon reads place_hint t
 CREATE TABLE public.private_row_policy_copies(reader text NOT NULL, relation text NOT NULL, policy_filter text NOT NULL, recorded_hash text NOT NULL,
   owner_lane text NOT NULL, note text NOT NULL, recorded_at timestamptz NOT NULL DEFAULT now(), active boolean NOT NULL DEFAULT true,
   PRIMARY KEY (reader, relation, policy_filter));
+-- Its live hash function, stubbed: answers the hash set in test.vi_policy_hash (the fixture's policies are not prod's).
+CREATE FUNCTION public.private_row_policy_hash(p_relation text, p_policy_filter text) RETURNS TABLE (policy_hash text, policies int)
+LANGUAGE sql STABLE AS $$ SELECT current_setting('test.vi_policy_hash', true), 1 $$;
+-- Another live vehicle_images policy hash (the pre-#3971 one): the migration stops and applies nothing.
+SELECT set_config('test.vi_policy_hash', '3af9ebbc1bebf423e3bd1e0b7c45a194', false);
+\set ON_ERROR_STOP 0
+\ir ../migrations/20261125200000_scan_metadata_withheld_paths.sql
+\set ON_ERROR_STOP 1
+SELECT public.t_assert(to_regprocedure('public.vehicle_image_scan_metadata(uuid)') IS NULL
+  AND to_regclass('public.image_scan_withheld_paths') IS NULL AND NOT EXISTS (SELECT 1 FROM public.private_row_policy_copies),
+  'another live vehicle_images policy hash: the migration applies nothing');
+SELECT set_config('test.vi_policy_hash', 'd00a311fd7235bb19240f3fd812493c4', false);
 \ir ../migrations/20261125200000_scan_metadata_withheld_paths.sql
 
 -- 1. Shape.
@@ -870,7 +883,7 @@ SELECT public.t_assert(NOT EXISTS (
        AND has_function_privilege(r.role, p.oid, 'EXECUTE')
        AND EXISTS (SELECT 1 FROM unnest(p.proargtypes::oid[]) t WHERE t IN ('jsonb'::regtype, 'json'::regtype, 'text'::regtype, 'public.image_scan_rule[]'::regtype))),
   'catalog: no anon- or authenticated-executable function that reaches the worker takes jsonb, json, text or rules');
-SELECT public.t_assert((SELECT recorded_hash = '3af9ebbc1bebf423e3bd1e0b7c45a194' AND owner_lane = 'ta-policies' FROM public.private_row_policy_copies
+SELECT public.t_assert((SELECT recorded_hash = 'd00a311fd7235bb19240f3fd812493c4' AND owner_lane = 'ta-policies' FROM public.private_row_policy_copies
                          WHERE reader = 'vehicle_image_scan_metadata(uuid)' AND relation = 'vehicle_images'), 'policy copy registered');
 
 -- 18. The plate after a JSON escape and with other separators (the car's plate is tst-pl8 9; fixture rows, rolled back).

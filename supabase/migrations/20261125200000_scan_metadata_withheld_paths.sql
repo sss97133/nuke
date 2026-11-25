@@ -514,12 +514,19 @@ GRANT EXECUTE ON FUNCTION public.vehicle_image_scan_metadata(uuid) TO anon, auth
 COMMENT ON FUNCTION public.vehicle_image_scan_metadata(uuid) IS
   'One photo''s ai_scan_metadata as the caller may read it, by photo id: NULL unless the caller may see the photo (shown on a public, non-deleted car and gallery-eligible, or the uploader, or tied); then withheld paths removed for an untied caller. Takes no document from the caller. ai_scan_metadata of vehicle_images_public.';
 
+-- The read policies this reader restates must be the ones it was written against: vehicle_images SELECT/ALL policies
+-- hash d00a311f... on production since #3971 (20261125 05:25 PT). Any other live hash stops the migration.
 DO $reg$
+DECLARE v_live text;
 BEGIN
   IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    SELECT h.policy_hash INTO v_live FROM public.private_row_policy_hash('vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')') h;
+    IF v_live IS DISTINCT FROM 'd00a311fd7235bb19240f3fd812493c4' THEN
+      RAISE EXCEPTION 'vehicle_images read policies hash % live; vehicle_image_scan_metadata restates d00a311f...: re-read them before applying', v_live;
+    END IF;
     EXECUTE $i$INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
       VALUES ('vehicle_image_scan_metadata(uuid)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')',
-              '3af9ebbc1bebf423e3bd1e0b7c45a194', 'ta-policies',
+              'd00a311fd7235bb19240f3fd812493c4', 'ta-policies',
               '20261125200000 restates the vehicle_images read policy (shown, uploader, tied) before returning a photo''s analysis')
       ON CONFLICT (reader, relation, policy_filter) DO NOTHING$i$;
   END IF;
