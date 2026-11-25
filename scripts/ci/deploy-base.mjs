@@ -15,9 +15,12 @@
 // Re-runs: a run keeps its id and created_at when re-run, so only runs created before this one are candidates (a re-run
 // of an old commit diffs from the run before it, not from newer runs), and a run's steps are read across all its
 // attempts (jobs?filter=all): a run whose first attempt applied and whose re-run is still queued has applied.
-// Fallback: HEAD^ with a ::warning:: when the API cannot be read or no such run is found in the newest page.
+// No fallback: when no base can be established (API unreadable, no such run in the newest page) or the base is not an
+// ancestor of this run's commit (GitHub compare: ahead or identical), the step fails loudly; a silent HEAD^ is how
+// #3918's migration was dropped. A base run whose apply step did not succeed is named with a ::warning::.
 //
-// Usage (in the workflow): BASE=$(node scripts/ci/deploy-base.mjs) ; prints one sha on stdout, notes on stderr.
+// Usage (in the workflow): BASE=$(node scripts/ci/deploy-base.mjs) ; prints one sha on stdout, notes on stderr, exit 1
+// when no safe base exists.
 
 export const APPLY_STEP = /^Apply migrations/;
 
@@ -33,7 +36,10 @@ export async function selectBase(runs, stepsByRun, { currentRunId, currentCreate
     if (steps == null) return { sha: null, why: `steps of run ${r.id} unreadable` };
     const applies = steps.filter((s) => APPLY_STEP.test(s.name || ''));
     const started = applies.some((s) => s.started_at && s.conclusion !== 'skipped' && s.status !== 'queued');
-    if (started) return { sha: r.head_sha, run: r.id, skipped };
+    if (started) {
+      const ok = applies.some((s) => s.conclusion === 'success');
+      return { sha: r.head_sha, run: r.id, applied: ok ? 'success' : applies.map((s) => s.conclusion || s.status).join('/'), skipped };
+    }
     const seen = applies.map((s) => s.conclusion || s.status).join('/') || 'absent';
     skipped.push({ id: r.id, sha: r.head_sha, why: `${r.conclusion}, apply step ${seen}` });
   }
@@ -48,13 +54,17 @@ async function api(path, token) {
   return res.json();
 }
 
+// GitHub compare base...head: 'ahead' or 'identical' means base is an ancestor of head (or head itself).
+export function isAncestorStatus(status) { return status === 'ahead' || status === 'identical'; }
+
 async function main() {
-  const { GITHUB_TOKEN: token, GITHUB_REPOSITORY: repo, GITHUB_RUN_ID: runId } = process.env;
-  const fallback = (why) => {
-    console.error(`::warning::deploy-base: ${why}; diffing from HEAD^ (a run replaced while pending may be missed)`);
-    process.stdout.write('HEAD^\n');
+  const { GITHUB_TOKEN: token, GITHUB_REPOSITORY: repo, GITHUB_RUN_ID: runId, GITHUB_SHA: head } = process.env;
+  const fail = (why) => {
+    console.error(`::error::deploy-base: ${why}. No safe diff base, so nothing is applied; re-dispatch the migrations by name.`);
+    process.exit(1);
   };
-  if (!token || !repo) return fallback('GITHUB_TOKEN or GITHUB_REPOSITORY missing');
+  if (!token || !repo || !runId || !head) return fail('GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_RUN_ID or GITHUB_SHA missing');
+  let out;
   try {
     const { workflow_runs: runs } = await api(
       `/repos/${repo}/actions/workflows/supabase-deploy.yml/runs?branch=main&event=push&per_page=30`, token);
@@ -64,15 +74,19 @@ async function main() {
         return jobs.flatMap((j) => j.steps || []);
       } catch { return null; }
     };
-    const current = runId ? await api(`/repos/${repo}/actions/runs/${runId}`, token) : null;
-    const out = await selectBase(runs, stepsByRun, { currentRunId: runId, currentCreatedAt: current?.created_at });
-    for (const s of out.skipped || []) console.error(`deploy-base: run ${s.id} (${s.sha.slice(0, 9)}) applied nothing (${s.why}); its files ride this run`);
-    if (!out.sha) return fallback(out.why);
-    console.error(`deploy-base: run ${out.run} applied through ${out.sha.slice(0, 9)}`);
-    process.stdout.write(`${out.sha}\n`);
+    const current = await api(`/repos/${repo}/actions/runs/${runId}`, token);
+    out = await selectBase(runs, stepsByRun, { currentRunId: runId, currentCreatedAt: current.created_at });
   } catch (e) {
-    return fallback(e.message);
+    return fail(e.message);
   }
+  for (const s of out.skipped || []) console.error(`deploy-base: run ${s.id} (${s.sha.slice(0, 9)}) applied nothing (${s.why}); its files ride this run`);
+  if (!out.sha) return fail(out.why);
+  let status;
+  try { ({ status } = await api(`/repos/${repo}/compare/${out.sha}...${head}`, token)); } catch (e) { return fail(`compare: ${e.message}`); }
+  if (!isAncestorStatus(status)) return fail(`base ${out.sha.slice(0, 9)} (run ${out.run}) is not an ancestor of ${head.slice(0, 9)} (compare: ${status})`);
+  if (out.applied !== 'success') console.error(`::warning::deploy-base: base run ${out.run} reached its apply step but ended ${out.applied}; its own files are not re-applied (re-dispatch them by name)`);
+  console.error(`deploy-base: run ${out.run} applied through ${out.sha.slice(0, 9)}`);
+  process.stdout.write(`${out.sha}\n`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) await main();

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { selectBase } from './deploy-base.mjs';
+import { selectBase, isAncestorStatus } from './deploy-base.mjs';
 
 const run = (id, sha, conclusion, extra = {}) => ({ id, head_sha: sha, conclusion, status: 'completed', event: 'push', head_branch: 'main',
   created_at: `2026-11-25T10:${String(id).padStart(2, '0')}:00Z`, ...extra });
@@ -43,7 +43,7 @@ test('a run the API still lists in progress, with its apply step started, is the
   assert.equal(out.sha, 'c5');
 });
 
-test('unreadable steps or no qualifying run give no base (the caller falls back to HEAD^ with a warning)', async () => {
+test('unreadable steps or no qualifying run give no base (the caller fails the step)', async () => {
   assert.equal((await selectBase([run(2, 'c2', 'success')], async () => null, { currentRunId: 3 })).sha, null);
   assert.equal((await selectBase([run(2, 'c2', 'cancelled')], steps({}), { currentRunId: 3 })).sha, null);
 });
@@ -60,4 +60,17 @@ test('a run whose first attempt applied and whose re-run is queued still counts 
   const out = await selectBase([run(5, 'c5', null, { status: 'queued', run_attempt: 2 }), run(3, 'c3', 'success')],
     steps({ 5: attempts, 3: applied() }), { currentRunId: 6, currentCreatedAt: run(6).created_at });
   assert.equal(out.sha, 'c5');
+});
+
+test('a base is usable only when it is an ancestor of the run commit (compare ahead or identical)', () => {
+  assert.equal(isAncestorStatus('ahead'), true);
+  assert.equal(isAncestorStatus('identical'), true);
+  assert.equal(isAncestorStatus('behind'), false);   // base is a descendant: a re-run would apply nothing and stay green
+  assert.equal(isAncestorStatus('diverged'), false);
+});
+
+test('a base run that failed while applying is still the base and is reported as not successful', async () => {
+  const out = await selectBase([run(5, 'c5', 'failure'), run(2, 'c2', 'success')], steps({ 5: applied('failure'), 2: applied() }), { currentRunId: 6 });
+  assert.equal(out.sha, 'c5');
+  assert.equal(out.applied, 'failure');
 });
