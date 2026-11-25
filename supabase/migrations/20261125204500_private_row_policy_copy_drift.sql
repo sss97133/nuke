@@ -22,13 +22,15 @@
 -- RECORDED. Measured live 2026-11-25 ~01:50 PT; the migration refuses to apply if any live hash differs, so the watch
 -- starts from the state each copy was checked against:
 --   get_field_provenance(uuid,text)   field_evidence        SELECT/ALL    2 policies  (skeptic2 checked #3915's copy
---                                     vehicle_observations  RESTRICTIVE   4 policies   against these on 2026-11-25)
+--                                     vehicle_observations  SELECT/ALL   10 policies   against these on 2026-11-25;
+--                                     vehicle_field_sources SELECT/ALL    1 policy     every read rule the body restates,
+--                                     observation_witnesses SELECT/ALL    1 policy     permissive and restrictive)
 --   get_image_deep_analysis(uuid)     vehicle_images        SELECT/ALL    5 policies  (20261125160500's shown test)
 --   intake_live_state(integer,integer) vehicle_images       SELECT/ALL    5 policies
 --   intake_live_state(integer,integer) work_sessions        SELECT/ALL    3 policies
 --
 -- REVERT. supabase/sql/revert_20261125204500_private_row_policy_copy_drift.sql
--- TEST. supabase/sql/test_private_row_policy_copy_drift.sql
+-- TEST. supabase/sql/test_private_row_reader_policy_copy.sql
 SET lock_timeout = '5s';
 SET statement_timeout = '30s';
 
@@ -64,8 +66,12 @@ REVOKE ALL ON FUNCTION public.private_row_policy_hash(text, text) FROM PUBLIC, a
 INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note) VALUES
   ('get_field_provenance(uuid,text)', 'field_evidence', 'p.cmd IN (''SELECT'', ''ALL'')', '15d0adf6157e9a117db0acf9eb2f6a28',
    'ta-readers', '#3915 restates the field_evidence read policies in the definer body'),
-  ('get_field_provenance(uuid,text)', 'vehicle_observations', 'p.permissive = ''RESTRICTIVE''', 'e9d400a2ab750cbf53d36ac8c5e98825',
-   'ta-readers', '#3915 restates the vehicle_observations restrictive policies in the definer body'),
+  ('get_field_provenance(uuid,text)', 'vehicle_observations', 'p.cmd IN (''SELECT'', ''ALL'')', '16c9e48fc1fbfbe5dc4ae10fe8947c7c',
+   'ta-readers', '#3915 restates the vehicle_observations read policies (vo_authenticated_read and the restrictive ones) in the definer body'),
+  ('get_field_provenance(uuid,text)', 'vehicle_field_sources', 'p.cmd IN (''SELECT'', ''ALL'')', 'f94521f7a825c2a01002b19d262b7353',
+   'ta-readers', '#3915 restates vehicle_field_sources_read (public car or tied) in the definer body'),
+  ('get_field_provenance(uuid,text)', 'observation_witnesses', 'p.cmd IN (''SELECT'', ''ALL'')', 'e6a01484953741fc9bb29becee17d4e2',
+   'ta-readers', '#3915 restates public_derived_image_witness_read (gallery-eligible cited photo) in the definer body'),
   ('get_image_deep_analysis(uuid)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')', '3af9ebbc1bebf423e3bd1e0b7c45a194',
    'ta-pipeline', '20261125160500 restates the vehicle_images read policy (shown, is_sensitive, uploader, tied)'),
   ('intake_live_state(integer,integer)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')', '3af9ebbc1bebf423e3bd1e0b7c45a194',
