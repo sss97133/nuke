@@ -24,7 +24,7 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;
 -- pg_cron, as far as the migration and the tick use it
 CREATE SCHEMA cron;
 CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text);
-CREATE TABLE cron.job_run_details (runid bigserial PRIMARY KEY, jobid bigint, status text);
+CREATE TABLE cron.job_run_details (runid bigserial PRIMARY KEY, jobid bigint, status text, start_time timestamptz, end_time timestamptz);
 CREATE FUNCTION cron.schedule(n text, s text, c text) RETURNS bigint LANGUAGE sql AS
   'INSERT INTO cron.job (jobname, schedule, command) VALUES (n, s, c) RETURNING jobid';
 CREATE FUNCTION cron.unschedule(n text) RETURNS boolean LANGUAGE sql AS 'DELETE FROM cron.job WHERE jobname = n RETURNING true';
