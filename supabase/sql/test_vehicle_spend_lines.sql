@@ -101,7 +101,7 @@ SELECT public.assert((public.get_vehicle_total_invested_unmasked('00000000-0000-
 
 \ir ../migrations/20261124224500_vehicle_spend_lines.sql
 \ir ../migrations/20261124224500_vehicle_spend_lines.sql
-\ir ../migrations/20261124234501_vehicle_spend_fold_enqueue_value.sql
+\ir ../migrations/20261124234500_vehicle_spend_fold_enqueue_value.sql
 
 CREATE FUNCTION pg_temp.rows_of(p_receipt text) RETURNS text LANGUAGE sql AS $$
   SELECT string_agg(basis || ':' || amount::text, ',' ORDER BY basis, amount)
