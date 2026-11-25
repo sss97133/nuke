@@ -14,7 +14,7 @@ import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, referenceFieldImages, isReferenceImage, hasImageAnalysis, webSourceUrl, heroFacetImages } from './hooks/useVehicleImageEvidence';
-import { useFieldProvenance, citedFieldImages, currentImageObservations, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
+import { useFieldProvenance, citedFieldImages, currentImageObservations, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS, withheldFieldWords } from './hooks/useFieldProvenance';
 import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import FieldProvenanceDrawer from './FieldProvenanceDrawer';
 import { CorrectionReceipt } from './FinancialReceiptRecords';
@@ -206,6 +206,12 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
 
   if (!context && !provenance.isLoading && provenance.data === null && !provenance.error) {
     return <div className="field-evidence-popup"><p role="status">Field evidence is unavailable or this record is private.</p></div>;
+  }
+  // A field the caller may not read: say it is private, never "no source claim" and never an empty card.
+  if (provenance.data?.withheld) {
+    return <div className="field-evidence-popup" data-withheld={provenance.data.withheld_reason ?? 'withheld'}>
+      <p role="status">{withheldFieldWords(provenance.data.withheld_reason)}</p>
+    </div>;
   }
   if (!context && provenanceCoverageUnavailable(provenance.data)) {
     return <div className="field-evidence-popup"><p role="status">Source evidence could not be loaded completely for this field. Coverage is unknown.</p>

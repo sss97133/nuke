@@ -37,6 +37,10 @@ export interface FieldProvenance {
   field: string;
   vehicle_id?: string;
   value: string | null;
+  /** get_field_provenance's withheld shape (20261125175500): the caller may not read this field; value and evidence are empty. */
+  withheld?: boolean;
+  /** 'column_not_public' | 'field_not_recognized' */
+  withheld_reason?: string | null;
   current_correction?: {
     correction_id: string; value: string; receipt_id: string; document_id: string;
     source_table: 'vehicle_documents' | 'vehicle_images'; page_date: string; recorded_at: string;
@@ -154,6 +158,13 @@ export function bindEngineCanonical(vehicleId: string, field: string, provenance
 
 export function formatProvenanceValue(field: string, value: string): string {
   return field === 'engine_displacement_l' ? `${value} L` : value;
+}
+
+/** The withheld shape in words, the same on web and iOS (FieldProvenance.withheldWords). One renderer for every field. */
+export function withheldFieldWords(reason: string | null | undefined): string {
+  if (reason === 'column_not_public') return 'Private: only the owner and the people tied to this car can see this field.';
+  if (reason === 'field_not_recognized') return 'This record has no field by that name.';
+  return 'Withheld for this viewer.';
 }
 
 export function useFieldProvenance(vehicleId: string, field: string) {

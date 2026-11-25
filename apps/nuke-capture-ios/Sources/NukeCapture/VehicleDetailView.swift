@@ -2947,8 +2947,21 @@ struct FieldProvenance: Decodable {
     // Optional for older reader payloads. These are claim-specific citations,
     // already filtered by the RPC's vehicle and image visibility gates.
     let image_observations: [ImageObservation]?
+    /// The withheld shape (20261125175500): the caller may not read this field; value and evidence are empty.
+    var withheld: Bool? = nil
+    /// "column_not_public" | "field_not_recognized"
+    var withheld_reason: String? = nil
 
     var imageObservations: [ImageObservation] { image_observations ?? [] }
+
+    /// The withheld shape in words, the same on web and iOS (useFieldProvenance.ts withheldFieldWords).
+    static func withheldWords(_ reason: String?) -> String {
+        switch reason {
+        case "column_not_public": return "Private: only the owner and the people tied to this car can see this field."
+        case "field_not_recognized": return "This record has no field by that name."
+        default: return "Withheld for this viewer."
+        }
+    }
 
     var hasSharedImageSource: Bool {
         let citations = imageObservations
@@ -3106,7 +3119,14 @@ struct FieldProvenanceSheet: View {
                     Divider()
                     // Context section: what this value means + how it compares
                     if let ctx = context { contextSection(ctx) }
-                    if let p = prov {
+                    if let p = prov, p.withheld == true {
+                        // A field the caller may not read: private, never "no source" and never an empty card.
+                        Label(FieldProvenance.withheldWords(p.withheld_reason), systemImage: "lock")
+                            .font(.footnote).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                            .accessibilityIdentifier("field-provenance-withheld")
+                    } else if let p = prov {
                         sourceLine(p)
                         if let img = p.source_image_url, !img.isEmpty { sourceImage(img) }
                         if !p.imageObservations.isEmpty { imageObservationsSection(p) }

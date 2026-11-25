@@ -311,3 +311,17 @@ it('retries only the failed reader and disables its action while a retry is runn
     expect(imageRetry).toHaveBeenCalledOnce();
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
+it('says a withheld field is private, in both presentations, and never reports missing evidence', () => {
+  const withheld = { field: 'owner_name', value: null, withheld: true, withheld_reason: 'column_not_public', evidence: [], observations: [], image_observations: [],
+    inline_source: null, source_image_url: null, current_correction: null, coverage: null };
+  fixture.provenance = { isLoading: false, data: withheld };
+  const citations = () => renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="owner_name" label="Owner" value="" presentation="citations" />);
+  for (const html of [render(), citations()]) {
+    expect(html).toContain('Private: only the owner and the people tied to this car can see this field.');
+    expect(html).not.toContain('No source claim was returned');
+    expect(html).not.toContain('IMAGE CITATION MISSING');
+    expect(html).not.toContain('could not be loaded completely');
+  }
+  fixture.provenance = { isLoading: false, data: { ...withheld, field: null, withheld_reason: 'field_not_recognized' } };
+  expect(render()).toContain('This record has no field by that name.');
+});
