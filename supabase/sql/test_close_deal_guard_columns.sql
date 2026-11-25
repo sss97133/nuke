@@ -42,6 +42,20 @@ DELETE FROM public.auction_events WHERE id = '00000000-0000-0000-0000-0000000000
 SELECT public.assert(closed_by_auction_event_id IS NULL, 'event delete cleared the key')
   FROM public.deal_jackets WHERE id = '00000000-0000-0000-0000-0000000000f1';
 
+-- The closing setting is reset inside the closing transaction: a direct key write to the deal it just closed, later
+-- in the same transaction, is refused.
+INSERT INTO public.deal_jackets (id, vehicle_id, deal_type, created_at) VALUES
+  ('00000000-0000-0000-0000-0000000000f6', '00000000-0000-0000-0000-0000000000b6', 'consignment', '2026-01-01');
+DO $same_tx$
+BEGIN
+  INSERT INTO public.auction_events (id, source, vehicle_id, outcome, gross_price, auction_end_date)
+  VALUES ('00000000-0000-0000-0000-0000000000c6', 'bat', '00000000-0000-0000-0000-0000000000b6', 'sold', 400, '2026-11-21 18:00Z');
+  PERFORM public.assert(closed_by_auction_event_id = '00000000-0000-0000-0000-0000000000c6', 'closed in the transaction')
+    FROM public.deal_jackets WHERE id = '00000000-0000-0000-0000-0000000000f6';
+  PERFORM public.refuses_priv($$UPDATE public.deal_jackets SET closed_price_basis = 'hammer' WHERE id = '00000000-0000-0000-0000-0000000000f6'$$);
+END
+$same_tx$;
+
 -- Skip rows only for a deal the sale could close.
 INSERT INTO public.deal_jackets (id, vehicle_id, deal_type, created_at) VALUES
   ('00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000b4', 'consignment', '2026-01-01'),
