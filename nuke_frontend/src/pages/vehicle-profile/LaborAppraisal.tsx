@@ -27,17 +27,42 @@ const stepText = (s: LaborStageStep) => [
   rangeText({ hours_min: s.hours_min ?? null, hours_typical: s.hours_typical ?? null, hours_max: s.hours_max ?? null }),
 ].filter(Boolean).join(' · ');
 
-/** A part line as the reader names it; the reader's words only. Without them the part is counted, not named. */
-const partWords = (p: LaborPart) => p.name || p.description || null;
+/** A part line as the reader names it: the catalog part's name, else the reader's own words. Without them it is counted. */
+const partWords = (p: LaborPart) => p.part?.name || p.name || p.description || null;
 
-/** The reassembly parts: named in the reader's words, the rest counted. */
+/** The reassembly parts: named in the reader's words, the rest counted. When the reader keys pieces to the catalog, an
+ *  unnamed piece is one with no catalog row. */
 function PartsLine({ title, parts }: { title: string; parts: LaborPart[] }) {
   const named = parts.filter(p => partWords(p));
   const said = parts.filter(p => partWords(p) || p.operation_code).map(p => [partWords(p), p.operation_code, h(p.hours), p.reason].filter(Boolean).join(' '));
   const unnamed = parts.length - named.length;
+  const keyed = parts.some(p => p.part !== undefined);
   return <Text role="caption" as="p" className="k-item__line">
-    {title}: {parts.length}{said.length ? `. ${said.join('; ')}` : ''}{unnamed ? ` (${unnamed} of ${parts.length} not named by the reader)` : ''}
+    {title}: {parts.length}{said.length ? `. ${said.join('; ')}` : ''}
+    {unnamed ? (keyed ? ` (${unnamed} of ${parts.length} part not in catalog)` : ` (${unnamed} of ${parts.length} not named by the reader)`) : ''}
   </Text>;
+}
+
+/** Every piece the reader witnessed or questioned for a segment, wherever it sends them. */
+function segmentPieces(segment: LaborSegment): LaborPart[] {
+  return [
+    ...(segment.witness_share?.pieces ?? []),
+    ...(segment.stage_steps ?? []).flatMap(s => s.pieces ?? []),
+    ...(segment.reassembly?.matched ?? []), ...(segment.reassembly?.unmatched ?? []),
+  ].filter(p => p.witness);
+}
+
+/** The reader's witness counts for a segment's pieces. An unwitnessed piece is "bought, not seen fitted", never
+ *  "not fitted"; the ones whose fitted question was answered "cannot tell" are counted beside it. */
+export function witnessText(pieces: LaborPart[]): string | null {
+  if (!pieces.length) return null;
+  const count = (w: string) => pieces.filter(p => p.witness === w).length;
+  const cannotTell = pieces.filter(p => p.witness === 'unwitnessed' && p.question_state === 'cannot_tell').length;
+  return [
+    count('fitted') ? `${count('fitted')} fitted` : null,
+    count('not_fitted') ? `${count('not_fitted')} not fitted` : null,
+    count('unwitnessed') ? `${count('unwitnessed')} bought, not seen fitted` + (cannotTell ? ` (${cannotTell} cannot tell)` : '') : null,
+  ].filter(Boolean).join(' · ') || null;
 }
 
 /** One segment as one kit item: its name and hours on the row, then how the hours are known, line by line. */
@@ -45,18 +70,25 @@ export function SegmentRows({ segment }: { segment: LaborSegment }) {
   const r = segment.reassembly;
   const known = [
     segment.evidence_grade ? `Evidence: ${codeText(segment.evidence_grade)}` : 'Ungraded by the reader',
+    segment.counts_in === 'unwitnessed_purchase' ? 'bought, not seen fitted' : null,
+    segment.counts_in === 'unwitnessed_purchase' && rangeText({ hours_min: segment.witnessed_hours_min ?? null,
+      hours_typical: segment.witnessed_hours_typical ?? null, hours_max: segment.witnessed_hours_max ?? null })
+      ? `witnessed ${rangeText({ hours_min: segment.witnessed_hours_min ?? null, hours_typical: segment.witnessed_hours_typical ?? null,
+          hours_max: segment.witnessed_hours_max ?? null })}` : null,
     segment.hours_basis ? `hours from ${codeText(segment.hours_basis)}` : null,
     segment.paper_hours != null ? `${h(segment.paper_hours)} on shop paper` : null,
     segment.book_hours ? `book range ${rangeText(segment.book_hours)}` : null,
     segment.hours_counted_elsewhere != null ? `${h(segment.hours_counted_elsewhere)} counted in other segments` : null,
     segment.evidence_count != null ? `${segment.evidence_count} evidence rows` : null,
   ].filter(Boolean).join(' · ');
+  const witnessed = witnessText(segmentPieces(segment));
   return <div className="k-item" data-key={segment.segment} data-status={segment.evidence_grade ?? 'ungraded'}>
     <div className="k-row">
       <Text role="label">{codeText(segment.segment)}</Text>
       <Text role="measure">{rangeText(segment) ?? 'No hours'}</Text>
     </div>
     <Text role="caption" as="p" className="k-item__line">{known}</Text>
+    {witnessed && <Text role="caption" as="p" className="k-item__line">Pieces: {witnessed}</Text>}
     {segment.range_below_paper && <Text role="caption" as="p" className="k-item__line">The book range is below the hours on shop paper; the paper hours are used.</Text>}
     {!!segment.stage_steps?.length && <Text role="caption" as="p" className="k-item__line">Stages: {segment.stage_steps.map(stepText).join('; ')}</Text>}
     {!!r?.matched?.length && <PartsLine title="Fitted parts with a book operation" parts={r.matched} />}
@@ -68,10 +100,25 @@ export function SegmentRows({ segment }: { segment: LaborSegment }) {
 export function LaborAppraisalView({ appraisal }: { appraisal: Appraisal }) {
   // A segment the reader gives no hours is not printed (no empty rows); the coverage line still counts every segment it returned.
   const priced = appraisal.segments.filter(s => s.hours_typical != null);
+  const coverage = { n: priced.length, of: appraisal.segments.length, grain: 'segments with hours', as_of: appraisal.as_of };
+  // The reader says "nothing priced" with priced_segments = 0: that is an answer, printed as one.
+  if (appraisal.applicable && appraisal.totals?.priced_segments === 0 && appraisal.segments.length) {
+    return <Section title="Labor appraisal by segment" coverage={coverage}>
+      <Text role="caption" as="p">Not appraised: the reader has no segment with hours for this car yet.</Text>
+      {appraisal.logic_version && <Text role="caption" as="p">Reader: vehicle_labor_appraisal · {appraisal.logic_version}</Text>}
+    </Section>;
+  }
   if (!appraisal.applicable || !priced.length) return null;
   const byGrade = appraisal.totals?.by_grade ? Object.entries(appraisal.totals.by_grade) : [];
-  return <Section title="Labor appraisal by segment" coverage={{ n: priced.length, of: appraisal.segments.length, grain: 'segments with hours', as_of: appraisal.as_of }}>
+  const witnessedTotal = rangeText(appraisal.totals?.witnessed);
+  const withPurchases = rangeText(appraisal.totals?.with_unwitnessed_purchases);
+  return <Section title="Labor appraisal by segment" coverage={coverage}>
     <Text role="caption" as="p">Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.</Text>
+    {witnessedTotal && withPurchases && <Rows title="Hours, two totals side by side">
+      <Row label="Witnessed" role="measure">{witnessedTotal}</Row>
+      <Row label="With purchases not seen fitted" role="measure">{withPurchases}</Row>
+    </Rows>}
+    {witnessedTotal && withPurchases && appraisal.totals?.rule && <Text role="caption" as="p">{appraisal.totals.rule}</Text>}
     {byGrade.length > 0 && <Rows title="Hours by evidence grade">
       {byGrade.map(([grade, range]) => <Row key={grade} label={codeText(grade)} role="measure">{rangeText(range) ?? 'No hours'}</Row>)}
     </Rows>}
