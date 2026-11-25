@@ -223,6 +223,13 @@ BEGIN
                         AND (s - 'as_of' - 'state') = keep.read, 'slow car, stale: last stored read with as-of');
   PERFORM public.assert(public.vehicle_labor_appraisal_gauge() -> 'too_slow_to_compute_at_read' ? vid::text,
                         'gauge names the slow car with a row');
+  -- the line is a rule row: half of anon's timeout today
+  PERFORM public.assert((SELECT value FROM public.labor_fold_read_limits WHERE limit_key = 'stored_fold_share_of_anon_timeout') = 0.5
+                        AND (SELECT length(basis) > 0 FROM public.labor_fold_read_limits WHERE limit_key = 'never_folded_image_line'),
+                        'read limits are rule rows with a basis');
+  UPDATE public.labor_fold_read_limits SET value = 0.6 WHERE limit_key = 'stored_fold_share_of_anon_timeout';
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'computed_now', 'the share row moves the line (9,000 ms)');
+  UPDATE public.labor_fold_read_limits SET value = 0.5 WHERE limit_key = 'stored_fold_share_of_anon_timeout';
   UPDATE public.vehicle_labor_appraisal_state SET ms = 7499 WHERE vehicle_id = vid;
   PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'computed_now'
                         AND NOT (public.vehicle_labor_appraisal_gauge() -> 'too_slow_to_compute_at_read' ? vid::text),
@@ -231,6 +238,43 @@ BEGIN
   INSERT INTO public.vehicle_labor_appraisal_state SELECT keep.*;
 END $$;
 RESET test.auth_role;
+
+-- Lead condition (1): a never-folded car over the size line answers the status at once, without computing, and the
+-- gauge names it while the seed has it queued. The compute is replaced by one that fails, so a compute call fails the case.
+-- ALLOW_RAW_TESTIMONY_WRITE (disposable PG17 fixture database)
+DO $$
+DECLARE vid uuid := (SELECT b.v FROM _labor_names_before b JOIN public.vehicles v ON v.id = b.v
+                      WHERE v.is_public IS TRUE ORDER BY b.v LIMIT 1);
+        keep public.vehicle_labor_appraisal_state%ROWTYPE; s jsonb; t0 timestamptz; ms numeric;
+        d text := pg_get_functiondef('public.vehicle_labor_appraisal_compute(uuid)'::regprocedure);
+        n int := (SELECT count(*) FROM public.vehicle_images WHERE vehicle_id = vid);
+BEGIN
+  PERFORM public.assert(n >= 1, 'fixture car has a photo: ' || n);
+  SELECT * INTO keep FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = vid;
+  DELETE FROM public.vehicle_labor_appraisal_state WHERE vehicle_id = vid;
+  UPDATE public.labor_fold_read_limits SET value = n WHERE limit_key = 'never_folded_image_line';
+  EXECUTE $x$CREATE OR REPLACE FUNCTION public.vehicle_labor_appraisal_compute(p_vehicle_id uuid) RETURNS jsonb
+           LANGUAGE plpgsql STABLE AS $b$ BEGIN RAISE EXCEPTION 'computed at read'; END $b$ $x$;
+  t0 := clock_timestamp();
+  s := public.vehicle_labor_appraisal(vid);
+  ms := extract(epoch FROM clock_timestamp() - t0) * 1000;
+  PERFORM public.assert(s ->> 'status' = 'not_yet_computed' AND s #>> '{state,label}' = 'not yet computed' AND ms < 100,
+                        format('never folded, over the line: status in %s ms, no compute: %s', round(ms, 1), s));
+  INSERT INTO public.model_fold_signal (vehicle_id, reason, priority) VALUES (vid, 'labor_logic_key', 4);
+  PERFORM public.assert(public.vehicle_labor_appraisal_gauge() -> 'too_slow_to_compute_at_read' ? vid::text,
+                        'gauge names the never-folded car over the line while it is queued');
+  DELETE FROM public.model_fold_signal WHERE vehicle_id = vid;
+  EXECUTE d;
+  UPDATE public.labor_fold_read_limits SET value = n + 1 WHERE limit_key = 'never_folded_image_line';
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'computed_now', 'under the line: computed now');
+  -- the size test is for a car with no stored read only: a folded car over the line, stale, is computed now
+  INSERT INTO public.vehicle_labor_appraisal_state SELECT keep.*;
+  UPDATE public.labor_fold_read_limits SET value = n WHERE limit_key = 'never_folded_image_line';
+  UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = folded_at + interval '1 second' WHERE vehicle_id = vid;
+  PERFORM public.assert(public.vehicle_labor_appraisal(vid) #>> '{state,basis}' = 'computed_now', 'folded car over the line: its fold ms decides');
+  UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = keep.evidence_changed_at WHERE vehicle_id = vid;
+  UPDATE public.labor_fold_read_limits SET value = 500 WHERE limit_key = 'never_folded_image_line';
+END $$;
 
 -- An answer lands: the row goes stale and the reader serves the stored read flagged; the next fold makes it fresh.
 CREATE TEMP TABLE fold_v AS SELECT b.v FROM _labor_names_before b JOIN public.vehicles v ON v.id = b.v
@@ -515,6 +559,53 @@ BEGIN
                         'custody: the re-fold drops the photo');
   r := public.vehicle_labor_appraisal_enqueue();
   PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car), 'custody: then nothing to seed');
+
+  -- ta-skeptic must-fix: a cited photo moved to another car, or marked sensitive, is withheld too. The photo is shown
+  -- first (outside custody), so only the car test or the sensitive flag can withhold it.
+  UPDATE public.vehicle_images SET is_external = true WHERE id = img;
+  UPDATE public.vehicle_labor_appraisal_state SET read = jsonb_set(read, '{segments}',
+           (read -> 'segments') || jsonb_build_array(jsonb_build_object('fixture_cite', jsonb_build_object('image_id', img::text))))
+       , read_hash = NULL  -- a tampered fixture read; the fold keeps a read whose hash is unchanged
+   WHERE vehicle_id = car;
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((r ->> 'cites_withheld_photo')::int = 0, 'custody: the shown photo cited on its own car is not withheld: ' || r::text);
+  DELETE FROM public.model_fold_signal;
+  UPDATE public.vehicle_images SET vehicle_id = '10000000-0000-0000-0000-000000000002' WHERE id = img;
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((r ->> 'cites_withheld_photo')::int = 1, 'custody: a cited photo moved to another car is withheld: ' || r::text);
+  UPDATE public.vehicle_images SET vehicle_id = car, is_sensitive = true WHERE id = img;
+  DELETE FROM public.model_fold_signal;
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((r ->> 'cites_withheld_photo')::int = 1, 'custody: a cited photo marked sensitive is withheld: ' || r::text);
+  UPDATE public.vehicle_images SET is_sensitive = false WHERE id = img;
+  DELETE FROM public.model_fold_signal;
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((r ->> 'cites_withheld_photo')::int = 0, 'custody: back on its car, not sensitive: shown again: ' || r::text);
+  -- should-fix (a): one non-uuid image_id string counts as withheld and does not fail the run
+  UPDATE public.vehicle_labor_appraisal_state SET read = jsonb_set(read, '{segments}',
+           (read -> 'segments') || '[{"fixture_cite": {"image_id": "not-a-uuid"}}]'::jsonb)
+       , read_hash = NULL  -- a tampered fixture read; the fold keeps a read whose hash is unchanged
+   WHERE vehicle_id = car;
+  DELETE FROM public.model_fold_signal;
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((r ->> 'cites_withheld_photo')::int = 1, 'custody: a non-uuid image_id is withheld, the run survives: ' || r::text);
+  DELETE FROM public.model_fold_signal;
+  PERFORM public.vehicle_labor_appraisal_fold(car);
+  r := public.vehicle_labor_appraisal_enqueue();
+  PERFORM public.assert((r ->> 'cites_withheld_photo')::int = 0 AND NOT EXISTS (SELECT 1 FROM public.model_fold_signal WHERE vehicle_id = car),
+                        'custody: re-fold clears the fixture citations: ' || r::text);
+  -- should-fix (b): the bump is capped at p_limit
+  UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = folded_at + interval '1 second';
+  INSERT INTO public.model_fold_work (vehicle_id, state, priority, reasons, dirty_at, first_dirty_at, next_attempt_at)
+  SELECT s.vehicle_id, 'pending', 9, '{sweep}', t0, t0, t0 FROM public.vehicle_labor_appraisal_state s
+   WHERE NOT EXISTS (SELECT 1 FROM public.model_fold_work w WHERE w.vehicle_id = s.vehicle_id);
+  PERFORM public.assert((SELECT count(*) FROM public.model_fold_work WHERE state = 'pending' AND priority = 9) >= 2, 'cap: two waiting cars');
+  r := public.vehicle_labor_appraisal_enqueue(1);
+  PERFORM public.assert((r ->> 'raised')::int = 1, 'cap: p_limit 1 raises one waiting car: ' || r::text);
+  DELETE FROM public.model_fold_work WHERE dirty_at = t0;
+  DELETE FROM public.model_fold_signal;
+  PERFORM public.vehicle_labor_appraisal_fold(s.vehicle_id) FROM public.vehicle_labor_appraisal_state s;
+  DELETE FROM public.model_fold_signal;
 
   -- a stale car waiting at priority 9 is lowered to 4; its clocks stay; no second signal
   UPDATE public.vehicle_labor_appraisal_state SET evidence_changed_at = folded_at + interval '1 second' WHERE vehicle_id = car;

@@ -32,7 +32,8 @@ DECLARE k text := public.vehicle_labor_appraisal_logic_key(); n int := 0; bumped
 BEGIN
   DELETE FROM public.vehicle_labor_appraisal_fold_runs WHERE started_at < now() - interval '30 days';
 
-  -- stored reads citing a photo the logged-out gallery test refuses (computed as the fold computes: anon claims)
+  -- stored reads citing a photo the compute would no longer cite for a visitor (computed as the fold computes: anon
+  -- claims): missing, not a uuid, moved to another car, marked sensitive, or refused by the gallery test
   CREATE TEMP TABLE IF NOT EXISTS _labor_withheld (vehicle_id uuid PRIMARY KEY) ON COMMIT DROP;
   TRUNCATE _labor_withheld;
   BEGIN
@@ -43,9 +44,12 @@ BEGIN
       FROM (SELECT st.vehicle_id, st.read FROM public.vehicle_labor_appraisal_state st
              WHERE st.read IS NOT NULL ORDER BY random() LIMIT 2000) s
      WHERE EXISTS (SELECT 1 FROM jsonb_path_query(s.read, 'strict $.**.image_id') i
-                     LEFT JOIN public.vehicle_images vi ON vi.id = (i #>> '{}')::uuid
+                     LEFT JOIN public.vehicle_images vi
+                       ON vi.id = CASE WHEN (i #>> '{}') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN (i #>> '{}')::uuid END
                     WHERE jsonb_typeof(i) = 'string'
-                      AND (vi.id IS NULL OR NOT public.vehicle_image_gallery_eligible(vi)));
+                      -- the compute cites a photo only when it is this car's, gallery-eligible and not sensitive
+                      AND (vi.id IS NULL OR vi.vehicle_id IS DISTINCT FROM s.vehicle_id OR coalesce(vi.is_sensitive, false)
+                           OR NOT public.vehicle_image_gallery_eligible(vi)));
     PERFORM set_config('request.jwt.claims', coalesce(c_claims, ''), true);
     PERFORM set_config('request.jwt.claim.role', coalesce(c_role, ''), true);
   EXCEPTION WHEN others THEN
@@ -77,7 +81,9 @@ BEGIN
          reasons = (SELECT array_agg(DISTINCT x ORDER BY x) FROM unnest(coalesce(w.reasons, '{}') || '{labor_logic_key}'::text[]) x),
          updated_at = now()
    WHERE w.state = 'pending' AND w.priority > 4
-     AND w.vehicle_id IN (SELECT nd.vehicle_id FROM _labor_need nd);
+     AND w.vehicle_id IN (SELECT w2.vehicle_id FROM public.model_fold_work w2 JOIN _labor_need nd ON nd.vehicle_id = w2.vehicle_id
+                           WHERE w2.state = 'pending' AND w2.priority > 4
+                           ORDER BY w2.vehicle_id LIMIT greatest(0, least(coalesce(p_limit, 500), 500)));
   GET DIAGNOSTICS bumped = ROW_COUNT;
 
   INSERT INTO public.model_fold_signal (vehicle_id, reason, priority, at)
@@ -102,9 +108,34 @@ GRANT EXECUTE ON FUNCTION public.vehicle_labor_appraisal_enqueue(integer) TO ser
 --     statement_timeout (read from pg_db_role_setting; 15 s on 2026-11-25), or its fold failed on a timeout. A car
 --     never folded has no measure: it is computed live, and its first fold names it if it is slow. Basis: 51 folds
 --     on production 2026-11-25, p50 309 ms, p90 2,054 ms, max 2,983 ms.
+--     A car never folded is tested by size before any compute (lead condition, 2026-11-25): at or over the image line
+--     (labor_fold_read_limits.never_folded_image_line) it answers not_yet_computed at once and the gauge names it while
+--     the seed folds it; the slow line is labor_fold_read_limits.stored_fold_share_of_anon_timeout of anon's timeout.
 --     A fold that failed otherwise serves the last good read with the error beside it (a live compute would fail too).
 --     state.label carries the words a renderer prints (ta-packet #3946): null when fresh or computed now,
 --     'recomputing' for a stored read served while a newer one is due, 'not yet computed' when there is none.
+
+-- (4) Lead conditions on (3), 2026-11-25: the slow line and the size line are rule rows with their basis, not literals.
+--   labor_fold_read_limits (grain: one read limit; PK limit_key): value, unit, basis. Read by
+--   vehicle_labor_appraisal_too_slow_to_read only; not in the logic key (it changes no stored read).
+CREATE TABLE IF NOT EXISTS public.labor_fold_read_limits (
+  limit_key text PRIMARY KEY,
+  value numeric NOT NULL CHECK (value > 0),
+  unit text NOT NULL,
+  basis text NOT NULL CHECK (length(btrim(basis)) > 0),
+  measured_at timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE public.labor_fold_read_limits IS
+  'labor_fold_v1 read limits: when vehicle_labor_appraisal serves a stored read or a status instead of computing at a visitor''s read. One row per limit, each with its measured basis.';
+ALTER TABLE public.labor_fold_read_limits ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.labor_fold_read_limits FROM anon, authenticated;
+GRANT SELECT ON public.labor_fold_read_limits TO service_role;
+INSERT INTO public.labor_fold_read_limits (limit_key, value, unit, basis) VALUES
+  ('stored_fold_share_of_anon_timeout', 0.5, 'share of anon statement_timeout',
+   'A car whose last fold (vehicle_labor_appraisal_state.ms) took at least this share of anon''s statement_timeout (pg_db_role_setting, 15s on 2026-11-25, so 7,500 ms) is not computed at read. Half leaves room for a cold cache: a90c008a computed in more than 10,000 ms cold (q.sh, 02:4x PT) and folded in 748 ms warm (02:59 PT).'),
+  ('never_folded_image_line', 500, 'vehicle_images rows of the car',
+   'A car with no stored read and at least this many vehicle_images rows is not computed at read; it answers not_yet_computed and the seed folds it. Fit on the 52 folded cars on production 2026-11-25: fold ms = 342 + 0.450 x images (r 0.59, residual sd 670 ms; images predicted best of receipts 0.31, receipt items 0.40, judgment requests 0.42, paint-stage observations 0.40, segments 0.00). With the measured cold factor 13.4 (a90c008a: more than 10,000 ms cold / 748 ms warm), the fit reaches 7,500 ms at 488 images; rounded to 500. 17 of the 52 folded cars hold 500 or more.')
+ON CONFLICT (limit_key) DO NOTHING;
 CREATE OR REPLACE FUNCTION public.vehicle_labor_appraisal_too_slow_to_read(p_vehicle uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $fn$
   WITH lim AS (
@@ -115,10 +146,18 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalo
                        FROM pg_db_role_setting d, unnest(d.setconfig) c,
                             LATERAL (SELECT split_part(c, '=', 2) AS v) x
                       WHERE d.setrole = 'anon'::regrole AND d.setdatabase = 0 AND split_part(c, '=', 1) = 'statement_timeout'
-                      LIMIT 1), 15000) / 2 AS half_ms)
-  SELECT EXISTS (SELECT 1 FROM public.vehicle_labor_appraisal_state s
-                  WHERE s.vehicle_id = p_vehicle
-                    AND (s.ms >= (SELECT half_ms FROM lim) OR s.error ~* 'statement timeout|canceling statement'))
+                      LIMIT 1), 15000)
+           * coalesce((SELECT r.value FROM public.labor_fold_read_limits r WHERE r.limit_key = 'stored_fold_share_of_anon_timeout'), 0.5)
+             AS slow_ms,
+           coalesce((SELECT r.value FROM public.labor_fold_read_limits r WHERE r.limit_key = 'never_folded_image_line'), 500)::int
+             AS image_line),
+  st AS (SELECT s.ms, s.error, s.read FROM public.vehicle_labor_appraisal_state s WHERE s.vehicle_id = p_vehicle)
+  SELECT EXISTS (SELECT 1 FROM st WHERE st.ms >= (SELECT slow_ms FROM lim)
+                                     OR st.error ~* 'statement timeout|canceling statement')
+      -- never folded (no stored read): the size test, a count that stops at the line
+      OR (NOT EXISTS (SELECT 1 FROM st WHERE st.read IS NOT NULL)
+          AND (SELECT count(*) FROM (SELECT 1 FROM public.vehicle_images vi WHERE vi.vehicle_id = p_vehicle
+                                      LIMIT (SELECT image_line FROM lim)) x) >= (SELECT image_line FROM lim))
 $fn$;
 REVOKE ALL ON FUNCTION public.vehicle_labor_appraisal_too_slow_to_read(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.vehicle_labor_appraisal_too_slow_to_read(uuid) TO service_role;
@@ -196,8 +235,15 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog,
            round((percentile_cont(0.5) WITHIN GROUP (ORDER BY (r.wait_ms + r.ms)) FILTER (WHERE r.stamped_at IS NOT NULL AND r.error IS NULL) / 1000.0)::numeric, 1) AS stale_p50_s,
            round((percentile_cont(0.9) WITHIN GROUP (ORDER BY (r.wait_ms + r.ms)) FILTER (WHERE r.stamped_at IS NOT NULL AND r.error IS NULL) / 1000.0)::numeric, 1) AS stale_p90_s
       FROM public.vehicle_labor_appraisal_fold_runs r WHERE r.started_at > now() - interval '24 hours'),
-  slow AS (SELECT coalesce(jsonb_agg(s.vehicle_id ORDER BY s.vehicle_id), '[]'::jsonb) AS ids
-             FROM public.vehicle_labor_appraisal_state s WHERE public.vehicle_labor_appraisal_too_slow_to_read(s.vehicle_id))
+  slow AS (SELECT coalesce(jsonb_agg(c.vehicle_id ORDER BY c.vehicle_id), '[]'::jsonb) AS ids
+             FROM (SELECT s.vehicle_id FROM public.vehicle_labor_appraisal_state s
+                   UNION
+                   -- never folded and waiting in the queue under the seed's reason
+                   SELECT g.vehicle_id FROM public.model_fold_signal g WHERE g.reason = 'labor_logic_key'
+                   UNION
+                   SELECT w.vehicle_id FROM public.model_fold_work w
+                    WHERE w.state IN ('pending', 'leased') AND 'labor_logic_key' = ANY (w.reasons)) c
+            WHERE public.vehicle_labor_appraisal_too_slow_to_read(c.vehicle_id))
   SELECT jsonb_build_object('rows', st.n_rows, 'off_key', st.off_key, 'stale_now', st.stale_now, 'errored', st.errored,
     'newest_folded_at', st.newest_folded_at, 'folds_24h', runs.folds_24h, 'stamps_answered_24h', runs.stamps_answered_24h,
     'errors_24h', runs.errors_24h, 'stale_p50_s', runs.stale_p50_s, 'stale_p90_s', runs.stale_p90_s, 'key', (SELECT k FROM k),
