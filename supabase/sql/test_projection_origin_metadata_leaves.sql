@@ -1,13 +1,15 @@
 -- Empty disposable PG17 only:
 --   createdb dm_refinement_leaves; psql -X -v ON_ERROR_STOP=1 -d dm_refinement_leaves -f this-file.sql
 --   (-v omig=<path> runs the contract against another body; the mutation runs use it.)
--- Proves 20261125231500_projection_origin_metadata_leaves.sql: the public vehicle projection redacts origin_metadata
--- string leaf by string leaf with the contact_redaction_rules rows: phones and emails in text leaves, emails in URL
--- leaves, never a phone-shaped run inside a URL or under an id/serial key; every email the prior serialized-text regex
--- redacted is still redacted; a value with nothing to redact is returned untouched; with no enabled rule origin_metadata
--- is null; rule rows change the answer without a function change; the rows refuse a pattern that does not compile or
--- matches nothing-at-all; text_redact_contact's patterns equal the seeded rows; insiders read the raw value through
--- get_vehicle_profile_data and anon reads the redacted one.
+-- Proves 20261125231500_projection_origin_metadata_leaves.sql: for a non-insider the public vehicle projection drops
+-- contact-named keys of origin_metadata whole (the gate) and redacts phones and emails leaf by leaf (the backstop) with
+-- the contact_redaction_rules rows: emails everywhere; phones in text, never inside a URL (a leaf that is one URL is
+-- left alone, a sentence is redacted around its URLs) and never under an id/serial key unless that key names a contact;
+-- every email the prior serialized-text regex redacted is still redacted; a value with nothing to change is returned
+-- untouched; with no enabled rule origin_metadata is null; rule rows change the answer without a function change; the
+-- rows refuse malformed rules; text_redact_contact's patterns equal the seeded rows; insiders read the raw value through
+-- get_vehicle_profile_data and anon reads the redacted one; the owner keys are masked exactly as jsonb_mask_keys masks
+-- them, with the recursive walk only when one sits below the top level.
 \set ON_ERROR_STOP on
 \if :{?omig}
 \else
@@ -26,11 +28,18 @@ INSERT INTO om_case VALUES
               "thumbnail_url": "https://cdn.invalid/t/7025550146.jpg",
               "discovery_url": "https://example.invalid/post/7025550147.html",
               "chassis_number": "7025550148", "craigslist_post_id": "7025550149", "engine_number": "702 555 0150",
-              "repost_of": "7025550151", "auction_observation_id": "7025550152", "craigslist_post_ids": ["7025550158", "7025550159"],
+              "repost_of": "7025550151", "auction_observation_id": "7025550152", "source_snapshot_id": ["7025550158", "7025550159"],
               "bat_url": "https://example.invalid/listing?who=x@y.invalid",
               "raw_description": "line one\n7025550153 line two \"q@r.invalid\"",
-              "lot": 7025550154, "nested": [[{"deep": "e@f.invalid and (702) 555-0155"}]]}'),
-  ('clean',  '{"images": ["https://cdn.invalid/p/1.jpg"], "lot_number": "12", "note": "no contact here", "n": 5, "b": true, "z": null}'),
+              "lot": 7025550154, "nested": [[{"deep": "e@f.invalid and (702) 555-0155"}]],
+              "sentence": "see https://x.invalid/7025550161 or call 702-555-0162",
+              "url_then_text": "https://a.invalid/x 702-555-0163",
+              "phone_number": "7025550164", "seller_contact_id": "7025550165", "Cell_Number": "702 555 0166",
+              "deep_contact": {"x": [{"Seller_Phone": {"n": "ask", "v": ["7025550167"]}}], "keep": "fine"}, "null_party": {"Party_Type": null}}'),
+  ('dropobj', '{"a": "fine", "x": {"seller_phone": {"n": "ask"}}}'),
+  ('dropkey', '{"seller_phone": "ask for Bob", "a": "fine"}'),
+  ('clean',  '{"images": ["https://cdn.invalid/p/1.jpg"], "lot_number": "12", "note": "no contact here", "n": 5, "b": true, "z": null,
+              "bat_snapshot_parsed": {"party_type": null}, "seller_phone": null}'),
   ('emails', '{"a": "x@y.invalid", "b": ["he said \"p@q.invalid\"", {"c": "mailto:m@n.invalid"}], "u": "https://h.invalid/?e=s@t.invalid"}'),
   ('array',  '["call 702-555-0156", "https://cdn.invalid/7025550157.jpg"]');
 
@@ -54,24 +63,33 @@ DO $$
 DECLARE m jsonb := (SELECT r FROM om_after WHERE k = 'mixed'); src jsonb := (SELECT om FROM om_case WHERE k = 'mixed');
 BEGIN
   -- 1. Phones and emails in text leaves are redacted, at any depth and inside arrays.
-  ASSERT m ->> 'seller_phone' = 'call [contact through Nuke] today', '1 seller_phone';
-  ASSERT m -> 'bat_snapshot_parsed' ->> 'party_type' = 'Dealer: Desert Cars, [contact through Nuke], [contact through Nuke]', '1 party_type';
+  -- 0. Contact-named keys are dropped whole, at any depth, any case, whatever their value holds.
+  ASSERT NOT (m ? 'seller_phone') AND NOT (m -> 'bat_snapshot_parsed' ? 'party_type'), '0 seller_phone and party_type dropped';
+  ASSERT m -> 'deep_contact' = '{"x": [{}], "keep": "fine"}', '0 a nested, mixed-case contact key and its object dropped';
+  ASSERT (SELECT r FROM om_after WHERE k = 'dropkey') = '{"a": "fine"}', '0 a contact key with no pattern in it is still dropped';
+  ASSERT (SELECT r FROM om_after WHERE k = 'dropobj') = '{"a": "fine", "x": {}}', '0 an object under a contact key alone still walks';
+  ASSERT m -> 'null_party' = '{"Party_Type": null}', '0 a contact key holding null is kept (nothing to withhold)';
   ASSERT m -> 'bat_snapshot_parsed' -> 'features' = '["a", "ring [contact through Nuke]"]', '1 array of text under a key';
   ASSERT m -> 'nested' = '[[{"deep": "[contact through Nuke] and [contact through Nuke]"}]]', '1 nested arrays and objects';
   ASSERT m ->> 'raw_description' = E'line one\n[contact through Nuke] line two "[contact through Nuke]"',
     '1 decoded leaf: a phone after a newline and an email inside quotes';
+  ASSERT m ->> 'sentence' = 'see https://x.invalid/7025550161 or call [contact through Nuke]', '1 a sentence: redacted around its URL';
+  ASSERT m ->> 'url_then_text' = 'https://a.invalid/x [contact through Nuke]', '1 a leaf that starts with a URL but is not one';
+  -- 1b. An id/serial key skip never applies to a key that names a contact.
+  ASSERT m ->> 'phone_number' = '[contact through Nuke]' AND m ->> 'seller_contact_id' = '[contact through Nuke]'
+     AND m ->> 'Cell_Number' = '[contact through Nuke]', '1b contact-named id/number keys are redacted';
   -- 2. URL leaves keep their digits; id and serial keys keep their values; numbers are not strings.
   ASSERT m -> 'images' = src -> 'images' AND m -> 'thumbnail_url' = src -> 'thumbnail_url'
      AND m -> 'discovery_url' = src -> 'discovery_url', '2 URL leaves the page renders are untouched';
   ASSERT m -> 'chassis_number' = src -> 'chassis_number' AND m -> 'craigslist_post_id' = src -> 'craigslist_post_id'
      AND m -> 'engine_number' = src -> 'engine_number' AND m -> 'repost_of' = src -> 'repost_of'
-     AND m -> 'auction_observation_id' = src -> 'auction_observation_id' AND m -> 'craigslist_post_ids' = src -> 'craigslist_post_ids'
+     AND m -> 'auction_observation_id' = src -> 'auction_observation_id' AND m -> 'source_snapshot_id' = src -> 'source_snapshot_id'
      AND m -> 'bat_snapshot_parsed' -> 'chassis' = src -> 'bat_snapshot_parsed' -> 'chassis', '2 id and serial keys are untouched';
   ASSERT m -> 'lot' = '7025550154'::jsonb, '2 a json number is not a string leaf';
   -- 3. Emails are redacted in URL leaves too, as the serialized-text regex did; keys are kept.
   ASSERT m ->> 'bat_url' = 'https://example.invalid/listing?who=[contact through Nuke]', '3 email inside a URL';
-  ASSERT (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(m) k) = (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(src) k),
-    '3 keys kept';
+  ASSERT (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(m) k)
+       = (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(src) k WHERE k <> 'seller_phone'), '3 every other key kept';
   -- 4. A top-level array is walked the same way, its elements under no key.
   ASSERT (SELECT r FROM om_after WHERE k = 'array') = '["call [contact through Nuke]", "https://cdn.invalid/7025550157.jpg"]', '4 array';
 END $$;
@@ -98,7 +116,7 @@ BEGIN;
 UPDATE public.contact_redaction_rules SET enabled = false WHERE rule_key = 'phone';
 DO $$ BEGIN
   ASSERT public.vehicle_row_public_projection(jsonb_build_object('origin_metadata', (SELECT om FROM om_case WHERE k = 'mixed')))
-           -> 'origin_metadata' ->> 'seller_phone' = 'call (702) 555-0142 today', '7 phone rule disabled: phone passes';
+           -> 'origin_metadata' ->> 'sentence' = 'see https://x.invalid/7025550161 or call 702-555-0162', '7 phone rule disabled: phone passes';
 END $$;
 UPDATE public.contact_redaction_rules SET enabled = false;
 DO $$ DECLARE r jsonb := public.vehicle_row_public_projection('{"id": "v", "make": "M", "origin_metadata": {"a": "b"}}'::jsonb);
@@ -118,19 +136,42 @@ BEGIN
   FOREACH p IN ARRAY ARRAY['(', '.*', 'a*', '', '\Ax\d', 'x\d\Z'] LOOP
     ok := false;
     BEGIN
-      INSERT INTO public.contact_redaction_rules (rule_key, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
-        VALUES ('bad', p, 'x', false, 99, 'contract case: must be refused', '2026-11-25');
+      INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
+        VALUES ('bad', 'redact', p, 'x', false, 99, 'contract case: must be refused', '2026-11-25');
     EXCEPTION WHEN check_violation OR invalid_regular_expression THEN ok := true;
     END;
     ASSERT ok, format('8 pattern %L refused', p);
   END LOOP;
   ok := false;
   BEGIN
-    INSERT INTO public.contact_redaction_rules (rule_key, pattern, replacement, skip_url_leaves, skip_key_regex, ordinal, reason, measured_at)
-      VALUES ('bad2', 'x\d', 'x', false, '(', 98, 'contract case: must be refused', '2026-11-25');
+    INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, skip_key_regex, never_skip_key_regex, ordinal, reason, measured_at)
+      VALUES ('bad2', 'redact', 'x\d', 'x', false, '(', 'phone', 98, 'contract case: must be refused', '2026-11-25');
   EXCEPTION WHEN check_violation OR invalid_regular_expression THEN ok := true;
   END;
   ASSERT ok, '8 skip_key_regex that does not compile refused';
+  ok := false;
+  BEGIN
+    INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_key_regex, ordinal, reason, measured_at)
+      VALUES ('bad3', 'redact', 'x\d', 'x', '_id$', 97, 'contract case: must be refused', '2026-11-25');
+  EXCEPTION WHEN check_violation THEN ok := true;
+  END;
+  ASSERT ok, '8 a key skip without a never-skip refused';
+  FOREACH p IN ARRAY ARRAY['.*', 'x*', ''] LOOP
+    ok := false;
+    BEGIN
+      INSERT INTO public.contact_redaction_rules (rule_key, action, key_regex, ordinal, reason, measured_at)
+        VALUES ('bad4', 'drop_key', p, 96, 'contract case: must be refused', '2026-11-25');
+    EXCEPTION WHEN check_violation THEN ok := true;
+    END;
+    ASSERT ok, format('8 drop key regex %L refused', p);
+  END LOOP;
+  ok := false;
+  BEGIN
+    INSERT INTO public.contact_redaction_rules (rule_key, action, key_regex, pattern, replacement, ordinal, reason, measured_at)
+      VALUES ('bad5', 'drop_key', '^x$', 'x\d', 'x', 95, 'contract case: must be refused', '2026-11-25');
+  EXCEPTION WHEN check_violation THEN ok := true;
+  END;
+  ASSERT ok, '8 a drop rule carrying a pattern refused';
   ASSERT has_table_privilege('anon', 'public.contact_redaction_rules', 'SELECT')
      AND NOT has_table_privilege('anon', 'public.contact_redaction_rules', 'INSERT')
      AND NOT has_table_privilege('authenticated', 'public.contact_redaction_rules', 'UPDATE')
@@ -140,8 +181,9 @@ END $$;
 -- 9. text_redact_contact's two patterns are the seeded rows, verbatim, and on text with no URL the rows give its answer.
 DO $$
 DECLARE src text := (SELECT prosrc FROM pg_proc WHERE oid = 'public.text_redact_contact(text)'::regprocedure);
-        rules jsonb := (SELECT jsonb_agg(jsonb_build_object('pattern', pattern, 'replacement', replacement,
-                          'skip_url_leaves', skip_url_leaves, 'skip_key_regex', skip_key_regex) ORDER BY ordinal)
+        rules jsonb := (SELECT jsonb_agg(jsonb_build_object('action', action, 'key_regex', key_regex, 'pattern', pattern,
+                          'replacement', replacement, 'skip_url_leaves', skip_url_leaves, 'skip_key_regex', skip_key_regex,
+                          'never_skip_key_regex', never_skip_key_regex) ORDER BY ordinal)
                         FROM public.contact_redaction_rules WHERE enabled);
         t text;
 BEGIN
@@ -168,8 +210,8 @@ DO $$ BEGIN
 END $$;
 -- 11. The fast path tries each rule once over the joined leaves; a rule anchored with ^ or $ still finds a later leaf.
 BEGIN;
-INSERT INTO public.contact_redaction_rules (rule_key, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
-  VALUES ('anchored', '^SECRET-\d+$', '[gone]', false, 30, 'contract case: anchored whole-leaf rule', '2026-11-25');
+INSERT INTO public.contact_redaction_rules (rule_key, action, pattern, replacement, skip_url_leaves, ordinal, reason, measured_at)
+  VALUES ('anchored', 'redact', '^SECRET-\d+$', '[gone]', false, 30, 'contract case: anchored whole-leaf rule', '2026-11-25');
 DO $$ BEGIN
   ASSERT public.jsonb_redact_contact('{"a": "first leaf", "b": ["x", "SECRET-42"]}'::jsonb) = '{"a": "first leaf", "b": ["x", "[gone]"]}',
     '11 anchored rule on a later leaf';
@@ -179,6 +221,53 @@ DO $$ BEGIN
        = '{"t": "fine", "u": "https://h.invalid/7025550160"}', '11 URL-only phone shape: returned as it came';
   ASSERT public.jsonb_redact_contact('{"u": "https://h.invalid/?e=s@t.invalid", "t": "fine"}'::jsonb)
        = '{"t": "fine", "u": "https://h.invalid/?e=[contact through Nuke]"}', '11 an email only inside a URL still walks';
+  ASSERT public.jsonb_redact_contact('{"a": "see https://h.invalid/7025550170 now", "b": "x https://h.invalid/1"}'::jsonb)::text
+       = '{"a": "see https://h.invalid/7025550170 now", "b": "x https://h.invalid/1"}', '11 a phone shape only inside URLs of sentences: as it came';
+  ASSERT public.jsonb_redact_contact('{"a": "702 https://h.invalid/ 555-0171"}'::jsonb)
+       = '{"a": "702 https://h.invalid/ 555-0171"}', '11 digits on both sides of a URL are not joined into a phone';
+  ASSERT public.jsonb_redact_contact('{"a": "https://h.invalid/x 702-555-0190"}'::jsonb)
+       = '{"a": "https://h.invalid/x [contact through Nuke]"}', '11 a leaf that starts with a URL is tried by the fast path';
+  ASSERT public.jsonb_redact_contact('{"a": {"Party_Type": "ask"}}'::jsonb) = '{"a": {}}', '11 a contact key alone walks';
+END $$;
+ROLLBACK;
+
+-- 12. Owner keys: masked as jsonb_mask_keys masks them, top level directly, the recursive walk only when one is nested.
+DO $$
+DECLARE k text[] := ARRAY['purchase_price', 'purchase_date', 'purchase_location', 'owner_name', 'owner_contact'];
+        r jsonb; rows jsonb[] := ARRAY[
+  '{"id": "a", "owner_name": "N", "purchase_price": 5, "make": "M", "value_breakdown": {"x": [1, {"y": 2}]}}',
+  '{"id": "b", "make": "M", "owner_contact": null}',
+  '{"id": "c", "value_breakdown": {"purchase_price": 9, "z": [{"owner_name": "N"}]}, "purchase_date": "2020-01-01"}',
+  '{"id": "d", "origin_metadata": {"a": "fine", "owner_contact": "o"}}',
+  '{"id": "e"}']::jsonb[];
+BEGIN
+  FOREACH r IN ARRAY rows LOOP
+    ASSERT public.vehicle_row_public_projection(r) - 'origin_metadata' = public.jsonb_mask_keys(r, k) - 'origin_metadata',
+      format('12 same mask as jsonb_mask_keys for %s', r ->> 'id');
+  END LOOP;
+  ASSERT public.vehicle_row_public_projection(rows[3]) -> 'value_breakdown' = '{"purchase_price": null, "z": [{"owner_name": null}]}',
+    '12 nested owner keys still masked';
+  ASSERT public.vehicle_row_public_projection(rows[4]) -> 'origin_metadata' = '{"a": "fine", "owner_contact": null}',
+    '12 a nested owner key in origin_metadata still masked';
+  ASSERT position('jsonb_path_exists' in (SELECT prosrc FROM pg_proc WHERE oid = 'public.vehicle_row_public_projection(jsonb)'::regprocedure)) > 0,
+    '12 the walk is gated';
+END $$;
+-- 13. Each step runs once a call: the OFFSET 0 barriers keep the planner from repeating r.j and m.j at every reference.
+BEGIN;
+SET LOCAL track_functions = 'all';
+DO $$
+DECLARE c0 bigint; d0 bigint; w jsonb;
+BEGIN
+  c0 := coalesce(pg_stat_get_xact_function_calls('public.jsonb_redact_contact(jsonb)'::regprocedure), 0);
+  d0 := coalesce(pg_stat_get_xact_function_calls('public.text_redact_contact(text)'::regprocedure), 0);
+  w := public.vehicle_row_public_projection('{"id": "t", "description": "call 702-555-0180", "origin_metadata": {"a": "702-555-0181"},
+                                              "value_breakdown": {"owner_name": "N"}}'::jsonb);
+  ASSERT coalesce(pg_stat_get_xact_function_calls('public.jsonb_redact_contact(jsonb)'::regprocedure), 0) - c0 = 1
+     AND coalesce(pg_stat_get_xact_function_calls('public.text_redact_contact(text)'::regprocedure), 0) - d0 = 1,
+    format('13 one call each, got %s and %s',
+           coalesce(pg_stat_get_xact_function_calls('public.jsonb_redact_contact(jsonb)'::regprocedure), 0) - c0,
+           coalesce(pg_stat_get_xact_function_calls('public.text_redact_contact(text)'::regprocedure), 0) - d0);
+  ASSERT w -> 'origin_metadata' ->> 'a' = '[contact through Nuke]' AND w ->> 'description' NOT LIKE '%555-0180%', '13 answer';
 END $$;
 ROLLBACK;
 SELECT 'PASS: the public projection redacts origin_metadata leaf by leaf with contact rule rows' AS result;
