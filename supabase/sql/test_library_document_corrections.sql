@@ -8,6 +8,8 @@ DO $r$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
 END $r$;
 CREATE TABLE public.library_documents (id uuid, library_id uuid, document_type text, title text, description text, file_url text, thumbnail_url text, file_size_bytes bigint, page_count integer, mime_type text, year_published integer, year_range_start integer, year_range_end integer, publisher text, part_number text, language text, edition text, tags text[], is_factory_original boolean, is_verified boolean, quality_rating integer, view_count integer, download_count integer, bookmark_count integer, uploaded_by uuid, uploaded_at timestamp with time zone, verified_by uuid, verified_at timestamp with time zone, created_at timestamp with time zone, updated_at timestamp with time zone, uploader_type text, uploader_org_id uuid, metadata jsonb, PRIMARY KEY (id));
+CREATE TABLE public.reference_libraries (id uuid PRIMARY KEY, year int, make text, model text);
+INSERT INTO public.reference_libraries VALUES ('e0000000-0000-0000-0000-00000000000a', 1978, 'Chevrolet', 'C10');
 CREATE TABLE public.service_manual_chunks (id uuid PRIMARY KEY, document_id uuid REFERENCES public.library_documents (id),
   page_number int, section_name text, section_heading text, content text, content_type text, key_topics text[]);
 GRANT SELECT ON public.library_documents, public.service_manual_chunks TO anon;
@@ -174,10 +176,10 @@ END;
 $function$
 ;
 
-INSERT INTO public.library_documents (id, title, document_type, is_factory_original) VALUES
-  ('d0000000-0000-0000-0000-00000000000a', '1978 Light Truck Service Manual', 'service_manual', true),
-  ('d0000000-0000-0000-0000-00000000000b', '1978 Light Truck Service Manual', 'service_manual', true),
-  ('d0000000-0000-0000-0000-00000000000c', 'Other manual', 'service_manual', true);
+INSERT INTO public.library_documents (id, library_id, title, document_type, is_factory_original) VALUES
+  ('d0000000-0000-0000-0000-00000000000a', 'e0000000-0000-0000-0000-00000000000a', '1978 Light Truck Service Manual', 'service_manual', false),
+  ('d0000000-0000-0000-0000-00000000000b', 'e0000000-0000-0000-0000-00000000000a', '1978 Light Truck Service Manual', 'service_manual', true),
+  ('d0000000-0000-0000-0000-00000000000c', 'e0000000-0000-0000-0000-00000000000a', 'Other manual', 'service_manual', true);
 INSERT INTO public.service_manual_chunks (id, document_id, page_number, content) VALUES
   ('c0000000-0000-0000-0000-0000000000a2', 'd0000000-0000-0000-0000-00000000000a', 2,
    E'FOREWORD This manual has been developed to provide service\ninformation for the Chevrolet motor home chassis.'),
@@ -186,7 +188,13 @@ INSERT INTO public.service_manual_chunks (id, document_id, page_number, content)
    E'FOREWORD This manual has been developed to provide service\ninformation for the Chevrolet motor home chassis.'),
   ('c0000000-0000-0000-0000-0000000000b3', 'd0000000-0000-0000-0000-00000000000b', 3, 'Printed in 1991. Brake bleeding procedure.'),
   ('c0000000-0000-0000-0000-0000000000c2', 'd0000000-0000-0000-0000-00000000000c', 2,
-   E'FOREWORD This manual has been developed to provide service\ninformation for the Chevrolet motor home chassis.');
+   E'FOREWORD This manual has been developed to provide service\ninformation for the Chevrolet motor home chassis.'),
+  ('c0000000-0000-0000-0000-0000000000a1', 'd0000000-0000-0000-0000-00000000000a', 1,
+   E'SERVICE MANUAL\nCHEVROLET MOTOR DIVISION\nGENERAL MOTORS CORPORATION'),
+  ('c0000000-0000-0000-0000-0000000000b1', 'd0000000-0000-0000-0000-00000000000b', 1,
+   E'SERVICE MANUAL\nCHEVROLET MOTOR DIVISION\nGENERAL MOTORS CORPORATION'),
+  ('c0000000-0000-0000-0000-0000000000c1', 'd0000000-0000-0000-0000-00000000000c', 1,
+   E'REPRINTED BY HELM INCORPORATED\nFROM THE CHEVROLET ORIGINAL');
 
 \ir ../migrations/20261125124500_library_document_corrections.sql
 \ir ../migrations/20261125124500_library_document_corrections.sql
@@ -260,6 +268,21 @@ BEGIN
   SELECT count(*) INTO n FROM public.search_service_manual_chunks('brake');
   IF n <> 1 THEN RAISE EXCEPTION 'search returns duplicate pages: %', n; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.search_service_manual_chunks('brake', B)) THEN RAISE EXCEPTION 'duplicate unreadable by id'; END IF;
+
+  -- factory flag: true needs the page carrying the current publisher, and that publisher naming the library's make
+  BEGIN PERFORM public.library_document_correct(A, 'is_factory_original', 'true', 'c0000000-0000-0000-0000-0000000000a1', 'title page prints the division', 'agent:ta-facts');
+        RAISE EXCEPTION 'factory flag without publisher admitted';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM = 'factory flag without publisher admitted' THEN RAISE; END IF; END;
+  PERFORM public.library_document_correct(A, 'publisher', '"Chevrolet Motor Division"', 'c0000000-0000-0000-0000-0000000000a1', 'title page prints the division', 'agent:ta-facts');
+  BEGIN PERFORM public.library_document_correct(A, 'is_factory_original', 'true', 'c0000000-0000-0000-0000-0000000000a2', 'foreword names the make', 'agent:ta-facts');
+        RAISE EXCEPTION 'factory flag cited to another page admitted';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM = 'factory flag cited to another page admitted' THEN RAISE; END IF; END;
+  PERFORM public.library_document_correct(A, 'is_factory_original', 'true', 'c0000000-0000-0000-0000-0000000000a1', 'title page prints the division', 'agent:ta-facts');
+  IF (SELECT is_factory_original FROM public.library_documents_current WHERE id = A) IS NOT TRUE THEN RAISE EXCEPTION 'factory witness not read'; END IF;
+  PERFORM public.library_document_correct(C, 'publisher', '"Helm Incorporated"', 'c0000000-0000-0000-0000-0000000000c1', 'title page prints the reprinter', 'agent:ta-facts');
+  BEGIN PERFORM public.library_document_correct(C, 'is_factory_original', 'true', 'c0000000-0000-0000-0000-0000000000c1', 'title page prints the reprinter', 'agent:ta-facts');
+        RAISE EXCEPTION 'reprint publisher admitted as factory';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM = 'reprint publisher admitted as factory' THEN RAISE; END IF; END;
 
   -- only the writer writes
   IF has_function_privilege('anon', 'public.library_document_correct(uuid,text,jsonb,uuid,text,text,uuid)', 'execute')

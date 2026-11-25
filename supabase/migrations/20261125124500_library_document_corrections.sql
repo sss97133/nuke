@@ -8,6 +8,8 @@
 -- ROWS. library_document_corrections: one row per (document, field) correction, with the old and new value, the
 -- chunk of the same document that shows the true value (basis_chunk_id), a note, and who corrected it. A newer
 -- correction of the same field supersedes the older (superseded_by / superseded_at); nothing is deleted.
+-- is_factory_original = true needs the page that carries the document's current publisher correction, and that publisher
+-- must name the make of the document's library (reference_libraries.make); false needs no witness.
 -- field 'duplicate_of' is the duplicate edge: duplicate_of_document_id names the survivor; the duplicate stays.
 --
 -- WRITER. library_document_correct(...) is the only writer (no table write grant to any API role). It refuses a
@@ -129,6 +131,19 @@ BEGIN
       RAISE EXCEPTION 'document_type must be one already in the library'; END IF;
   ELSIF p_field = 'is_factory_original' THEN
     IF jsonb_typeof(v_new) <> 'boolean' THEN RAISE EXCEPTION 'is_factory_original must be a boolean'; END IF;
+    -- true is witnessed by the document's own page printing its publisher, and that publisher naming the make of the
+    -- document's library (a manufacturer's division prints its make; a reprint house does not). false needs no witness.
+    IF v_new = 'true'::jsonb THEN
+      SELECT x.new_value #>> '{}' INTO w FROM public.library_document_corrections x
+       WHERE x.document_id = p_document AND x.field = 'publisher' AND x.superseded_at IS NULL AND x.basis_chunk_id = p_basis_chunk;
+      IF w IS NULL THEN
+        RAISE EXCEPTION 'library_document_correct: is_factory_original true needs a current publisher correction cited to the same page'; END IF;
+      IF NOT EXISTS (SELECT 1 FROM public.reference_libraries rl
+                      WHERE rl.id = d.library_id AND length(btrim(coalesce(rl.make, ''))) > 0
+                        AND position(' ' || btrim(regexp_replace(upper(rl.make), '[^A-Z0-9]+', ' ', 'g')) || ' '
+                                     IN ' ' || regexp_replace(upper(w), '[^A-Z0-9]+', ' ', 'g') || ' ') > 0) THEN
+        RAISE EXCEPTION 'library_document_correct: publisher % does not name the make of the document''s library', w; END IF;
+    END IF;
   ELSIF p_field = 'duplicate_of' THEN
     IF p_duplicate_of IS NULL OR p_duplicate_of = p_document THEN RAISE EXCEPTION 'duplicate_of needs another document'; END IF;
     IF EXISTS (SELECT 1 FROM public.library_document_corrections
