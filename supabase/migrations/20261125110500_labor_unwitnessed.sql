@@ -33,7 +33,7 @@ DECLARE
   lit_old text := $l$'unwitnessed_purchase'$l$;
   lit_new text := $l$'unwitnessed'$l$;
   a_ver text := $a$  version text := 'vehicle_labor_appraisal/20261125073000.1';$a$;
-  r_ver text := $r$  version text := 'vehicle_labor_appraisal/20261125091500.1';$r$;
+  r_ver text := $r$  version text := 'vehicle_labor_appraisal/20261125110500.1';$r$;
   a_decl text := $a$  pf_n int; pu_n int; grade_fit text; grade_unw text; graded_j jsonb; /* labor_grade_rows_v1 */$a$;
   r_decl text := $r$  pf_n int; pu_n int; grade_fit text; grade_unw text; graded_j jsonb; /* labor_grade_rows_v1 */
   pn_n int; /* labor_unwitnessed_v1 */$r$;

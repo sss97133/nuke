@@ -13,8 +13,8 @@ CREATE TEMP TABLE _unw_before AS
     FROM unnest(ARRAY['10000000-0000-0000-0000-000000000001',
                       '10000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000004']::uuid[]) v;
 RESET ROLE;
-\ir ../migrations/20261125091500_labor_unwitnessed.sql
-\ir ../migrations/20261125091500_labor_unwitnessed.sql
+\ir ../migrations/20261125110500_labor_unwitnessed.sql
+\ir ../migrations/20261125110500_labor_unwitnessed.sql
 
 CREATE FUNCTION public._norm_unw(j jsonb) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
   SELECT ((j - 'as_of' - 'logic_version' - 'segments') #- '{totals,with_unwitnessed}' #- '{totals,unwitnessed_segments}')
@@ -44,7 +44,7 @@ DECLARE r record; a jsonb;
 BEGIN
   FOR r IN SELECT * FROM _unw_before LOOP
     a := public.vehicle_labor_appraisal(r.v);
-    PERFORM public.assert(a->>'logic_version' = 'vehicle_labor_appraisal/20261125091500.1', 'version');
+    PERFORM public.assert(a->>'logic_version' = 'vehicle_labor_appraisal/20261125110500.1', 'version');
     PERFORM public.assert(public._norm_unw(a) = public._norm_unw(replace(r.j::text, '"unwitnessed_purchase"', '"unwitnessed"')::jsonb),
                           format('vehicle %s: only the rename and the new keys', r.v));
     PERFORM public.assert((a #> '{totals,with_unwitnessed}') IS NOT DISTINCT FROM (a #> '{totals,with_unwitnessed_purchases}')
