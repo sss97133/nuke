@@ -2,7 +2,8 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { LaborAppraisalView, rangeText, witnessText } from './LaborAppraisal';
+import { LaborAppraisalView, rangeText, witnessText, witnessedHoursText } from './LaborAppraisal';
+import live214500 from './__fixtures__/labor-appraisal-214500.json';
 import type { LaborAppraisal } from './hooks/useLaborAppraisal';
 import live from './__fixtures__/labor-appraisal.json';
 
@@ -71,17 +72,34 @@ describe('LaborAppraisalView', () => {
   });
 
   it('counts pieces by witness and never calls an unwitnessed piece not fitted', () => {
-    expect(witnessText([
-      { item_id: 'a', hours: 1, witness: 'fitted' }, { item_id: 'b', hours: 1, witness: 'fitted' },
-      { item_id: 'c', hours: 1, witness: 'not_fitted' },
-      { item_id: 'd', hours: 1, witness: 'unwitnessed', question_state: 'open' },
-      { item_id: 'e', hours: 1, witness: 'unwitnessed', question_state: 'cannot_tell' },
-    ])).toBe('2 fitted · 1 not fitted · 2 bought, not seen fitted (1 cannot tell)');
-    expect(witnessText([])).toBeNull();
-    const seg = { ...appraisal.segments[0], counts_in: 'unwitnessed_purchase', witness_share: { pieces: [{ item_id: 'x', hours: 2, witness: 'unwitnessed', question_state: 'open' }] } };
-    const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={{ ...appraisal, segments: [seg] }} />));
-    expect(page).toContain('Pieces: 1 bought, not seen fitted');
-    expect(page).not.toMatch(/\bnot fitted\b(?! *seen)/);
+    const seg = (extra: object) => ({ ...appraisal.segments[0], ...extra }) as LaborAppraisal['segments'][number];
+    expect(witnessText(seg({ witness_share: { fitted_with_operation: 0, fitted_without_operation: 1, not_fitted: 0, unwitnessed: 13,
+      none_raised: 13, cannot_tell: 3, pieces: [] } })))
+      .toBe('1 fitted without a book operation · 13 bought, not seen fitted (13 with no fitted question raised) · 3 cannot tell');
+    expect(witnessText(seg({ stage_steps: [{ pieces: [
+      { item_id: 'a', hours: null, witness: 'unwitnessed', question_state: 'cannot_tell' },
+      { item_id: 'b', hours: null, witness: 'unwitnessed', question_state: 'open' },
+      { item_id: 'c', hours: null, witness: 'fitted' } ] }] }))).toBe('1 fitted · 1 bought; fitted question cannot tell · 1 bought; fitted question open');
+    expect(witnessText(seg({}))).toBeNull();
+  });
+
+  it('says a missing witnessed minimum instead of filling it', () => {
+    const seg = (extra: object) => ({ ...appraisal.segments[0], ...extra }) as LaborAppraisal['segments'][number];
+    expect(witnessedHoursText(seg({ witnessed_reason: 'not witnessed', witnessed_hours_min: null, witnessed_hours_typical: null, witnessed_hours_max: 84 })))
+      .toBe('Witnessed: not witnessed; minimum unknown, at most 84 h');
+    expect(witnessedHoursText(seg({ witnessed_hours_min: 7, witnessed_hours_typical: 7, witnessed_hours_max: 40 }))).toBe('Witnessed: 7 h to 40 h, typical 7 h');
+  });
+
+  it('renders the live 20261124214500 shape: two totals, witness counts, and no foreign number', () => {
+    const a = live214500 as unknown as LaborAppraisal;
+    const page = text(renderToStaticMarkup(<LaborAppraisalView appraisal={a} />));
+    expect(page).toContain('Witnessed');
+    expect(page).toContain('With purchases not seen fitted');
+    expect(page).toContain('bought; fitted question cannot tell');
+    expect(page).not.toMatch(/\d+ not fitted/);
+    const allowed = readerNumbers(a);
+    const printed = (page.replace(/(\d),(\d)/g, '$1$2').match(/\d+(?:\.\d+)?/g) ?? []).map(x => String(Number(x)));
+    expect(printed.filter(x => !allowed.has(x))).toEqual([]);
   });
 
   it('names a reassembly piece by its catalog part and says when a piece has none', () => {
