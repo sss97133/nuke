@@ -1,3 +1,8 @@
+-- guardrail-allow(center-key-fk): vehicle_contributors.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
+-- guardrail-allow(center-key-fk): vehicle_contributor_roles.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
+-- guardrail-allow(center-key-fk): organization_vehicles.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
+-- guardrail-allow(center-key-fk): ownership_verifications.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
+-- guardrail-allow(center-key-fk): vehicle_user_permissions.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
 -- Isolated PostgreSQL 17 contract for 20261126011500_user_can_edit_vehicle_tied_grantor.sql.
 -- Builds the live user_can_edit_vehicle(uuid, uuid) and vehicle_user_has_access(uuid, uuid) verbatim (live 2026-11-25,
 -- md5-checked) over the columns they read, then applies the migration. Synthetic rows only. Cases:
