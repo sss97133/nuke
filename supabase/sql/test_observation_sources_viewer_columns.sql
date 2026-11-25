@@ -113,7 +113,12 @@ CREATE TABLE public.private_row_probes (relation text NOT NULL, subject_kind tex
   row_key text NOT NULL, rank smallint NOT NULL, owner_lane text NOT NULL, note text NOT NULL CHECK (length(btrim(note)) >= 12),
   audiences text[] NOT NULL DEFAULT '{anon,authenticated}', sample_size int NOT NULL DEFAULT 50, active boolean NOT NULL DEFAULT true,
   added_at timestamptz NOT NULL DEFAULT now(), reader text NOT NULL DEFAULT '',
+  reader_args text, reader_ids text, sample_filter text, reader_tail text,
   PRIMARY KEY (relation, subject_kind, subject_column, reader),
+  CONSTRAINT private_row_probes_audiences_check CHECK (audiences <@ '{anon,authenticated}'::text[] AND cardinality(audiences) > 0),
+  CONSTRAINT private_row_probes_sample_size_check CHECK (sample_size >= 1 AND sample_size <= 500),
+  -- the live reader_shape CHECK, read 2026-11-25
+  CONSTRAINT private_row_probes_reader_shape CHECK (((reader ~ '^([a-z_][a-z0-9_]*)?$'::text) AND ((reader_args IS NULL) OR ((reader <> ''::text) AND (reader_args ~ '^[0-9, ]*$'::text) AND (reader_ids IS NOT NULL))) AND ((reader_ids IS NULL) OR ((reader <> ''::text) AND ((reader_ids)::jsonpath IS NOT NULL))) AND ((reader_tail IS NULL) OR ((reader <> ''::text) AND (reader_args IS NULL) AND (reader_tail ~ '^(, *''[a-z_]+'')+$'::text))) AND ((sample_filter IS NULL) OR ((reader_args IS NULL) AND (POSITION((';'::text) IN (sample_filter)) = 0))) AND ((subject_kind <> 'withheld_column'::text) OR ((reader <> ''::text) AND (reader_args IS NULL))))),
   CONSTRAINT private_row_probes_subject_kind_check CHECK (subject_kind = ANY (ARRAY['image', 'vehicle', 'user', 'flag', 'visibility', 'withheld_column'])));
 \ir ../migrations/20261126052500_observation_sources_viewer_columns.sql
 DO $$ BEGIN
@@ -123,6 +128,9 @@ END $$;
 ALTER TABLE public.private_row_probes DROP CONSTRAINT private_row_probes_subject_kind_check;
 ALTER TABLE public.private_row_probes ADD CONSTRAINT private_row_probes_subject_kind_check
   CHECK (subject_kind = ANY (ARRAY['image', 'vehicle', 'user', 'flag', 'visibility', 'withheld_column', 'private_column']));
+-- #3970's shape CHECK for the kind
+ALTER TABLE public.private_row_probes ADD CONSTRAINT private_row_probes_private_column_shape
+  CHECK (subject_kind <> 'private_column' OR (reader = '' AND reader_args IS NULL AND reader_ids IS NULL AND reader_tail IS NULL));
 -- With the kind live, a guard refusal writes no watch row (a row would read 'exposed' while nothing narrowed).
 \ir revert_20261126052500_observation_sources_viewer_columns.sql
 ALTER TABLE public.observation_sources ADD COLUMN fixture_unclassed text;
