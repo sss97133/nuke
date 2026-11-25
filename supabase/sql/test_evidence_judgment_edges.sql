@@ -1,7 +1,6 @@
 -- Contract for 20261124193300_evidence_judgment_edges (empty disposable PG17; dependencies stubbed, fixtures synthetic).
 -- Asserts: property_id / receipt_item_id are derived from subject_id by subject_table and are real foreign keys;
--- evidence_judgment_images holds one row per cited / candidate / answer photo that is a vehicle_images row (backfill and
--- trigger agree; a re-answer recomputes; junk ids and unknown photos are not linked); record_fact_doubt_landing links
+-- record_fact_doubt_landing links
 -- only the reading landed for that very request and is idempotent; anon reads none of it.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -61,21 +60,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: a doubt about an unknown property was accepted';
   EXCEPTION WHEN foreign_key_violation THEN NULL;
   END;
-  -- backfill: cited 1 (junk and unknown dropped), answer 2 + 1, candidate 3 once
-  PERFORM pg_temp.t_assert((SELECT count(*) FROM evidence_judgment_images) = 4, 'backfill links four photos');
-  PERFORM pg_temp.t_assert((SELECT string_agg(role || ':' || right(image_id::text, 1) || ':' || ord, ',' ORDER BY role, ord)
-    FROM evidence_judgment_images WHERE request_id = 'a0000000-0000-0000-0000-000000000001') = 'answer:2:1,answer:1:2,cited:1:1',
-    'roles and order kept');
-  -- trigger: a re-answer recomputes; a new question links on insert
-  UPDATE evidence_judgment_requests SET answer = '{"outcome":"value","value":"X1","image_ids":["50000000-0000-0000-0000-000000000003"]}'
-   WHERE id = 'a0000000-0000-0000-0000-000000000001';
-  PERFORM pg_temp.t_assert((SELECT string_agg(role || ':' || right(image_id::text, 1), ',' ORDER BY role)
-    FROM evidence_judgment_images WHERE request_id = 'a0000000-0000-0000-0000-000000000001') = 'answer:3,cited:1', 're-answer recomputes');
-  INSERT INTO evidence_judgment_requests (id, vehicle_id, question_kind, status, subject_table, subject_id, params)
-  VALUES ('a0000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'fact_doubt', 'pending',
-          'observation_properties', '40000000-0000-0000-0000-000000000002', '{"cited_image_ids":["50000000-0000-0000-0000-000000000002"]}');
-  PERFORM pg_temp.t_assert((SELECT count(*) FROM evidence_judgment_images WHERE request_id = 'a0000000-0000-0000-0000-000000000003') = 1,
-    'insert links');
 END $$;
 
 -- record_fact_doubt_landing
@@ -100,8 +84,7 @@ BEGIN
     'a linked request keeps its reading');
   PERFORM pg_temp.t_assert((SELECT answer_observation_id FROM evidence_judgment_requests WHERE id = 'a0000000-0000-0000-0000-000000000001')
     = '70000000-0000-0000-0000-000000000001', 'edge stored');
-  PERFORM pg_temp.t_assert(NOT has_table_privilege('anon', 'evidence_judgment_images', 'SELECT')
-    AND NOT has_function_privilege('anon', 'record_fact_doubt_landing(uuid,uuid)', 'EXECUTE')
+  PERFORM pg_temp.t_assert(NOT has_function_privilege('anon', 'record_fact_doubt_landing(uuid,uuid)', 'EXECUTE')
     AND has_function_privilege('service_role', 'record_fact_doubt_landing(uuid,uuid)', 'EXECUTE'), 'grants');
 END $$;
 \ir ../migrations/20261124193300_evidence_judgment_edges.sql

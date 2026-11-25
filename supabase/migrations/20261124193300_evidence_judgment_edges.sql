@@ -12,15 +12,14 @@
 --   receipt_item_id  uuid, stored generated from subject_id when subject_table = 'receipt_items', FK receipt_items.
 --   answer_observation_id uuid FK vehicle_observations: the keyed reading a value answer became (written only by
 --                    record_fact_doubt_landing, below, after the sanctioned writer ingest-observation landed it).
---   evidence_judgment_images (request_id FK evidence_judgment_requests, image_id FK vehicle_images, role cited |
---                    candidate | answer): one row per photo a question cited or offered, or its answer read. Kept by a
---                    trigger on every insert and on every change of params or answer, so a re-ask, a re-answer or a
---                    reopen recomputes the request's rows; an id that is not a vehicle_images row is not linked.
--- Clocks: the request's own (created_at, answered_at); this adds none. Writers: the existing judgment RPCs (unchanged),
--- the trigger, and record_fact_doubt_landing (service_role). No testimony table is written.
+-- The photos a value answer read reach the center through its reading: answer_observation_id -> vehicle_observations
+-- -> observation_witnesses (image_id FK vehicle_images, written by trigger project_observation_image_witness). The photos
+-- a question cites before it is answered stay in params (a new photo-keyed table needs the owner's approval through
+-- schema_proposals: scripts/guardrails/no-new-photo-reader.mjs); that remains a named debt.
+-- Clocks: the request's own (created_at, answered_at); this adds none. Writers: the existing judgment RPCs (unchanged)
+-- and record_fact_doubt_landing (service_role). No testimony table is written.
 --
--- REVERT. DROP FUNCTION record_fact_doubt_landing(uuid,uuid); DROP TRIGGER evidence_judgment_images_sync ON
--- evidence_judgment_requests; DROP FUNCTION evidence_judgment_images_sync(); DROP TABLE evidence_judgment_images;
+-- REVERT. DROP FUNCTION record_fact_doubt_landing(uuid,uuid);
 -- ALTER TABLE evidence_judgment_requests DROP COLUMN answer_observation_id, DROP COLUMN receipt_item_id, DROP COLUMN property_id.
 -- Contract: supabase/sql/test_evidence_judgment_edges.sql.
 SET lock_timeout = '5s';
@@ -48,72 +47,6 @@ COMMENT ON COLUMN public.evidence_judgment_requests.receipt_item_id IS
   'The receipt line a receipt question is about (subject_id when subject_table = receipt_items). evidence_judgment_edges_v1.';
 COMMENT ON COLUMN public.evidence_judgment_requests.answer_observation_id IS
   'The keyed reading (vehicle_observations) a value answer became, landed by ingest-observation and linked by record_fact_doubt_landing. evidence_judgment_edges_v1.';
-
-CREATE TABLE IF NOT EXISTS public.evidence_judgment_images (
-  request_id uuid NOT NULL REFERENCES public.evidence_judgment_requests(id) ON DELETE CASCADE,
-  image_id uuid NOT NULL REFERENCES public.vehicle_images(id),
-  role text NOT NULL CHECK (role IN ('cited', 'candidate', 'answer')),
-  ord integer NOT NULL,
-  PRIMARY KEY (request_id, image_id, role)
-);
-CREATE INDEX IF NOT EXISTS evidence_judgment_images_image_idx ON public.evidence_judgment_images (image_id);
-ALTER TABLE public.evidence_judgment_images ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.evidence_judgment_images FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON public.evidence_judgment_images TO service_role;
-COMMENT ON TABLE public.evidence_judgment_images IS
-  'Photos a judgment question cited (params.cited_image_ids), offered (params.candidate_image_ids) or its answer read (answer.image_ids), by foreign key. Kept by trigger evidence_judgment_images_sync; never written by hand. evidence_judgment_edges_v1.';
-
-CREATE OR REPLACE FUNCTION public.evidence_judgment_images_sync()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  DELETE FROM public.evidence_judgment_images WHERE request_id = NEW.id;
-  INSERT INTO public.evidence_judgment_images (request_id, image_id, role, ord)
-  SELECT NEW.id, s.id::uuid, s.role, min(s.ord)
-  FROM (
-    SELECT 'cited' AS role, e.v AS id, e.ord FROM jsonb_array_elements_text(
-      CASE WHEN jsonb_typeof(NEW.params->'cited_image_ids') = 'array' THEN NEW.params->'cited_image_ids' ELSE '[]' END) WITH ORDINALITY e(v, ord)
-    UNION ALL
-    SELECT 'candidate', e.v, e.ord FROM jsonb_array_elements_text(
-      CASE WHEN jsonb_typeof(NEW.params->'candidate_image_ids') = 'array' THEN NEW.params->'candidate_image_ids' ELSE '[]' END) WITH ORDINALITY e(v, ord)
-    UNION ALL
-    SELECT 'answer', e.v, e.ord FROM jsonb_array_elements_text(
-      CASE WHEN jsonb_typeof(NEW.answer->'image_ids') = 'array' THEN NEW.answer->'image_ids' ELSE '[]' END) WITH ORDINALITY e(v, ord)
-  ) s
-  WHERE s.id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-    AND EXISTS (SELECT 1 FROM public.vehicle_images i WHERE i.id = s.id::uuid)
-  GROUP BY s.id, s.role;
-  RETURN NULL;
-END;
-$$;
-REVOKE ALL ON FUNCTION public.evidence_judgment_images_sync() FROM PUBLIC, anon, authenticated;
-
-DROP TRIGGER IF EXISTS evidence_judgment_images_sync ON public.evidence_judgment_requests;
-CREATE TRIGGER evidence_judgment_images_sync
-  AFTER INSERT OR UPDATE OF params, answer ON public.evidence_judgment_requests
-  FOR EACH ROW EXECUTE FUNCTION public.evidence_judgment_images_sync();
-
--- Backfill: the trigger's rule over the rows already stored (about 6.6k references).
-INSERT INTO public.evidence_judgment_images (request_id, image_id, role, ord)
-SELECT r.id, s.id::uuid, s.role, min(s.ord)
-FROM public.evidence_judgment_requests r
-CROSS JOIN LATERAL (
-  SELECT 'cited' AS role, e.v AS id, e.ord FROM jsonb_array_elements_text(
-    CASE WHEN jsonb_typeof(r.params->'cited_image_ids') = 'array' THEN r.params->'cited_image_ids' ELSE '[]' END) WITH ORDINALITY e(v, ord)
-  UNION ALL
-  SELECT 'candidate', e.v, e.ord FROM jsonb_array_elements_text(
-    CASE WHEN jsonb_typeof(r.params->'candidate_image_ids') = 'array' THEN r.params->'candidate_image_ids' ELSE '[]' END) WITH ORDINALITY e(v, ord)
-  UNION ALL
-  SELECT 'answer', e.v, e.ord FROM jsonb_array_elements_text(
-    CASE WHEN jsonb_typeof(r.answer->'image_ids') = 'array' THEN r.answer->'image_ids' ELSE '[]' END) WITH ORDINALITY e(v, ord)
-) s
-WHERE s.id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-  AND EXISTS (SELECT 1 FROM public.vehicle_images i WHERE i.id = s.id::uuid)
-GROUP BY r.id, s.id, s.role
-ON CONFLICT DO NOTHING;
 
 -- The edge from a value answer to the reading it became. Refuses anything but the reading the sanctioned writer landed
 -- for this very request: same vehicle, same property, method fact_doubt_reread_v1, the request id in its record, current.
