@@ -11,6 +11,7 @@
 import React, { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { explainRefusal } from '../../lib/adminOnlyRefusal';
 
 interface ExtractedData {
   year: number | null;
@@ -66,7 +67,7 @@ export default function FacebookMarketplaceImport() {
         },
       });
 
-      if (error) throw error;
+      if (error) throw explainRefusal(error);
       setResult(data);
 
       // If this is owner's listing, show sale form option

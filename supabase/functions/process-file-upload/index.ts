@@ -70,6 +70,19 @@ Deno.serve(async (req) => {
     const file = formData.get("file") as File | null;
     const vehicleId = formData.get("vehicle_id") as string | null;
     const processImmediately = formData.get("process_immediately") === "true";
+    // The import row is keyed to the caller; a vehicle it names must be one the caller can edit, or a stranger's
+    // file would be processed into another person's car (2026-11-25).
+    if (vehicleId) {
+      const { data: canEdit, error: canEditErr } = await supabase.rpc("user_can_edit_vehicle", {
+        p_vehicle_id: vehicleId, p_user_id: userId,
+      });
+      if (canEditErr || canEdit !== true) {
+        return new Response(
+          JSON.stringify({ error: "forbidden", reason: "vehicle_id is not a vehicle you can edit" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     if (!file) {
       return new Response(

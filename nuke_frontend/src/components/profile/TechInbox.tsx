@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { ADMIN_ONLY_TEXT, isAdminOnlyRefusal } from '../../lib/adminOnlyRefusal';
 
 interface TelegramImage {
   id: string;
@@ -303,6 +304,10 @@ export default function TechInbox({ technicianId }: TechInboxProps) {
         }
       );
 
+      if (isAdminOnlyRefusal(response)) {
+        setMessage(ADMIN_ONLY_TEXT);
+        return;
+      }
       const result = await response.json();
 
       if (result.error) {

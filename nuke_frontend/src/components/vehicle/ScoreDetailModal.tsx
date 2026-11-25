@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { ADMIN_ONLY_TEXT, isAdminOnlyRefusal } from '../../lib/adminOnlyRefusal';
 import { supabase } from '../../lib/supabase';
 
 interface ScoreFactor {
@@ -54,6 +55,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
   const [commentCount, setCommentCount] = useState(0);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [showFormula, setShowFormula] = useState(false);
+  const [refused, setRefused] = useState(false);
 
   useEffect(() => {
     loadExplanation();
@@ -65,6 +67,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
         body: { action: 'explain', vehicle_id: vehicleId },
       });
 
+      if (error && isAdminOnlyRefusal(error)) setRefused(true);
       if (!error && data) {
         setExplanation(data.breakdown?.[scoreKey] || null);
         setVehicleTitle(data.vehicle_title || '');
@@ -105,7 +108,7 @@ export default function ScoreDetailModal({ vehicleId, scoreKey, onClose }: Props
       <div style={overlayStyle} onClick={onClose}>
         <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
           <div style={{ padding: '40px', textAlign: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>
-            Score data unavailable
+            {refused ? ADMIN_ONLY_TEXT : 'Score data unavailable'}
           </div>
         </div>
       </div>

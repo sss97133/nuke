@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { explainRefusal } from '../../lib/adminOnlyRefusal';
 
 interface BATListingManagerProps {
   vehicleId: string;
@@ -124,7 +125,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
         }
       });
 
-      if (error) throw error;
+      if (error) throw explainRefusal(error);
 
       if (data.success) {
         setProgress(`✅ Extracted ${data.count || 0} parts/brands from BAT listing`);

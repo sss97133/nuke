@@ -2,6 +2,7 @@ import React from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/unified-design-system.css';
+import { explainRefusal } from '../lib/adminOnlyRefusal';
 
 interface IdentityResult {
   id: string;
@@ -306,7 +307,7 @@ const ClaimExternalIdentity: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('ingest-external-profile', {
         body: { platform, profile_url: profileUrl, notify_user_id: userId },
       });
-      if (error) throw error;
+      if (error) throw explainRefusal(error);
       if (!data?.success) throw new Error(data?.error || 'Import failed');
 
       addLog(`Identity created: ${data.identity.handle}`, 'success');

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getSupabaseFunctionsUrl } from '../lib/supabase';
+import { ADMIN_ONLY_TEXT, isAdminOnlyRefusal } from '../lib/adminOnlyRefusal';
 
 export interface PipelineEntry {
   id: string;
@@ -125,6 +126,7 @@ export function useAcquisitionPipeline() {
         },
         body: JSON.stringify({ action, pipeline_id: pipelineId, ...params }),
       });
+      if (isAdminOnlyRefusal(res)) throw new Error(ADMIN_ONLY_TEXT);
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Failed to advance stage');
       await fetchData(); // refresh

@@ -35,7 +35,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
@@ -1010,6 +1010,9 @@ if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

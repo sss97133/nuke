@@ -41,7 +41,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { parseTitle } from "./titleParse.ts";
 import { extractBonhamsHighlights, isBonhamsNonVehicleLot, parseSellerAssessment } from "../extract-bonhams/lotPage.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { ART_DEPARTMENTS, ART_LOT_METHOD, artDepartmentFilter, artLotFromDoc, assetTypeForDepartment } from "./artLot.ts";
 import { advance, landedAnything, startFrom, type WalkCursor } from "./landCursor.ts";
@@ -363,6 +363,9 @@ Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

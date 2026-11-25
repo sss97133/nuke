@@ -23,7 +23,7 @@ import { vehicleEventWriterFor } from '../_shared/vehicleEventWrite.ts';
 const writeVehicleEventByKey = vehicleEventWriterFor('extract-ebay-motors');
 import { ExtractionLogger, validateVin, parsePrice, parseMileage } from '../_shared/extractionHealth.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { BROWSE_ACTIONS, handleBrowse } from './browseHandler.ts';
 import { handleParts } from './partsFinder.ts';
@@ -773,6 +773,10 @@ Deno.serve(async (req) => {
     const body = await req.json();
     // Parts finder for a job (partsFinder.ts): signed-in users, its own capped share of the Browse quota; writes nothing.
     if (body?.action === 'parts') return await handleParts(req, body);
+    // Every other action writes vehicles, images and observations with the service client from a caller URL or
+    // query: the service key or an active admin only; signed in is anyone while sign-up is open (2026-11-25).
+    const notAdmin = await requireAdminOrService(req, { headers: corsHeaders });
+    if (notAdmin) return notAdmin;
     // Browse API intake (official API, keys in function secrets); the Firecrawl single-URL path below is the older door.
     if (BROWSE_ACTIONS.includes(body?.action)) {
       const supabase = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!);

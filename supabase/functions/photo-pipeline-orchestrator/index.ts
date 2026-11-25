@@ -17,7 +17,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { authenticateWriter, requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { classifyImageRouted, classificationFromReader, loadManifest, renderPromptV2 } from "./classifierProvider.ts";
 import { qualifyVinRead, vinCitation, type VinAdmission } from "./vinAdmission.ts";
@@ -303,6 +303,12 @@ Deno.serve(async (req) => {
       }
     }
 
+    // The queue and assay actions claim and classify any image with the service client and paid models: the service key
+    // or an active admin only; signed in is anyone while sign-up is open (2026-11-25).
+    if (input?.action === "process_pending" || input?.action === "classifier_assay") {
+      const notAdmin = await requireAdminOrService(req, { headers: corsHeaders });
+      if (notAdmin) return notAdmin;
+    }
     if (input?.action === "classifier_assay") return await runClassifierAssay(req, input, supabase);
     // The checklist for a reader that runs the classification elsewhere (the owner's subscription worker): the same
     // v98 prompt the OpenAI path sends, from the same manifest. No image, no model call.
@@ -472,9 +478,17 @@ Deno.serve(async (req) => {
     }
 
     const { data: imageRow, error: imageError } = await supabase.from("vehicle_images")
-      .select("apple_ml_labels, vehicle_score, latitude, longitude, taken_at, is_external, image_url, vehicle_id")
+      .select("apple_ml_labels, vehicle_score, latitude, longitude, taken_at, is_external, image_url, vehicle_id, user_id")
       .eq("id", image_id).single();
     if (imageError || !imageRow) throw new Error("photo_pipeline_image_read_failed");
+    // One image: its uploader (the web upload path calls this with the uploader's session), or the service key or an
+    // active admin. Anyone else would spend paid reads and rewrite the scan state of a stranger's photo (2026-11-25).
+    const writer = await authenticateWriter(req);
+    const isUploader = writer.ok && writer.caller.kind === "user" && !!imageRow.user_id && writer.caller.userId === imageRow.user_id;
+    if (!isUploader) {
+      const notAdmin = await requireAdminOrService(req, { headers: corsHeaders });
+      if (notAdmin) return notAdmin;
+    }
     if (imageRow.image_url !== image_url || imageRow.vehicle_id !== vehicle_id) {
       throw new Error("photo_pipeline_source_changed");
     }

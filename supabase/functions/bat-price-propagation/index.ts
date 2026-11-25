@@ -23,7 +23,7 @@ import {
   quarantineRecord,
   type ProvenanceMetadata,
 } from "../_shared/batUpsertWithProvenance.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const PROPAGATION_VERSION = "bat-price-propagation:1.0.0";
@@ -43,6 +43,9 @@ Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const startTime = Date.now();

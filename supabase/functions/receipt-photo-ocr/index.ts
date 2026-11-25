@@ -5,7 +5,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { type CapturePageRow, type Deps, handle, type LandDocumentResult, type LandEnvelope } from "./core.ts";
 
@@ -86,6 +86,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Service key or an active admin only: no end user calls this, and signed in is anyone while sign-up is open (2026-11-25).
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   const started = Date.now();
   try {
     const body = await req.json().catch(() => ({}));

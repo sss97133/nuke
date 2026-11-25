@@ -3,7 +3,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { extractBatListingWithFirecrawl } from '../_shared/batFirecrawlMapper.ts';
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireAdminOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { fetchBatPage } from '../_shared/batFetcher.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -53,6 +53,11 @@ Deno.serve(async (req: Request) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Service key or an active admin only: it fetches a caller-named URL (SSRF) and writes vehicles.uploaded_by for any
+  // caller, and signed in is anyone while sign-up is open (2026-11-25). BaTProfileExtractor shows the refusal; an
+  // owner-checked form comes back in the row-owner work.
+  const notAdmin = await requireAdminOrService(req);
+  if (notAdmin) return notAdmin;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
