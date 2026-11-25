@@ -47,7 +47,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS library_document_corrections_current
   ON public.library_document_corrections (document_id, field) WHERE superseded_at IS NULL;
 ALTER TABLE public.library_document_corrections ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS library_document_corrections_read ON public.library_document_corrections;
-CREATE POLICY library_document_corrections_read ON public.library_document_corrections FOR SELECT TO anon, authenticated USING (true);
+-- a correction is visible exactly when its document is (library_documents' own row level security decides)
+CREATE POLICY library_document_corrections_read ON public.library_document_corrections FOR SELECT TO anon, authenticated
+  USING (EXISTS (SELECT 1 FROM public.library_documents d WHERE d.id = library_document_corrections.document_id));
 REVOKE ALL ON public.library_document_corrections FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT ON public.library_document_corrections TO anon, authenticated, service_role;
 COMMENT ON TABLE public.library_document_corrections IS
