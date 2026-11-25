@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { ORGANIZATION_VEHICLE_PRIVATE_COLUMNS, OWNERSHIP_TRANSFER_PRIVATE_COLUMNS, VEHICLE_OWNER_PII_COLUMNS, VEHICLE_PRIVATE_COLUMNS } from './privateMoney';
+import { ORGANIZATION_VEHICLE_PRIVATE_COLUMNS, OWNERSHIP_TRANSFER_PRIVATE_COLUMNS, VEHICLE_OWNER_PII_COLUMNS, VEHICLE_PLATE_COLUMNS, VEHICLE_PRIVATE_COLUMNS } from './privateMoney';
 import { VEHICLE_CARD_COLUMNS } from '../components/vehicles/vehicleCardColumns';
 import { VEHICLE_POPUP_COLUMNS } from '../components/popups/vehiclePopupColumns';
 
@@ -11,7 +11,7 @@ import { VEHICLE_POPUP_COLUMNS } from '../components/popups/vehiclePopupColumns'
 // or returns every column after a write fails for every visitor. This scans the web's source for
 // such reads so a new one fails CI instead of the page.
 const PRIVATE: Record<string, readonly string[]> = {
-  vehicles: [...VEHICLE_PRIVATE_COLUMNS, ...VEHICLE_OWNER_PII_COLUMNS],
+  vehicles: [...VEHICLE_PRIVATE_COLUMNS, ...VEHICLE_OWNER_PII_COLUMNS, ...VEHICLE_PLATE_COLUMNS],
   organization_vehicles: ORGANIZATION_VEHICLE_PRIVATE_COLUMNS,
   ownership_transfers: OWNERSHIP_TRANSFER_PRIVATE_COLUMNS,
 };
@@ -141,6 +141,7 @@ describe('private money columns', () => {
     expect(hits("supabase.from('organization_vehicles').select('id, cost_basis, vehicles(id, asking_price)')")).toBe(1);
     expect(hits("supabase.from('auction_events').select('*, vehicle:vehicles(*)')")).toBe(1);
     expect(hits("supabase.from('vehicles').select('*', { count: 'exact', head: true })")).toBe(1);
+    expect(hits("supabase.from('generated_invoices').select('id, event:timeline_events(title, vehicle:vehicles(make, vin, license_plate))')")).toBe(1);
     expect(hits("supabase.from('vehicles').select('id, year, make, model').eq('make', make)")).toBe(0);
     expect(hits("supabase.from('organization_vehicles').select('id, vehicles!inner(id, sale_price)')")).toBe(0);
   });

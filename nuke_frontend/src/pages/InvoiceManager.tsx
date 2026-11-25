@@ -118,7 +118,7 @@ const InvoiceManager: React.FC = () => {
             title,
             event_type,
             mileage_at_event,
-            vehicle:vehicles(make, model, year, series, vin, license_plate)
+            vehicle:vehicles(id, make, model, year, series, vin)
           )
         `)
         .order('invoice_date', { ascending: false });
@@ -150,7 +150,7 @@ const InvoiceManager: React.FC = () => {
           ? `${inv.event.vehicle.year} ${inv.event.vehicle.make} ${inv.event.vehicle.model}${inv.event.vehicle.series ? ' ' + inv.event.vehicle.series : ''}`
           : null,
         vehicle_vin: inv.event?.vehicle?.vin || null,
-        vehicle_license_plate: inv.event?.vehicle?.license_plate || null,
+        vehicle_license_plate: null,
         subtotal: parseFloat(inv.subtotal || 0),
         tax_amount: parseFloat(inv.tax_amount || 0),
         total_amount: parseFloat(inv.total_amount || 0),
@@ -161,6 +161,21 @@ const InvoiceManager: React.FC = () => {
         html_content: inv.html_content,
         cashflow: undefined
       }));
+
+      // The plate is not read off the embed: license_plate is withheld from signed-in strangers by column grant.
+      // vehicle_row_read returns it to the car's owner and tied viewers and null to everyone else.
+      const plateVehicleIds = [...new Set((data || []).map((inv: any) => inv.event?.vehicle?.id).filter(Boolean))] as string[];
+      if (plateVehicleIds.length > 0) {
+        const plates = new Map<string, string | null>();
+        await Promise.all(plateVehicleIds.map(async (vehicleId) => {
+          const { data: row } = await supabase.rpc('vehicle_row_read', { p_vehicle_id: vehicleId });
+          plates.set(vehicleId, (row as { license_plate?: string | null } | null)?.license_plate || null);
+        }));
+        (data || []).forEach((inv: any, i: number) => {
+          const vehicleId = inv.event?.vehicle?.id;
+          if (vehicleId) formatted[i].vehicle_license_plate = plates.get(vehicleId) ?? null;
+        });
+      }
 
       // Best-effort: attach cashflow health to each invoice (invoice_payment events + payouts)
       try {
