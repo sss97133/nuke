@@ -11,7 +11,7 @@
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
@@ -45,10 +45,16 @@ Return ONLY a JSON object:
 Extract EVERY reconditioning line item. Be precise with amounts. If unclear, note in description.`;
 
 // ─── MAIN HANDLER ───────────────────────────────────────────────────────────
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Every mode but status writes with the service client on a caller-named image or on a car chosen from
+  // caller-supplied extraction text (moving the photo, creating cars, overwriting vin, mileage and sale price),
+  // and scan/process run paid extraction. Like forensic-deal-jacket: the owner or the service key only, because
+  // "signed in" is anyone while sign-up is open (2026-11-25).
+  const notOwner = await requireOwnerOrService(req);
+  if (notOwner) return notOwner;
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -93,7 +99,9 @@ Deno.serve(async (req) => {
     console.error("Pipeline error:", err);
     return jsonResponse({ error: String(err) }, 500);
   }
-});
+}
+
+if (import.meta.main) Deno.serve(handler);
 
 // ─── STATUS ─────────────────────────────────────────────────────────────────
 async function getStatus() {
@@ -158,8 +166,8 @@ async function scanAndProcess(limit: number) {
       results.processed++;
       if (result.extracted) results.extracted++;
       else results.failed++;
-      if (result.vehicle_linked) results.vehicles_linked++;
-      if (result.vehicle_created) results.vehicles_created++;
+      if ("vehicle_linked" in result && result.vehicle_linked) results.vehicles_linked++;
+      if ("vehicle_created" in result && result.vehicle_created) results.vehicles_created++;
       results.details.push({ image_id: doc.id, ...result });
     } catch (err) {
       results.failed++;
@@ -321,6 +329,22 @@ async function processExtraction(imageId: string, vehicleId: string | null, extr
 }
 
 // ─── AUTO-LINK VEHICLE ──────────────────────────────────────────────────────
+// A photo moves onto a car only through relink_testimony, the sanctioned mover: it keeps
+// merged_from_vehicle_id, applies the vision gate and writes the reattribution_audit row.
+// A raw vehicle_images.vehicle_id update did none of that (2026-11-25).
+async function moveImage(imageId: string, vehicleId: string, how: string): Promise<boolean> {
+  const { error } = await supabase.rpc("relink_testimony", {
+    p_observation_type: "image",
+    p_observation_id: imageId,
+    p_target_vehicle_id: vehicleId,
+    p_reason: `deal_jacket_pipeline: ${how}`,
+    p_actor_user_id: null,
+    p_gate_override_reason: null,
+  });
+  if (error) console.error(`[deal-jacket-pipeline] relink_testimony refused ${imageId}: ${error.message}`);
+  return !error;
+}
+
 async function autoLinkVehicle(imageId: string, vehicleData: any, extraction: any) {
   const year = vehicleData.year;
   const make = (vehicleData.make || "").trim();
@@ -336,7 +360,7 @@ async function autoLinkVehicle(imageId: string, vehicleData: any, extraction: an
       .is("deleted_at", null)
       .limit(1);
     if (vinMatch?.length) {
-      await supabase.from("vehicle_images").update({ vehicle_id: vinMatch[0].id }).eq("id", imageId);
+      if (!(await moveImage(imageId, vinMatch[0].id, "vin match"))) return { vehicleId: null, linked: false, created: false };
       await enrichVehicle(vinMatch[0].id, extraction);
       return { vehicleId: vinMatch[0].id, linked: true, created: false };
     }
@@ -350,7 +374,7 @@ async function autoLinkVehicle(imageId: string, vehicleData: any, extraction: an
     const { data: matches } = await query.limit(5);
 
     if (matches?.length === 1) {
-      await supabase.from("vehicle_images").update({ vehicle_id: matches[0].id }).eq("id", imageId);
+      if (!(await moveImage(imageId, matches[0].id, "unique year/make/model match"))) return { vehicleId: null, linked: false, created: false };
       await enrichVehicle(matches[0].id, extraction);
       return { vehicleId: matches[0].id, linked: true, created: false };
     }
@@ -381,7 +405,7 @@ async function autoLinkVehicle(imageId: string, vehicleData: any, extraction: an
       .single();
 
     if (newVehicle) {
-      await supabase.from("vehicle_images").update({ vehicle_id: newVehicle.id }).eq("id", imageId);
+      if (!(await moveImage(imageId, newVehicle.id, "new vehicle from extraction"))) return { vehicleId: newVehicle.id, linked: false, created: true };
       await enrichVehicle(newVehicle.id, extraction);
       return { vehicleId: newVehicle.id, linked: false, created: true };
     }

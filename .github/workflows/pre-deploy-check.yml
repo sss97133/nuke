@@ -62,6 +62,12 @@ jobs:
       - name: Raw-fetch guard regression tests
         run: node --test scripts/guardrails/no-raw-fetch.test.mjs
 
+      - name: Edge writers refuse anonymous callers; service-scoped writers refuse signed-in strangers
+        # The same check supabase-deploy runs before deploying, here so a regression fails the pull request.
+        run: |
+          node --test scripts/guardrails/check-write-guard.test.mjs
+          node scripts/guardrails/check-write-guard.mjs
+
       - name: Reviewed photo intake replay and source custody
         run: |
           node --test scripts/lib/ingest-image-identity-payload.test.mjs

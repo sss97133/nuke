@@ -24,7 +24,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const FN_DIR = path.join(REPO, "supabase/functions");
+// CHECK_WRITE_GUARD_FN_DIR points the check at a fixture tree (check-write-guard.test.mjs); production never sets it.
+const FN_DIR = process.env.CHECK_WRITE_GUARD_FN_DIR || path.join(REPO, "supabase/functions");
 
 // Functions that write but are allowed to skip requireWriteAuth, with the reason.
 // Adding a name here is a decision, not a convenience: say what refuses the anonymous caller.
@@ -46,6 +47,85 @@ const ALLOWLIST = {
   "universal-search": "public read; its one write (register_make_model_subject) is idempotent and bounded to canonical make/model/year",
 };
 
+// Functions that write with the service client on ids or text the caller supplies, and so must refuse an ordinary
+// signed-in caller too (sign-up is open with email auto-confirmed, so "signed in" is anyone): each must call
+// requireOwnerOrService, requireAdminOrService or isServiceCaller before it reads the request body.
+// Say which rows a stranger could otherwise write.
+const SERVICE_SCOPED = {
+  "deal-jacket-pipeline": "moves a caller-named vehicle_images row onto a car picked from caller text, creates cars, overwrites vehicles.vin/mileage/sale_price/origin_metadata, runs paid extraction (2026-11-25)",
+  "forensic-deal-jacket": "stores extractions on a caller-named image and writes vehicles.origin_metadata; runs paid AI (2026-09-29)",
+};
+// The gate: a statement of its own that returns its refusal (requireOwnerOrService / requireAdminOrService into a
+// const, then `if (x) return`; or `if (!(await isServiceCaller(req))) return`). Group 1 is its indent.
+const STRONG_GATE = /^( *)(?:(?:const|let) (\w+) = \(?await (?:requireOwnerOrService|requireAdminOrService)\(\s*(?:req|request)\b[^;]*;\s*if \(\2\) return\b|if \(!\s*\(?await isServiceCaller\(\s*(?:req|request)\b[^\n]*\)\)\s*(?:return\b|\{\s*return\b))/gm;
+const BODY_READ = /\b(req|request)\.(json|formData|text|arrayBuffer|blob|body)\b|new URL\(\s*(req|request)\.url/;
+// What may run before the gate: requireWriteAuth and its refusal, and the OPTIONS preflight return.
+const PRE_GATE_OK = [
+  /^\s*(?:const|let) (\w+) = await requireWriteAuth\([^;]*;\s*if \(\1\) return \1;?/,
+  /^\s*if \((?:req|request)\.method === ["']OPTIONS["']\)\s*(?:\{\s*return [^;]*;\s*\}|return [^;]*;)/,
+];
+// Comments and string contents do not gate anything and must not move braces: blank them, keeping offsets.
+function blank(src, strings = true) {
+  const sp = (m) => m.replace(/[^\n]/g, " ");
+  return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, (m) =>
+    m[0] === "/" ? sp(m) : strings ? m[0] + sp(m.slice(1, -1)) + m[m.length - 1] : m);
+}
+// The handler: Deno.serve's inline function, or the named function Deno.serve is handed (an exported handler
+// gated by `if (import.meta.main) Deno.serve(handler)` counts), in index.ts. Returns [open, close] brace offsets.
+function handlerSpan(src) {
+  let at = -1;
+  const inline = /(?:Deno\.serve|\bserve)\(\s*(?:\{[^}]*\},\s*)?(?:async\s*)?(?:function\s*\w*\s*)?\(\s*(?:req|request|_req)\b/.exec(src);
+  if (inline) at = inline.index + inline[0].length;
+  else {
+    const named = /Deno\.serve\(\s*(?:\{[^}]*\},\s*)?(\w+)\s*\)/.exec(src);
+    if (!named) return null;
+    const def = new RegExp(`(?:function\\s+${named[1]}\\s*\\(|(?:const|let)\\s+${named[1]}\\s*=\\s*(?:async\\s*)?(?:function\\s*)?\\()`).exec(src);
+    if (!def) return null;
+    at = def.index + def[0].length;
+  }
+  // Skip the parameter list (balanced parens), then the body opens at the first "{".
+  let depth = 1, i = at;
+  for (; i < src.length && depth; i++) depth += src[i] === "(" ? 1 : src[i] === ")" ? -1 : 0;
+  const open = src.indexOf("{", i);
+  if (open < 0) return null;
+  depth = 0;
+  for (let j = open; j < src.length; j++) {
+    if (src[j] === "{") depth++;
+    else if (src[j] === "}" && --depth === 0) return [open, j];
+  }
+  return null;
+}
+// The gate must be a statement at the top level of the handler (the indent of its first statement), inside the
+// handler's own span in index.ts, with nothing before it but requireWriteAuth and the OPTIONS return, and before
+// anything reads what the caller sent. A gate in another file, in an unused function, in a branch or after the
+// body is read does not count.
+function gatedBeforeBody(fn) {
+  const file = path.join(FN_DIR, fn, "index.ts");
+  if (!existsSync(file)) return false;
+  const raw = readFileSync(file, "utf8");
+  const src = blank(raw); // braces and spans: comments and string contents blanked
+  const text = blank(raw, false); // statements: comments blanked, strings kept (same offsets)
+  const span = handlerSpan(src);
+  if (!span) return false;
+  const [open, close] = span;
+  const first = /\S/.exec(src.slice(open + 1));
+  if (!first) return false;
+  const firstAt = open + 1 + first.index;
+  const indent = firstAt - (src.lastIndexOf("\n", firstAt) + 1);
+  for (const g of text.matchAll(STRONG_GATE)) {
+    if (g.index < open || g.index > close || g[1].length !== indent) continue;
+    let pre = text.slice(open + 1, g.index);
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const ok of PRE_GATE_OK) {
+        const m = ok.exec(pre);
+        if (m) { pre = pre.slice(m[0].length); changed = true; }
+      }
+    }
+    return pre.trim() === "" && !BODY_READ.test(text.slice(open, g.index));
+  }
+  return false;
+}
 const WRITE_RPCS = new Set(["persist_auction_readiness", "register_make_model_subject", "exec_sql", "execute_sql"]);
 const RAW_PG = /deno\.land\/x\/postgres|postgresjs|npm:postgres|NUKE_DB_POOL_URL|SUPABASE_DB_URL/;
 const RAW_WRITE = /\b(INSERT\s+INTO|UPDATE\s+[a-z_."]+\s+SET|DELETE\s+FROM|TRUNCATE)\b/i;
@@ -125,6 +205,8 @@ while (changed) {
 const writers = [...info].filter(([, i]) => i.reasons.length);
 const unguarded = writers.filter(([fn, i]) => !i.guarded && !(fn in ALLOWLIST));
 const preflightRuns = [...info].filter(([, i]) => i.usesGuard && i.preflight);
+const scopedOpen = Object.keys(SERVICE_SCOPED).filter((fn) => info.has(fn) && !gatedBeforeBody(fn));
+const scopedStale = Object.keys(SERVICE_SCOPED).filter((fn) => !info.has(fn));
 const stale = Object.keys(ALLOWLIST).filter((fn) => !info.has(fn));
 const idle = Object.keys(ALLOWLIST).filter((fn) => info.has(fn) && !info.get(fn).reasons.length);
 
@@ -143,6 +225,15 @@ console.log(
 );
 for (const fn of stale) console.log(`  note: allowlist entry '${fn}' has no function directory (stale)`);
 for (const fn of idle) console.log(`  note: allowlist entry '${fn}' no longer writes (drop it)`);
+if (scopedStale.length) {
+  // A rename would otherwise drop the function out of the check without anyone noticing.
+  console.error(`\n✗ service-scoped entr${scopedStale.length === 1 ? "y has" : "ies have"} no function directory: ${scopedStale.join(", ")} (rename the entry with the function)`);
+}
+if (scopedOpen.length) {
+  console.error(`\n✗ ${scopedOpen.length} service-scoped function(s) admit any signed-in caller:`);
+  for (const fn of scopedOpen) console.error(`  ${fn}  (${SERVICE_SCOPED[fn]})`);
+  console.error("\nRight after requireWriteAuth, before the body is read, add\n`const notOwner = await requireOwnerOrService(req); if (notOwner) return notOwner;`\n(or requireAdminOrService / isServiceCaller), as forensic-deal-jacket does.");
+}
 if (preflightRuns.length) {
   console.error(`\n✗ ${preflightRuns.length} guarded function(s) run their handler for an anonymous OPTIONS request:`);
   for (const [fn, i] of preflightRuns) console.error(`  ${fn}  (${i.preflight})`);
@@ -153,5 +244,5 @@ if (unguarded.length) {
   for (const [fn, i] of unguarded) console.error(`  ${fn}  (${i.reasons.join("; ")})`);
   console.error("\nAdd `const denied = await requireWriteAuth(req); if (denied) return denied;` as the first statement of the handler\n(import from ../_shared/writeGuard.ts), or allowlist it in scripts/guardrails/check-write-guard.mjs with the auth that refuses anonymous callers.");
 }
-if (unguarded.length || preflightRuns.length) process.exit(1);
+if (unguarded.length || preflightRuns.length || scopedOpen.length || scopedStale.length) process.exit(1);
 console.log("✓ every writing function refuses anonymous callers");
