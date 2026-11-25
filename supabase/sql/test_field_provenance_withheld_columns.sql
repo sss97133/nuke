@@ -60,6 +60,124 @@ INSERT INTO public.field_evidence(vehicle_id,field_name,proposed_value,source_ty
 INSERT INTO public.vehicle_field_sources(vehicle_id,field_name,field_value,source_type,confidence_score,created_at) VALUES
  ('11111111-1111-1111-1111-111111111111','purchase_price','1','user_input',90,now());
 
+-- Gallery eligibility, as live (2026-11-25): the vehicle_images columns it reads, photo_extracted_fields,
+-- image_privacy_rules and the live bodies of image_stage_custody_external, vehicle_image_privacy_withheld and
+-- vehicle_image_gallery_eligible(vehicle_images). bat_pending_image_has_listing reads auction_events_canonical, which this
+-- fixture does not carry; it is stubbed false (it only admits 'pending' BaT photos, and no fixture photo is pending).
+ALTER TABLE public.vehicle_images ADD COLUMN user_id uuid REFERENCES auth.users(id), ADD COLUMN is_external boolean,
+  ADD COLUMN is_approved boolean, ADD COLUMN approval_status text, ADD COLUMN verification_status text,
+  ADD COLUMN redaction_level text, ADD COLUMN exif_data jsonb;
+CREATE TABLE public.photo_extracted_fields (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  image_id uuid NOT NULL REFERENCES public.vehicle_images(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users(id),
+  vehicle_id uuid REFERENCES public.vehicles(id) ON DELETE SET NULL,
+  field_name text NOT NULL, value text NOT NULL, source text NOT NULL DEFAULT 'classifier_v2',
+  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (image_id, field_name, source));
+CREATE TABLE public.image_privacy_rules (field_name text NOT NULL, min_alnum integer NOT NULL CHECK (min_alnum >= 1),
+  applies_to text NOT NULL CHECK (applies_to = 'custody'), enabled boolean NOT NULL DEFAULT true,
+  reason text NOT NULL CHECK (btrim(reason) <> ''), created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (field_name, applies_to));
+CREATE FUNCTION public.bat_pending_image_has_listing(p_vehicle_id uuid, p_exif jsonb) RETURNS boolean LANGUAGE sql STABLE
+  SET search_path TO '' AS $$ SELECT false $$;
+CREATE OR REPLACE FUNCTION public.image_stage_custody_external(p_is_external boolean, p_user_id uuid, p_source text, p_exif jsonb)
+ RETURNS boolean LANGUAGE sql IMMUTABLE PARALLEL SAFE
+AS $function$
+  select case
+    when p_is_external is not true then false
+    when p_user_id is not null and p_source = 'iphoto'
+         and p_exif -> 'source_rendition' ->> 'contract' = 'photos_cached_preview_v1' then false
+    else true
+  end $function$;
+CREATE OR REPLACE FUNCTION public.vehicle_image_privacy_withheld(p_image_id uuid)
+ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER COST 50 SET search_path TO 'pg_catalog', 'public'
+AS $function$
+  SELECT CASE
+    WHEN (SELECT auth.role()) = 'service_role' THEN false
+    WHEN (SELECT auth.role()) IS NULL AND session_user <> 'authenticator' THEN false
+    ELSE EXISTS (
+      SELECT 1
+      FROM public.photo_extracted_fields f
+      JOIN public.image_privacy_rules r
+        ON r.field_name = f.field_name AND r.enabled AND r.applies_to = 'custody'
+      JOIN public.vehicle_images i ON i.id = f.image_id
+      WHERE f.image_id = p_image_id
+        AND length(regexp_replace(upper(f.value), '[^A-Z0-9]', '', 'g')) >= r.min_alnum
+        AND NOT public.image_stage_custody_external(i.is_external, i.user_id, i.source, i.exif_data)
+        AND i.user_id IS DISTINCT FROM (SELECT auth.uid())
+        AND NOT public.vehicle_viewer_tied(i.vehicle_id))
+  END
+$function$;
+CREATE OR REPLACE FUNCTION public.vehicle_image_gallery_eligible(vehicle_images)
+ RETURNS boolean LANGUAGE sql STABLE
+AS $function$
+  SELECT
+    coalesce(($1).is_document,false)=false
+    AND coalesce(($1).is_duplicate,false)=false
+    AND coalesce(($1).is_superseded,false)=false
+    AND nullif(btrim(($1).image_url),'') IS NOT NULL
+    AND ($1).image_url NOT LIKE 'file://%'
+    AND (($1).source IS NULL OR ($1).source <> 'e2e_test')
+    AND coalesce(($1).image_vehicle_match_status,'') NOT IN ('mismatch','unrelated')
+    AND CASE
+      WHEN ($1).vision_gate_status IS NULL OR ($1).vision_gate_status::text='approved' THEN true
+      WHEN ($1).vision_gate_status::text='pending' THEN
+        coalesce(($1).is_sensitive,false)=false
+        AND (
+          (
+            coalesce(($1).source='bat_import',false)
+            AND ($1).is_external IS TRUE
+            AND ($1).is_approved IS TRUE
+            AND coalesce(($1).approval_status::text IN ('approved','auto_approved'),false)
+            AND coalesce(($1).verification_status='approved',false)
+            AND coalesce(($1).redaction_level::text='none',false)
+            AND ($1).image_url ~* '^https://(www\.)?bringatrailer\.com/wp-content/uploads/'
+            AND public.bat_pending_image_has_listing(($1).vehicle_id, ($1).exif_data)
+          )
+          OR (
+            coalesce(($1).source='bat_import',false)=false
+            AND ($1).is_external IS TRUE
+            AND ($1).user_id IS NULL
+            AND ($1).is_approved IS TRUE
+            AND coalesce(($1).approval_status::text,'') <> 'rejected'
+            AND coalesce(($1).verification_status='approved',false)
+            AND coalesce(($1).redaction_level::text='none',false)
+            AND ($1).image_url ~* '^https://'
+          )
+        )
+      ELSE false
+    END
+    AND NOT public.vehicle_image_privacy_withheld(($1).id);
+$function$;
+GRANT SELECT ON public.image_privacy_rules TO anon, authenticated;
+INSERT INTO public.image_privacy_rules (field_name, min_alnum, applies_to, reason) VALUES ('license_plate', 4, 'custody', 'fixture');
+
+-- Rows each source table's own read policy hides from some caller, under non-column names (their own cases, test 10):
+--   seller_name: field_evidence seller identity, signed-in callers only ("Anyone can view evidence");
+--   fixture_doc_field: a vehicle_field_sources row citing a document photo (not gallery-eligible);
+--   fixture_plate_photo: a row citing a custody photo with a keyed plate reading (image_privacy_rules) uploaded by
+--     someone else, hidden from a caller who is not tied;
+--   fixture_statement: an owner_statement_v1 observation, readable only by its submitter (the signed-in stranger cccc).
+-- ALLOW_RAW_TESTIMONY_WRITE: fixture rows in an empty disposable PG17 database, never production.
+INSERT INTO auth.users (id) SELECT 'dddddddd-dddd-dddd-dddd-dddddddddddd' WHERE NOT EXISTS
+  (SELECT 1 FROM auth.users WHERE id = 'dddddddd-dddd-dddd-dddd-dddddddddddd');
+INSERT INTO public.vehicle_images (id, vehicle_id, image_url, source, is_document) VALUES
+  ('d0c00000-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111', 'https://fixture.invalid/doc.jpg', 'user_upload', true);
+INSERT INTO public.vehicle_images (id, vehicle_id, image_url, source, user_id, is_external) VALUES
+  ('d0c00000-0000-4000-8000-000000000002', '11111111-1111-1111-1111-111111111111', 'https://fixture.invalid/plate.jpg', 'user_upload',
+   'dddddddd-dddd-dddd-dddd-dddddddddddd', false);
+INSERT INTO public.photo_extracted_fields (image_id, field_name, value) VALUES
+  ('d0c00000-0000-4000-8000-000000000002', 'license_plate', 'FIXTURE9');
+INSERT INTO public.field_evidence(vehicle_id,field_name,proposed_value,source_type,source_confidence,status,raw_extraction_data) VALUES
+ ('11111111-1111-1111-1111-111111111111','seller_name','fixture seller','bat_listing',70,'accepted','{}');
+INSERT INTO public.vehicle_field_sources(vehicle_id,field_name,field_value,source_type,confidence_score,source_image_id,created_at) VALUES
+ ('11111111-1111-1111-1111-111111111111','fixture_doc_field','doc value','user_input',90,'d0c00000-0000-4000-8000-000000000001',now()),
+ ('11111111-1111-1111-1111-111111111111','fixture_plate_photo','plate value','user_input',90,'d0c00000-0000-4000-8000-000000000002',now());
+INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, is_superseded, observed_at, ingested_at,
+  content_text, extraction_method, confidence_score, submitted_by_user_id)
+VALUES ('d0c00000-0000-4000-8000-000000000003', '11111111-1111-1111-1111-111111111111', 'condition',
+  '{"fixture_statement":"said by the stranger"}', false, now(), now(), 'fixture statement', 'owner_statement_v1', 0.5,
+  'cccccccc-cccc-cccc-cccc-cccccccccccc');
+
 -- Every answer before and after, for five callers: anon, a signed-in stranger, the owner (tied), the service role,
 -- and a direct SQL caller with no request claims (pg_cron, scripts), which must count as anon.
 CREATE TABLE public.wc_fields AS
@@ -68,6 +186,7 @@ CREATE TABLE public.wc_fields AS
   UNION SELECT unnest(ARRAY['year','make','model','vin','color','mileage','engine_type','location','trim','currency',
     'owner_name','license_plate','purchase_price','purchase_location','color_source','currency_source',
     'image_visible_rust_severity','image_visible_paint_stage','image_visible_assembly_state',
+    'seller_name','fixture_doc_field','fixture_plate_photo','fixture_statement',
     'x''); drop table public.vehicles; --','Owner_Name','']);
 -- The owner viewer is tied to 1111 only; on 2222 it is a signed-in stranger.
 CREATE TABLE public.wc_viewers(viewer text PRIMARY KEY, role_name text, auth_role text, uid text);
@@ -178,11 +297,47 @@ BEGIN
              AND t.attname = a.field AND t.attnum > 0
              AND NOT has_column_privilege(CASE WHEN v.role_name = 'authenticated' THEN 'authenticated' ELSE 'anon' END,
                'public.vehicles'::regclass, t.attnum, 'SELECT')))))
+     AND a.field NOT IN ('seller_name','fixture_doc_field','fixture_plate_photo','fixture_statement')
      AND NOT (a.field = 'currency' AND NOT (v.viewer = 'service' OR (v.viewer = 'owner' AND a.vehicle = pub))
        AND a.p - 'inline_source' = b.p - 'inline_source' AND a.p->'inline_source' = 'null'::jsonb);
   ASSERT n >= 400, format('8 answers %s', n);
   ASSERT d = 0, format('8 %s answers changed that were not a withheld column or sibling', d);
   RAISE NOTICE 'PASS 1-8: % answers per phase, 5 callers', n;
+
+  -- 10. A non-column name returns only what each source table's own read policy would show the caller.
+  ASSERT pg_temp.ask('anon', pub, 'seller_name')->'evidence' = '[]'::jsonb, '10 anon seller_name field_evidence (policy)';
+  ASSERT jsonb_array_length(pg_temp.ask('untied', pub, 'seller_name')->'evidence') = 1, '10 signed-in seller_name evidence';
+  ASSERT jsonb_array_length(pg_temp.ask('service', pub, 'seller_name')->'evidence') = 1, '10 service seller_name evidence';
+  ASSERT pg_temp.ask('anon', pub, 'fixture_doc_field')->'evidence' = '[]'::jsonb, '10 anon document photo source';
+  ASSERT pg_temp.ask('untied', pub, 'fixture_doc_field')->'evidence' = '[]'::jsonb, '10 stranger document photo source';
+  ASSERT pg_temp.ask('owner', pub, 'fixture_doc_field')->'evidence'->0->>'image_id' = 'd0c00000-0000-4000-8000-000000000001',
+    '10 owner document photo source';
+  ASSERT pg_temp.ask('anon', pub, 'fixture_plate_photo')->'evidence' = '[]'::jsonb, '10 anon privacy-rule photo source';
+  ASSERT pg_temp.ask('untied', pub, 'fixture_plate_photo')->'evidence' = '[]'::jsonb, '10 stranger privacy-rule photo source';
+  ASSERT pg_temp.ask('owner', pub, 'fixture_plate_photo')->'evidence'->0->>'image_id' = 'd0c00000-0000-4000-8000-000000000002',
+    '10 owner privacy-rule photo source';
+  ASSERT pg_temp.ask('anon', pub, 'fixture_statement')->'observations' = '[]'::jsonb, '10 anon owner statement';
+  ASSERT pg_temp.ask('owner', pub, 'fixture_statement')->'observations' = '[]'::jsonb, '10 owner is not the submitter';
+  ASSERT pg_temp.ask('untied', pub, 'fixture_statement')->'observations'->0->>'id' = 'd0c00000-0000-4000-8000-000000000003',
+    '10 submitter reads own statement';
+  ASSERT jsonb_array_length(pg_temp.ask('service', pub, 'fixture_statement')->'observations') = 1, '10 service statement';
+  -- The prior body returned the policy-hidden rows, so these cases bite.
+  ASSERT (SELECT p->'evidence' <> '[]'::jsonb FROM public.wc_answers WHERE phase = 'before'
+          AND viewer = 'anon' AND vehicle = pub AND field = 'seller_name'), '10 prior body leaked seller_name to anon';
+  ASSERT (SELECT p->'observations' <> '[]'::jsonb FROM public.wc_answers WHERE phase = 'before'
+          AND viewer = 'anon' AND vehicle = pub AND field = 'fixture_statement'), '10 prior body leaked the statement to anon';
+  ASSERT (SELECT p->'evidence' <> '[]'::jsonb FROM public.wc_answers WHERE phase = 'before'
+          AND viewer = 'anon' AND vehicle = pub AND field = 'fixture_doc_field'), '10 prior body cited the document photo to anon';
+
+  -- 11. A non-column name is never an alias onto a column: its value is null for every caller; the only vehicles
+  -- columns it reaches are its own _source/_confidence/_source_image_id siblings, each gated (test 7).
+  SELECT count(*) INTO d FROM public.wc_answers a WHERE a.phase = 'after' AND a.p IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM pg_attribute t WHERE t.attrelid = 'public.vehicles'::regclass AND t.attname = a.field
+                    AND t.attnum > 0 AND NOT t.attisdropped)
+    AND a.p->>'value' IS NOT NULL;
+  ASSERT d = 0, format('11 %s non-column answers carry a value', d);
+  RAISE NOTICE 'PASS 10-11';
+
 END $$;
 
 -- 9. A REVOKE closes the path with no function change; the GRANT reopens it.

@@ -2,7 +2,7 @@
 --
 -- WHY. get_field_provenance(uuid,text) is SECURITY DEFINER and anon may execute it. It returned the stored value of
 -- any vehicles column named by p_field (to_jsonb(vehicle)->>p_field), with its _source / _confidence /
--- _source_image_id siblings and the evidence and observation rows filed under that name. 29 vehicles columns are
+-- _source_image_id siblings and the evidence and observation rows filed under that name. 30 vehicles columns are
 -- denied to anon by column grants (owner_name, owner_contact, purchase_price, purchase_date, purchase_location,
 -- license_plate since 20261125152500, ...), and this path ignored all of them. Measured live 2026-11-25 01:25 PT as
 -- anon over PostgREST: owner_name value non-null on 5 of 5 public cars sampled (assay probe 23 in 20261125124500).
@@ -10,7 +10,7 @@
 -- WHAT. Four CTEs at the top of the live body (marker field_provenance_withheld_columns_v1), and one new WHEN:
 --   req           auth.role() mapped by whitelist: service_role, authenticated, else anon. current_user is the owner
 --                 inside SECURITY DEFINER, so the request role is tested explicitly, never current_user.
---   viewer        privileged = service_role or public.vehicle_viewer_tied(p_vehicle_id), called once.
+--   viewer        privileged = service_role or public.vehicle_viewer_tied(p_vehicle_id), called once (not for anon).
 --   column_access for p_field and its three sibling names: readable = privileged, or not a vehicles column, or
 --                 has_column_privilege(request role, 'public.vehicles', attnum, 'SELECT'). attnum comes from
 --                 pg_attribute by name, so an unknown name cannot raise and no dynamic SQL is built.
@@ -19,11 +19,22 @@
 -- A withheld answer has the keys of the existing refused shape (value null, inline_* null, evidence / observations /
 -- image_observations []) plus withheld = true and withheld_reason, and it is returned before any evidence CTE runs.
 -- Each sibling (_source, _confidence, _source_image_id) is returned only when its own column is readable.
--- The gate now also admits a tied viewer (vehicle_viewer_tied: owner, user, uploader, creator, granted access) and the
--- service role; everyone else still needs is_public = true and deleted_at is null. A private, deleted or missing
--- vehicle still returns NULL for every caller who is not tied, so the three are indistinguishable.
+-- The gate also admits the service role; everyone else still needs is_public = true and deleted_at is null, or to be
+-- the car's user, owner or uploader (unchanged: vehicle_images' and vehicle_observations' read policies admit only
+-- those three on a private car). A private, deleted or missing vehicle returns NULL to everyone else, identically.
 -- A name that is not a vehicles column (factory_color, engine_displacement_l, image_visible_*, ...) keeps the
--- evidence-only answer the page drills today; its value is null by construction.
+-- evidence-only answer the page drills today; its value is null by construction. A definer reader must not return
+-- more than each source table's own read policy would, so the body now applies them for a caller who is not the
+-- service role:
+--   field_evidence        "Anyone can view evidence": seller_name / seller_profile_url / seller_phone / seller_email /
+--                         buyer_name rows only to a signed-in caller (money sources stay tied-only).
+--   vehicle_observations  the RESTRICTIVE policies: garage_owner_correction_v1, owner_statement_v1,
+--                         owner_statement_org_link_v1, vehicle_statement_v1 and work_order_payment_witness_sign_v1
+--                         rows only to their submitter.
+--   vehicle_images        a photo cited as a source (evidence image, witness image, correction document, source
+--                         image) only when vehicle_image_gallery_eligible (documents, test rows, image_privacy_rules
+--                         custody readings) for a caller who is not tied; tested by primary key on the citing row, so
+--                         the cost follows the cited photos, not the car's photo count.
 -- Grants are read at call time: a future REVOKE on a vehicles column closes this path with no code change.
 -- Signature, return type, STABLE, SECURITY DEFINER, search_path '' and the ACL are unchanged (CREATE OR REPLACE).
 -- CONTRACT: supabase/sql/test_field_provenance_withheld_columns.sql (PG17). REVERSAL:
@@ -60,7 +71,9 @@ AS $function$
              when 'authenticated' then 'authenticated' else 'anon' end as role_name
   ), viewer as materialized (
     select r.role_name,
-           (r.role_name = 'service_role' or coalesce(public.vehicle_viewer_tied(p_vehicle_id), false)) as privileged
+           (r.role_name = 'service_role'
+             -- a caller with no user id is never tied; skip the call for anon
+             or (auth.uid() is not null and coalesce(public.vehicle_viewer_tied(p_vehicle_id), false))) as privileged
     from req r
   ), column_access as materialized (
     -- One pg_attribute lookup per name; a name that is not a vehicles column has no stored value to withhold.
@@ -76,12 +89,14 @@ AS $function$
                 when not coalesce((select c.readable from column_access c where c.k = 'value'), false)
                   then 'column_not_public' end as withheld_reason
   ), gate as (
-    -- A caller who is not tied and not the service role sees only a public, undeleted vehicle.
+    -- A caller who is not the vehicle's user, owner or uploader and not the service role sees only a public, undeleted
+    -- vehicle. Not widened to every tied viewer: vehicle_images' and vehicle_observations' read policies admit only
+    -- these three on a private car.
     select v.* from public.vehicles v
     where v.id = p_vehicle_id
       and ((v.is_public = true and v.deleted_at is null)
            or auth.uid() in (v.user_id, v.owner_id, v.uploaded_by)
-           or (select privileged from viewer))
+           or (select role_name from req) = 'service_role')
   ),
   prov as (
     select primary_source, total_confidence
@@ -97,6 +112,9 @@ AS $function$
       and i.is_duplicate is not true
       and (i.vision_gate_status is null or i.vision_gate_status::text = 'approved')
       and coalesce(i.image_vehicle_match_status, '') not in ('mismatch', 'unrelated')
+    -- A caller who is not tied sees a photo cited as a source only when the gallery would show it to them (documents,
+    -- test rows and image_privacy_rules custody readings are not): vehicle_image_gallery_eligible is tested where a
+    -- photo is cited, by primary key, so a car with 1,400 photos pays for its cited ones only.
   ), photo_location_fold as materialized (
     -- Photo GPS areas and days come from the one fold the header also reads (vehicle_location_fold,
     -- 20261116007000); only the location field calls it, so every other field pays nothing.
@@ -134,7 +152,7 @@ AS $function$
       and ((r.source_document_table='vehicle_documents' and exists(
         select 1 from public.vehicle_documents d where d.id=r.source_document_id and d.vehicle_id=p_vehicle_id))
         or (r.source_document_table='vehicle_images' and exists(
-          select 1 from visible_images i where i.id=r.source_document_id)))
+          select 1 from visible_images i where i.id=r.source_document_id and ((select privileged from viewer) or exists (select 1 from public.vehicle_images gi where gi.id = i.id and public.vehicle_image_gallery_eligible(gi))))))
       and l.page_date is not null
     order by l.page_date desc,l.id limit 1
   ), field_observations as materialized (
@@ -220,6 +238,13 @@ AS $function$
           ELSE false END, false))
       and (public.observation_is_public(o.kind,o.structured_data)
            or exists (select 1 from gate g where auth.uid() in (g.user_id,g.owner_id,g.uploaded_by)))
+      -- vehicle_observations' RESTRICTIVE read policies (garage correction, owner statement, vehicle statement, work
+      -- order payment witness): only the submitter reads these rows; the service role bypasses RLS.
+      and ((select role_name from req) = 'service_role'
+        or o.extraction_method is null
+        or o.extraction_method not in ('garage_owner_correction_v1','owner_statement_v1','owner_statement_org_link_v1',
+             'vehicle_statement_v1','work_order_payment_witness_sign_v1')
+        or o.submitted_by_user_id = auth.uid())
   ), image_observations as (
     -- Typed derived edges are authoritative when present. Visibility is checked
     -- again at read time; a hidden typed edge must not reopen a JSON fallback.
@@ -229,12 +254,12 @@ AS $function$
     join public.observation_witnesses w on w.observation_id = o.id and w.witness_role = 'derived'
       and (o.extraction_method is distinct from 'cached_byok_property_projection_v1'
         or w.image_id = o.legacy_image_id)
-    join visible_images i on i.id = w.image_id
+    join visible_images i on i.id = w.image_id and ((select privileged from viewer) or exists (select 1 from public.vehicle_images gi where gi.id = w.image_id and public.vehicle_image_gallery_eligible(gi)))
     union all
     select o.*, null::uuid as witness_id, null::text as witness_role,
            i.id as visible_image_id, i.image_url as visible_image_url
     from field_observations o
-    join visible_images i on i.id = o.legacy_image_id
+    join visible_images i on i.id = o.legacy_image_id and ((select privileged from viewer) or exists (select 1 from public.vehicle_images gi where gi.id = o.legacy_image_id and public.vehicle_image_gallery_eligible(gi)))
     where not exists (select 1 from public.observation_witnesses w
       where w.observation_id = o.id and w.witness_role = 'derived')
   ), readable_observations as (
@@ -259,20 +284,28 @@ AS $function$
     from public.field_evidence fe
     left join lateral (
       select vi.* from visible_images vi
-      where vi.id=case
+      where (vi.id=case
         when fe.raw_extraction_data->>'photo_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
           then (fe.raw_extraction_data->>'photo_id')::uuid
         when fe.raw_extraction_data->>'photo_id' is null
           and fe.raw_extraction_data->>'image_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
           then (fe.raw_extraction_data->>'image_id')::uuid end
         or (fe.raw_extraction_data->>'photo_id' is null and fe.raw_extraction_data->>'image_id' is null
-          and vi.image_url=fe.raw_extraction_data->>'image_url')
+          and vi.image_url=fe.raw_extraction_data->>'image_url'))
+        and ((select privileged from viewer) or exists (select 1 from public.vehicle_images gi where gi.id = vi.id and public.vehicle_image_gallery_eligible(gi)))
       order by vi.id limit 1
     ) i on true
     where fe.vehicle_id=p_vehicle_id and fe.field_name=p_field
       and coalesce(fe.proposed_value,'')<>'' and fe.status<>'superseded' and fe.status not like 'rejected%'
       and (coalesce(fe.source_type,'') not in ('quickbooks','invoice','email_receipt','receipt','bank_statement','card_statement')
         or (select tied from money_viewer))
+      -- field_evidence's read policy "Anyone can view evidence": seller and buyer identity fields only for a signed-in
+      -- caller; the service role bypasses RLS.
+      and ((select role_name from req) = 'service_role'
+        or (coalesce(fe.source_type,'') not in ('quickbooks','invoice','email_receipt','receipt','bank_statement','card_statement')
+            and ((select role_name from req) = 'authenticated'
+              or coalesce(fe.field_name,'') not in ('seller_name','seller_profile_url','seller_phone','seller_email','buyer_name')))
+        or ((select role_name from req) = 'authenticated' and (select tied from money_viewer)))
       and (nullif(btrim(fe.raw_extraction_data->>'image_url'),'') is null
         or fe.raw_extraction_data->>'image_url'=i.image_url)
       and (fe.raw_extraction_data->>'photo_id' is null or fe.raw_extraction_data->>'image_id' is null
@@ -286,7 +319,7 @@ AS $function$
             'verified',fs.is_verified,'reasoning',fs.ai_reasoning,
             'image_id',i.id,'at',fs.created_at) as e
           from public.vehicle_field_sources fs
-          left join visible_images i on i.id = fs.source_image_id
+          left join visible_images i on i.id = fs.source_image_id and ((select privileged from viewer) or exists (select 1 from public.vehicle_images gi where gi.id = i.id and public.vehicle_image_gallery_eligible(gi)))
           where fs.vehicle_id = p_vehicle_id and fs.field_name = p_field
             and coalesce(fs.field_value,'') <> ''
             and (fs.source_image_id is null or i.id is not null)
@@ -345,7 +378,7 @@ AS $function$
     -- source image falls back to the cited field_evidence row's photo
     'source_image_url', coalesce(
         (select i.image_url from visible_images i
-          where (select c.readable from column_access c where c.k = 'image') and i.id = case
+          where (select c.readable from column_access c where c.k = 'image') and ((select privileged from viewer) or exists (select 1 from public.vehicle_images gi where gi.id = i.id and public.vehicle_image_gallery_eligible(gi))) and i.id = case
             when (select to_jsonb(g)->>(p_field||'_source_image_id') from gate g)
               ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
             then (select to_jsonb(g)->>(p_field||'_source_image_id') from gate g)::uuid end),
