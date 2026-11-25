@@ -268,7 +268,8 @@ struct VehicleLaborAppraisalSection: View {
         // The reader is 1-2 s warm and slower under load: two retries with backoff, as the web hook does.
         for attempt in 0..<3 {
             do {
-                let read: LaborAppraisal = try await SupabaseService.client
+                // null: the reader has nothing for this vehicle, which renders nothing (not a failure).
+                let read: LaborAppraisal? = try await SupabaseService.client
                     .rpc("vehicle_labor_appraisal", params: ["p_vehicle_id": vehicleId]).execute().value
                 guard !Task.isCancelled else { return }
                 appraisal = read
