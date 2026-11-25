@@ -18,10 +18,10 @@ INSERT INTO public.evidence_class_rank VALUES ('decode', 0, true, ''), ('receipt
   ('claim', 3, true, ''), ('reading_unregistered', 4, true, ''), ('mentioned', 5, true, ''), ('record', NULL, false, '');
 CREATE TABLE public.vocabulary_labels (domain text, code text, label text CHECK (btrim(label) <> ''), note text, PRIMARY KEY (domain, code));
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, vin text, is_public boolean, deleted_at timestamptz);
-CREATE TABLE public.field_evidence (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, field_name text,
+CREATE TABLE public.field_evidence (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles (id), field_name text,
   proposed_value text, source_type text, status text, raw_extraction_data jsonb, extraction_context text);
-CREATE TABLE public.vehicle_vin_evidence (id bigserial PRIMARY KEY, vehicle_id uuid, vin_value text, retired_at timestamptz);
-CREATE TABLE public.data_set_member_grades (vehicle_id uuid, set_id uuid, set_kind text, grade text, witness_classes text[],
+CREATE TABLE public.vehicle_vin_evidence (id bigserial PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles (id), vin_value text, retired_at timestamptz);
+CREATE TABLE public.data_set_member_grades (vehicle_id uuid REFERENCES public.vehicles (id), set_id uuid, set_kind text, grade text, witness_classes text[],
   n_witnesses int, PRIMARY KEY (vehicle_id, set_id));
 CREATE FUNCTION public.data_set_can_read_vehicle(p_vehicle uuid) RETURNS boolean LANGUAGE sql STABLE AS $f$
   SELECT EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = p_vehicle AND v.is_public AND v.deleted_at IS NULL) $f$;
