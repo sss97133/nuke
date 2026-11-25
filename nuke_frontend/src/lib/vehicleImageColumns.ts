@@ -38,14 +38,72 @@ function splitTopLevel(list: string): string[] {
   return out;
 }
 
+// An item may be a column, an alias of a JSON path (`exif_camera:exif_data->camera`) or a path; what it reads is the
+// part after the alias, up to the first arrow.
+const ALIAS = /^([A-Za-z_][A-Za-z0-9_]*):(?!:)/;
+const readsColumn = (item: string) => item.replace(ALIAS, '').split('->')[0].trim();
+
 /** The given select list, minus the columns anon may not read when signed out. */
 export async function vehicleImageColumnsForViewer<T extends string>(columns: T): Promise<T> {
   if (await signedIn()) return columns;
   const excluded = new Set<string>(VEHICLE_IMAGE_ANON_EXCLUDED_COLUMNS);
-  // An item may be a column, an alias of a JSON path (`exif_camera:exif_data->camera`) or a path; what it reads is the
-  // part after the alias, up to the first arrow.
-  const reads = (item: string) => item.replace(/^[A-Za-z_][A-Za-z0-9_]*:(?!:)/, '').split('->')[0].trim();
-  return splitTopLevel(columns).map((c) => c.trim()).filter((c) => c && !excluded.has(reads(c))).join(', ') as T;
+  return splitTopLevel(columns).map((c) => c.trim()).filter((c) => c && !excluded.has(readsColumn(c))).join(', ') as T;
+}
+
+// The photo reading. vehicle_images_public redacts it per row (vehicle_image_scan_metadata, migration 20261125200000)
+// in a lateral below any sort, so an ordered page that names it redacts every photo of the car, not the page.
+const SCAN_COLUMN = 'ai_scan_metadata';
+// vehicle_image_scan_metadata_many takes at most platform_config vehicle_image_scan_metadata_many.max_ids ids a call
+// (1,000, migration 20261126162500); a longer array is refused, so ids go in chunks of that size.
+const SCAN_READ_MAX_IDS = 1000;
+
+/**
+ * A signed-out view select split into the page's own columns and its photo-reading items (`ai_scan_metadata`, or
+ * `alias:ai_scan_metadata->...`). The page reads its rows without them; withScanReadings then reads the readings of
+ * exactly those rows. `id` is added to the page when the list lacks it (addedId), to join the two.
+ */
+export function splitScanReadingColumns(columns: string): { page: string; readings: string[]; addedId: boolean } {
+  const items = splitTopLevel(columns).map((c) => c.trim()).filter(Boolean);
+  const readings = items.filter((c) => readsColumn(c) === SCAN_COLUMN);
+  const page = items.filter((c) => readsColumn(c) !== SCAN_COLUMN);
+  const addedId = readings.length > 0 && !page.includes('id');
+  return { page: (addedId ? ['id', ...page] : page).join(', '), readings, addedId };
+}
+
+// The key PostgREST gives a select item: its alias, else the last step of its JSON path, else the column.
+const itemKey = (item: string) => item.match(ALIAS)?.[1] ?? item.split(/->>?/).pop()!.trim();
+
+/**
+ * The photo readings of exactly these rows, merged into each row under the keys the items name. Read through
+ * vehicle_image_scan_metadata_many (SECURITY INVOKER over vehicle_images_public: the same rows and redaction as the
+ * view, one redaction per row), projected server-side by PostgREST `select=` on its result. A row the reader does not
+ * return gets null for each item. An error is returned, not swallowed.
+ */
+export async function withScanReadings<T extends { id: string }>(
+  rows: T[],
+  readings: string[],
+  options: { dropId?: boolean; signal?: AbortSignal } = {},
+): Promise<{ data: T[] | null; error: unknown }> {
+  if (rows.length === 0 || readings.length === 0) return { data: rows, error: null };
+  const byId = new Map<string, Record<string, unknown>>();
+  for (let from = 0; from < rows.length; from += SCAN_READ_MAX_IDS) {
+    let query = supabase
+      .rpc('vehicle_image_scan_metadata_many', { p_image_ids: rows.slice(from, from + SCAN_READ_MAX_IDS).map((row) => row.id) })
+      .select(['image_id', ...readings].join(','));
+    if (options.signal) query = query.abortSignal(options.signal);
+    const { data, error } = await query;
+    if (error) return { data: null, error };
+    for (const { image_id, ...values } of (data || []) as unknown as Array<Record<string, unknown>>) byId.set(String(image_id), values);
+  }
+  const absent = Object.fromEntries(readings.map((item) => [itemKey(item), null]));
+  return {
+    data: rows.map((row) => {
+      const merged: Record<string, unknown> = { ...row, ...(byId.get(row.id) ?? absent) };
+      if (options.dropId) delete merged.id;
+      return merged as T;
+    }),
+    error: null,
+  };
 }
 
 /**

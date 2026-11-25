@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { vehicleImageGallerySource, vehicleImageColumnsForViewer } from './vehicleImageColumns';
+import { vehicleImageGallerySource, vehicleImageColumnsForViewer, splitScanReadingColumns, withScanReadings } from './vehicleImageColumns';
 import { createViewerScopedInflight } from './viewerScopedInflight';
 
 // PostgREST's row cap on this project (probed 2026-10-14: limit=1500 returns 1000 rows). Every page re-runs the whole
@@ -91,8 +91,18 @@ async function fetchVehicleImagesUncached<T = any>(
   // It preserves the gate for private intake and excludes rejected/unsafe rows;
   // display eligibility does not claim that vision analysis has completed.
   const source = await vehicleImageGallerySource();
-  const columns = await vehicleImageColumnsForViewer(selectClause);
-  const fetchPage = (from: number, withCount: boolean) => {
+  const viewerColumns = await vehicleImageColumnsForViewer(selectClause);
+  // Signed out, the view redacts ai_scan_metadata for every photo of the car below the page's sort; the page reads its
+  // rows without it, then the readings of exactly its rows (one redaction each). Signed in, the table, as before.
+  const scan = (source as string) === 'vehicle_images_public' ? splitScanReadingColumns(viewerColumns) : null;
+  const columns = scan && scan.readings.length > 0 ? scan.page : viewerColumns;
+  const fetchPage = async (from: number, withCount: boolean) => {
+    const result = await fetchPageRows(from, withCount);
+    if (result.error || !scan || scan.readings.length === 0) return result;
+    const read = await withScanReadings((result.data || []) as unknown as Array<{ id: string }>, scan.readings, { dropId: scan.addedId });
+    return read.error ? { ...result, data: null, error: read.error } : { ...result, data: read.data };
+  };
+  const fetchPageRows = (from: number, withCount: boolean) => {
     assertCurrent();
     let query = supabase
       .from(source)
