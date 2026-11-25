@@ -2,6 +2,7 @@ import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { enforceCallerDailyCap } from '../_shared/callerDailyCap.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
@@ -1335,6 +1336,20 @@ Deno.serve(async (req) => {
       console.warn('Failed to initialize Supabase client:', e?.message);
       supabase = null;
     }
+
+    // Firecrawl is paid per request and any signed-in account can paste a URL here: a per-user daily cap from its
+    // rule row (edge_function_caller_caps), checked before any fetch. The service key is not capped (2026-11-25).
+    const capped = await enforceCallerDailyCap(req, 'scrape-vehicle', {
+      readCap: async (fn) => {
+        if (!supabase) return null;
+        const { data, error } = await supabase.from('edge_function_caller_caps')
+          .select('calls_per_user_per_day').eq('function_name', fn).maybeSingle();
+        if (error) throw error;
+        return data;
+      },
+      rpc: (fn, args) => supabase ? supabase.rpc(fn, args) : Promise.resolve({ data: null, error: 'no client' }),
+    }, corsHeaders);
+    if (capped) return capped;
 
     // Robust path: Firecrawl structured extraction first (works better on JS-heavy dealer sites).
     let firecrawlResult: any = null
