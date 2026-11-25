@@ -52,7 +52,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
          CASE WHEN jsonb_typeof(r.answer->'confidence') = 'number' THEN (r.answer->>'confidence')::numeric END,
          r.answered_at
   FROM public.evidence_judgment_requests r
-  JOIN public.observation_properties p ON p.id = r.subject_id AND p.property_key = r.params->>'property_key'
+  JOIN public.observation_properties p ON p.id = r.property_id AND p.property_key = r.params->>'property_key'
   CROSS JOIN LATERAL (
     SELECT i.id, i.taken_at
       FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(r.answer->'image_ids') = 'array' THEN r.answer->'image_ids' ELSE '[]'::jsonb END)
@@ -64,6 +64,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
   WHERE r.question_kind = 'fact_doubt' AND r.status = 'answered' AND r.subject_table = 'observation_properties'
     AND r.params->>'doubt_form' = 'property' AND r.answer->>'outcome' = 'value'
     AND nullif(btrim(r.answer->>'value'), '') IS NOT NULL AND nullif(btrim(r.answer_model), '') IS NOT NULL
+    -- landed and linked (record_fact_doubt_landing, 20261124193300), or landed and not yet linked
+    AND r.answer_observation_id IS NULL
     AND NOT EXISTS (
       SELECT 1 FROM public.vehicle_observations o
        WHERE o.vehicle_id = r.vehicle_id AND o.property_id = p.id AND o.extraction_method = 'fact_doubt_reread_v1'
@@ -74,6 +76,6 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
   LIMIT greatest(0, least(coalesce(p_limit, 50), 200))
 $$;
 COMMENT ON FUNCTION public.fact_doubt_readings_to_land(integer) IS
-  'Answered value fact_doubts (form property) not yet landed as a keyed reading: one row per request with one witness photo of the vehicle, every answer image id, capture time, reader model and confidence. Pumped to ingest-observation by scripts/doubts/land-fact-doubt-readings.mjs (method fact_doubt_reread_v1). Service role only.';
+  'Answered value fact_doubts (form property) not yet landed (answer_observation_id null and no landed reading for the request) as a keyed reading: one row per request with one witness photo of the vehicle, every answer image id, capture time, reader model and confidence. Pumped to ingest-observation by scripts/doubts/land-fact-doubt-readings.mjs (method fact_doubt_reread_v1). Service role only.';
 REVOKE ALL ON FUNCTION public.fact_doubt_readings_to_land(integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fact_doubt_readings_to_land(integer) TO service_role;

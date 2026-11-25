@@ -105,7 +105,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
   if (landLimit > 0) {
     try {
       const l = await land(['--limit', String(landLimit), ...(dry ? ['--dry-run'] : [])], env);
-      summary.landed = l.landed; summary.land_duplicate = l.duplicate; summary.land_refused = l.refused; summary.land_failed = l.failed;
+      summary.landed = l.landed; summary.land_duplicate = l.duplicate; summary.land_refused = l.refused; summary.land_failed = l.failed + (l.link_failed ?? 0);
       for (const [cls, k] of Object.entries(l.refusal_classes ?? {})) summary.error_classes[`land ${cls}`] = (summary.error_classes[`land ${cls}`] ?? 0) + k;
       if (l.failed) err('land');
     } catch { err('land'); }

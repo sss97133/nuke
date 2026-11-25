@@ -19,7 +19,10 @@ CREATE TABLE public.observation_properties (id uuid PRIMARY KEY, property_key te
 CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, property_id uuid,
   extraction_method text, agent_model text, structured_data jsonb, is_superseded boolean DEFAULT false);
 CREATE TABLE public.evidence_judgment_requests (id uuid PRIMARY KEY, vehicle_id uuid, question_kind text, status text,
-  subject_table text, subject_id uuid, params jsonb, answer jsonb, answer_model text, answered_at timestamptz);
+  subject_table text, subject_id uuid, params jsonb, answer jsonb, answer_model text, answered_at timestamptz,
+  -- as 20261124193300 makes them
+  property_id uuid GENERATED ALWAYS AS (CASE WHEN subject_table = 'observation_properties' THEN subject_id END) STORED,
+  answer_observation_id uuid);
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
 
@@ -103,6 +106,10 @@ BEGIN
     'a same-model re-ask of the same value adds nothing';
   ASSERT EXISTS (SELECT 1 FROM public.fact_doubt_readings_to_land(50) WHERE request_id = 'a0000000-0000-0000-0000-00000000000a'),
     'another model''s read lands';
+  -- linked by record_fact_doubt_landing (20261124193300): not listed again
+  UPDATE public.evidence_judgment_requests SET answer_observation_id = gen_random_uuid() WHERE id = 'a0000000-0000-0000-0000-00000000000a';
+  ASSERT NOT EXISTS (SELECT 1 FROM public.fact_doubt_readings_to_land(50) WHERE request_id = 'a0000000-0000-0000-0000-00000000000a'),
+    'a linked request is landed';
 END $$;
 
 SET ROLE anon;

@@ -224,12 +224,15 @@ test('the lander posts each listed answer to ingest-observation and counts lande
   const replies = [{ ok: true, status: 200, json: { observation_id: I1 } }, { ok: true, status: 200, json: { observation_id: I2, duplicate: true } },
     { ok: false, status: 400, json: { error: 'A physical reading is the marking as read: capitals, digits and separators' } }, { ok: false, status: 503, json: null }];
   const posted = [];
-  const db = { rpc: async (fn, b) => { assert.equal(fn, 'fact_doubt_readings_to_land'); assert.equal(b.p_limit, 50); return rows; },
+  const links = [];
+  const db = { rpc: async (fn, b) => { if (fn === 'record_fact_doubt_landing') { links.push(b); return true; }
+      assert.equal(fn, 'fact_doubt_readings_to_land'); assert.equal(b.p_limit, 50); return rows; },
     fn: async (name, body) => { assert.equal(name, 'ingest-observation'); posted.push(body); return replies[posted.length - 1]; } };
   const s = await main([], {}, { db });
   assert.equal(s.listed, 5); assert.equal(posted.length, 4); assert.equal(s.landed, 1); assert.equal(s.duplicate, 1); assert.equal(s.refused, 2); assert.equal(s.failed, 1);
   assert.equal(s.refusal_classes.row_shape, 1); assert.ok(Object.keys(s.refusal_classes).some((k) => k.startsWith('400: A physical reading is the marking as read')));
   assert.ok(!JSON.stringify(s).includes('9799140'), 'counts only');
+  assert.equal(s.linked, 2); assert.deepEqual(links.map((l) => l.p_observation_id), [I1, I2]); assert.equal(links[0].p_request_id, I1);
   const dry = await main(['--dry-run'], {}, { db: { rpc: async () => rows, fn: async () => { throw new Error('no post on a dry run'); } } });
   assert.equal(dry.listed, 5); assert.equal(dry.landed, 0);
 });
