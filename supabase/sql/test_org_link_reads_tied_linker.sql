@@ -1,3 +1,8 @@
+-- guardrail-allow(center-key-fk): image_work_extractions.image_id: synthetic fixture table in a throwaway contract database, never deployed
+-- guardrail-allow(center-key-fk): vehicle_relationship_verifications.organization_vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
+-- guardrail-allow(center-key-fk): ownership_verifications.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
+-- guardrail-allow(center-key-fk): vehicle_user_permissions.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
+-- guardrail-allow(center-key-fk): vehicle_contributors.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
 -- guardrail-allow(center-key-fk): vehicle_images.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
 -- guardrail-allow(center-key-fk): organization_vehicles.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
 -- guardrail-allow(center-key-fk): image_work_extractions.vehicle_id: synthetic fixture table in a throwaway contract database, never deployed
@@ -354,6 +359,20 @@ INSERT INTO organization_contributors(organization_id, user_id, role, status) VA
 SELECT t_assert((SELECT images = 1 AND extractions = 1 AND verifications = 1 AND matches = 1 FROM reads_as(:M, :P)),
   'after: a member of the organization the owner linked still reads photos, extractions, verifications and matches');
 SELECT t_assert((SELECT wo AND card AND profile FROM readers_as(:M)), 'after: the three readers still count that member');
+DO $$ BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', '0d000000-0000-0000-0000-0000000000d0', 'role', 'authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    INSERT INTO public.vehicle_relationship_verifications(organization_vehicle_id, requested_by_user_id, verification_type, status)
+    VALUES ('40000000-0000-0000-0000-000000000004', '0d000000-0000-0000-0000-0000000000d0', 'sale', 'approved');
+    RAISE EXCEPTION 'FAIL: a member inserted a verification already approved';
+  EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE 'PASS: after: a member of a tied link cannot insert a verification already approved';
+  END;
+  INSERT INTO public.vehicle_relationship_verifications(organization_vehicle_id, requested_by_user_id, verification_type)
+  VALUES ('40000000-0000-0000-0000-000000000004', '0d000000-0000-0000-0000-0000000000d0', 'sale');
+  RAISE NOTICE 'PASS: after: a member of a tied link still files a pending verification';
+  RESET ROLE;
+END $$;
 SELECT t_assert((SELECT images = 1 FROM reads_as(:O, :P)), 'after: the owner still reads the car''s photos');
 
 -- Fail closed with the rule: no stamp trigger, no organization grant anywhere.
@@ -391,3 +410,34 @@ WHERE proname IN ('work_order_evidence_image_visible', 'vehicle_card_images', 'g
 SELECT t_assert((SELECT md5(string_agg(pg_get_functiondef(oid), '|' ORDER BY proname)) FROM pg_proc
   WHERE proname IN ('work_order_evidence_image_visible', 'vehicle_card_images', 'get_vehicle_profile_data')) = :'readers_after',
   're-applying the migration changes nothing');
+
+-- Cost: the rule runs only on a link the caller is an active member through, never once per link before the membership
+-- test (live organization_vehicles holds 897,433 rows, 2026-11-25). 20,000 unrelated links and 2,000 photos here, in the
+-- contract's own throwaway database. -- ALLOW_RAW_TESTIMONY_WRITE
+INSERT INTO organization_vehicles(organization_id, vehicle_id) SELECT gen_random_uuid(), gen_random_uuid() FROM generate_series(1, 20000);
+INSERT INTO vehicle_images(vehicle_id, user_id) SELECT :P, :O FROM generate_series(1, 2000);
+INSERT INTO image_work_extractions(image_id, vehicle_id) SELECT id, vehicle_id FROM vehicle_images WHERE vehicle_id = :P;
+CREATE INDEX ON organization_vehicles(vehicle_id); CREATE INDEX ON organization_contributors(organization_id, user_id);
+CREATE INDEX ON vehicle_images(vehicle_id); CREATE INDEX ON image_work_extractions(vehicle_id);
+ANALYZE;
+SET track_functions = 'all';
+CREATE FUNCTION pg_temp.rule_calls(p_user uuid, p_sql text) RETURNS bigint LANGUAGE plpgsql AS $f$
+DECLARE c0 bigint;
+BEGIN
+  c0 := coalesce(pg_stat_get_xact_function_calls('public.organization_vehicle_link_grants'::regproc), 0);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', p_user, 'role', 'authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
+  EXECUTE p_sql;
+  RESET ROLE;
+  RETURN coalesce(pg_stat_get_xact_function_calls('public.organization_vehicle_link_grants'::regproc), 0) - c0;
+END $f$;
+\set S '''0e000000-0000-0000-0000-0000000000e0'''
+SELECT t_assert(pg_temp.rule_calls(:S, format('SELECT count(*) FROM vehicle_images WHERE vehicle_id = %L', :P)) = 0
+  AND pg_temp.rule_calls(:S, 'SELECT count(*) FROM vehicle_images') = 0
+  AND pg_temp.rule_calls(:S, 'SELECT count(*) FROM image_work_extractions') = 0
+  AND pg_temp.rule_calls(:S, 'SELECT count(*) FROM work_organization_matches') = 0
+  AND pg_temp.rule_calls(:S, 'SELECT count(*) FROM vehicle_relationship_verifications') = 0,
+  'a caller in no organization never runs the rule, on the car''s gallery or on whole-table reads');
+SELECT t_assert(pg_temp.rule_calls(:M, 'SELECT count(*) FROM vehicle_images') <= 2
+  AND pg_temp.rule_calls(:M, 'SELECT count(*) FROM image_work_extractions') <= 2,
+  'a member runs the rule once per link it is a member through (here one), not per row or per link in the table');

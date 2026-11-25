@@ -15,12 +15,18 @@
 --   * the six policies: each organization_vehicles subquery adds organization_vehicle_link_grants(ov.vehicle_id,
 --     ov.linked_by_user_id); each applies to authenticated only (every branch needs auth.uid(), and the rule is not
 --     executable by anon).
+--   * "Org members can create verifications" also requires status = 'pending' (the column default; the client never sets
+--     it): a request is approved by an owner or manager through "Org owners can manage verifications", not by its requester.
 --   * the three readers: the same condition is added to their organization-member EXISTS, by an anchored edit of the live
 --     definition (the anchor must occur exactly once; a marker makes it idempotent).
 --   * private_row_policy_copies: the three readers are registered as copies of the vehicle_images organization policy;
 --     the two existing vehicle_images copies (get_image_deep_analysis, intake_live_state) restate no organization branch,
 --     were re-read, and get the new hash.
 -- Effect today (live, 2026-11-25): 391 links carry a linker, 0 untied; no current read changes.
+--
+-- Cost: the rule is called only on a link the caller is an active member through. It is written inside a CASE on the
+-- membership row so the planner cannot push it onto the organization_vehicles scan (897,433 rows, 2026-11-25), where a
+-- whole-table read would run it once per link before the membership test.
 --
 -- Locks: ALTER POLICY takes ACCESS EXCLUSIVE on each table for the catalog change only; lock_timeout 3 s, run in a quiet
 -- window (vehicle_images is read on every gallery).
@@ -41,7 +47,7 @@ BEGIN
     AND c.relname IN ('vehicle_images', 'image_work_extractions', 'vehicle_relationship_verifications', 'work_organization_matches')
     AND (coalesce(pg_get_expr(p.polqual, p.polrelid), '') || coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '')) ~ 'organization_vehicles';
   IF h NOT IN ('dde57bb446994ca0f6340a406e466910', -- gitleaks:allow (policy fingerprint read 2026-11-25, not a secret)
-               'd440dd11ce134c13aa6ec3e1ab712bb1') THEN -- gitleaks:allow (policy fingerprint after this migration, not a secret)
+               '81d32c95e101c45d668580e76a7bd6ad') THEN -- gitleaks:allow (policy fingerprint after this migration, not a secret)
     RAISE EXCEPTION 'the organization-link read policies changed since 2026-11-25 (md5 %); review first', h;
   END IF;
 END
@@ -53,7 +59,7 @@ ALTER POLICY "Organization members can view org vehicle images" ON public.vehicl
    FROM (organization_vehicles ov
      JOIN organization_contributors oc ON ((ov.organization_id = oc.organization_id)))
   WHERE ((ov.vehicle_id = vehicle_images.vehicle_id) AND (oc.user_id = ( SELECT auth.uid() AS uid)) AND (oc.status = 'active'::text)
-    AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id)))));
+    AND CASE WHEN oc.status = 'active'::text THEN public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) ELSE false END))));
 
 ALTER POLICY "View work extractions" ON public.image_work_extractions
   TO authenticated
@@ -61,8 +67,9 @@ ALTER POLICY "View work extractions" ON public.image_work_extractions
    FROM organization_vehicles ov
   WHERE ((ov.vehicle_id = image_work_extractions.vehicle_id) AND (EXISTS ( SELECT 1
            FROM organization_contributors oc
-          WHERE ((oc.organization_id = ov.organization_id) AND (oc.user_id = ( SELECT auth.uid() AS uid)) AND (oc.status = 'active'::text))))
-    AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id)))) OR (EXISTS ( SELECT 1
+          WHERE ((oc.organization_id = ov.organization_id) AND (oc.user_id = ( SELECT auth.uid() AS uid)) AND (oc.status = 'active'::text)
+            AND CASE WHEN oc.status = 'active'::text THEN public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) ELSE false END))))))
+    OR (EXISTS ( SELECT 1
    FROM vehicle_images vi
   WHERE ((vi.id = image_work_extractions.image_id) AND (vi.user_id = ( SELECT auth.uid() AS uid)))))));
 
@@ -74,8 +81,8 @@ ALTER POLICY "View work matches" ON public.work_organization_matches
    FROM organization_vehicles ov
   WHERE ((ov.vehicle_id = work_organization_matches.vehicle_id) AND (EXISTS ( SELECT 1
            FROM organization_contributors oc2
-          WHERE ((oc2.organization_id = ov.organization_id) AND (oc2.user_id = ( SELECT auth.uid() AS uid)) AND (oc2.status = 'active'::text))))
-    AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id))))));
+          WHERE ((oc2.organization_id = ov.organization_id) AND (oc2.user_id = ( SELECT auth.uid() AS uid)) AND (oc2.status = 'active'::text)
+            AND CASE WHEN oc2.status = 'active'::text THEN public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) ELSE false END))))))));
 
 ALTER POLICY "Org members can create verifications" ON public.vehicle_relationship_verifications
   TO authenticated
@@ -83,7 +90,7 @@ ALTER POLICY "Org members can create verifications" ON public.vehicle_relationsh
    FROM (organization_vehicles ov
      JOIN organization_contributors oc ON ((oc.organization_id = ov.organization_id)))
   WHERE ((ov.id = vehicle_relationship_verifications.organization_vehicle_id) AND (oc.user_id = ( SELECT auth.uid() AS uid)) AND (oc.status = 'active'::text)
-    AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id)))) AND (requested_by_user_id = ( SELECT auth.uid() AS uid))));
+    AND CASE WHEN oc.status = 'active'::text THEN public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) ELSE false END))) AND (requested_by_user_id = ( SELECT auth.uid() AS uid)) AND (status = 'pending'::text)));
 
 ALTER POLICY "Org members can view verifications" ON public.vehicle_relationship_verifications
   TO authenticated
@@ -91,7 +98,7 @@ ALTER POLICY "Org members can view verifications" ON public.vehicle_relationship
    FROM (organization_vehicles ov
      JOIN organization_contributors oc ON ((oc.organization_id = ov.organization_id)))
   WHERE ((ov.id = vehicle_relationship_verifications.organization_vehicle_id) AND (oc.user_id = ( SELECT auth.uid() AS uid)) AND (oc.status = 'active'::text)
-    AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id)))));
+    AND CASE WHEN oc.status = 'active'::text THEN public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) ELSE false END))));
 
 ALTER POLICY "Org owners can manage verifications" ON public.vehicle_relationship_verifications
   TO authenticated
@@ -99,7 +106,7 @@ ALTER POLICY "Org owners can manage verifications" ON public.vehicle_relationshi
    FROM (organization_vehicles ov
      JOIN organization_contributors oc ON ((oc.organization_id = ov.organization_id)))
   WHERE ((ov.id = vehicle_relationship_verifications.organization_vehicle_id) AND (oc.user_id = ( SELECT auth.uid() AS uid)) AND (oc.status = 'active'::text) AND (oc.role = ANY (ARRAY['owner'::text, 'co_founder'::text, 'manager'::text, 'board_member'::text]))
-    AND public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id)))));
+    AND CASE WHEN oc.status = 'active'::text THEN public.organization_vehicle_link_grants(ov.vehicle_id, ov.linked_by_user_id) ELSE false END))));
 
 -- The three definer readers: anchored edits of the live definitions.
 DO $readers$
