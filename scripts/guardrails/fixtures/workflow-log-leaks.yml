@@ -1,0 +1,85 @@
+# A deliberately bad workflow for scripts/guardrails/workflow-log-counts-only.test.mjs. Never run: it is not under
+# .github/workflows. Each `# BAD: <words>` line marks the statement right after it, and the guard must report that
+# line with a reason containing <words>. Every other statement must pass.
+name: leaks fixture
+on: workflow_dispatch
+jobs:
+  token-twice:
+    runs-on: ubuntu-latest
+    steps:
+      - name: names the secret in a second step
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: bash scripts/ci/subscription-token.sh
+      - name: bare reader
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          # BAD: stdout reaches the log
+          node scripts/photo-pipeline/subscription-frame-classifier.mjs --limit 1 2>/dev/null
+      - name: joined streams
+        run: |
+          # BAD: stderr is joined
+          python3 -u scripts/photo-pipeline/keys_lane.py --photos 1 >"$RUNNER_TEMP/out" 2>&1
+      - name: tee
+        run: |
+          # BAD: piped to something other than jq
+          node scripts/photo-pipeline/subscription-document-reader.mjs 2>"$RUNNER_TEMP/err" | tee "$RUNNER_TEMP/out"
+      - name: no stderr file
+        run: |
+          # BAD: stderr is not sent to a file
+          node scripts/deep-image-analysis-byok.mjs project-cached >"$RUNNER_TEMP/receipt"
+      - name: cat the files
+        run: |
+          node scripts/photo-pipeline/subscription-frame-classifier.mjs >"$RUNNER_TEMP/summary" 2>"$RUNNER_TEMP/said"
+          echo "stderr: $(wc -l < "$RUNNER_TEMP/said" | tr -d ' ') lines withheld"
+          if [ -s "$RUNNER_TEMP/said" ]; then echo "something on stderr"; fi
+          # BAD: reaches the log
+          cat "$RUNNER_TEMP/said"
+          # BAD: reaches the log
+          grep -m1 Error "$RUNNER_TEMP/said"
+          # BAD: reaches the log
+          tail -n 1 "$RUNNER_TEMP/summary" | jq .
+      - name: echo a variable read from the summary
+        run: |
+          node scripts/photo-pipeline/subscription-frame-classifier.mjs >"$RUNNER_TEMP/summary" 2>"$RUNNER_TEMP/said"
+          summary="$(tail -n 1 "$RUNNER_TEMP/summary" 2>/dev/null || true)"
+          copy="$summary"
+          # BAD: reaches the log
+          echo "$summary"
+          # BAD: reaches the log
+          printf '%s\n' "$copy" >> "$GITHUB_STEP_SUMMARY"
+          # BAD: reaches the log
+          printf '%s\n' "$summary" | jq -c '{frames}'
+          READER_SUMMARY="$summary" node scripts/photo-pipeline/reader-heartbeat.mjs 2>/dev/null || true
+      - name: a filter that passes row text
+        run: |
+          show='objects | {frames, read, error_text, by_type}'
+          node scripts/photo-pipeline/subscription-frame-classifier.mjs >"$RUNNER_TEMP/summary" 2>"$RUNNER_TEMP/said"
+          # BAD: passes text that is not a number
+          line="$(tail -n 1 "$RUNNER_TEMP/summary" | jq -c "$show")"
+          # BAD: reaches the log
+          echo "$line"
+      - name: a filter that passes any object
+        run: |
+          show='objects | with_entries(select((.value | type) as $t | $t == "number" or $t == "object"))'
+          # BAD: passes text that is not a number
+          node scripts/photo-pipeline/subscription-frame-classifier.mjs 2>"$RUNNER_TEMP/said" | jq -c "$show"
+      - name: a raw filter that passes any line after a known start
+        run: |
+          show='select(test("^(photo [0-9]+ of [0-9]+|result)[:, ]"))'
+          # BAD: passes text that is not a number
+          python3 -u scripts/photo-pipeline/keys_lane.py 2>"$RUNNER_TEMP/said" | jq -R -r --unbuffered "$show"
+      - name: a filter that is not a variable here
+        run: |
+          # BAD: is not a single-quoted variable
+          node scripts/photo-pipeline/subscription-frame-classifier.mjs 2>"$RUNNER_TEMP/said" | jq -c "$elsewhere"
+      - name: counts only (passes)
+        run: |
+          show='objects | with_entries(select((.key | test("^[a-z_]{1,40}$")) and ((.value | type) == "number" or ((.value | type) == "string" and (.value | test("^[a-z_]{1,40}$"))))))'
+          node scripts/photo-pipeline/subscription-frame-classifier.mjs --limit 1 >"$RUNNER_TEMP/summary" 2>"$RUNNER_TEMP/said"
+          line="$( { [ -s "$RUNNER_TEMP/summary" ] && tail -n 1 "$RUNNER_TEMP/summary" | jq -ce "$show" 2>/dev/null; } || true )"
+          if [ -n "$line" ]; then echo "$line"; fi
+          echo "stderr: $(wc -l < "$RUNNER_TEMP/said" | tr -d ' ') lines withheld"
+          python3 scripts/photo-pipeline/test_keys_lane.py
+          node --test scripts/photo-pipeline/subscription-frame-classifier.test.mjs
