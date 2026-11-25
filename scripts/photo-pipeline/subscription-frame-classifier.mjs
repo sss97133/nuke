@@ -19,8 +19,9 @@
 // A stage the database does not hold yet claims nothing: a quiet no-op. Every model call starts lean (leanClaudeArgs).
 //
 //   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid|config> [--probe] [--limit N] [--concurrency 2] [--model claude-sonnet-5-5] [--status failed,pending] [--source auto|stage-queue|status] [--deep-limit 20] [--keyed-limit 60] [--dry-run] [--out receipt.json]
-//   ... --stage-dry-run --image-ids <uuid,uuid> [--stages deep_reading,keyed_values]   reads those photos twice and prints, per photo, validity, seconds, tokens, the agreement
-//                                                 and the exact envelope it would post, plus the keyed projection as a dry run; claims and writes nothing
+//   ... --stage-dry-run --image-ids <uuid,uuid> [--stages keyed_values]   prints the keyed projection of those photos as a dry run; claims and writes
+//                                                 nothing. A deep reading of a named photo is refused (deep-stage.mjs UnclaimedDeepReadingError):
+//                                                 every deep reading is a claimed work item, counted against image_pipeline_stages.daily_cap
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -30,7 +31,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, firstReadAllowance, inputFingerprint, ownerFromStageConfig, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
-import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, REFUSAL_STREAK_STOP, admitsFrom, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, projectionAnswer, subscriptionEnv, refusalStreak } from './deep-stage.mjs';
+import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, REFUSAL_STREAK_STOP, UnclaimedDeepReadingError, admitsFrom, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, projectionAnswer, subscriptionEnv, refusalStreak } from './deep-stage.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -49,6 +50,9 @@ const dry = args['dry-run'] === true;
 const source = args.source && args.source !== true ? String(args.source) : 'auto';
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 const READER = `claude-cli ${model} subscription`;
+// Where this fire runs, on every stage receipt (detail.host), so a day's deep readings can be counted by host: READER_HOST when
+// it is a fixed word (subscription-reader-batch.sh sets mac_launchd), github_actions on an Actions runner, else not said.
+const HOST = /^[a-z_]{1,24}$/.test(process.env.READER_HOST ?? '') ? process.env.READER_HOST : process.env.GITHUB_ACTIONS === 'true' ? 'github_actions' : null;
 
 async function rest(q) {
   const r = await fetch(`${URL_}/rest/v1/${q}`, { headers: H });
@@ -137,13 +141,18 @@ if (args['stage-dry-run'] === true) {
   const which = String(args.stages === true || !args.stages ? 'deep_reading,keyed_values' : args.stages).split(',');
   for (const f of rows) {
     if (which.includes(DEEP_STAGE)) {
-    const res = await deepReadFrame({ id: f.id, vehicle_id: f.vehicle_id }, deepDeps(dir), { dir, contract: contractText(), model, runId, post: false, reader: READER, admits });
+    // a named photo holds no claim: deepReadFrame refuses it before any download or model call
+    let res;
+    try { res = await deepReadFrame({ id: f.id, vehicle_id: f.vehicle_id }, deepDeps(dir), { dir, contract: contractText(), model, runId, post: false, reader: READER, admits }); }
+    catch (e) { if (!(e instanceof UnclaimedDeepReadingError)) throw e; console.log(JSON.stringify({ stage: DEEP_STAGE, image_id: f.id, refused: e.code, reason: e.reason })); res = null; }
+    if (res) {
     console.log(JSON.stringify({ stage: DEEP_STAGE, image_id: f.id, valid: res.valid, seconds: res.seconds,
       tokens: (res.reads ?? []).map((r) => ({ input: r.stats.input_tokens, output: r.stats.output_tokens, seconds: r.stats.seconds, attempts: r.stats.attempts, notional_usd: r.stats.notional_cost_usd })),
       agreement: res.agreement ? { agreed: res.agreement.agreed, disagreements: res.agreement.disagreements, values: res.agreement.values, posted: res.agreement.posted, held: res.agreement.held } : null,
       // what each pass said in its own words (kept in the stage receipt on a real fire, never posted)
       raw_reads: (res.reads ?? []).map((r) => ({ scene_type: r.verdict.scene_type, state: r.verdict.state_observations, narrative: r.verdict.narrative_one_line, confidence: r.verdict.confidence, components: (r.verdict.components_seen ?? []).length })),
       would_post: res.envelope ?? null, receipt_if_not_two_valid_reads: res.envelope ? null : res.receipt }));
+    }
     }
     if (!which.includes(KEYED_STAGE)) continue;
     sb ??= await supabaseClient();
@@ -274,10 +283,11 @@ if (!dry) {
 const stages = {};
 const settleStage = async (stageName, summary, f, receipt) => {
   countReceipt(summary, receipt);
+  if (HOST) receipt = { ...receipt, detail: { ...(receipt.detail ?? {}), host: HOST } };
   const saved = await recordStageReceipt(rpc, { stage: stageName, imageId: f.id, version: f.target_version, receipt, fingerprint: inputFingerprint(f.image_url, md5) });
   if (saved.ok) summary.receipts++; else { summary.receipt_errors++; console.error(`${f.id} ${stageName} receipt not recorded: ${saved.error}`); }
 };
-const toFrame = (w) => ({ id: w.image_id, vehicle_id: w.vehicle_id, user_id: w.user_id, image_url: w.image_url, target_version: w.target_version, lane: w.lane, reason: w.reason });
+const toFrame = (w) => ({ work_id: w.work_id, id: w.image_id, vehicle_id: w.vehicle_id, user_id: w.user_id, image_url: w.image_url, target_version: w.target_version, lane: w.lane, reason: w.reason });
 // Each stage runs inside its own boundary: a fault in one cannot cost the fire its first-read summary or its other stage.
 const phaseFailed = (e) => ({ ...newStageSummary(), error: 'phase_failed', error_text: String(e?.message || e).slice(0, 120) });
 async function deepPhase() {
@@ -308,7 +318,11 @@ async function deepPhase() {
         s.started++;
         let res;
         try { res = await deepReadFrame(f, deepDeps(dir), { dir, contract, model, runId, reader: READER, signal: halt.signal, admits }); }
-        catch (e) { res = { receipt: receiptForResult({ reader: { error: String(e?.message || e), missingTool: e?.code === 'ENOENT' } }, { reader: READER, promptVersion: 'reviewed_image_analysis_v1' }), stop: false }; }
+        catch (e) {
+          // no claimed item for this photo (its lease ran out and it was handed back, or the claim cannot be read): nothing
+          // was read, and the item is not this fire's to close, so no receipt
+          if (e instanceof UnclaimedDeepReadingError) { s.unclaimed = (s.unclaimed || 0) + 1; console.error(`${f.id} ${DEEP_STAGE} refused ${e.reason}`); return; }
+          res = { receipt: receiptForResult({ reader: { error: String(e?.message || e), missingTool: e?.code === 'ENOENT' } }, { reader: READER, promptVersion: 'reviewed_image_analysis_v1' }), stop: false }; }
         if (res.aborted || !res.receipt) { s.aborted++; return; }   // ended by a sibling's halt: no receipt, no attempt counted; the lease hands it back
         if (res.agreement && res.reads) {
           s.reads_valid += res.reads.length; s.read_seconds += Math.round(res.seconds);

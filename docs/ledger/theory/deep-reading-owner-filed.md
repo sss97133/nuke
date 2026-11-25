@@ -15,7 +15,8 @@ Until this change, that row listed only the 1966 Mustang
 `vehicle_ids` key as every vehicle of the listed owners, minus
 `exclude_vehicle_ids`. This change drops `vehicle_ids` and sets
 `max_open` to 5 so the existing stage room can hold a small batch. The
-`deep_reading` `backfill_daily_cap` stays 150.
+`deep_reading` `backfill_daily_cap` stayed 150 (since `20261126091500` it is derived:
+one `daily_cap` of 150 across both lanes, 30 of it held for the live lane, so 120).
 
 The subscription path is unchanged: `subscription-frame-classifier.mjs` on
 the owner's Claude Code login (`ANTHROPIC_API_KEY` refused), with

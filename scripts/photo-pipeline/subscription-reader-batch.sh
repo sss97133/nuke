@@ -84,7 +84,8 @@ run_reader() { # name script args...
   # READER_PATH_FIRST: a directory searched ahead of the rest of PATH for this reader only. On 2026-11-20 /usr/local/bin/claude
   # (2.1.20, no --safe-mode) shadowed ~/.local/bin/claude (2.1.329); the frame reader's lean calls need the newer one, and the
   # reader falls back to its old call when the CLI it finds cannot take them.
-  summary="$(cd "$HOME/nuke" && PATH="${READER_PATH_FIRST:+$READER_PATH_FIRST:}$PATH" dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" ${READER_DEADLINE:+--deadline-at "$(( started_s + READER_WALL_S ))"} 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
+  # READER_HOST: the frame reader writes it on its stage receipts (detail.host), so a day's deep readings count by host.
+  summary="$(cd "$HOME/nuke" && PATH="${READER_PATH_FIRST:+$READER_PATH_FIRST:}$PATH" READER_HOST=mac_launchd dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" ${READER_DEADLINE:+--deadline-at "$(( started_s + READER_WALL_S ))"} 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
   local rc=$?
   echo "$STAMP $name exit=$rc ${summary:-no summary}"
   # How the fire ended, for the fast fires: the photos it claimed, and whether it ended clean (exit 0, first reads not

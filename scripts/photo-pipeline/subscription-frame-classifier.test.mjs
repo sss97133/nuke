@@ -60,10 +60,11 @@ const FAKE_SUPABASE_JS = `exports.createClient = () => ({
     then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; },
 });`;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, own = {}, projections = {}, extraArgs = [], supabaseJs = false, failClaims = [], failClaimsAfter = {}, oldCli = false, queued = 0, readLastHour = 0 } = {}) {
-  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], standing: [], own: [], projected: [], tiers: 0, probes: [], prompts: 0 };
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, own = {}, projections = {}, extraArgs = [], supabaseJs = false, failClaims = [], failClaimsAfter = {}, oldCli = false, queued = 0, readLastHour = 0, unclaim = [], env: extraEnv = {} } = {}) {
+  const calls = { claimChecks: [], receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], standing: [], own: [], projected: [], tiers: 0, probes: [], prompts: 0 };
   const cursor = {};   // each stage hands out its photos once, at most p_limit a call, like the database
-  const claimCount = {};   // failClaimsAfter: { stage: n } answers that stage's first n claims and fails the ones after
+  const claimCount = {};
+  const held = {};   // the work items each claim handed out, by stage and work_id: what the claim check (assertDeepClaim) asks for   // failClaimsAfter: { stage: n } answers that stage's first n claims and fails the ones after
   let port;
   const server = createServer((req, res) => {
     let data = '';
@@ -101,6 +102,12 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         return json(200, [{ id, vehicle_id: '00000000-0000-4000-8000-0000000000cc', image_url: `https://example.test/${id}`, updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null,
           deep_stamp: null, is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, doc_flag: null, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...(rows[id] ?? {}) }]);
       }
+      // --stage-dry-run: the named photos (id=in.(...)), as the owner's rows
+      if (req.url.startsWith('/rest/v1/vehicle_images') && req.url.includes('id=in.(')) {
+        const u = decodeURIComponent(req.url), at = u.indexOf('id=in.(') + 'id=in.('.length;
+        const ids = u.slice(at, u.indexOf(')', at)).split(',');
+        return json(200, ids.map((id) => ({ id, vehicle_id: '00000000-0000-4000-8000-0000000000cc' })));
+      }
       if (req.url.startsWith('/rest/v1/vehicle_images')) {
         calls.status.push(decodeURIComponent(req.url));
         return json(200, statusFrames.map((n) => ({ id: n, vehicle_id: null, user_id: OWNER, image_url: `http://127.0.0.1:${port}/img/${n}`, file_name: null, taken_at: null, ai_processing_status: 'failed' })));
@@ -109,6 +116,12 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
       if (req.url.startsWith('/rest/v1/image_stage_receipts')) {
         calls.probes.push(`${req.method} ${decodeURIComponent(req.url)} ${req.headers.prefer}`);
         return res.writeHead(200, { 'Content-Range': `0-0/${readLastHour}` }).end();
+      }
+      // the deep reading's claim check: one claimed item by id and stage; `unclaim` names photos whose lease ran out
+      if (req.url.startsWith('/rest/v1/image_stage_work') && /[?&]id=eq\./.test(req.url)) {
+        const q = decodeURIComponent(req.url); calls.claimChecks.push(q);
+        const id = q.match(/[?&]id=eq\.(\d+)/)?.[1], stage = q.match(/stage=eq\.([a-z_]+)/)?.[1], n = held[`${stage}:${id}`];
+        return json(200, n && !unclaim.includes(n) && q.includes('status=eq.claimed') ? [{ id: Number(id), image_id: n, stage, status: 'claimed' }] : []);
       }
       // --probe: how many first reads are queued and due (a question; nothing is claimed)
       if (req.url.startsWith('/rest/v1/image_stage_work')) {
@@ -121,6 +134,7 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         if (failClaims.includes(claim.p_stage) || claimCount[claim.p_stage] > (failClaimsAfter[claim.p_stage] ?? Infinity)) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
         const names = claim.p_stage === 'deep_reading' ? deepFrames : claim.p_stage === 'keyed_values' ? keyedFrames : frameNames;
         const from = cursor[claim.p_stage] ?? 0, take = names.slice(from, from + claim.p_limit); cursor[claim.p_stage] = from + take.length;
+        take.forEach((n, i) => { held[`${claim.p_stage}:${from + i + 1}`] = n; });
         return json(200, take.map((n, i) => ({ work_id: from + i + 1, image_id: n, image_url: n.includes('no-url') ? '' : `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: claim.p_stage === 'classifier' ? null : '00000000-0000-4000-8000-0000000000cc', lane: 'live', reason: 'missing', target_version: 1 })));
       }
       if (req.url === '/rest/v1/rpc/record_image_stage_receipt') {
@@ -153,7 +167,7 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
       cwd: project,
       // PATH holds only the stand-ins (they run under this node by absolute path): a real `claude` or `sips` on the
       // machine, which can sit in node's own directory, is never reached
-      env: { PATH: bin, HOME: bin, ...(oldCli ? { FAKE_CLAUDE_OLD: '1' } : {}), SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key' },
+      env: { PATH: bin, HOME: bin, ...(oldCli ? { FAKE_CLAUDE_OLD: '1' } : {}), SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key', ...extraEnv },
     }).then((r) => ({ code: 0, ...r }), (e) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));
     let summary = null; try { summary = JSON.parse(result.stdout.trim().split('\n').pop()); } catch { /* the run failed before its summary */ }
     let claudeArgs = []; try { claudeArgs = readFileSync(join(bin, 'claude-args.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { /* no CLI call */ }
@@ -318,6 +332,37 @@ test('deep readings: claimed with a lease that covers the batch; a photo that no
     for (const r of calls.receipts) assert.equal(r.p_producer_version, 1);
     assert.equal(calls.tiers, 1, 'the admitted set is read once a fire');
   }, { deepFrames: Object.keys(gone), rows: gone, extraArgs: ['--deep-limit', '12'] });
+});
+
+// The one daily cap is counted at the claim (20261126091500): a photo whose claim is gone by the time it is read (its lease ran
+// out and the item was handed back) is not read, and no receipt is written for an item this fire no longer holds. Every
+// stage receipt says which host wrote it (detail.host).
+test('deep readings: a photo whose claimed item is gone is refused with no model call and no receipt; receipts name the host', async () => {
+  const deep = ['e-held.jpg', 'f-lapsed.jpg'];
+  const ok = { 'e-held.jpg': { is_document: true }, 'f-lapsed.jpg': { is_document: true } };
+  await withStandIns([], ({ calls, summary, claudeArgs }) => {
+    assert.deepEqual(calls.claimChecks.map((q) => q.match(/id=eq\.(\d+)&stage=eq\.([a-z_]+)&status=eq\.claimed/)?.slice(1)), [['1', 'deep_reading'], ['2', 'deep_reading']],
+      'each claimed photo is checked by its work item before anything else');
+    assert.deepEqual(calls.snapshots, ['e-held.jpg'], 'the refused photo is not even read from the database');
+    assert.deepEqual(calls.receipts.filter((r) => r.p_stage === 'deep_reading').map((r) => [r.p_image_id, r.p_detail.host]), [['e-held.jpg', 'mac_launchd']],
+      'one receipt, for the photo still held, with the host');
+    assert.equal(claudeArgs.length, 0, 'no model call');
+    assert.deepEqual([summary.stages.deep_reading.claimed, summary.stages.deep_reading.unclaimed, summary.stages.deep_reading.receipts], [2, 1, 1]);
+  }, { deepFrames: deep, rows: ok, unclaim: ['f-lapsed.jpg'], extraArgs: ['--deep-limit', '2'], env: { READER_HOST: 'mac_launchd' } });
+  // on an Actions runner the host is github_actions; a word that is not a fixed word is not written
+  await withStandIns([], ({ calls }) => {
+    assert.deepEqual(calls.receipts.filter((r) => r.p_stage === 'deep_reading').map((r) => r.p_detail.host), ['github_actions']);
+  }, { deepFrames: ['g.jpg'], rows: { 'g.jpg': { is_document: true } }, extraArgs: ['--deep-limit', '1'], env: { GITHUB_ACTIONS: 'true', READER_HOST: 'Mac Book; rm' } });
+});
+
+test('--stage-dry-run on named photos: a deep reading is refused (no claim), with no fetch and no model call', async () => {
+  await withStandIns([], ({ result, claudeArgs, calls }) => {
+    assert.equal(result.code, 0);
+    const lines = result.stdout.trim().split('\n').map((l) => JSON.parse(l));
+    assert.deepEqual(lines, [{ stage: 'deep_reading', image_id: '00000000-0000-4000-8000-0000000000d1', refused: 'deep_reading_unclaimed', reason: 'no_work_id' }]);
+    assert.equal(claudeArgs.filter((a) => !a.includes('--help')).length, 0, 'no model call');
+    assert.deepEqual([calls.snapshots, calls.claimChecks, calls.claims], [[], [], []], 'nothing claimed, nothing fetched');
+  }, { extraArgs: ['--stage-dry-run', '--image-ids', '00000000-0000-4000-8000-0000000000d1', '--stages', 'deep_reading'] });
 });
 
 test('deep readings wait for the database to say what this reader may post: no row, an empty row or an unreadable one claims nothing', async () => {

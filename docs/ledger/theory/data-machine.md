@@ -94,8 +94,10 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    (since 2026-11-20 a fast fire each minute between runs the first read of a newly landed photo, up to
    `first_reads_per_hour` in `platform_config` `image_stage_reconciler`, 360 when the row names none).
    Since 2026-11-25 two hosts read, the Mac's launchd job and the `stages` job of `.github/workflows/photo-keys.yml`,
-   claiming one `image_stage_work` queue under leases and a live daily cap the database enforces
-   (`image_pipeline_stages.live_daily_cap`, #3861). Each posts its own heartbeat (`subscription-frame-classifier`,
+   claiming one `image_stage_work` queue under leases and one daily cap per stage the database enforces at the claim,
+   both lanes and both hosts together (`image_pipeline_stages.daily_cap`, deep_reading 150, of which `live_min_reserved`
+   30 only the live lane may take; `20261126091500`). A deep reading starts only from a claimed work item
+   (`deep-stage.mjs` `assertDeepClaim`), and a deep reading receipt that answers no claimed item is refused. Each posts its own heartbeat (`subscription-frame-classifier`,
    `subscription-frame-classifier-actions`); a host that stops turns `subscription-reader-watch` red in `v_job_health`.
    Each of those reads lands a description, a colour, text and sometimes an angle, and nothing keyed. A
    request to read faster, or to read everything oldest first, is answered with those facts and one

@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { validateVerdict } from '../../supabase/functions/_shared/byokImageVerdict.mjs';
 import { stageSchema, crossCheckedValues, AUTOMATIC_READING_TIER } from '../lib/byok-stage-schema.mjs';
-import { receiptForDeepResult, receiptForResult, receiptForKeyedResult } from './stage-queue.mjs';
+import { DEEP_STAGE, receiptForDeepResult, receiptForResult, receiptForKeyedResult } from './stage-queue.mjs';
 import { projectCachedRun } from '../lib/image-property-projection.mjs';
 
 const run = promisify(execFile);
@@ -590,6 +590,49 @@ export function deepPrompt({ contract, imageId, vehicleId, imagePath }) {
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
+// ---------------------------------------------------------------------------------------------------------------------
+// The claim
+
+/**
+ * A deep reading spends the owner's subscription, and the one number that bounds it is image_pipeline_stages.daily_cap,
+ * counted when claim_image_stage_work hands an item out (20261126091500). So no deep reading starts without a claimed
+ * image_stage_work row for exactly this photo: not a named id, not a dry run, not a frame from anywhere else. The refusal
+ * comes before the photo is fetched or any model is called, and no receipt is written for it (the item, if any, is not
+ * this reader's to close).
+ *   reason  no_work_id        the frame carries no work item id (it did not come from a claim)
+ *           not_claimed       the database holds no claimed deep_reading item with that id for this photo (never claimed,
+ *                             its lease ran out and it was handed back, or it is another photo's)
+ *           claim_unreadable  the question could not be asked: not proven, so not read
+ */
+export class UnclaimedDeepReadingError extends Error {
+  constructor(reason, { imageId = null, workId = null } = {}) {
+    super(`deep_reading_unclaimed: ${reason}`);
+    this.name = 'UnclaimedDeepReadingError';
+    this.code = 'deep_reading_unclaimed';
+    this.reason = reason;
+    this.imageId = imageId;
+    this.workId = workId;
+  }
+}
+
+/** The claimed work item a deep reading must hold, as a PostgREST query: one row or none. */
+export const claimedWorkQuery = (workId) =>
+  `image_stage_work?select=id,image_id,stage,status&id=eq.${workId}&stage=eq.${DEEP_STAGE}&status=eq.claimed&limit=1`;
+
+/** Resolves when `frame` holds a claimed deep_reading item for its own photo; otherwise throws UnclaimedDeepReadingError. */
+export async function assertDeepClaim(frame, rest) {
+  const workId = frame?.work_id;
+  const ids = { imageId: frame?.id ?? null, workId: workId ?? null };
+  const n = typeof workId === 'number' ? workId : typeof workId === 'string' && /^[1-9][0-9]*$/.test(workId) ? Number(workId) : NaN;
+  if (!Number.isSafeInteger(n) || n < 1) throw new UnclaimedDeepReadingError('no_work_id', ids);
+  let rows;
+  try { rows = await rest(claimedWorkQuery(workId)); } catch { throw new UnclaimedDeepReadingError('claim_unreadable', ids); }
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row || String(row.id) !== String(workId) || row.stage !== DEEP_STAGE || row.status !== 'claimed' || row.image_id !== frame.id) {
+    throw new UnclaimedDeepReadingError('not_claimed', ids);
+  }
+}
+
 /**
  * What a deep reading's stage receipt keeps beside the outcome: both full reads (the only place a component, a text
  * region or a phase guess of an automatic read is kept: operational record, not testimony), what each said for the four
@@ -609,9 +652,11 @@ export function deepDetail({ model, runId, reads, agreement, seconds, admits = n
 }
 
 /**
- * One photo's deep reading, from claim to typed receipt. `post` false is the dry run: everything but the post.
+ * One photo's deep reading, from claim to typed receipt. `post` false is the dry run: everything but the post. Either way
+ * the frame must hold a claimed work item (assertDeepClaim): without one this throws UnclaimedDeepReadingError before any
+ * download or model call.
  *
- *   frame        { id, vehicle_id, image_url } from the claim
+ *   frame        { work_id, id, vehicle_id, image_url } from the claim
  *   deps.rest    PostgREST read (query string) -> rows
  *   deps.ask(argv, text, cwd) -> CLI stdout (claudePrint with the subscription environment)
  *   deps.orchestrator(body) -> { http, ... }
@@ -623,6 +668,8 @@ export function deepDetail({ model, runId, reads, agreement, seconds, admits = n
  */
 export async function deepReadFrame(frame, deps, { dir, contract, model, runId, post = true, now = () => new Date(), reader, promptVersion = 'reviewed_image_analysis_v1', signal, admits = NO_ADMITS }) {
   const t0 = Date.now();
+  // the one cap is counted at the claim: no claimed item, no reading (throws, nothing fetched, no model call)
+  await assertDeepClaim(frame, deps.rest);
   const typed = (result) => {
     const receipt = receiptForDeepResult(result, { reader, promptVersion });
     return { receipt, stop: receipt.stop === true, valid: false, seconds: Math.round((Date.now() - t0) / 100) / 10 };

@@ -299,7 +299,7 @@ jobs:
             def take($names): . as $o | $names | map({key: ., value: $o[.]}) | from_entries | with_entries(select((.value | type) == "number"));
             def stage: if type != "object" then {} else . as $s
               | take(["claimed", "started", "succeeded", "policy_skip", "unavailable", "blocked_input", "rate_limited", "failed", "receipts",
-                      "receipt_errors", "reads_valid", "agreed_all", "posted_values", "held_pictures", "aborted", "values", "read_seconds",
+                      "receipt_errors", "reads_valid", "agreed_all", "posted_values", "held_pictures", "aborted", "unclaimed", "values", "read_seconds",
                       "input_tokens", "output_tokens"])
                 + {stopped: ($s.stopped | word), skipped: ($s.skipped | word), claim_error: ($s.claim_error | word), error: ($s.error | word),
                    error_classes: ($s.error_classes | counts), skip_reasons: ($s.skip_reasons | counts), disagreements: ($s.disagreements | counts)} end;
