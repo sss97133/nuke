@@ -16,6 +16,7 @@ import {
 } from "../_shared/scopeGrammar.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { serviceInvoker } from "./advisor/instant_ingest.ts";
+import { callerRelayHeaders, scopedObservation, scopedPhotoIngest } from "./callerRelay.ts";
 import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import {
   checkAdvisorRateLimit,
@@ -4000,18 +4001,15 @@ async function handleExtractListing(args: Record<string, unknown>): Promise<Tool
   return toolOk(data);
 }
 
-async function handleSubmitObservation(args: Record<string, unknown>): Promise<ToolResult> {
-  const data = await callEdgeFn("ingest-observation", {
-    vehicle_id: args.vehicle_id,
-    source_slug: args.source_slug,
-    kind: args.kind,
-    content_text: args.content_text || null,
-    structured_data: args.structured_data || {},
-    confidence_score: args.confidence_score || 0.5,
-    source_url: args.source_url || null,
-    submitted_by_user_id: args.submitted_by_user_id || null,
-  });
-  return toolOk(data);
+async function handleSubmitObservation(args: Record<string, unknown>, caller?: CallerContext): Promise<ToolResult> {
+  // The service key reaches ingest-observation either way; for anyone else the caller, never an argument, is the
+  // person on the row, and an owner sign-off stays only when the caller can edit the vehicle (callerRelay.ts).
+  const supabase = sb();
+  const { body, ownerConfirmedDropped } = await scopedObservation((fn, a) => supabase.rpc(fn, a), caller, args);
+  const data = await callEdgeFn("ingest-observation", body);
+  return toolOk(ownerConfirmedDropped && data && typeof data === "object"
+    ? { ...(data as Record<string, unknown>), owner_confirmed_ignored: "you cannot edit this vehicle, so the observation was kept without the owner's sign-off" }
+    : data);
 }
 
 // ── External Agent Write API (v1/events) ────────────────────────────────────
@@ -4095,7 +4093,7 @@ const EVENT_SCHEMAS_INLINE: Record<string, Record<string, unknown>> = {
 
 const EVENT_TYPE_TO_VIN_SCOPE = (vin: string) => `events:write:vehicle:${vin}`;
 
-async function handleSubmitVehicleEvent(args: Record<string, unknown>): Promise<ToolResult> {
+async function handleSubmitVehicleEvent(args: Record<string, unknown>, caller?: CallerContext): Promise<ToolResult> {
   const vin = typeof args.vin === "string" ? args.vin.trim().toUpperCase() : "";
   const eventType = typeof args.event_type === "string" ? args.event_type : "";
   const occurredAt = typeof args.occurred_at === "string" ? args.occurred_at : "";
@@ -4118,13 +4116,14 @@ async function handleSubmitVehicleEvent(args: Record<string, unknown>): Promise<
     agent_inferred: !!args.agent_inferred,
   };
 
-  // Call api-v1-events internally with service-role auth.
+  // api-v1-events checks the caller's per-VIN scope (events:write:vehicle:<VIN> or events:write:all), records the
+  // submitter and decides whether correction_of may supersede. The service key skips all three, so it goes only for
+  // the service key; anyone else's own login or API key is forwarded (callerRelay.ts, 2026-11-25).
+  const relay = callerRelayHeaders(caller, SERVICE_ROLE_KEY);
+  if (!relay) return toolErr("submit_vehicle_event needs your own Nuke login or API key; nothing was written.");
   const res = await fetch(`${SUPABASE_URL}/functions/v1/api-v1-events`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-    },
+    headers: { "Content-Type": "application/json", ...relay },
     body: JSON.stringify(envelope),
   });
 
@@ -5010,7 +5009,7 @@ async function handlePrepareListing(
 
 // ── Photo Ingest Handler ────────────────────────────────────────────────────
 
-async function handleIngestPhotos(args: Record<string, unknown>): Promise<ToolResult> {
+async function handleIngestPhotos(args: Record<string, unknown>, caller?: CallerContext): Promise<ToolResult> {
   const supabase = sb();
   const images = args.images as Array<{
     url?: string; base64?: string; filename?: string;
@@ -5018,8 +5017,6 @@ async function handleIngestPhotos(args: Record<string, unknown>): Promise<ToolRe
   }>;
   const vehicleId = args.vehicle_id as string | undefined;
   const vehicleHint = args.vehicle_hint as { year?: number; make?: string; model?: string; vin?: string; color?: string } | undefined;
-  const userId = args.user_id as string | undefined;
-  const source = (args.source as string) || "ai_ingest";
 
   if (!images || !Array.isArray(images) || images.length === 0) {
     return toolErr("images array required with at least one image (url or base64)");
@@ -5047,6 +5044,13 @@ async function handleIngestPhotos(args: Record<string, unknown>): Promise<ToolRe
     }
   }
 
+  // Whose photos these are and where they may land: the service key as before; anyone else documents them as
+  // themself, links them only to a vehicle they can edit (user_can_edit_vehicle), and never replaces a stored object.
+  const scope = await scopedPhotoIngest((fn, a) => supabase.rpc(fn, a), caller, args, resolvedVehicleId);
+  resolvedVehicleId = scope.vehicleId;
+  const userId = scope.documentedBy;
+  const source = scope.source;
+
   // Upload each image: base64 → storage, or pass URL directly
   const results: Array<{ filename: string; status: string; error?: string }> = [];
   let uploaded = 0, errors = 0;
@@ -5065,11 +5069,11 @@ async function handleIngestPhotos(args: Record<string, unknown>): Promise<ToolRe
           const ext = filename.split(".").pop()?.toLowerCase() || "jpg";
           const mime = ext === "png" ? "image/png" : "image/jpeg";
           const vehicleDir = resolvedVehicleId || "unassigned";
-          const storagePath = `${vehicleDir}/${source}/${filename}`;
+          const storagePath = `${vehicleDir}/${source}/${scope.storageName(filename)}`;
 
           const { error: uploadErr } = await supabase.storage
             .from("vehicle-photos")
-            .upload(storagePath, bytes, { contentType: mime, upsert: true });
+            .upload(storagePath, bytes, { contentType: mime, upsert: scope.upsert });
 
           if (uploadErr) {
             results.push({ filename, status: "error", error: uploadErr.message });
@@ -5132,6 +5136,7 @@ async function handleIngestPhotos(args: Record<string, unknown>): Promise<ToolRe
     vehicle: vehicleInfo || (resolvedVehicleId ? { id: resolvedVehicleId } : null),
     vehicle_matched: !!resolvedVehicleId,
     vehicle_hint_used: !vehicleId && !!vehicleHint,
+    ...(scope.vehicleRefused ? { vehicle_refused: "you cannot edit that vehicle, so the photos were stored unassigned" } : {}),
     results: results.length <= 20 ? results : results.filter(r => r.status === "error").slice(0, 10),
     _note: resolvedVehicleId
       ? `${uploaded} photos linked to vehicle. AI classification will run automatically.`
@@ -6482,7 +6487,8 @@ Deno.serve(async (req: Request) => {
       if (privilegedOnly && !(await isPrivilegedCaller(auth))) {
         return toolRefused(body.id, 403, `Tool '${named ? toolName : "?"}' answers only an administrator's credential for now.`);
       }
-      caller = { userId: auth.userId, scopes: auth.scopes, oauthToken: auth.oauthToken };
+      caller = { userId: auth.userId, scopes: auth.scopes, oauthToken: auth.oauthToken,
+        ...(apiKey && !auth.oauthToken && auth.userId !== "service-role" ? { apiKey } : {}) };
     } else if (!isPublic) {
       // No auth + a tool that is not public → trigger OAuth flow via 401 + WWW-Authenticate.
       return toolRefused(body.id, 401, `Authentication required for tool '${named ? toolName : "?"}'.`);

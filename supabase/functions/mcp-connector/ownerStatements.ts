@@ -93,6 +93,8 @@ export interface CallerContext {
   userId?: string;
   scopes?: string[];
   oauthToken?: string;
+  /** The raw X-API-Key this request presented, so a write tool can forward the caller's own key (callerRelay.ts). */
+  apiKey?: string;
 }
 
 type ToolResult = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
