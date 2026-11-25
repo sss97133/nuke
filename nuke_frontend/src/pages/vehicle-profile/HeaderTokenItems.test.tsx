@@ -300,7 +300,7 @@ it('a claim says how many independent sources agree, and a lone claim says nothi
 });
 
 it('an established item says what establishes it, from the reader basis', async () => {
-  const item = (status: string, basis: FacetItem['basis']): FacetItem => ({ key: 'year.decode', facet: 'decode', value: '1973', status,
+  const item = (status: FacetItem['status'], basis: FacetItem['basis']): FacetItem => ({ key: 'year.decode', facet: 'decode', value: '1973', status,
     unit: null, rule: null, equation: null, needed: null, basis,
     sources: [{ kind: 'observation', label: 'VIN decode', value_label: '1973', observed_at: '2026-01-02T00:00:00Z' }] });
   await render(<HeaderTokenItems vehicleId="v-1" dimension="year" items={{ year: [item('established',
