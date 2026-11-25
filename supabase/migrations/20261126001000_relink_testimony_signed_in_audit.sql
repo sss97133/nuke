@@ -77,6 +77,8 @@ AS $writer$
 DECLARE
   v_uid uuid := auth.uid();
   v_vehicle uuid;
+  v_image_user uuid;
+  v_merged_from uuid;
   v_xmin xid;
   v_cur bigint;
   v_full bigint;
@@ -88,7 +90,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.reattribution_reason_kinds k WHERE k.kind = p_kind AND k.signed_in) THEN
     RAISE EXCEPTION 'reattribution_audit_record_move: reason kind % is not allowed', p_kind USING ERRCODE = '22023';
   END IF;
-  SELECT i.vehicle_id, i.xmin INTO v_vehicle, v_xmin FROM public.vehicle_images i WHERE i.id = p_image_id;
+  SELECT i.vehicle_id, i.xmin, i.user_id, i.merged_from_vehicle_id INTO v_vehicle, v_xmin, v_image_user, v_merged_from
+    FROM public.vehicle_images i WHERE i.id = p_image_id;
   IF NOT FOUND OR v_vehicle IS DISTINCT FROM p_target_vehicle_id THEN
     RAISE EXCEPTION 'reattribution_audit_record_move: photo % is not on vehicle %', p_image_id, p_target_vehicle_id
       USING ERRCODE = '42501';
@@ -101,6 +104,30 @@ BEGIN
   END IF;
   IF v_full < 3 OR pg_xact_status(v_full::text::xid8) IS DISTINCT FROM 'in progress' THEN
     RAISE EXCEPTION 'reattribution_audit_record_move: photo % was not moved by this transaction', p_image_id
+      USING ERRCODE = '42501';
+  END IF;
+  -- The stated source (ta-skeptic2): not the target; one the caller may move from (relink_testimony's source rule: the
+  -- uploader, or tied to that vehicle); and a move off a vehicle leaves merged_from_vehicle_id set (relink_testimony
+  -- writes COALESCE(merged_from_vehicle_id, old)). The note stays the caller's own words, under the signed_in_move kind.
+  IF p_old_vehicle_id IS NOT DISTINCT FROM p_target_vehicle_id
+     OR (p_old_vehicle_id IS NOT NULL AND v_merged_from IS NULL)
+     OR NOT (v_image_user IS NOT DISTINCT FROM v_uid
+             OR (p_old_vehicle_id IS NOT NULL AND public.vehicle_viewer_tied(p_old_vehicle_id))) THEN
+    RAISE EXCEPTION 'reattribution_audit_record_move: vehicle % is not a source this caller moved photo % from',
+      p_old_vehicle_id, p_image_id USING ERRCODE = '42501';
+  END IF;
+  -- One audit row per photo per transaction (ta-skeptic2): refuse when this transaction already wrote one for it.
+  -- Rows written by this transaction carry created_at = now() (its start) and an in-progress xmin; the actor index
+  -- (actor_user_id, created_at) finds them.
+  IF EXISTS (
+    SELECT 1 FROM public.reattribution_audit a
+     WHERE a.actor_user_id = v_uid AND a.created_at = now() AND a.new_observation_id = p_image_id
+       AND pg_xact_status((((v_cur >> 32) << 32) | (a.xmin::text::bigint)
+             - CASE WHEN (((v_cur >> 32) << 32) | (a.xmin::text::bigint)) > v_cur + 2147483648 THEN 4294967296
+                    WHEN (((v_cur >> 32) << 32) | (a.xmin::text::bigint)) < v_cur - 2147483648 THEN -4294967296
+                    ELSE 0 END
+           )::text::xid8) = 'in progress') THEN
+    RAISE EXCEPTION 'reattribution_audit_record_move: photo % already has its audit row in this transaction', p_image_id
       USING ERRCODE = '42501';
   END IF;
   INSERT INTO public.reattribution_audit (observation_type, old_observation_id, old_vehicle_id,

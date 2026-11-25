@@ -60,7 +60,9 @@ INSERT INTO vehicle_ties_fx VALUES
 INSERT INTO vehicle_images(id, vehicle_id, user_id, file_hash, vision_gate_status) VALUES
   ('30000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-00000000000e', '0a000000-0000-0000-0000-0000000000a0', 'k1', 'approved'),
   ('30000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000007', '0b000000-0000-0000-0000-0000000000b0', 'k2', 'approved'),
-  ('30000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-00000000000e', '0a000000-0000-0000-0000-0000000000a0', 'k3', 'approved');
+  ('30000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-00000000000e', '0a000000-0000-0000-0000-0000000000a0', 'k3', 'approved'),
+  -- uploaded by U, on O's car E: O moves it (tied to E); O is not the uploader, so a stated source must be tied.
+  ('30000000-0000-0000-0000-000000000004', 'e0000000-0000-0000-0000-00000000000e', '0b000000-0000-0000-0000-0000000000b0', 'k4', 'approved');
 INSERT INTO vehicle_observations(id, vehicle_id, subject_type, subject_id) VALUES
   ('40000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-00000000000e', 'vehicle', 'e0000000-0000-0000-0000-00000000000e');
 DELETE FROM reattribution_audit;
@@ -104,7 +106,8 @@ DECLARE x xid; sub boolean; r uuid;
 BEGIN
   BEGIN
     -- ALLOW_RAW_TESTIMONY_WRITE: contract fixture; a synthetic photo moved inside a subtransaction.
-    UPDATE public.vehicle_images SET vehicle_id = 'f0000000-0000-0000-0000-00000000000f'
+    UPDATE public.vehicle_images SET vehicle_id = 'f0000000-0000-0000-0000-00000000000f',
+           merged_from_vehicle_id = coalesce(merged_from_vehicle_id, 'e0000000-0000-0000-0000-00000000000e')
      WHERE id = '30000000-0000-0000-0000-000000000003';
   EXCEPTION WHEN OTHERS THEN RAISE;
   END;
@@ -113,6 +116,21 @@ BEGIN
   r := public.reattribution_audit_record_move('30000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-00000000000e',
                                               'f0000000-0000-0000-0000-00000000000f', 'signed_in_move', 'subtransaction proof');
   RETURN 'subxact=' || sub || ' writer=' || (r IS NOT NULL);
+END $$;
+-- ta-skeptic2's should-fix: after a real move in one transaction, the writer is called again for the same photo, and
+-- with a stated source equal to the target or one the caller is not tied to.
+CREATE FUNCTION pg_temp.second_row_after_move() RETURNS text LANGUAGE plpgsql AS $$
+DECLARE r jsonb; again text; same text; untied text;
+BEGIN
+  r := public.relink_testimony('image', '30000000-0000-0000-0000-000000000004', 'f0000000-0000-0000-0000-00000000000f',
+                               'move then repeat', '0a000000-0000-0000-0000-0000000000a0', NULL::text);
+  again := pg_temp.try_writer('30000000-0000-0000-0000-000000000004', 'e0000000-0000-0000-0000-00000000000e',
+                              'f0000000-0000-0000-0000-00000000000f', 'signed_in_move');
+  same := pg_temp.try_writer('30000000-0000-0000-0000-000000000004', 'f0000000-0000-0000-0000-00000000000f',
+                             'f0000000-0000-0000-0000-00000000000f', 'signed_in_move');
+  untied := pg_temp.try_writer('30000000-0000-0000-0000-000000000004', '70000000-0000-0000-0000-000000000007',
+                               'f0000000-0000-0000-0000-00000000000f', 'signed_in_move');
+  RETURN (r->>'success') || ' | ' || again || ' | ' || same || ' | ' || untied;
 END $$;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA pg_temp TO authenticated;
 
@@ -174,6 +192,7 @@ SELECT pg_temp.try_writer('30000000-0000-0000-0000-000000000001', 'e0000000-0000
 SELECT pg_temp.try_move('observation', '40000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-00000000000f',
   '0a000000-0000-0000-0000-0000000000a0') AS owner_observation \gset
 SELECT pg_temp.subxact_proof() AS subxact \gset
+SELECT pg_temp.second_row_after_move() AS repeat_case \gset
 RESET ROLE;
 SELECT t_assert(:'owner_move' = 'ok true', 'the owner''s signed-in move succeeds');
 SELECT t_assert((SELECT vehicle_id FROM vehicle_images WHERE id = '30000000-0000-0000-0000-000000000001') = 'f0000000-0000-0000-0000-00000000000f',
@@ -189,7 +208,15 @@ SELECT t_assert(:'owner_observation' LIKE 'refused RL001:%cannot move an observa
 SELECT t_assert((SELECT vehicle_id FROM vehicle_observations WHERE id = '40000000-0000-0000-0000-000000000001') = 'e0000000-0000-0000-0000-00000000000e',
   'the refused observation move wrote nothing');
 SELECT t_assert(:'subxact' = 'subxact=true writer=true', 'the writer accepts a move made in a subtransaction (xmin is not the top-level id)');
-SELECT t_assert((SELECT count(*) FROM reattribution_audit) = 2, 'two audit rows: the owner''s move and the subtransaction proof');
+SELECT t_assert(split_part(:'repeat_case', ' | ', 1) = 'true', 'the owner moves a photo onto F in one transaction');
+SELECT t_assert(split_part(:'repeat_case', ' | ', 2) LIKE 'refused 42501:%already has its audit row in this transaction%',
+  'a second writer call for the same photo in that transaction is refused');
+SELECT t_assert(split_part(:'repeat_case', ' | ', 3) LIKE 'refused 42501:%is not a source%', 'a stated source equal to the target is refused');
+SELECT t_assert(split_part(:'repeat_case', ' | ', 4) LIKE 'refused 42501:%is not a source%',
+  'a stated source the caller is not tied to (and the photo is not theirs) is refused');
+SELECT t_assert((SELECT count(*) FROM reattribution_audit WHERE new_observation_id = '30000000-0000-0000-0000-000000000004') = 1,
+  'exactly one audit row for that photo');
+SELECT t_assert((SELECT count(*) FROM reattribution_audit) = 3, 'three audit rows: the owner''s two moves and the subtransaction proof');
 SELECT t_assert(:owner_reads_audit = 0, 'a signed-in user reads no audit rows (no SELECT policy)');
 SELECT t_assert(:'forged' = 'refused 42501', 'a direct audit insert naming another actor is refused (42501)');
 SELECT t_assert(:'forged_self' = 'refused 42501', 'a direct audit insert naming oneself (the REST POST) is refused (42501)');
