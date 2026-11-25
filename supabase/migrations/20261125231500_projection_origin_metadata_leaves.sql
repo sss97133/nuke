@@ -9,11 +9,12 @@
 --   keys, 32 of 4,096 slices (8,962 public cars): bat_snapshot_parsed.party_type (the BaT seller line) holds a string on
 --     231 cars, 212 of them a phone or email; no other key named phone, mobile, cell, tel, contact, whatsapp, fax or
 --     mail. None of the five owner keys sits below the top level of any jsonb column on those cars.
--- Cost: on one public car whose to_jsonb row is 17,844 bytes, the live projection took 102-191 ms a call under anon
--- claims (EXPLAIN ANALYZE, 30 evaluations, three runs). Its subqueries were pulled up, so the recursive owner-key mask
--- ran once per reference; the same body with OFFSET 0 barriers took 21 ms. This body, inlined with its origin_metadata
--- step as the fast-path test, took 41-57 ms on the same row (the remaining cost is 20261125202000's grant mask, 14-21 ms,
--- and the nested-key test, 4-5 ms); that row's origin_metadata takes the fast path.
+-- Cost: one public car whose to_jsonb row is 17,844 bytes, anon claims, EXPLAIN ANALYZE, ms per call, two sessions of
+-- interleaved runs (prod is shared, so medians move between sessions): live projection 108 (runs 89-124; 102-191 in
+-- earlier runs). Its subqueries were pulled up, so the masks ran once per reference; the same body with OFFSET 0
+-- barriers 20-29; this body 17-30. Pieces alone: the origin_metadata fast path 1.0-1.2 (this row takes it), the
+-- nested-key test plus top-level mask 4-5 against jsonb_mask_keys 9-14, and 20261125202000's grant mask 15-22, which is
+-- most of what remains.
 --
 -- WHAT.
 --   public.contact_redaction_rules, one row per rule in ordinal order:
