@@ -43,7 +43,7 @@ $function$;
 
 \ir revert_20261124224500_vehicle_spend_lines.sql
 \ir ../migrations/20261124224500_vehicle_spend_lines.sql
-\ir ../migrations/20261124234500_vehicle_spend_fold_enqueue_value.sql
+\ir ../migrations/20261124234501_vehicle_spend_fold_enqueue_value.sql
 CREATE TABLE public.before_def AS SELECT md5(pg_get_viewdef('public.vehicle_spend_lines_due'::regclass)) AS h;
 
 INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a1');
