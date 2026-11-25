@@ -26,7 +26,8 @@ const ProductPage = React.lazy(() => import('./pages/landing/ProductPage'));
 const OneMap = React.lazy(() => import('./components/map/OneMap'));
 const VehicleShowcase = React.lazy(() => import('./pages/showcase/VehicleShowcase'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
-const ShareWiring = React.lazy(() => import('./pages/ShareWiring'));
+// A shared harness is the same current schedule; never regenerate it from manifest defaults.
+const ShareWiring = React.lazy(() => import('./pages/WiringPlan'));
 const AssetProfilePage = React.lazy(() => import('./pages/AssetProfile'));
 const AssetDeclarePage = React.lazy(() => import('./pages/AssetDeclare'));
 const HeldAssetsPage = React.lazy(() => import('./pages/HeldAssets'));

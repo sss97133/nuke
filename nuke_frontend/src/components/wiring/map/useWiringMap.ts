@@ -59,10 +59,20 @@ export interface MapWire {
   fromText: string | null;
   toText: string | null;
   buildState: string | null;
+  plannedLengthFt?: number | null;
+  plannedLengthKind?: string | null;
+  plannedLengthBasis?: string | null;
+  measuredLengthFt?: number | null;
+  observedAt?: string | null;
+  checkedAt?: string | null;
+  checksVersion?: string | null;
+  source?: string | null;
+  trust?: string | null;
   checks: Record<string, [string, string]> | null;   // rule checks R8-R14 (check_plug_ends.py --wires), derived each load
 }
 
 export interface MapEnd {
+  id?: string;
   circuitId: string;
   endpointId: string;
   cavity: string | null;
@@ -99,6 +109,7 @@ export interface MapCall {
 export interface WiringMapData {
   loaded: boolean;
   error: string | null;
+  readAt?: string;
   nodes: MapNode[];
   wires: MapWire[];
   ends: MapEnd[];
@@ -114,6 +125,7 @@ const n = (v: unknown) => (v == null || v === '' ? null : Number(v));
 export function useWiringMap(vehicleId: string | undefined): WiringMapData {
   const [data, setData] = useState<WiringMapData>(EMPTY);
   useEffect(() => {
+    setData(EMPTY);
     if (!vehicleId) return;
     let cancelled = false;
     (async () => {
@@ -137,11 +149,11 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
           : Promise.resolve({ data: [], error: null }),
         overlayIds.length
           ? supabase.from('vehicle_custom_circuits')
-              .select('id, circuit_code, circuit_name, harness_section, design_status, derivation_version, wire_gauge_awg, wire_color, wire_type, from_endpoint_id, to_endpoint_id, from_cavity, to_cavity, from_component, to_component, build_state, checks')
+              .select('id, circuit_code, circuit_name, harness_section, design_status, derivation_version, wire_gauge_awg, wire_color, wire_type, from_endpoint_id, to_endpoint_id, from_cavity, to_cavity, from_component, to_component, build_state, checks, planned_length_ft, planned_length_kind, planned_length_basis, measured_length_ft, observed_at, checked_at, checks_version, source, trust')
               .in('overlay_id', overlayIds).eq('is_superseded', false).limit(3000)
           : Promise.resolve({ data: [], error: null }),
         supabase.from('wire_termination_specs')
-          .select('circuit_id, endpoint_id, cavity, terminal_contact_pn, pin_seal_pn, crimp_tool_pn, source')
+          .select('id, circuit_id, endpoint_id, cavity, terminal_contact_pn, pin_seal_pn, crimp_tool_pn, source')
           .eq('vehicle_id', vehicleId).eq('is_superseded', false).not('circuit_id', 'is', null).limit(3000),
         callIds.length
           ? supabase.from('wiring_decision_alternatives').select('id, decision_id, key, label, zone, source')
@@ -161,6 +173,7 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
       setData({
         loaded: true,
         error: null,
+        readAt: new Date().toISOString(),
         // a plug keyed to the route graph sits at its live point (overtaken twin anchors fall to their successors);
         // the copied twin coordinates stand only for a plug with no point
         nodes: ((nodes.data ?? []) as Row[]).map(r => { const t = r.topology as Row | null; return {
@@ -178,9 +191,14 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
           gauge: n(r.wire_gauge_awg), color: s(r.wire_color), spec: s(r.wire_type),
           fromId: s(r.from_endpoint_id), toId: s(r.to_endpoint_id), fromCavity: s(r.from_cavity), toCavity: s(r.to_cavity),
           fromText: s(r.from_component), toText: s(r.to_component), buildState: s(r.build_state),
+          plannedLengthFt: n(r.planned_length_ft), plannedLengthKind: s(r.planned_length_kind),
+          plannedLengthBasis: s(r.planned_length_basis), measuredLengthFt: n(r.measured_length_ft),
+          observedAt: s(r.observed_at), checkedAt: s(r.checked_at), checksVersion: s(r.checks_version),
+          source: s(r.source), trust: s(r.trust),
           checks: (r.checks as Record<string, [string, string]> | null) ?? null,
         })),
         ends: ((ends.data ?? []) as Row[]).map(r => ({
+          id: r.id as string,
           circuitId: r.circuit_id as string, endpointId: r.endpoint_id as string, cavity: s(r.cavity),
           terminal: s(r.terminal_contact_pn), seal: s(r.pin_seal_pn), tool: s(r.crimp_tool_pn), source: s(r.source),
         })),

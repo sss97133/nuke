@@ -2,7 +2,7 @@
 // connector, a wire, a pin, a loom segment, a device, a section). Results only; the owner also gets the records card
 // (proof, notes, sources, open calls) through `ownerExtra`, which the MAP tab passes only after its owner check.
 // A wire gets the builder's card (brief 2026-09-30 §4, "Follow a wire"): its ends and the hops between, gauge, colour and
-// spec, the cut length with its ± and its basis, then per end the terminal, seal and crimp tool. All of it comes from the
+// spec, recorded planned and measured lengths, then per end the terminal, seal and crimp tool. All of it comes from the
 // rows the MAP reads (vehicle_custom_circuits, wire_termination_specs) and the loom routes; a gap reads
 // "not on file: <what closes it>", never a blank.
 
@@ -10,9 +10,10 @@ import React from 'react';
 import type { Colorway } from '../connector-inspector/colorways';
 import { rule } from '../connector-inspector/colorways';
 import { DevicePhoto, WhereOnTruck } from './MountsPanel';
-import { SECTIONS, type MapEnd, type WiringMapData } from './useWiringMap';
+import { SECTIONS, type WiringMapData } from './useWiringMap';
 import { openEndOf } from './MissingList';
 import { kindOf, mask, modelsOf, partNo, publicName, valOf, weakestBasis, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
+import { engineeringText, scheduleLength } from './wiringSchedule';
 
 const FRONT_AXLE = -1.853, IN = 0.0254;
 const secWord = (s: string | null | undefined) => SECTIONS.find(x => x.id === s)?.label ?? '—';
@@ -59,16 +60,14 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
     </div>
   );
   const lenOf = (wc: string) => {
-    const segs = (ix.segsByWire.get(wc) ?? []).map(s => ix.segById.get(s)).filter(Boolean);
-    if (!segs.length) return null;
-    return { mm: Math.round(segs.reduce((a, s) => a + (s!.len ?? 0), 0) * 1000), pm: Math.round(Math.sqrt(segs.reduce((a, s) => a + (s!.mar ?? 0) ** 2, 0))), n: segs.length };
+    const wire = ix.wireByCode.get(wc);
+    return wire ? scheduleLength(wire, site).planned : null;
   };
   // a status word is the owner's; a visitor sees the result, or a dash where there is none yet
   const pending = isOwner ? <span style={{ color: cw.warn }}>ENDS PENDING</span> : '—';
-  const endLink = (h: { code: string; cav: string | null }) => <Link cw={cw} id={'p:' + h.code + '|' + (h.cav ?? '')} onSelect={onSelect}>{h.code}{h.cav ? ':' + h.cav : ''}</Link>;
   const wireTable = (wcs: string[], here?: string) => (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-      <thead><tr>{['WIRE', 'AWG', 'COLOR', here ? 'OTHER END' : 'FROM → TO', 'MM'].map(h => <th key={h} style={{ textAlign: h === 'AWG' || h === 'MM' ? 'right' : 'left', fontSize: 9.5, color: cw.inkMuted, padding: '2px 4px', borderBottom: `2px solid ${cw.border}` }}>{h}</th>)}</tr></thead>
+      <thead><tr>{['WIRE', 'AWG', 'COLOR', here ? 'OTHER END' : 'FROM → TO', 'PLANNED FT'].map(h => <th key={h} style={{ textAlign: h === 'AWG' || h === 'PLANNED FT' ? 'right' : 'left', fontSize: 9.5, color: cw.inkMuted, padding: '2px 4px', borderBottom: `2px solid ${cw.border}` }}>{h}</th>)}</tr></thead>
       <tbody>{wcs.map(wc => {
         const w = ix.wireByCode.get(wc), ch = ix.chain.get(wc) ?? [], L = lenOf(wc);
         // the other end: the far end from here; from a pass-through (the 61-pin), both ends
@@ -81,7 +80,7 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
             <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw), textAlign: 'right' }}>{w?.gauge ?? ''}</td>
             <td style={{ padding: '2px 4px', borderBottom: rule(cw) }}>{w?.color ?? ''}</td>
             <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw) }}>{far.length ? far.map((h, i) => <span key={i}>{i ? ' → ' : ''}{h!.code}{h!.cav ? ':' + h!.cav : ''}</span>) : pending}</td>
-            <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw), textAlign: 'right' }}>{L ? `${L.mm} ±${L.pm}` : ''}</td>
+            <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw), textAlign: 'right' }}>{L ?? '—'}</td>
           </tr>
         );
       })}</tbody>
@@ -134,30 +133,34 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
   }
   if (k === 'w') {
     const w = ix.wireByCode.get(v); if (!w) return null;
-    const ch = ix.chain.get(v) ?? [], L = lenOf(v), segs = (ix.segsByWire.get(v) ?? []).map(s => ix.segById.get(s)!).filter(Boolean);
+    const ch = ix.chain.get(v) ?? [], length = scheduleLength(w, site), segs = (ix.segsByWire.get(v) ?? []).map(s => ix.segById.get(s)!).filter(Boolean);
     const open = openEndOf(w, ix);
-    // each point on the chain with its own end row (wire_termination_specs), matched by connector, then by cavity
-    const mine = map.ends.filter(e => e.circuitId === w.id), used = new Set<MapEnd>();
-    const endAt = (h: { code: string; cav: string | null }) => {
-      const at = mine.filter(e => !used.has(e) && ix.byId.get(e.endpointId)?.code === h.code);
-      const e = at.find(x => (x.cavity ?? '').startsWith(h.cav ?? '')) ?? at[0];
-      if (e) used.add(e);
-      return e;
-    };
-    const points = ch.map((h, i) => ({ h, e: endAt(h), role: i === 0 ? 'END A' : i === ch.length - 1 ? 'END B' : 'VIA' }));
+    // Preserve each termination record; the drawing index shortens cavity labels
+    // and must not decide what the selected record says about an unresolved pin.
+    const points = map.ends.filter(e => e.circuitId === w.id).map(e => ({
+      h: { code: ix.byId.get(e.endpointId)?.code ?? e.endpointId, cav: e.cavity }, e,
+    }));
     const nameOf = (code: string) => site.ends[code]?.dev_name || publicName(ix.byCode.get(code)?.name);
     const pn = (val: string | null | undefined, gap: string) => {
-      const t = partNo(val);
-      return t === '—' ? <NotOnFile cw={cw} closes={gap} /> : <span style={mono}>{t}</span>;
+      const t = engineeringText(val);
+      return !t ? <NotOnFile cw={cw} closes={gap} /> : <span style={mono}>{t}</span>;
+    };
+    const recordedEnd = (id: string | null, fallback: string | null, cavity: string | null) => {
+      const node = ix.byId.get(id ?? '');
+      return <><span style={mono}>{node ? <Link cw={cw} id={'n:' + node.code} onSelect={onSelect}>{node.code}</Link> : engineeringText(fallback) || 'Connection point not recorded'}</span>
+        {' · '}{engineeringText(cavity) || 'Cavity / stud not recorded'}</>;
     };
     return (
       <div>
         {head('WIRE', '#' + w.code, w.name)}
         <F cw={cw} k="SYSTEM">{secWord(w.section)}</F>
 
-        <H cw={cw}>ITS ENDS, AND THE HOPS BETWEEN</H>
-        {points.map(({ h, role }, i) => (
-          <F key={i} cw={cw} k={role}>{endLink(h)} <span style={{ color: cw.inkMuted }}>{nameOf(h.code)}</span></F>
+        <H cw={cw}>RECORDED CIRCUIT ENDS</H>
+        <F cw={cw} k="FROM">{recordedEnd(w.fromId, w.fromText, w.fromCavity)}</F>
+        <F cw={cw} k="TO">{recordedEnd(w.toId, w.toText, w.toCavity)}</F>
+        {points.length > 0 && <H cw={cw}>CONNECTION RECORDS</H>}
+        {points.map(({ h, e }, i) => (
+          <F key={e.id ?? i} cw={cw} k="CONNECTION">{ix.byCode.has(h.code) ? <Link cw={cw} id={'n:' + h.code} onSelect={onSelect}>{h.code}</Link> : <span style={mono}>Endpoint unavailable: {h.code}</span>}{' · '}{engineeringText(e.cavity) || 'Cavity / stud not recorded'} <span style={{ color: cw.inkMuted }}>{nameOf(h.code)}</span></F>
         ))}
         {open && <F cw={cw} k={ch.length ? 'OPEN END' : 'ENDS'}><NotOnFile cw={cw} closes={open} /></F>}
 
@@ -165,16 +168,11 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
         <F cw={cw} k="GAUGE">{w.gauge != null ? <span style={mono}>{w.gauge} AWG</span> : <NotOnFile cw={cw} closes={GAP.gauge} />}</F>
         <F cw={cw} k="COLOUR">{w.color ? w.color : <NotOnFile cw={cw} closes={GAP.color} />}</F>
         <F cw={cw} k="SPEC">{w.spec ? <span style={mono}>{w.spec}</span> : <NotOnFile cw={cw} closes={GAP.spec} />}</F>
-        <F cw={cw} k="CUT LENGTH">{L ? <span style={mono}>{L.mm} ± {L.pm} MM</span> : <NotOnFile cw={cw} closes={GAP.length} />}</F>
-        {L && (
-          <>
-            <F cw={cw} k="BASIS">
-              Estimated: routed along the loom drawn on the truck's 3D twin, through {L.n} segment{L.n === 1 ? '' : 's'}
-              {site.routesOn ? ` (routes of ${site.routesOn})` : ''}. The ± is the segments' drawing margins combined.
-            </F>
-            <F cw={cw} k="MEASURED"><NotOnFile cw={cw} closes={GAP.measure} /></F>
-          </>
-        )}
+        <F cw={cw} k="PLANNED LENGTH">{length.planned !== null ? <span style={mono}>{length.planned} FT</span> : <NotOnFile cw={cw} closes={GAP.length} />}</F>
+        {length.kind && <F cw={cw} k="LENGTH BASIS">{length.kind}</F>}
+        {isOwner && length.basis && <F cw={cw} k="LENGTH EVIDENCE">{length.basis}</F>}
+        <F cw={cw} k="MEASURED LENGTH">{w.measuredLengthFt != null && Number.isFinite(w.measuredLengthFt)
+          ? <span style={mono}>{w.measuredLengthFt} FT</span> : <NotOnFile cw={cw} closes={GAP.measure} />}</F>
         <F cw={cw} k="ALLOWANCES"><NotOnFile cw={cw} closes={GAP.allowance} /></F>
         {onShowOnTruck && (
           <button onClick={onShowOnTruck} style={{ marginTop: 8, border: `2px solid ${cw.border}`, background: cw.surface, color: cw.ink,
@@ -182,23 +180,24 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
         )}
 
         {points.length > 0 && <H cw={cw}>AT EACH END: TERMINAL, SEAL, CRIMP TOOL</H>}
-        {points.map(({ h, e, role }, i) => (
+        {points.map(({ h, e }, i) => (
           <div key={i} style={{ padding: '4px 0', borderBottom: rule(cw) }}>
             <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.7, color: cw.inkMuted }}>
-              {role} · <span style={{ ...mono, fontSize: 12, color: cw.ink }}>{h.code}{h.cav ? ':' + h.cav : ''}</span>
+              <span style={{ ...mono, fontSize: 12, color: cw.ink }}>{h.code}{e?.cavity ? ': ' + engineeringText(e.cavity) : ''}</span>
             </div>
             <F cw={cw} k="TERMINAL">{pn(e?.terminal, GAP.terminal)}</F>
             <F cw={cw} k="SEAL">{pn(e?.seal, GAP.seal)}</F>
             <F cw={cw} k="CRIMP TOOL">{pn(e?.tool, GAP.tool)}</F>
           </div>
         ))}
-        {isOwner && <F cw={cw} k="STATUS">{w.designStatus === 'decided' ? 'DECIDED' : 'CONCEPT (NOT DECIDED)'}</F>}
+        <F cw={cw} k="DESIGN STATE">{w.designStatus === 'decided' ? 'Decided' : 'Concept'}</F>
+        <F cw={cw} k="BUILD STATE">{w.buildState?.replaceAll('_', ' ') || 'Not recorded'}</F>
         {segs.length > 0 && <>
           <H cw={cw}>ROUTE ({segs.length})</H>
           {segs.map(s => (
             <div key={s.id} onClick={() => onSelect('s:' + s.id)} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, fontSize: 12, padding: '2px 0', borderBottom: rule(cw), cursor: 'pointer' }}>
               <span><span style={mono}>{s.id}</span> <span style={{ color: cw.inkMuted }}>{(s.b ?? '').split(' (')[0]}</span></span>
-              <span style={mono}>⌀{s.od ?? '?'} · {Math.round((s.len ?? 0) * 1000)} ±{s.mar ?? '?'}</span>
+              <span style={mono}>⌀{s.od ?? '?'} · {s.len == null ? '?' : Math.round(s.len * 1000)} ±{s.mar ?? '?'} MM · model</span>
             </div>
           ))}
         </>}
