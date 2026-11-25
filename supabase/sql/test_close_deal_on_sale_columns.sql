@@ -11,7 +11,7 @@ CREATE TABLE public.auction_events (
   hammer_price numeric, gross_price numeric, auction_end_date timestamptz);
 CREATE TABLE public.deal_jackets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, deal_type text, sold_date date,
-  sale_price_inc_doc numeric, updated_at timestamptz);
+  sale_price_inc_doc numeric, updated_at timestamptz, created_at timestamptz NOT NULL DEFAULT '2026-01-01');
 CREATE TABLE public.deal_jacket_parties (
   deal_jacket_id uuid, role text, threshold_amount numeric, split_pct numeric, flat_fee numeric,
   commission_pct numeric, actual_amount numeric, actual_currency text);
@@ -32,6 +32,18 @@ DO $$ BEGIN
   EXCEPTION WHEN undefined_column THEN NULL;
   END;
 END $$;
+
+-- The transfer seed trigger function (its live body's request object, without the HTTP call).
+CREATE FUNCTION public.auto_create_transfer_on_auction_close() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  PERFORM set_config('test.seed_body', jsonb_build_object(
+        'action', 'seed_from_auction',
+        'auction_event_id', NEW.id::text
+      )::text, false);
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_auto_create_transfer_on_auction_close AFTER INSERT OR UPDATE OF outcome ON public.auction_events
+  FOR EACH ROW EXECUTE FUNCTION public.auto_create_transfer_on_auction_close();
 
 \i supabase/migrations/20261125084210_close_deal_on_sale_columns.sql
 \i supabase/migrations/20261125084210_close_deal_on_sale_columns.sql
@@ -55,6 +67,29 @@ DO $$ BEGIN
   IF (SELECT actual_amount FROM public.deal_jacket_parties WHERE role = 'owner') <> 100
      OR (SELECT actual_amount FROM public.deal_jacket_parties WHERE role = 'shop') <> 30 THEN
     RAISE EXCEPTION 'FAIL: party amounts';
+  END IF;
+END $$;
+-- A late-landing result seeds with notifications suppressed; a fresh one does not suppress.
+INSERT INTO public.auction_events (vehicle_id, outcome, high_bid, auction_end_date) VALUES (gen_random_uuid(), 'sold', 10, now() - interval '3 days');
+DO $$ BEGIN
+  IF (current_setting('test.seed_body')::jsonb->>'suppress_notifications') IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION 'FAIL: backlog seed not suppressed: %', current_setting('test.seed_body');
+  END IF;
+END $$;
+INSERT INTO public.auction_events (vehicle_id, outcome, high_bid, auction_end_date) VALUES (gen_random_uuid(), 'sold', 10, now() - interval '5 minutes');
+DO $$ BEGIN
+  IF (current_setting('test.seed_body')::jsonb->>'suppress_notifications') IS DISTINCT FROM 'false' THEN
+    RAISE EXCEPTION 'FAIL: fresh seed suppressed: %', current_setting('test.seed_body');
+  END IF;
+END $$;
+-- A sale that ended before the deal was opened does not close it.
+INSERT INTO public.deal_jackets (id, vehicle_id, deal_type, created_at) VALUES
+  ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000a2', 'consignment', now());
+INSERT INTO public.auction_events (vehicle_id, outcome, gross_price, auction_end_date)
+VALUES ('00000000-0000-0000-0000-0000000000a2', 'sold', 500, now() - interval '10 days');
+DO $$ BEGIN
+  IF (SELECT sold_date FROM public.deal_jackets WHERE id = '00000000-0000-0000-0000-0000000000d2') IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: an older sale closed a newer deal';
   END IF;
 END $$;
 -- A sold row with only a high bid and no close date still lands.
