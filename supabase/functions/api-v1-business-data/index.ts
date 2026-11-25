@@ -13,6 +13,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { GATE_LINK_COLUMNS, GATE_VEHICLE_COLUMNS, keepReadableOrTiedLinks, type LinkRow } from "./tiedLinks.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -192,50 +193,71 @@ async function getSubmissions(
   };
 }
 
+// organization_vehicle_link_grants through the secret key; a failed call answers null, and the gate drops the row.
+async function linkGrants(vehicleId: string, linker: string | null): Promise<boolean | null> {
+  const { data, error } = await supabase.rpc("organization_vehicle_link_grants", {
+    p_vehicle_id: vehicleId,
+    p_linker: linker,
+  });
+  if (error) {
+    console.error("organization_vehicle_link_grants error:", error.message);
+    return null;
+  }
+  return data === true;
+}
+
+// The organization's links that pass the gate in tiedLinks.ts, read 1,000 at a time (PostgREST's page) up to
+// LINK_PAGES pages. truncated says the organization has more links than were read.
+const LINK_PAGE = 1000;
+const LINK_PAGES = 10;
+async function readGatedLinks(
+  columns: string,
+  vehicleColumns: string,
+  filter: (q: any) => any,
+): Promise<{ rows: any[]; truncated: boolean }> {
+  const rows: any[] = [];
+  for (let page = 0; page < LINK_PAGES; page++) {
+    const from = page * LINK_PAGE;
+    const { data, error } = await filter(
+      supabase
+        .from("organization_vehicles")
+        .select(`${columns}, ${GATE_LINK_COLUMNS}, vehicles:vehicle_id (${vehicleColumns}, ${GATE_VEHICLE_COLUMNS})`),
+    )
+      .order("id", { ascending: true })
+      .range(from, from + LINK_PAGE - 1);
+    if (error) throw error;
+    const got = (data || []) as LinkRow[];
+    rows.push(...(await keepReadableOrTiedLinks(got, linkGrants)));
+    if (got.length < LINK_PAGE) return { rows, truncated: false };
+  }
+  return { rows, truncated: true };
+}
+
 // GET /vehicles - List vehicles in service
 async function getVehicles(
   businessId: string,
   params: URLSearchParams
-): Promise<{ data: any[]; total: number }> {
+): Promise<{ data: any[]; total: number; truncated: boolean }> {
   const status = params.get("status") || "active";
   const serviceStatus = params.get("service_status");
 
-  let query = supabase
-    .from("organization_vehicles")
-    .select(
-      `
-      id,
-      relationship_type,
-      status,
-      service_status,
-      start_date,
-      notes,
-      created_at,
-      vehicles:vehicle_id (
-        id, year, make, model, vin, color
-      )
-    `,
-      { count: "exact" }
-    )
-    .eq("organization_id", businessId);
-
-  if (status !== "all") {
-    query = query.eq("status", status);
-  }
-  if (serviceStatus) {
-    query = query.eq("service_status", serviceStatus);
-  }
-
-  const { data, count, error } = await query;
-
-  if (error) {
-    console.error("getVehicles error:", error);
-    throw error;
-  }
+  // Only links whose car is publicly readable or whose linker is tied to the car (tiedLinks.ts); the total counts
+  // those, never the organization's other links.
+  const { rows, truncated } = await readGatedLinks(
+    "id, relationship_type, status, service_status, start_date, notes, created_at",
+    "id, year, make, model, vin, color",
+    (q) => {
+      q = q.eq("organization_id", businessId);
+      if (status !== "all") q = q.eq("status", status);
+      if (serviceStatus) q = q.eq("service_status", serviceStatus);
+      return q;
+    },
+  );
 
   return {
-    data: data || [],
-    total: count || 0,
+    data: rows,
+    total: rows.length,
+    truncated,
   };
 }
 
@@ -313,11 +335,9 @@ async function getSummary(businessId: string): Promise<any> {
       .eq("business_id", businessId)
       .eq("status", "active"),
 
-    supabase
-      .from("organization_vehicles")
-      .select("*", { count: "exact", head: true })
-      .eq("organization_id", businessId)
-      .eq("service_status", "currently_in_service"),
+    readGatedLinks("id", "id", (q) =>
+      q.eq("organization_id", businessId).eq("service_status", "currently_in_service")
+    ).then(({ rows }) => ({ count: rows.length })),
   ]);
 
   // Get recent activity
