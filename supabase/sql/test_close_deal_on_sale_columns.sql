@@ -1,4 +1,6 @@
 -- Disposable PG17: 20261125084210. A sold auction_events row with the live table's columns (no sale_price, no
+-- guardrail-allow(center-key-fk): auction_events: disposable fixture with the live columns the trigger reads; no vehicles table here
+-- guardrail-allow(center-key-fk): deal_jackets: disposable fixture with the live columns the trigger reads; no vehicles table here
 -- event_date) is written, and an open consignment deal closes at the sale price; non-sold rows pass untouched.
 -- Run from the repo root in an empty database named dm_refinement_<name>. Synthetic rows only.
 \set ON_ERROR_STOP on
