@@ -27,7 +27,7 @@
 --   c. the loop takes condition ids first, in id order, from the (vehicle_id, kind) index (enum compare, not
 --      o.kind::text), and applies observation_is_public and reads the wide columns only for rows in that order until 500
 --      pass, walking at most the first cand_cap ids. cand_cap is the rule row platform_config 'listing_work_plan_read'
---      .condition_candidate_cap (2,000, bounded 500..8,000 in the body; basis in the row). When fewer than 500 pass and
+--      .condition_candidate_cap (1,800, bounded 500..8,000 in the body; basis in the row). When fewer than 500 pass and
 --      the car has more candidates than the cap, the excess is counted in exclusions.condition_candidates_beyond_cap and
 --      gaps gets {family: condition, reason: candidate_cap}. The cap bounds the walk (detoast and public test per row),
 --      not the id scan: prod plans the candidate ids as an index scan of idx_vobs_engagement_contrib (vehicle_id, kind,
@@ -87,9 +87,9 @@ DECLARE
   rate jsonb;
   disc_rows integer := 0;
   cond_rows integer := 0;
-  -- rule row platform_config 'listing_work_plan_read'.condition_candidate_cap, bounded 500..8000, 2000 when absent
+  -- rule row platform_config 'listing_work_plan_read'.condition_candidate_cap, bounded 500..8000, 1800 when absent
   cand_cap integer := COALESCE((SELECT LEAST(GREATEST((c.config_value->>'condition_candidate_cap')::integer, 500), 8000)
-    FROM public.platform_config c WHERE c.config_key = 'listing_work_plan_read' AND c.config_value->>'condition_candidate_cap' ~ '^[0-9]{1,6}$'), 2000);
+    FROM public.platform_config c WHERE c.config_key = 'listing_work_plan_read' AND c.config_value->>'condition_candidate_cap' ~ '^[0-9]{1,6}$'), 1800);
   cand_total integer;
   identity_blocks boolean;
   tokens text[];
@@ -461,14 +461,18 @@ END $fn$;
 
 -- The candidate cap's rule row. Basis (prod, read-only EXPLAIN ANALYZE of the capped statement, 2026-11-25 03:45 PT):
 -- 1,024 candidates walked to pass 500 on a public car took 4,167 ms cold and 2,938 ms warm (10,484 buffers), i.e. 2.9 to
--- 4.1 ms per walked row; earlier warm walks measured 1.0 to 1.8 ms. 2,000 walked rows are 2.0 to 8.2 s of anon's 15 s
--- statement_timeout. A reviewed row change retunes it.
+-- 4.1 ms per walked row; earlier warm walks measured 1.0 to 1.8 ms. One run each on the live primary under its normal
+-- traffic, not an isolated benchmark. Rule: the worst cold read at the cap stays within half of anon's 15 s
+-- statement_timeout, so 7,500 ms / 4.1 ms = 1,829 rows, rounded down to 1,800. A reviewed row change retunes it.
 INSERT INTO public.platform_config (config_key, config_value, description)
 VALUES ('listing_work_plan_read',
-        jsonb_build_object('condition_candidate_cap', 2000,
-          'basis', 'condition walk 1.0-4.1 ms per walked candidate row on prod (read-only EXPLAIN ANALYZE 2026-11-25: 1024 rows 2938 ms warm, 4167 ms cold); 2000 rows = 2.0-8.2 s of anon''s 15 s statement_timeout',
+        jsonb_build_object('condition_candidate_cap', 1800,
+          'rule', 'worst cold read at the cap <= half of anon''s 15 s statement_timeout (7500 ms)',
+          'measured_at', '2026-11-25T03:45:00-08:00', 'rows_walked', 1024, 'cold_ms', 4167, 'warm_ms', 2938, 'buffers', 10484,
+          'load', 'one run each on the live primary under its normal traffic; not an isolated benchmark',
+          'basis', 'worst cold 4167 ms / 1024 rows = 4.1 ms per walked row; 7500 / 4.1 = 1829, rounded down to 1800',
           'bounds', jsonb_build_array(500, 8000), 'migration', '20261125233000'),
-        'listing_work_plan_read: candidate condition ids walked per call (bounded 500..8000 in the reader; 2000 when absent). Ids past the cap are counted in exclusions.condition_candidates_beyond_cap.')
+        'listing_work_plan_read: candidate condition ids walked per call (bounded 500..8000 in the reader; 1800 when absent). Ids past the cap are counted in exclusions.condition_candidates_beyond_cap.')
 ON CONFLICT (config_key) DO NOTHING;
 
 -- The body restates the vehicle_images read policy (shown, uploader, tied); register the copy so the hourly watch

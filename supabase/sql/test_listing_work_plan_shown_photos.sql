@@ -72,6 +72,8 @@ INSERT INTO vehicles VALUES ('10000000-0000-0000-0000-000000000001', 1979, 'Chev
   true, NULL, NULL, 'Private Seller Name'),
  ('10000000-0000-0000-0000-000000000003', 1978, 'Chevrolet', 'C10', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
   'https://bringatrailer.com/listing/1978-chevrolet-c10-fixture/', NULL, NULL, 'A truck with many condition rows.', true, NULL, NULL, NULL),
+ ('10000000-0000-0000-0000-000000000004', 1977, 'Chevrolet', 'C20', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  'https://bringatrailer.com/listing/1977-chevrolet-c20-fixture/', NULL, NULL, 'A truck whose rows were stored newest first.', true, NULL, NULL, NULL),
  ('10000000-0000-0000-0000-000000000002', 1980, 'Ford', 'F-150', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Hidden truck.', false, NULL, NULL, NULL);
 INSERT INTO description_discoveries VALUES
  ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','2026-01-01','m1','v3','{"error":"timeout"}'),
@@ -99,6 +101,12 @@ INSERT INTO vehicle_observations(id, vehicle_id, subject_type, kind, source_url,
 SELECT ('41000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid, '10000000-0000-0000-0000-000000000003', 'vehicle', 'condition', NULL, '2026-01-03', '2026-01-03',
        'rubric_v1', 0.5, NULL, jsonb_build_object('rubric', true, 'known_issues', jsonb_build_array('Worn trim piece ' || n)) || CASE WHEN n % 3 = 0 THEN '{"private":"true"}'::jsonb ELSE '{}'::jsonb END
 FROM generate_series(1, 900) n;
+-- Car 4: 700 public condition rows (two pages of 500), inserted highest id first, so heap order is the reverse of id order.
+INSERT INTO vehicle_observations(id, vehicle_id, subject_type, kind, source_url, observed_at, ingested_at, extraction_method, confidence_score, content_text, structured_data)
+SELECT ('42000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid, '10000000-0000-0000-0000-000000000004', 'vehicle', 'condition', NULL, '2026-01-03', '2026-01-03',
+       'rubric_v1', 0.5, NULL, jsonb_build_object('rubric', true, 'known_issues', jsonb_build_array('Chipped trim ' || n))
+FROM generate_series(700, 1, -1) n;
+ANALYZE vehicle_observations;
 INSERT INTO labor_operations VALUES ('PAINT-COMPLETE-PANEL','Complete paint per panel',4,'paint',NULL,NULL),('MECH-BRAKES-FRONT','Front brakes',2,'brakes',NULL,NULL),
  ('MECH-BRAKES-REAR','Rear brakes',2,'brakes',NULL,NULL),('MECH-BRAKES-ALL','All brakes',4,'brakes',NULL,NULL),('ELEC-GAUGES','Gauges',3,'electrical',1960,1990),
  ('INT-DASH-RR','Dash pad',3,'interior',NULL,NULL),('EXH-MUFFLER-RR','Muffler',1.5,'exhaust',NULL,NULL),('BODY-DENT-SMALL','Small dent',1,'body',NULL,NULL);
@@ -207,15 +215,17 @@ SELECT t_assert((:'tied_read'::jsonb->>'hidden_claims')::int = 1 AND (:'tied_rea
 COMMIT;
 
 -- The candidate cap (rule row) and the walk order, on car 3 (900 candidates, 600 public).
-SELECT t_assert((SELECT (config_value->>'condition_candidate_cap')::int = 2000 FROM platform_config WHERE config_key = 'listing_work_plan_read'),
-  'rule row: condition_candidate_cap 2000');
+SELECT t_assert((SELECT (config_value->>'condition_candidate_cap')::int = 1800 AND config_value->>'rule' IS NOT NULL
+                  AND (config_value->>'rows_walked')::int = 1024 AND (config_value->>'cold_ms')::int = 4167
+                  FROM platform_config WHERE config_key = 'listing_work_plan_read'),
+  'rule row: condition_candidate_cap 1800 with its basis keys');
 SELECT t_assert((SELECT recorded_hash = '3af9ebbc1bebf423e3bd1e0b7c45a194' AND owner_lane = 'ta-policies' FROM private_row_policy_copies
                   WHERE reader = 'listing_work_plan_read(uuid)' AND relation = 'vehicle_images'), 'policy copy registered');
 BEGIN; SET LOCAL ROLE anon;
 SELECT t_big() AS big \gset
-SELECT t_assert((:'big'::jsonb->>'fetched')::int = 500 AND (:'big'::jsonb->>'cap')::int = 2000 AND (:'big'::jsonb->>'beyond')::int = 0
+SELECT t_assert((:'big'::jsonb->>'fetched')::int = 500 AND (:'big'::jsonb->>'cap')::int = 1800 AND (:'big'::jsonb->>'beyond')::int = 0
   AND NOT (:'big'::jsonb->>'cap_gap')::boolean AND :'big'::jsonb->'refs' = :'before_big'::jsonb->'refs',
-  'cap 2000: the same 500 rows, in the same id order, as the old body');
+  'cap 1800: the same 500 rows, in the same id order, as the old body');
 COMMIT;
 UPDATE platform_config SET config_value = jsonb_set(config_value, '{condition_candidate_cap}', '600') WHERE config_key = 'listing_work_plan_read';
 BEGIN; SET LOCAL ROLE anon;
@@ -232,19 +242,35 @@ SELECT t_assert((:'big'::jsonb->>'cap')::int = 500 AND (:'big'::jsonb->>'fetched
 COMMIT;
 UPDATE platform_config SET config_value = jsonb_set(config_value, '{condition_candidate_cap}', '"lots"') WHERE config_key = 'listing_work_plan_read';
 BEGIN; SET LOCAL ROLE anon;
-SELECT t_assert((t_big()->>'cap')::int = 2000, 'a malformed cap reads as 2000, never an error');
+SELECT t_assert((t_big()->>'cap')::int = 1800, 'a malformed cap reads as 1800, never an error');
 COMMIT;
 DELETE FROM platform_config WHERE config_key = 'listing_work_plan_read';
 BEGIN; SET LOCAL ROLE anon;
-SELECT t_assert((t_big()->>'cap')::int = 2000 AND (t_big()->>'fetched')::int = 500, 'no rule row: 2000');
+SELECT t_assert((t_big()->>'cap')::int = 1800 AND (t_big()->>'fetched')::int = 500, 'no rule row: 1800');
 COMMIT;
+
+-- The claim page is ordered by id, not by the join's output. A fresh session (no cached plan) with nested-loop and merge
+-- joins off makes the join hash the capped id list and return rows in heap order, which on car 4 is highest id first.
+-- Page one must still be ids 1..500 ascending, and nothing from page two (501..700).
+\c
+SET enable_nestloop = off;
+SET enable_mergejoin = off;
+BEGIN; SET LOCAL ROLE anon;
+SELECT set_config('request.jwt.claims', '{"role":"anon"}', true);
+SELECT t_assert((SELECT jsonb_agg(c#>>'{source,ref}' ORDER BY o) FROM jsonb_array_elements(public.listing_work_plan_read('10000000-0000-0000-0000-000000000004')->'claims')
+                   WITH ORDINALITY x(c, o) WHERE c#>>'{source,table}' = 'vehicle_observations')
+                = (SELECT jsonb_agg('vehicle_observations:42000000-0000-0000-0000-' || lpad(n::text, 12, '0') ORDER BY n) FROM generate_series(1, 500) n),
+  'two pages, heap order reversed, hash join: page one is ids 1..500 in id order');
+COMMIT;
+RESET enable_nestloop;
+RESET enable_mergejoin;
 
 BEGIN; SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claims', '{"role":"anon"}', true);
 SELECT t_assert(t_refused($q$SELECT listing_work_plan_read('10000000-0000-0000-0000-000000000002')$q$), 'non-public vehicle still refused');
 COMMIT;
 
-INSERT INTO platform_config(config_key, config_value) VALUES ('listing_work_plan_read', '{"condition_candidate_cap":2000}');
+INSERT INTO platform_config(config_key, config_value) VALUES ('listing_work_plan_read', '{"condition_candidate_cap":1800}');
 \ir revert_20261125233000_listing_work_plan_shown_photos.sql
 SELECT t_assert(NOT EXISTS (SELECT 1 FROM platform_config WHERE config_key = 'listing_work_plan_read')
   AND NOT EXISTS (SELECT 1 FROM private_row_policy_copies WHERE reader = 'listing_work_plan_read(uuid)'),
