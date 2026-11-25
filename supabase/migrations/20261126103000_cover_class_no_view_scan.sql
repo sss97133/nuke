@@ -19,7 +19,7 @@
 --      vehicle_image_scan_metadata (20261125200000) states: the caller uploaded the photo, or it is not sensitive, on a
 --      public non-deleted car and gallery-eligible (vehicle_image_gallery_eligible over the base row), or the caller is
 --      tied (vehicle_viewer_tied: owner fields, access rows, service_role); otherwise NULL. Every term is COALESCEd.
---      Registered in private_row_policy_copies (vehicle_images, 3af9ebbc...) as that reader is.
+--      Registered in private_row_policy_copies (vehicle_images, d00a311f..., checked live) as that reader is.
 --   2. get_first_image_batch: an anchored edit replaces the one garage_cover_class(... vi.ai_scan_metadata ...) call with
 --      vehicle_image_cover_class(vi.id). The call sits inside the existing CASE, so it runs only for approved frames no
 --      cheap reading places elsewhere; the ranked query no longer names the view's ai_scan_metadata, so the planner
@@ -80,12 +80,20 @@ GRANT EXECUTE ON FUNCTION public.vehicle_image_cover_class(uuid) TO anon, authen
 COMMENT ON FUNCTION public.vehicle_image_cover_class(uuid) IS
   'Whole-car cover class (garage_cover_class) of one photo from its own row; NULL unless the caller uploaded it, it is shown (gallery-eligible, not sensitive) on a public non-deleted car, or the caller is tied. Returns no reading text. 20261126103000.';
 
+-- The read policies this helper restates must be the ones it was written against: vehicle_images SELECT/ALL policies
+-- hash d00a311f... on production since #3971 (20261125 05:25 PT). Any other live hash stops the migration, so the
+-- registry never records a hash the drift watch would flag on its first run.
 DO $reg$
+DECLARE v_live text;
 BEGIN
   IF to_regclass('public.private_row_policy_copies') IS NOT NULL THEN
+    SELECT h.policy_hash INTO v_live FROM public.private_row_policy_hash('vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')') h;
+    IF v_live IS DISTINCT FROM 'd00a311fd7235bb19240f3fd812493c4' THEN
+      RAISE EXCEPTION 'vehicle_images read policies hash % live; vehicle_image_cover_class restates d00a311f...: re-read them before applying', v_live;
+    END IF;
     EXECUTE $i$INSERT INTO public.private_row_policy_copies (reader, relation, policy_filter, recorded_hash, owner_lane, note)
       VALUES ('vehicle_image_cover_class(uuid)', 'vehicle_images', 'p.cmd IN (''SELECT'', ''ALL'')',
-              '3af9ebbc1bebf423e3bd1e0b7c45a194', 'ta-policies',
+              'd00a311fd7235bb19240f3fd812493c4', 'ta-policies',
               '20261126103000 restates the vehicle_images read policy (shown, uploader, tied) before returning a photo''s cover class')
       ON CONFLICT (reader, relation, policy_filter) DO NOTHING$i$;
   END IF;

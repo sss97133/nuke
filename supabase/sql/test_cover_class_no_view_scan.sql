@@ -8,11 +8,13 @@
 --     runs only for the row the admission step reads (1), not for every candidate.
 --   * vehicle_image_cover_class: the class from the photo's stored reading for a shown photo on a public car; NULL to
 --     anon for a photo on a private car, a sensitive photo, a photo the gallery hides and a photo on a deleted car; the
---     owner (tied) and the uploader read theirs; registered as a policy copy.
+--     owner (tied) and the uploader read theirs; registered as a policy copy at the live vehicle_images policy hash
+--     (d00a311f..., since #3971); with any other live hash the migration stops and applies nothing.
 --   * Definer, search_path, grants; a second apply is a no-op; the revert restores the live body (md5) and drops the
 --     helper.
 -- Which assertion fails if the fix is removed: "after, #3935 view: anon's cover reads the reader once, not per
--- candidate" (and "after, #3935 view: the cover is the front three-quarter frame").
+-- candidate" (and "after, #3935 view: the cover is the front three-quarter frame"); the live-hash check removed ->
+-- "another live vehicle_images policy hash" (scratchpad cover_mut.py, 12 of 12 killed).
 -- Fixture rows only, in a disposable database. -- ALLOW_RAW_TESTIMONY_WRITE
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -62,6 +64,9 @@ CREATE FUNCTION public.vehicle_image_gallery_eligible(r public.vehicle_images) R
 -- The policy-copy registry of #3925 (live shape 2026-11-25).
 CREATE TABLE public.private_row_policy_copies(reader text NOT NULL, relation text NOT NULL, policy_filter text NOT NULL,
   recorded_hash text NOT NULL, owner_lane text NOT NULL, note text, PRIMARY KEY (reader, relation, policy_filter));
+-- Its live hash function, stubbed: answers the hash set in test.vi_policy_hash (the fixture's policies are not prod's).
+CREATE FUNCTION public.private_row_policy_hash(p_relation text, p_policy_filter text) RETURNS TABLE (policy_hash text, policies int)
+LANGUAGE sql STABLE AS $$ SELECT current_setting('test.vi_policy_hash', true), 1 $$;
 -- Tied stub: the owner fields, or service_role (the live body also reads access rows).
 CREATE FUNCTION public.vehicle_viewer_tied(p_vehicle_id uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT CASE WHEN auth.role() = 'service_role' THEN true WHEN auth.uid() IS NULL THEN false
@@ -175,6 +180,15 @@ SELECT public.t_assert(public.t_get('b_3935_calls')::int = 43 AND public.t_get('
 
 -- The migration, applied over the live view shape, then again (a no-op).
 SELECT public.t_view('live');
+-- Another live policy hash (the pre-#3971 one): the migration stops and applies nothing.
+SELECT set_config('test.vi_policy_hash', '3af9ebbc1bebf423e3bd1e0b7c45a194', false);
+\set ON_ERROR_STOP 0
+\ir ../migrations/20261126103000_cover_class_no_view_scan.sql
+\set ON_ERROR_STOP 1
+SELECT public.t_assert(to_regprocedure('public.vehicle_image_cover_class(uuid)') IS NULL
+  AND NOT EXISTS (SELECT 1 FROM public.private_row_policy_copies),
+  'another live vehicle_images policy hash: the migration applies nothing (no helper, no registry row)');
+SELECT set_config('test.vi_policy_hash', 'd00a311fd7235bb19240f3fd812493c4', false);
 \ir ../migrations/20261126103000_cover_class_no_view_scan.sql
 \ir ../migrations/20261126103000_cover_class_no_view_scan.sql
 SELECT public.t_assert(
@@ -230,7 +244,7 @@ SELECT public.t_assert(:'h_deleted' = 'null', 'helper: a photo on a deleted publ
 SELECT public.t_assert(:'h_sens' = 'null' AND :'h_none' = 'null', 'helper: a sensitive photo and an unknown id give NULL');
 SELECT public.t_assert(:'h_hidden' = 'null' AND :'h_uploader_hidden' <> 'null',
   'helper: a photo the gallery hides on a public car has no class for anon; its uploader reads it');
-SELECT public.t_assert((SELECT recorded_hash = '3af9ebbc1bebf423e3bd1e0b7c45a194' AND owner_lane = 'ta-policies' FROM public.private_row_policy_copies
+SELECT public.t_assert((SELECT recorded_hash = 'd00a311fd7235bb19240f3fd812493c4' AND owner_lane = 'ta-policies' FROM public.private_row_policy_copies
                         WHERE reader = 'vehicle_image_cover_class(uuid)' AND relation = 'vehicle_images'), 'helper registered as a policy copy');
 
 -- The revert restores the live body (its own md5 check) and drops the helper; the defect is back.
