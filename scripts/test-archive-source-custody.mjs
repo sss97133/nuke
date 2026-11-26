@@ -58,6 +58,7 @@ const sources = new Map([
   ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
   ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['catalogSupply',compile('../supabase/functions/ingest-observation/catalogSupply.ts')],
   ['financialEvidence',compile('../supabase/functions/ingest-observation/financialEvidence.ts')],
   ['financialDelegation',compile('../supabase/functions/ingest-observation/financialDelegation.ts')],
   ['financialProcessing',compile('../supabase/functions/ingest-observation/financialProcessing.ts')],
@@ -275,6 +276,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/observationWriter.ts')return {writeObservation:()=>assert.fail('No testimony write')};
         if(specifier==='../_shared/urlNormalization.ts')return {normalizeListingUrl:value=>value,normalizeVin:value=>value};
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
+        if(specifier==='./catalogSupply.ts')return load('catalogSupply');
         if(specifier==='./imageProperties.ts')return load('property');
         if(specifier==='./componentEvidence.ts')return load('componentEvidence');
         if(specifier==='../_shared/mccormickParser.ts')return load('mccormickParser');

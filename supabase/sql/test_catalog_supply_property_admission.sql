@@ -23,8 +23,9 @@ CREATE TABLE public.observation_sources(id uuid PRIMARY KEY DEFAULT gen_random_u
  base_trust_score numeric,supported_observations public.observation_kind[],notes text);
 CREATE TABLE public.catalog_sources(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),base_url text);
 CREATE TABLE public.catalog_parts(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),catalog_id uuid REFERENCES public.catalog_sources(id),part_number text,supplier_url text);
-CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),source_id uuid,kind text,vehicle_id uuid,subject_type text,subject_id uuid,
- source_observation_id uuid,source_url text,source_identifier text,observed_at timestamptz,extraction_method text,raw_source_ref text,content_text text,
+CREATE TABLE public.vehicles(id uuid PRIMARY KEY);
+CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),source_id uuid,kind text,vehicle_id uuid REFERENCES public.vehicles(id),subject_type text,subject_id uuid,
+ source_observation_id uuid REFERENCES public.vehicle_observations(id),source_url text,source_identifier text,observed_at timestamptz,extraction_method text,raw_source_ref text,content_text text,
  confidence_score numeric,analysis_deferred boolean,is_superseded boolean DEFAULT false,superseded_by uuid,superseded_at timestamptz,
  citation_document_id uuid,citation_page_number int,citation_excerpt text,structured_data jsonb,content_hash text UNIQUE,
  ingested_at timestamptz DEFAULT statement_timestamp(),is_processed boolean DEFAULT false,processed_at timestamptz);
