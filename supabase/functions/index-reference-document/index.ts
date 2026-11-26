@@ -9,7 +9,7 @@ import { enrichReceiptProducts } from './receiptProducts.ts';
 import { isServiceCaller, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from '../_shared/geminiGuard.ts';
-import { recordSuppliedReference, ReferenceError, sha256 } from './suppliedReference.ts';
+import { recordSuppliedDocument, recordSuppliedReference, ReferenceError, sha256 } from './suppliedReference.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,9 +31,10 @@ Deno.serve(async (req) => {
     )
 
     const body = await req.json();
-    if (body.mode === 'supplied_reference') {
+    if (body.mode === 'supplied_reference' || body.mode === 'supplied_document') {
       try {
-        const result = await recordSuppliedReference(body, {
+        const record = body.mode === 'supplied_document' ? recordSuppliedDocument : recordSuppliedReference;
+        const result = await record(body, {
           authorize: () => isServiceCaller(req),
           async retain(bytes, hash) {
             const storage = supabase.storage.from('reference-docs');

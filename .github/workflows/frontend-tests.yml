@@ -48,6 +48,8 @@ jobs:
           supabase/functions/ingest-observation/financialPngPixels.test.ts
           supabase/functions/ingest-observation/batLiveCollector.test.ts
           supabase/functions/transfer-advance/partyGate_test.ts
+          supabase/functions/index-reference-document/suppliedReference.test.ts
+          supabase/functions/index-reference-document/suppliedReferenceHandler.test.ts
       - name: Install native source-processing build dependencies
         timeout-minutes: 12
         run: |

@@ -1,4 +1,4 @@
-/** Retain an already reviewed public reference; no model, fetcher or vehicle filing. */
+/** Retain already reviewed public documents; assembly projection is a separate explicit mode. */
 export const REFERENCE_METHOD = 'supplied_reference_assembly_v1';
 export const MAX_REFERENCE_BYTES = 6 * 1024 * 1024;
 type Obj = Record<string, any>;
@@ -20,12 +20,10 @@ function canonical(value: unknown): string {
   if (object(value)) return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + canonical(value[k])).join(',') + '}';
   return JSON.stringify(value);
 }
-export async function validateReference(input: unknown, now = Date.now()) {
-  check(object(input), 'reference_object_required');
-  keys(input, ['mode', 'document', 'pages', 'assembly', 'reader', 'reviewed_at']);
-  check(input.mode === 'supplied_reference', 'reference_mode_required');
-  const d = input.document, a = input.assembly;
-  check(object(d) && object(a) && object(input.reader), 'reference_contract_required');
+/** The shared source contract: custody and cited pages, with no assembly assertion. */
+async function validateDocumentSource(input: Obj, now: number) {
+  const d = input.document;
+  check(object(d) && object(input.reader), 'reference_contract_required');
   keys(d, ['title', 'category', 'source_url', 'pdf_sha256', 'pdf_base64', 'page_count', 'retrieved_day', 'retrieved_at']);
   check(text(d.title) && ['parts_catalog', 'service_manual', 'component_drawing', 'component_datasheet'].includes(d.category), 'reference_document_invalid');
   check(text(d.source_url, 2048), 'reference_source_invalid');
@@ -52,6 +50,32 @@ export async function validateReference(input: unknown, now = Date.now()) {
       && text(p.printed_label, 250) && text(p.extracted_text, 20000) && typeof p.has_diagrams === 'boolean', 'reference_page_invalid');
     pages.set(p.page_number, p);
   }
+  check(typeof d.pdf_base64 === 'string' && d.pdf_base64.length <= Math.ceil(MAX_REFERENCE_BYTES / 3) * 4
+    && /^[A-Za-z0-9+/]+={0,2}$/.test(d.pdf_base64), 'reference_pdf_size_or_encoding');
+  let binary: string;
+  try { binary = atob(d.pdf_base64); } catch { throw new ReferenceError('reference_pdf_encoding'); }
+  check(binary.length >= 8 && binary.length <= MAX_REFERENCE_BYTES && binary.startsWith('%PDF-'), 'reference_pdf_invalid');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  check(await sha256(bytes) === d.pdf_sha256, 'reference_pdf_hash_mismatch');
+  const document = { ...d }; delete document.pdf_base64;
+  return { document, pages: [...pages.values()].sort((a, b) => a.page_number - b.page_number),
+    reader: input.reader, reviewed_at: input.reviewed_at, bytes };
+}
+export async function validateSuppliedDocument(input: unknown, now = Date.now()) {
+  check(object(input), 'reference_object_required');
+  keys(input, ['mode', 'document', 'pages', 'reader', 'reviewed_at']);
+  check(input.mode === 'supplied_document', 'reference_mode_required');
+  return await validateDocumentSource(input, now);
+}
+export async function validateReference(input: unknown, now = Date.now()) {
+  check(object(input), 'reference_object_required');
+  keys(input, ['mode', 'document', 'pages', 'assembly', 'reader', 'reviewed_at']);
+  check(input.mode === 'supplied_reference', 'reference_mode_required');
+  const a = input.assembly;
+  check(object(a), 'reference_contract_required');
+  const source = await validateDocumentSource(input, now);
+  const pages = new Map<number, Obj>(source.pages.map(p => [p.page_number, p]));
   keys(a, ['name', 'category', 'description', 'scope', 'application', 'positions', 'exclusions', 'limitations']);
   check(text(a.name, 100) && /^[a-z][a-z0-9_]*$/.test(a.name) && text(a.category, 50)
     && text(a.description, 1000) && text(a.scope, 1000), 'reference_assembly_invalid');
@@ -87,34 +111,38 @@ export async function validateReference(input: unknown, now = Date.now()) {
         && pages.get(ref.page_number)!.extracted_text.includes(ref.excerpt), 'reference_citation_invalid');
     }
   }
-  check(typeof d.pdf_base64 === 'string' && d.pdf_base64.length <= Math.ceil(MAX_REFERENCE_BYTES / 3) * 4
-    && /^[A-Za-z0-9+/]+={0,2}$/.test(d.pdf_base64), 'reference_pdf_size_or_encoding');
-  let binary: string;
-  try { binary = atob(d.pdf_base64); } catch { throw new ReferenceError('reference_pdf_encoding'); }
-  check(binary.length >= 8 && binary.length <= MAX_REFERENCE_BYTES && binary.startsWith('%PDF-'), 'reference_pdf_invalid');
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  check(await sha256(bytes) === d.pdf_sha256, 'reference_pdf_hash_mismatch');
-  const document = { ...d }; delete document.pdf_base64;
   const assemblyHash = await sha256(new TextEncoder().encode(canonical(a)));
-  return { document, pages: [...pages.values()].sort((a, b) => a.page_number - b.page_number), assembly: a,
-    reader: input.reader, reviewed_at: input.reviewed_at, bytes, assemblyHash };
+  return { ...source, assembly: a, assemblyHash };
 }
-export interface ReferenceDeps {
+export interface DocumentCustodyDeps {
   authorize(): Promise<boolean>;
   retain(bytes: Uint8Array, hash: string): Promise<void>;
   record(document: Obj, pages: Obj[], reader: Obj, reviewedAt: string): Promise<Obj>;
+  now?: number;
+}
+export interface ReferenceDeps extends DocumentCustodyDeps {
   ingest(observation: Obj): Promise<Obj>;
   project(observationId: string): Promise<Obj>;
-  now?: number;
+}
+async function persistDocument(source: Awaited<ReturnType<typeof validateDocumentSource>>, deps: DocumentCustodyDeps) {
+  await deps.retain(source.bytes, source.document.pdf_sha256);
+  const doc = await deps.record(source.document, source.pages, source.reader, source.reviewed_at);
+  check(doc?.success === true && /^[0-9a-f-]{36}$/.test(doc.document_id) && doc.file_hash === source.document.pdf_sha256
+    && typeof doc.reference_revision === 'string', 'reference_document_not_persisted', 502);
+  return doc;
+}
+/** Retains only source custody; never emits a property, vehicle or assembly claim. */
+export async function recordSuppliedDocument(input: unknown, deps: DocumentCustodyDeps) {
+  check(await deps.authorize(), 'reference_service_required', 403);
+  const source = await validateSuppliedDocument(input, deps.now);
+  const doc = await persistDocument(source, deps);
+  return { success: true, document_id: doc.document_id, file_hash: doc.file_hash,
+    reference_revision: doc.reference_revision, duplicate: doc.duplicate === true, custody_only: true, model_calls: 0 };
 }
 export async function recordSuppliedReference(input: unknown, deps: ReferenceDeps) {
   check(await deps.authorize(), 'reference_service_required', 403);
   const v = await validateReference(input, deps.now);
-  await deps.retain(v.bytes, v.document.pdf_sha256);
-  const doc = await deps.record(v.document, v.pages, v.reader, v.reviewed_at);
-  check(doc?.success === true && /^[0-9a-f-]{36}$/.test(doc.document_id) && doc.file_hash === v.document.pdf_sha256
-    && typeof doc.reference_revision === 'string', 'reference_document_not_persisted', 502);
+  const doc = await persistDocument(v, deps);
   const first = v.assembly.positions[0].source_refs[0];
   const observation = {
     source_slug: 'component-maker-documentation', kind: 'specification', source_url: v.document.source_url,
