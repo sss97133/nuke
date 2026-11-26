@@ -1,6 +1,10 @@
 -- Pure operating-point kernel for the existing harness-model compute family.
 -- Caller input is a conditional simulation, not a qualified vehicle/source row.
 -- No artificial leakage, implicit ground, guessed resistance or auto-tripping fuse.
+BEGIN;
+SET LOCAL statement_timeout='10s';
+SET LOCAL lock_timeout='2s';
+
 CREATE OR REPLACE FUNCTION public.harness_model_dc_compute(p_input jsonb)
 RETURNS jsonb LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE SECURITY INVOKER
 SET search_path=public SET extra_float_digits=3
@@ -393,3 +397,4 @@ COMMENT ON FUNCTION public.harness_model_dc_compute(jsonb) IS
 'Pure bounded linear DC operating-point helper in the harness-model compute family. Explicit scenario nodes/branches/reference; resistor, open/closed finite-R contact, independent V/I source. SI units V/A/ohm/W; signed flow from_node to to_node and absorbed power positive. MNA/partial pivoting with KCL, source-voltage and power residual checks. At most64 nodes/128 elements/16 ideal voltage sources/256KiB. Decimal accumulation and72-place elimination; session-independent output. Numerical domain R[1e-9,1e12]ohm, absolute source[0,1e6]V/A, at most24fractional places; these are solver bounds, never engineering limits. Unvalidated inputs have null input_hash; render/hash only after scalar/count bounds. Unbound state/parameter, floating island, dependent/conflicting ideal sources and unstable solve return no results. No implicit ground/leakage/zero resistance or physical release. Optional {model,scenario} envelope binds exact evaluated piece/termination/node keys with matching evaluation/snapshot identity, explicit conditional wire/device inputs and assumed-open boundaries; undeclared inputs hold. It covers only the selected sheet, cannot establish external network completeness or caller model currentness, and reports those limits. Assumed-open boundary means no additional modeled device at that port; it never severs an existing node or conductor. input_hash then covers only the compiled DC network; model identity and scenario ID remain separate fields. Caller scenario is conditional input, not sanctioned source admission; no table access or public harness reader replacement.';
 REVOKE ALL ON FUNCTION public.harness_model_dc_compute(jsonb) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.harness_model_dc_compute(jsonb) TO service_role;
+COMMIT;
