@@ -1,5 +1,7 @@
 # Receipt: the DC primary cables sized from physics; the "2 or 4 AWG" question closed
 
+**Status correction, 2026-11-26:** this receipt preserves the September study and its authored selections. Its title and historical pass results do not close present engineering, cut or order approval. Missing lengths, a fuse recommendation used as operating load, and unqualified thermal applicability remain unresolved. See the [dated source review](../research/2026-11-26_thermal-source-custody.md), [historical calculation status](../calc-data/CABLE_SIZING.md) and [status correction receipt](2026-11-26_primary-calculation-status.md). The original inputs and results below are retained as historical evidence.
+
 - **Date:** 2026-09-28 (night)
 - **Change type:** design (registry rows via `calc-data/cable_sizing_v5.py` → `cable_decisions.json` → `reconcile_v5.py`)
 - **Amends:** `receipts/2026-09-28_registry-corrections-from-reviews.md` (PDM15 feed 4 AWG → 2 AWG), state §1 row
