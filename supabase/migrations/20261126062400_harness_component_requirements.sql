@@ -258,7 +258,12 @@ splice_end_edges AS MATERIALIZED (
  SELECT sp.id AS splice_id,ed.*,mp.circuit_id IS NOT NULL AS declared_member
  FROM sp JOIN edges ed ON ed.endpoint_id=sp.endpoint_id
  JOIN t ON t.id=ed.termination_id
- LEFT JOIN member_pairs mp ON mp.splice_id=sp.id AND mp.circuit_id=ed.circuit_id WHERE sp.placement<>'at_pin' OR t.material_cavity=sp.cavity),
+ LEFT JOIN member_pairs mp ON mp.splice_id=sp.id AND mp.circuit_id=ed.circuit_id
+ WHERE sp.placement<>'at_pin' OR (t.material_cavity=sp.cavity AND
+  (mp.circuit_id IS NOT NULL OR NOT EXISTS (
+   SELECT FROM sp sibling JOIN member_pairs own ON own.splice_id=sibling.id
+   WHERE sibling.placement='at_pin' AND sibling.endpoint_id=sp.endpoint_id AND sibling.cavity=sp.cavity
+    AND own.circuit_id=ed.circuit_id)))),
 member_reach AS MATERIALIZED (
  SELECT sm.id,sm.splice_id,sm.circuit_id,c.id IS NOT NULL AS selected_circuit,
  count(DISTINCT s.id)>0 AS modeled,count(DISTINCT se.termination_id)>0 AS reaches
@@ -575,7 +580,12 @@ BEGIN
   WHERE s.id=NEW.segment_id AND s.vehicle_custom_circuit_id=NEW.circuit_id
    AND t.id IN(s.from_termination_id,s.to_termination_id)
    AND (q.termination_id=t.id OR q.endpoint_id=t.endpoint_id OR (sp.endpoint_id=t.endpoint_id
-     AND (sp.placement<>'at_pin' OR sp.cavity=regexp_replace(btrim(t.cavity),'^([A-Za-z]+)_?0*([0-9]+)$','\1\2'))))) THEN
+     AND (sp.placement<>'at_pin' OR (sp.cavity=regexp_replace(btrim(t.cavity),'^([A-Za-z]+)_?0*([0-9]+)$','\1\2')
+      AND (EXISTS(SELECT FROM public.harness_splice_members own WHERE own.splice_id=sp.id AND own.circuit_id=NEW.circuit_id)
+       OR NOT EXISTS(SELECT FROM public.harness_splices sibling JOIN public.harness_splice_members own ON own.splice_id=sibling.id
+        WHERE sibling.vehicle_id=sp.vehicle_id AND sibling.endpoint_id=sp.endpoint_id AND sibling.placement='at_pin'
+         AND sibling.cavity=sp.cavity AND NOT coalesce(sibling.is_superseded,false) AND sibling.superseded_by IS NULL
+         AND own.circuit_id=NEW.circuit_id))))))) THEN
   RAISE EXCEPTION 'component contributor is not the recorded physical owner edge' USING ERRCODE='23514';
  END IF;
  END IF;

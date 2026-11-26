@@ -1,6 +1,27 @@
 -- Disposable PostgreSQL17 only; parent contract enforces that boundary.
 \set ON_ERROR_STOP on
-\i supabase/sql/test_harness_contact_end_accounting.sql
+-- Reuse source/schema bootstrap without repeating the parent contracts'500-piece
+-- scale and adversarial assays here. CI still runs every parent contract.
+\i supabase/sql/helpers/harness_model_evaluation_setup.sql
+-- The source-reader contract ends with a deliberate RLS denial. Restore the
+-- same public source policy as the complete evaluation contract.
+DROP POLICY reader_contract_deny_segments ON public.harness_segments;
+CREATE POLICY "Public read for public vehicles" ON public.harness_segments FOR SELECT USING (
+ EXISTS(SELECT FROM public.vehicles v WHERE v.id=harness_segments.vehicle_id
+  AND (v.is_public IS TRUE OR v.user_id=auth.uid() OR v.owner_id=auth.uid())));
+SELECT set_config('test.auth_uid','',false),set_config('test.auth_jwt','{}',false);
+ALTER TABLE public.vehicles ADD COLUMN year integer, ADD COLUMN make text, ADD COLUMN model text, ADD COLUMN license_plate text;
+REVOKE SELECT ON public.vehicles FROM anon;
+GRANT SELECT(id,is_public,user_id,owner_id,deleted_at,year,make,model) ON public.vehicles TO anon;
+ALTER TABLE public.vehicle_custom_circuits ADD COLUMN IF NOT EXISTS system_category text,
+ ADD COLUMN IF NOT EXISTS from_endpoint_id uuid, ADD COLUMN IF NOT EXISTS to_endpoint_id uuid;
+ALTER TABLE public.harness_endpoints ADD COLUMN IF NOT EXISTS superseded_by uuid;
+ALTER TABLE public.wire_termination_specs ADD COLUMN IF NOT EXISTS superseded_by uuid;
+\i supabase/migrations/20261126021500_harness_manual_sheets.sql
+\i supabase/migrations/20261126041635_harness_functional_manual_sheets.sql
+\i supabase/migrations/20261126051125_harness_fold_phase_diagnostics.sql
+\i supabase/migrations/20261126052721_harness_manual_context_references.sql
+\i supabase/migrations/20261126061300_harness_contact_end_accounting.sql
 
 -- Compatibility with the earlier minimal source fixture. All of these fields
 -- and splice owners already exist in production; this change does not mint them.
@@ -27,16 +48,16 @@ GRANT SELECT ON public.harness_splices,public.harness_splice_members TO anon,aut
 DO $$
 DECLARE r jsonb;
 BEGIN
- r:=public.harness_model_fold(md5('functional context vehicle')::uuid);
+ r:=public.harness_model_fold('e08bf694-970f-4cbe-8a74-8715158a0f2e'::uuid);
  IF r->>'status' IS DISTINCT FROM 'current' THEN RAISE EXCEPTION 'Component producer failed: %',r; END IF;
  IF (SELECT count(*) FROM public.harness_model_component_requirements q JOIN public.harness_model_state s
- ON s.latest_evaluation_id=q.evaluation_id WHERE s.vehicle_id=md5('functional context vehicle')::uuid)=0
+ ON s.latest_evaluation_id=q.evaluation_id WHERE s.vehicle_id='e08bf694-970f-4cbe-8a74-8715158a0f2e'::uuid)=0
  THEN RAISE EXCEPTION 'Unassigned contacts disappeared as verified zero demand'; END IF;
  IF EXISTS(SELECT FROM public.harness_model_component_requirements q JOIN public.harness_model_state s
- ON s.latest_evaluation_id=q.evaluation_id WHERE s.vehicle_id=md5('functional context vehicle')::uuid AND q.state='provisional')
+ ON s.latest_evaluation_id=q.evaluation_id WHERE s.vehicle_id='e08bf694-970f-4cbe-8a74-8715158a0f2e'::uuid AND q.state='provisional')
  THEN RAISE EXCEPTION 'Missing catalog assignments or endpoint design status defaulted to qualified'; END IF;
  IF NOT EXISTS(SELECT FROM public.harness_model_evaluations e JOIN public.harness_model_state s ON s.latest_evaluation_id=e.id,
- jsonb_array_elements(e.component_role_coverage) x WHERE s.vehicle_id=md5('functional context vehicle')::uuid
+ jsonb_array_elements(e.component_role_coverage) x WHERE s.vehicle_id='e08bf694-970f-4cbe-8a74-8715158a0f2e'::uuid
  AND x->>'role'='boot' AND (x->>'recorded_owner_groups')::int>0 AND (x->>'groups_without_assignment')::int>0
  AND x->>'applicability_state'='unassessed' AND x->>'kind'='recorded_assignment_coverage')
  THEN RAISE EXCEPTION 'Absent boot assignments appeared as verified zero required parts'; END IF;
@@ -526,6 +547,54 @@ BEGIN
  OR NOT EXISTS(SELECT FROM public.harness_model_component_requirements WHERE evaluation_id=ev AND id=q
  AND state='held' AND 'splice_member_endpoint_unresolved'=ANY(blockers))
  THEN RAISE EXCEPTION 'Differently cased at-pin claims were silently joined'; END IF;
+END $$;
+ROLLBACK;
+-- Separate splice groups can share a connector pin. Declared membership
+-- separates their contributor edges; an actually unassigned conductor is held.
+BEGIN;
+UPDATE public.wire_termination_specs SET cavity='A02' WHERE id=(SELECT end_a1 FROM demand_fixture);
+UPDATE public.wire_termination_specs SET cavity='A_002' WHERE id=(SELECT end_a2 FROM demand_fixture);
+INSERT INTO public.harness_splices(id,vehicle_id,splice_code,placement,endpoint_id,cavity,part_number,part_id)
+ SELECT md5('component pin group A')::uuid,vehicle_id,'PIN-GROUP-A','at_pin',endpoint_a,'A2',
+ 'DEMAND-SPLICE',(SELECT id FROM public.catalog_parts WHERE part_number='DEMAND-SPLICE') FROM demand_fixture
+ UNION ALL SELECT md5('component pin group B')::uuid,vehicle_id,'PIN-GROUP-B','at_pin',endpoint_a,'A2',
+ 'DEMAND-SPLICE',(SELECT id FROM public.catalog_parts WHERE part_number='DEMAND-SPLICE') FROM demand_fixture;
+INSERT INTO public.harness_splice_members(splice_id,circuit_id,ordinal,member_label)
+ SELECT md5('component pin group A')::uuid,circuit_a,1,'A' FROM demand_fixture
+ UNION ALL SELECT md5('component pin group B')::uuid,circuit_b,1,'B' FROM demand_fixture;
+DO $$
+DECLARE ev uuid:=pg_temp.fold_current(); q uuid; f demand_fixture%ROWTYPE;
+BEGIN
+ SELECT * INTO f FROM demand_fixture;
+ IF (SELECT count(*) FROM public.harness_model_component_requirements WHERE evaluation_id=ev
+ AND splice_id IN(md5('component pin group A')::uuid,md5('component pin group B')::uuid))<>2
+ OR EXISTS(SELECT FROM public.harness_model_component_requirements WHERE evaluation_id=ev
+ AND splice_id IN(md5('component pin group A')::uuid,md5('component pin group B')::uuid)
+ AND blockers && ARRAY['splice_extra_endpoint_conductor','splice_member_endpoint_unresolved'])
+ THEN RAISE EXCEPTION 'Separate declared splice groups at one pin contaminated each other'; END IF;
+ IF (SELECT count(*) FROM public.harness_model_component_contributors c JOIN public.harness_model_component_requirements r
+ ON r.evaluation_id=c.evaluation_id AND r.id=c.requirement_id WHERE c.evaluation_id=ev
+ AND ((r.splice_id=md5('component pin group A')::uuid AND c.circuit_id=f.circuit_a)
+ OR (r.splice_id=md5('component pin group B')::uuid AND c.circuit_id=f.circuit_b)))<>2
+ OR (SELECT count(*) FROM public.harness_model_component_contributors c JOIN public.harness_model_component_requirements r
+ ON r.evaluation_id=c.evaluation_id AND r.id=c.requirement_id WHERE c.evaluation_id=ev
+ AND r.splice_id IN(md5('component pin group A')::uuid,md5('component pin group B')::uuid))<>2
+ THEN RAISE EXCEPTION 'Pin groups lost exact declared contributor conservation'; END IF;
+ SELECT id INTO STRICT q FROM public.harness_model_component_requirements WHERE evaluation_id=ev AND splice_id=md5('component pin group A')::uuid;
+ BEGIN
+  INSERT INTO public.harness_model_component_contributors(evaluation_id,requirement_id,segment_id,termination_id,circuit_id)
+  VALUES(ev,q,f.segment_b,f.end_a2,f.circuit_b);
+  RAISE EXCEPTION 'Scope guard accepted a neighboring pin-group contributor';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+END $$;
+DELETE FROM public.harness_splice_members WHERE splice_id=md5('component pin group B')::uuid;
+DO $$
+DECLARE ev uuid:=pg_temp.fold_current();
+BEGIN
+ IF NOT EXISTS(SELECT FROM public.harness_model_component_requirements WHERE evaluation_id=ev
+ AND splice_id=md5('component pin group A')::uuid AND state='held' AND 'splice_extra_endpoint_conductor'=ANY(blockers))
+ THEN RAISE EXCEPTION 'An actually unassigned pin conductor disappeared from qualification'; END IF;
 END $$;
 ROLLBACK;
 SELECT 'test_harness_component_requirements: PASS' AS result;
