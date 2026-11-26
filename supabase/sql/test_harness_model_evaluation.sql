@@ -95,6 +95,39 @@ BEGIN
  IF jsonb_array_length(r->'model'->'model_checks')=0 THEN RAISE EXCEPTION 'Consumer received no stored checks'; END IF;
 END $$;
 
+-- Typed result guards cannot attach another asset or swap a physical piece's recorded side.
+DO $$
+DECLARE run uuid; foreign_overlay uuid:=gen_random_uuid(); foreign_circuit uuid:=gen_random_uuid(); edge record;
+BEGIN
+ SELECT latest_evaluation_id INTO run FROM public.harness_model_state;
+ INSERT INTO public.vehicle_wiring_overlays(id,vehicle_id) VALUES(foreign_overlay,'00000000-0000-0000-0000-00000000ff01');
+ INSERT INTO public.vehicle_custom_circuits(id,overlay_id,circuit_code) VALUES(foreign_circuit,foreign_overlay,'FOREIGN');
+ BEGIN
+  INSERT INTO public.harness_model_checks(evaluation_id,rule_key,rule_version,circuit_id,result)
+   VALUES(run,'circuit_segments','1',foreign_circuit,'pass');
+  RAISE EXCEPTION 'Cross-vehicle result accepted';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+ SELECT a.* INTO edge FROM public.harness_model_segment_ends a JOIN public.harness_segments s ON s.id=a.segment_id
+  WHERE a.evaluation_id=run AND a.side='from' AND s.to_termination_id IS NOT NULL
+   AND s.to_termination_id<>a.termination_id LIMIT 1;
+ BEGIN
+  INSERT INTO public.harness_model_segment_ends(evaluation_id,segment_id,side,termination_id,node_id)
+   SELECT run,edge.segment_id,'from',s.to_termination_id,edge.node_id FROM public.harness_segments s WHERE s.id=edge.segment_id;
+  RAISE EXCEPTION 'Unrecorded physical end accepted';
+ EXCEPTION WHEN check_violation THEN NULL;
+ END;
+END $$;
+DO $$
+DECLARE before_hash text; previous_timezone text:=current_setting('TimeZone');
+BEGIN
+ before_hash:=public.harness_evaluated_model('e08bf694-970f-4cbe-8a74-8715158a0f2e')#>>'{model,snapshot_hash}';
+ PERFORM set_config('TimeZone','America/Los_Angeles',true);
+ IF before_hash IS DISTINCT FROM (public.harness_evaluated_model('e08bf694-970f-4cbe-8a74-8715158a0f2e')#>>'{model,snapshot_hash}')
+ THEN RAISE EXCEPTION 'Session timezone changed model identity'; END IF;
+ PERFORM set_config('TimeZone',previous_timezone,true);
+END $$;
+
 -- An unresolved endpoint reused by two pieces is not proof of shared electrical continuity.
 DO $$
 DECLARE i jsonb; g jsonb; piece jsonb; r jsonb; ids int;
