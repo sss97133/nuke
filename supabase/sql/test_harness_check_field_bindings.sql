@@ -105,6 +105,41 @@ DO $$ DECLARE e uuid; c uuid; r jsonb; BEGIN
 END $$;
 RESET ROLE;
 
+-- Hardware is counted once at its existing requirement grain. The inspector
+-- exposes the exact contributing wire ends, never a per-wire quantity sum.
+SET ROLE anon;
+DO $$ DECLARE e uuid; c uuid; q public.harness_model_component_requirements; r jsonb; expected jsonb; total integer; BEGIN
+ SELECT latest_evaluation_id INTO e FROM public.harness_model_state WHERE vehicle_id='e08bf694-970f-4cbe-8a74-8715158a0f2e';
+ SELECT * INTO STRICT q FROM public.harness_model_component_requirements WHERE evaluation_id=e ORDER BY id LIMIT 1;
+ SELECT id INTO STRICT c FROM public.harness_model_checks WHERE evaluation_id=e AND component_requirement_id=q.id ORDER BY id LIMIT 1;
+ r:=public.harness_model_check_context('e08bf694-970f-4cbe-8a74-8715158a0f2e',e,c);
+ SELECT count(*) INTO total FROM public.harness_model_component_contributors WHERE evaluation_id=e AND requirement_id=q.id;
+ SELECT coalesce(jsonb_agg(jsonb_build_object('segment_id',b.segment_id,'termination_id',b.termination_id,'circuit_id',b.circuit_id)
+  ORDER BY b.segment_id,b.termination_id),'[]'::jsonb) INTO expected FROM(
+   SELECT segment_id,termination_id,circuit_id FROM public.harness_model_component_contributors
+   WHERE evaluation_id=e AND requirement_id=q.id ORDER BY segment_id,termination_id LIMIT 8) b;
+ IF r->>'status'<>'current' OR r#>'{inspection_context,component,requirement,id}'<>to_jsonb(q.id)
+  OR r#>'{inspection_context,component,requirement,quantity}' IS DISTINCT FROM coalesce(to_jsonb(q.quantity),'null'::jsonb)
+  OR r#>'{inspection_context,component,requirement,blockers}'<>to_jsonb(q.blockers)
+  OR (r#>>'{inspection_context,component,contributor_count}')::int<>total
+  OR (r#>>'{inspection_context,component,contributors_complete}')::boolean IS DISTINCT FROM (total<=8)
+  OR r#>'{inspection_context,component,contributors}' IS DISTINCT FROM expected
+  OR r->>'input_coverage'<>'not_recorded' OR r->>'source_lineage'<>'not_assessed'
+ THEN RAISE EXCEPTION 'Component check lost exact shared demand, quantity, contributors or qualification: %',r; END IF;
+END $$;
+RESET ROLE;
+BEGIN;
+ALTER POLICY harness_model_component_contributors_read ON public.harness_model_component_contributors USING(false);
+SET LOCAL ROLE anon;
+DO $$ DECLARE e uuid; c uuid; r jsonb; BEGIN
+ SELECT latest_evaluation_id INTO e FROM public.harness_model_state WHERE vehicle_id='e08bf694-970f-4cbe-8a74-8715158a0f2e';
+ SELECT id INTO c FROM public.harness_model_checks WHERE evaluation_id=e AND component_requirement_id IS NOT NULL LIMIT 1;
+ r:=public.harness_model_check_context('e08bf694-970f-4cbe-8a74-8715158a0f2e',e,c);
+ IF r->>'status'='current' OR r->'check'<>'null'::jsonb OR r ? 'inspection_context'
+ THEN RAISE EXCEPTION 'Hidden component contributors left an apparently complete explanation'; END IF;
+END $$;
+ROLLBACK;
+
 -- One hidden child must withhold the shared receipt, all manual consumers and
 -- the bounded context reader. It cannot become an empty successful explanation.
 BEGIN;
@@ -174,6 +209,12 @@ ROLLBACK;
 -- just the pure JSON computation. Batch admission must retain every field.
 SET statement_timeout='10s';
 \i supabase/sql/helpers/harness_model_scale_fixture.sql
+BEGIN;
+-- A deliberately crowded recorded contact provides a real shared requirement
+-- with500 contributor ends. Unknown contact quantity must remain null.
+UPDATE public.wire_termination_specs SET cavity='shared-contact'
+ WHERE endpoint_id=md5('harness scale connector')::uuid;
+SELECT public.harness_model_fold(md5('harness scale vehicle')::uuid);
 SET ROLE anon;
 DO $$ DECLARE e uuid; expected integer; c uuid; r jsonb; BEGIN
  SELECT latest_evaluation_id INTO e FROM public.harness_model_state WHERE vehicle_id=md5('harness scale vehicle')::uuid;
@@ -189,6 +230,18 @@ DO $$ DECLARE e uuid; expected integer; c uuid; r jsonb; BEGIN
   OR NOT EXISTS(SELECT FROM jsonb_array_elements(r#>'{inspection_context,endpoints}') ep
    WHERE (ep->>'selected_piece_end_count')::int=500 AND ep->>'selected_piece_ends_complete'='false')
  THEN RAISE EXCEPTION 'Large endpoint context lost its bound or truncation declaration'; END IF;
+ SELECT k.id INTO STRICT c FROM public.harness_model_checks k
+ JOIN public.harness_model_component_requirements q ON q.evaluation_id=k.evaluation_id AND q.id=k.component_requirement_id
+ WHERE k.evaluation_id=e AND q.role='terminal_contact' AND q.endpoint_id=md5('harness scale connector')::uuid
+ ORDER BY k.id LIMIT 1;
+ r:=public.harness_model_check_context(md5('harness scale vehicle')::uuid,e,c);
+ IF r->>'status'<>'current' OR (r#>>'{inspection_context,component,contributor_count}')::int<>500
+  OR r#>>'{inspection_context,component,contributors_complete}'<>'false'
+  OR jsonb_array_length(r#>'{inspection_context,component,contributors}')<>8
+  OR r#>>'{inspection_context,component,requirement,role}'<>'terminal_contact'
+  OR r#>'{inspection_context,component,requirement,quantity}' IS DISTINCT FROM 'null'::jsonb
+ THEN RAISE EXCEPTION '500-piece shared hardware lost its exact quantity grain or bound: %',r; END IF;
 END $$;
 RESET ROLE;
+ROLLBACK;
 SELECT 'test_harness_check_field_bindings: PASS' result;
