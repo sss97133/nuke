@@ -20,9 +20,161 @@ DECLARE
  total_power numeric:=0; absolute_power numeric:=0; max_kcl numeric:=0;
  max_current numeric:=0; constraint_error numeric:=0; max_voltage numeric:=0;
  floating_ jsonb;
+ model_ jsonb; scenario_ jsonb; wire_ jsonb; device_ jsonb; bound_ jsonb; result_ jsonb;
+ node_map jsonb:='{}'; side_map jsonb:='{}'; wire_map jsonb:='{}'; bindings_ jsonb:='[]';
+ bound_branches jsonb:='[]'; node_ids text[]:='{}'; piece_ids text[]:='{}'; terminal_ids text[]:='{}';
+ covered_ids text[]:='{}'; assumed_open_ids text[]:='{}'; device_ids text[]:='{}';
+ from_ text; to_ text; key_ text; identity_ jsonb;
 BEGIN
  IF p_input IS NULL OR jsonb_typeof(p_input)<>'object' THEN
   RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','scenario_object_required')));
+ END IF;
+ -- Bind conditional design inputs to the existing evaluated physical graph.
+ -- This is still the same compute owner. Reader currentness is not established
+ -- by trusting this caller-supplied payload, and no source assertion is admitted.
+ IF p_input ? 'model' OR p_input ? 'scenario' THEN
+  model_:=p_input->'model'; scenario_:=p_input->'scenario';
+  IF pg_column_size(p_input)>262144 OR jsonb_typeof(model_) IS DISTINCT FROM 'object'
+   OR jsonb_typeof(scenario_) IS DISTINCT FROM 'object'
+   OR EXISTS(SELECT FROM jsonb_object_keys(p_input) t(key) WHERE key NOT IN ('model','scenario')) THEN
+   RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"binding_envelope_invalid"}]'::jsonb);
+  END IF;
+  IF model_->'contract_version' IS DISTINCT FROM '2'::jsonb OR model_->>'sheet_scope' IS DISTINCT FROM 'bounded_manual_sheet'
+   OR model_->>'selection' IS DISTINCT FROM 'decided_design'
+   OR EXISTS(SELECT FROM unnest(ARRAY['vehicle_id','evaluation_id','snapshot_hash','sheet_id']) t(key)
+    WHERE jsonb_typeof(model_->key) IS DISTINCT FROM 'string' OR length(model_->>key) NOT BETWEEN 1 AND 128)
+   OR EXISTS(SELECT FROM unnest(ARRAY['segments','electrical_nodes','segment_ends']) t(key)
+    WHERE jsonb_typeof(model_->key) IS DISTINCT FROM 'array') THEN
+   RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"bounded_model_identity_invalid"}]'::jsonb);
+  END IF;
+  IF jsonb_array_length(model_->'segments') NOT BETWEEN 1 AND 8 OR jsonb_array_length(model_->'electrical_nodes') NOT BETWEEN 1 AND 16
+   OR jsonb_array_length(model_->'segment_ends')>16 THEN
+   RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"bounded_model_size_invalid"}]'::jsonb);
+  END IF;
+  identity_:=jsonb_build_object('vehicle_id',model_->'vehicle_id','evaluation_id',model_->'evaluation_id',
+   'snapshot_hash',model_->'snapshot_hash','sheet_id',model_->'sheet_id','currentness','caller_supplied_not_verified');
+  base:=base||jsonb_build_object('model_identity',identity_);
+  IF model_->'unsegmented_end_count' IS DISTINCT FROM '0'::jsonb
+   OR model_->'unsegmented_end_records_complete' IS DISTINCT FROM 'true'::jsonb
+   OR model_->'unsegmented_end_records' IS DISTINCT FROM '[]'::jsonb THEN
+   RETURN base||jsonb_build_object('status','held','issues','[{"code":"source_end_coverage_unresolved"}]'::jsonb);
+  END IF;
+  IF scenario_->>'basis' IS DISTINCT FROM 'conditional_assumption'
+   OR scenario_->>'scope' IS DISTINCT FROM 'selected_sheet_only'
+   OR jsonb_typeof(scenario_->'id') IS DISTINCT FROM 'string' OR length(scenario_->>'id') NOT BETWEEN 1 AND 128
+   OR scenario_->'evaluation_id' IS DISTINCT FROM model_->'evaluation_id'
+   OR scenario_->'snapshot_hash' IS DISTINCT FROM model_->'snapshot_hash'
+   OR jsonb_typeof(scenario_->'reference_termination_id') IS DISTINCT FROM 'string'
+   OR EXISTS(SELECT FROM unnest(ARRAY['wires','devices','assumed_open_termination_ids']) t(key)
+    WHERE jsonb_typeof(scenario_->key) IS DISTINCT FROM 'array')
+   OR EXISTS(SELECT FROM jsonb_object_keys(scenario_) t(key) WHERE key NOT IN
+    ('id','basis','scope','evaluation_id','snapshot_hash','reference_termination_id','wires','devices','assumed_open_termination_ids')) THEN
+   RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"conditional_scenario_identity_invalid"}]'::jsonb);
+  END IF;
+  IF jsonb_array_length(scenario_->'wires')>8 OR jsonb_array_length(scenario_->'devices')>32
+   OR jsonb_array_length(scenario_->'assumed_open_termination_ids')>16 THEN
+   RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"conditional_scenario_bound_exceeded"}]'::jsonb);
+  END IF;
+  FOR row_ IN SELECT x FROM jsonb_array_elements(model_->'electrical_nodes') t(x) LOOP
+   IF jsonb_typeof(row_) IS DISTINCT FROM 'object' OR jsonb_typeof(row_->'id') IS DISTINCT FROM 'string'
+    OR length(row_->>'id') NOT BETWEEN 1 AND 128 OR row_->>'id'=ANY(node_ids) THEN
+    RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"evaluated_node_identity_invalid"}]'::jsonb);
+   END IF;
+   node_ids:=array_append(node_ids,row_->>'id');
+  END LOOP;
+  FOR row_ IN SELECT x FROM jsonb_array_elements(model_->'segments') t(x) LOOP
+   IF jsonb_typeof(row_) IS DISTINCT FROM 'object' OR jsonb_typeof(row_->'id') IS DISTINCT FROM 'string'
+    OR length(row_->>'id') NOT BETWEEN 1 AND 120 OR row_->>'id'=ANY(piece_ids) THEN
+    RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"selected_piece_identity_invalid"}]'::jsonb);
+   END IF;
+   piece_ids:=array_append(piece_ids,row_->>'id');
+  END LOOP;
+  FOR row_ IN SELECT x FROM jsonb_array_elements(model_->'segment_ends') t(x) LOOP
+   IF jsonb_typeof(row_) IS DISTINCT FROM 'object'
+    OR EXISTS(SELECT FROM unnest(ARRAY['segment_id','termination_id','node_id','side']) t(key) WHERE jsonb_typeof(row_->key) IS DISTINCT FROM 'string')
+    OR NOT row_->>'segment_id'=ANY(piece_ids) OR NOT row_->>'node_id'=ANY(node_ids)
+    OR row_->>'side' NOT IN ('from','to') OR length(row_->>'termination_id') NOT BETWEEN 1 AND 128 THEN
+    RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"evaluated_attachment_invalid"}]'::jsonb);
+   END IF;
+   key_:=row_->>'segment_id'||':'||(row_->>'side');
+   IF side_map ? key_ THEN
+    RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"evaluated_attachment_ambiguous"}]'::jsonb);
+   END IF;
+   IF node_map ? (row_->>'termination_id') THEN
+    RETURN base||jsonb_build_object('status','held','issues',jsonb_build_array(jsonb_build_object(
+     'code','physical_end_reused_by_segments','termination_id',row_->'termination_id')));
+   END IF;
+   side_map:=side_map||jsonb_build_object(key_,row_);
+   node_map:=node_map||jsonb_build_object(row_->>'termination_id',row_->'node_id');
+   IF NOT row_->>'termination_id'=ANY(terminal_ids) THEN terminal_ids:=array_append(terminal_ids,row_->>'termination_id'); END IF;
+  END LOOP;
+  FOR wire_ IN SELECT x FROM jsonb_array_elements(scenario_->'wires') t(x) LOOP
+   IF jsonb_typeof(wire_) IS DISTINCT FROM 'object' OR jsonb_typeof(wire_->'segment_id') IS DISTINCT FROM 'string'
+    OR NOT wire_->>'segment_id'=ANY(piece_ids) OR wire_map ? (wire_->>'segment_id')
+    OR EXISTS(SELECT FROM jsonb_object_keys(wire_) t(key) WHERE key NOT IN ('segment_id','state','resistance_ohm')) THEN
+    RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"wire_parameter_identity_invalid"}]'::jsonb);
+   END IF;
+   wire_map:=wire_map||jsonb_build_object(wire_->>'segment_id',wire_);
+  END LOOP;
+  FOR row_ IN SELECT x FROM jsonb_array_elements(model_->'segments') t(x) LOOP
+   key_:=row_->>'id'; wire_:=wire_map->key_;
+   IF side_map->(key_||':from')->'termination_id' IS DISTINCT FROM row_->'from_termination_id'
+    OR side_map->(key_||':to')->'termination_id' IS DISTINCT FROM row_->'to_termination_id'
+    OR NOT side_map ? (key_||':from') OR NOT side_map ? (key_||':to') THEN
+    issues:=issues||jsonb_build_array(jsonb_build_object('code','piece_end_attachment_unresolved','segment_id',key_)); CONTINUE;
+   END IF;
+   IF wire_ IS NULL THEN
+    issues:=issues||jsonb_build_array(jsonb_build_object('code','wire_operating_parameters_missing','segment_id',key_)); CONTINUE;
+   END IF;
+   bound_branches:=bound_branches||jsonb_build_array(jsonb_build_object('id','wire/'||key_,'kind','switch',
+    'from_node_id',side_map->(key_||':from')->'node_id','to_node_id',side_map->(key_||':to')->'node_id','state',wire_->'state')
+    ||CASE WHEN wire_ ? 'resistance_ohm' THEN jsonb_build_object('resistance_ohm',wire_->'resistance_ohm') ELSE '{}'::jsonb END);
+   bindings_:=bindings_||jsonb_build_array(jsonb_build_object('branch_id','wire/'||key_,'segment_id',key_,
+    'from_termination_id',row_->'from_termination_id','to_termination_id',row_->'to_termination_id'));
+  END LOOP;
+  FOR device_ IN SELECT x FROM jsonb_array_elements(scenario_->'devices') t(x) LOOP
+   IF jsonb_typeof(device_) IS DISTINCT FROM 'object' OR jsonb_typeof(device_->'id') IS DISTINCT FROM 'string'
+    OR length(device_->>'id') NOT BETWEEN 1 AND 120 OR device_->>'id'=ANY(device_ids)
+    OR EXISTS(SELECT FROM unnest(ARRAY['from_termination_id','to_termination_id']) t(key) WHERE jsonb_typeof(device_->key) IS DISTINCT FROM 'string')
+    OR NOT node_map ? (device_->>'from_termination_id') OR NOT node_map ? (device_->>'to_termination_id')
+    OR EXISTS(SELECT FROM jsonb_object_keys(device_) t(key) WHERE key NOT IN
+     ('id','kind','from_termination_id','to_termination_id','state','resistance_ohm','voltage_v','current_a')) THEN
+    RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"device_terminal_binding_invalid"}]'::jsonb);
+   END IF;
+   device_ids:=array_append(device_ids,device_->>'id'); from_:=device_->>'from_termination_id'; to_:=device_->>'to_termination_id';
+   covered_ids:=array_append(array_append(covered_ids,from_),to_);
+   bound_branches:=bound_branches||jsonb_build_array((device_-'from_termination_id'-'to_termination_id')||jsonb_build_object(
+    'id','device/'||(device_->>'id'),'from_node_id',node_map->from_,'to_node_id',node_map->to_));
+   bindings_:=bindings_||jsonb_build_array(jsonb_build_object('branch_id','device/'||(device_->>'id'),
+    'scenario_element_id',device_->'id','from_termination_id',from_,'to_termination_id',to_));
+  END LOOP;
+  FOR row_ IN SELECT x FROM jsonb_array_elements(scenario_->'assumed_open_termination_ids') t(x) LOOP
+   IF jsonb_typeof(row_) IS DISTINCT FROM 'string' THEN
+    RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"open_boundary_identity_invalid"}]'::jsonb);
+   END IF;
+   key_:=row_#>>'{}';
+   IF NOT key_=ANY(terminal_ids) OR key_=ANY(assumed_open_ids) OR key_=ANY(covered_ids) THEN
+    RETURN base||jsonb_build_object('status','invalid','issues','[{"code":"open_boundary_identity_invalid"}]'::jsonb);
+   END IF;
+   assumed_open_ids:=array_append(assumed_open_ids,key_);
+  END LOOP;
+  FOREACH key_ IN ARRAY terminal_ids LOOP
+   IF NOT key_=ANY(covered_ids) AND NOT key_=ANY(assumed_open_ids) THEN
+    issues:=issues||jsonb_build_array(jsonb_build_object('code','terminal_behavior_undeclared','termination_id',key_));
+   END IF;
+  END LOOP;
+  IF NOT node_map ? (scenario_->>'reference_termination_id') THEN
+   issues:=issues||jsonb_build_array(jsonb_build_object('code','reference_termination_unresolved'));
+  END IF;
+  IF jsonb_array_length(issues)>0 THEN RETURN base||jsonb_build_object('status','held','issues',issues); END IF;
+  bound_:=jsonb_build_object('reference_node_id',node_map->(scenario_->>'reference_termination_id'),
+   'nodes',(SELECT jsonb_agg(jsonb_build_object('id',id) ORDER BY id) FROM unnest(node_ids) t(id)),'branches',bound_branches);
+  result_:=public.harness_model_dc_compute(bound_);
+  RETURN result_||jsonb_build_object('model_identity',identity_,'scenario_id',scenario_->'id',
+   'parameter_basis','conditional_assumption','input_hash_scope','compiled_dc_network','branch_bindings',bindings_,
+   'network_completeness','not_established_by_bounded_sheet',
+   'terminal_coverage','evaluated_piece_attachments_only','structural_checks','not_consumed_by_conditional_solver',
+   'assumed_open_termination_ids',scenario_->'assumed_open_termination_ids');
  END IF;
  IF jsonb_typeof(p_input->'nodes') IS DISTINCT FROM 'array' OR jsonb_typeof(p_input->'branches') IS DISTINCT FROM 'array'
   OR jsonb_typeof(p_input->'reference_node_id') IS DISTINCT FROM 'string' THEN
@@ -238,6 +390,6 @@ EXCEPTION WHEN numeric_value_out_of_range OR invalid_text_representation THEN
 END;
 $fn$;
 COMMENT ON FUNCTION public.harness_model_dc_compute(jsonb) IS
-'Pure bounded linear DC operating-point helper in the harness-model compute family. Explicit scenario nodes/branches/reference; resistor, open/closed finite-R contact, independent V/I source. SI units V/A/ohm/W; signed flow from_node to to_node and absorbed power positive. MNA/partial pivoting with KCL, source-voltage and power residual checks. At most64 nodes/128 elements/16 ideal voltage sources/256KiB. Decimal accumulation and72-place elimination; session-independent output. Numerical domain R[1e-9,1e12]ohm, absolute source[0,1e6]V/A, at most24fractional places; these are solver bounds, never engineering limits. Unvalidated inputs have null input_hash; render/hash only after scalar/count bounds. Unbound state/parameter, floating island, dependent/conflicting ideal sources and unstable solve return no results. No implicit ground/leakage/zero resistance or physical release. Caller scenario is conditional input, not sanctioned source admission; no table access or public harness reader replacement.';
+'Pure bounded linear DC operating-point helper in the harness-model compute family. Explicit scenario nodes/branches/reference; resistor, open/closed finite-R contact, independent V/I source. SI units V/A/ohm/W; signed flow from_node to to_node and absorbed power positive. MNA/partial pivoting with KCL, source-voltage and power residual checks. At most64 nodes/128 elements/16 ideal voltage sources/256KiB. Decimal accumulation and72-place elimination; session-independent output. Numerical domain R[1e-9,1e12]ohm, absolute source[0,1e6]V/A, at most24fractional places; these are solver bounds, never engineering limits. Unvalidated inputs have null input_hash; render/hash only after scalar/count bounds. Unbound state/parameter, floating island, dependent/conflicting ideal sources and unstable solve return no results. No implicit ground/leakage/zero resistance or physical release. Optional {model,scenario} envelope binds exact evaluated piece/termination/node keys with matching evaluation/snapshot identity, explicit conditional wire/device inputs and assumed-open boundaries; undeclared inputs hold. It covers only the selected sheet, cannot establish external network completeness or caller model currentness, and reports those limits. Assumed-open boundary means no additional modeled device at that port; it never severs an existing node or conductor. input_hash then covers only the compiled DC network; model identity and scenario ID remain separate fields. Caller scenario is conditional input, not sanctioned source admission; no table access or public harness reader replacement.';
 REVOKE ALL ON FUNCTION public.harness_model_dc_compute(jsonb) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.harness_model_dc_compute(jsonb) TO service_role;
