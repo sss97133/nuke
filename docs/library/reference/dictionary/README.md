@@ -421,3 +421,7 @@ The existing property proposal governs ratification. An intake implementation do
 ### Retained reference custody
 
 A `reference_documents` row and its canonical supplied `document_pages` are retained source input, distinct from an observation about a vehicle or a technical property. `reference_document_evidence(uuid)` rechecks the content-addressed public Storage object, object version/hash/size, reviewed page fingerprint, and the admitted source metadata revision. It returns NULL for a withdrawn or changed source. An exact PDF/page identity establishes what was cited; it does not establish an installed part, electrical applicability, ampacity or build release. Technical claims must carry their own keyed applicability and witnesses. The existing assembly qualifier consumes this shared custody check.
+
+### Conditioned wire resistance vocabulary
+
+`wire_dc_resistance_per_length` is proposed through `schema_proposals` as a numeric material-class property in `ohm_per_m`, with discriminator `wire_condition_key`. The condition must identify wire specification, AWG gauge, conductor temperature and maximum/nominal role. A source cell keeps its original unit, token and exact page witness; paired unit cells from one page are one source, and discrepancies remain visible. This vocabulary is distinct from ampacity, operating current and installed wire. The proposal stays open until the measured gate runs; the existing intake continues to refuse numerical claims until a separately enforced profile exists.

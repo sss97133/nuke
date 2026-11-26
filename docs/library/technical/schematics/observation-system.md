@@ -1067,3 +1067,5 @@ flowchart LR
 ```
 
 A changed title, category, source URL or page count cannot continue to qualify under an old revision. This is source currentness on read; electrical property admission, dependency invalidation and harness calculation release remain separate work. Contract: `supabase/sql/test_reference_document_evidence.sql`; existing source-bound assembly contract also runs the shared qualifier and retains its native concurrency test.
+
+The measured `schema_proposal_key_gate` can also accept canonical `document_pages` as vocabulary prototypes. It calls the shared document qualifier and requires the proposed witness's document ID, full file hash and revision to match the current retained source before checking verbatim text and the category quote rule. A registry row naming `document_pages` does not admit arbitrary page text. The measure records the current document/revision/file/page-text fingerprints. The resistance proposal is a concept request, not a numerical reading or human approval; future numerical intake must enforce conditions and electrical applicability independently. Contract: `supabase/sql/test_wire_reference_property_vocabulary.sql`.
