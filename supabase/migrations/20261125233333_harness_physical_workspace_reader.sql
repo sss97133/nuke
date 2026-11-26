@@ -5,7 +5,7 @@
 -- Receipt: docs/wiring/receipts/2026-11-25_physical-workspace-reader.md
 -- Verification: docs/wiring/receipts/2026-11-25_physical-workspace-reader-verification.md
 BEGIN;
-SET LOCAL statement_timeout = '15s';
+SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '1s';
 
 CREATE OR REPLACE FUNCTION public.harness_schematic_model(p_vehicle_id uuid)
