@@ -117,6 +117,8 @@ BEGIN
  r:=public.harness_manual_mate_context('e08bf694-970f-4cbe-8a74-8715158a0f2e',eid,seg,side_);
  IF r->>'status'<>'current' OR (r->>'contact_mapping_qualified')::boolean OR jsonb_array_length(r->'destinations')=0
  THEN RAISE EXCEPTION 'Explicit connector mate context missing or overstated: %',r; END IF;
+ IF (SELECT count(DISTINCT (x->>'segment_id',x->>'side')) FROM jsonb_array_elements(r->'destinations') x)<>jsonb_array_length(r->'destinations')
+ THEN RAISE EXCEPTION 'Reverse connector-mate witnesses duplicated a physical end address'; END IF;
 END $$;
 RESET ROLE;
 

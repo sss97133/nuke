@@ -322,9 +322,9 @@ origin AS MATERIALIZED(SELECT a.*,n.endpoint_id,n.net_id FROM public.harness_mod
  WHERE a.evaluation_id=(r->>'id')::uuid AND a.evaluation_id=p_evaluation_id AND a.segment_id=p_segment_id AND a.side=p_side),
 mates AS(SELECT x FROM input CROSS JOIN LATERAL jsonb_array_elements(p->'model'->'connector_matings') a(x)),
 targets AS(
- SELECT DISTINCT a.segment_id,a.side,a.termination_id,a.node_id,n.endpoint_id,h.sheet_id,sh.title AS sheet_title,
+ SELECT DISTINCT ON(a.segment_id,a.side) a.segment_id,a.side,a.termination_id,a.node_id,n.endpoint_id,h.sheet_id,sh.title AS sheet_title,
  c.circuit_code AS wire_code,e.code AS endpoint_code,t.cavity,m.x AS recorded_mating,
-  a.segment_id::text||'/'||a.side||'/'||md5(m.x::text) AS sort_key FROM origin o
+  a.segment_id::text||'/'||a.side AS sort_key FROM origin o
  JOIN mates m ON o.endpoint_id::text IN(m.x->>'from_endpoint_id',m.x->>'to_endpoint_id')
  JOIN public.harness_model_nodes n ON n.evaluation_id=o.evaluation_id AND n.net_id=o.net_id AND n.endpoint_id<>o.endpoint_id
   AND n.endpoint_id::text IN(m.x->>'from_endpoint_id',m.x->>'to_endpoint_id')
@@ -332,7 +332,8 @@ targets AS(
  JOIN public.harness_model_sheet_ends h ON h.evaluation_id=a.evaluation_id AND h.segment_id=a.segment_id AND h.side=a.side
  JOIN public.harness_model_sheets sh ON sh.evaluation_id=h.evaluation_id AND sh.id=h.sheet_id
  JOIN public.wire_termination_specs t ON t.id=a.termination_id JOIN public.harness_endpoints e ON e.id=t.endpoint_id
- JOIN public.harness_segments s ON s.id=a.segment_id JOIN public.vehicle_custom_circuits c ON c.id=s.vehicle_custom_circuit_id),
+ JOIN public.harness_segments s ON s.id=a.segment_id JOIN public.vehicle_custom_circuits c ON c.id=s.vehicle_custom_circuit_id
+ ORDER BY a.segment_id,a.side,m.x::text),
 page AS MATERIALIZED(SELECT * FROM targets WHERE p_after IS NULL OR sort_key>p_after ORDER BY sort_key
  LIMIT greatest(1,least(coalesce(p_limit,50),50)))
 SELECT jsonb_build_object('vehicle_id',p_vehicle_id,'evaluation_id',r->>'id',
