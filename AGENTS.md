@@ -117,6 +117,14 @@ into permanent identity types or mandatory arrival choices without a separate mo
 
 ## What the owner has already told an agent
 
+For product requirements, `python3 scripts/agent-intent.py packet --scope <scope>` retrieves the
+reviewed requirements, original conversation context, declared implementation links and open outcomes
+from the existing private `~/nuke-logs/design-memory/` archive. `doctor` checks availability and frozen
+input identity; `doctor --verify-inputs` rehashes exports within a bounded budget. The code is versioned
+here; transcripts and receipts stay private. A missing scope, a
+partial archive or an unavailable source is unreviewed context, not abandonment or permission to
+invent a replacement. A retrievable packet does not establish deployment or owner acceptance.
+
 A person's statements about organisations (their own companies, brands, shops and the dealings between them) are
 stored whole by `record_owner_statement` and read back by the connector tool `read_owner_statements` (database
 reader `get_my_owner_statements`). Before answering a question about the account's organisations, read the stored
