@@ -1,4 +1,5 @@
 import { delegatedFinancialEvidence } from "./financialDelegation.ts";
+import { CATALOG_MODES, CATALOG_METHODS, admitCatalogSupply, catalogIntakeStore } from "./catalogSupply.ts";
 /**
  * INGEST OBSERVATION
  *
@@ -312,6 +313,20 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    if ((CATALOG_MODES as readonly string[]).includes(input.mode ?? "")) {
+      retainedListingBudget = true;
+      const result = await admitCatalogSupply(input as unknown as Record<string, unknown>, catalogIntakeStore(supabase, async () => {
+        const writer = await authenticateWriter(req);
+        return writer.ok && writer.caller.kind === "service_role";
+      }));
+      return new Response(JSON.stringify(result.body), { status: result.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (input.source_slug === "supplied-catalog-document" || CATALOG_METHODS.includes(input.extraction_method ?? "") ||
+      CATALOG_METHODS.includes(String(input.structured_data?.profile ?? ""))) {
+      return new Response(JSON.stringify({ error: "Catalog testimony requires retained-source selectors", writes: 0, model_calls: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     let ecr: Extract<Awaited<ReturnType<typeof import("./retainedEcr.ts").readEcrCapture>>, { ok: true }> | undefined;
     if (input.mode === ECR_MODE) {
       const denied = await requireWriteAuth(req);

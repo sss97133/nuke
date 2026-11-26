@@ -10,6 +10,7 @@ import { isServiceCaller, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from '../_shared/geminiGuard.ts';
 import { recordSuppliedReference, ReferenceError, sha256 } from './suppliedReference.ts';
+import { recordSuppliedCatalogDocument } from './suppliedCatalogDocument.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +32,41 @@ Deno.serve(async (req) => {
     )
 
     const body = await req.json();
+    if (body.mode === 'supplied_catalog_source') {
+      try {
+        const result = await recordSuppliedCatalogDocument(body, {
+          authorize: () => isServiceCaller(req),
+          async retain(bytes, hash) {
+            const storage = supabase.storage.from('reference-docs'), path = `supplied/${hash}.md`;
+            const saved = await storage.upload(path, bytes, { contentType: 'text/markdown', upsert: false,
+              metadata: { sha256: hash, source_role: 'supplied_catalog_unverified' } });
+            if (!saved.error) return;
+            if (!['409', '400'].includes(String(saved.error.statusCode)) || !/already exists|duplicate/i.test(saved.error.message))
+              throw new ReferenceError('catalog_bytes_not_retained', 502);
+            const existing = await storage.download(path);
+            if (existing.error || !existing.data || existing.data.size !== bytes.length ||
+              await sha256(new Uint8Array(await existing.data.arrayBuffer())) !== hash)
+              throw new ReferenceError('catalog_existing_bytes_mismatch', 409);
+          },
+          async record(document, originalBody) {
+            const r = await supabase.rpc('record_supplied_catalog_document', { p_document: document, p_body: originalBody });
+            if (r.error) throw new ReferenceError('catalog_source_not_recorded', 409);
+            return r.data;
+          },
+          async ingest(selector) {
+            const r = await supabase.functions.invoke('ingest-observation', {
+              body: selector, headers: { apikey: projectSecretKey() ?? '' },
+            });
+            if (r.error) throw new ReferenceError('catalog_source_not_admitted', 409);
+            return r.data;
+          },
+        });
+        return Response.json(result, { headers: corsHeaders });
+      } catch (error) {
+        return Response.json({ success: false, error: error instanceof ReferenceError ? error.code : 'catalog_persistence_failed', model_calls: 0 },
+          { status: error instanceof ReferenceError ? error.status : 500, headers: corsHeaders });
+      }
+    }
     if (body.mode === 'supplied_reference') {
       try {
         const result = await recordSuppliedReference(body, {
