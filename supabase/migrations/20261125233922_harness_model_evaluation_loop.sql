@@ -10,6 +10,9 @@ CREATE TABLE public.harness_model_rules (
   version text NOT NULL,
   subject_kind text NOT NULL CHECK (subject_kind IN ('vehicle','circuit','segment','termination')),
   description text NOT NULL,
+  display_name text NOT NULL CHECK (btrim(display_name)<>''),
+  attention_action text NOT NULL CHECK (btrim(attention_action)<>''),
+  attention_order integer NOT NULL CHECK (attention_order>0),
   implementation regprocedure NOT NULL,
   is_current boolean NOT NULL DEFAULT true,
   recorded_at timestamptz NOT NULL DEFAULT now(),
@@ -216,7 +219,8 @@ SELECT jsonb_build_object('model',g,
  'catalog_parts',coalesce((SELECT jsonb_agg(jsonb_build_object('id',p.id,'part_number',p.part_number) ORDER BY p.id)
    FROM public.catalog_parts p WHERE p.id IN (SELECT id FROM part_ids)),'[]'::jsonb),
  'rules',coalesce((SELECT jsonb_agg(jsonb_build_object('rule_key',r.rule_key,'version',r.version,
-   'subject_kind',r.subject_kind,'description',r.description,'implementation',r.implementation::text)
+   'subject_kind',r.subject_kind,'description',r.description,'display_name',r.display_name,
+   'attention_action',r.attention_action,'attention_order',r.attention_order,'implementation',r.implementation::text)
    ORDER BY r.rule_key) FROM public.harness_model_rules r WHERE r.is_current),'[]'::jsonb))
 FROM model;
 $fn$;
@@ -318,8 +322,9 @@ SELECT jsonb_build_object(
 $fn$;
 COMMENT ON FUNCTION public.harness_model_compute(jsonb) IS 'Pure structural computation over one captured input. Electrical joins use stored current net plus endpoint/cavity or bus identities; isolated ends create no shared continuity. Gross wire plans use physical segments once with no extra allowance. Unimplemented or engineering checks hold. No source rows, as-built states, supplier units or stock are invented.';
 
-INSERT INTO public.harness_model_rules(rule_key,version,subject_kind,description,implementation) VALUES
- ('circuit_segments','1','circuit','A selected decided circuit has at least one current decided physical segment; a missing physical piece is not a zero material requirement.','public.harness_model_compute(jsonb)'::regprocedure),
+INSERT INTO public.harness_model_rules(rule_key,version,subject_kind,description,implementation,display_name,attention_action,attention_order)
+SELECT r.*,l.display_name,l.attention_action,l.attention_order FROM (VALUES
+('circuit_segments','1','circuit','A selected decided circuit has at least one current decided physical segment; a missing physical piece is not a zero material requirement.','public.harness_model_compute(jsonb)'::regprocedure),
  ('segment_links','1','segment','Physical segment has both current typed end links in its source circuit.','public.harness_model_compute(jsonb)'::regprocedure),
  ('segment_specification','1','segment','Recorded segment, current circuit and exact keyed wire identity agree; this is structural agreement, not an engineering rating.','public.harness_model_compute(jsonb)'::regprocedure),
  ('wire_stock_key','1','segment','An exact known wire-stock catalog identity is present for this recorded specification.','public.harness_model_compute(jsonb)'::regprocedure),
@@ -330,7 +335,21 @@ INSERT INTO public.harness_model_rules(rule_key,version,subject_kind,description
  ('terminal_catalog_key','1','termination','The recorded end names a visible canonical terminal catalog identity; wire-range fit is a separate engineering check.','public.harness_model_compute(jsonb)'::regprocedure),
  ('seal_catalog_key','1','termination','The recorded seal has a canonical catalog identity. Missing identification or applicability remains unknown.','public.harness_model_compute(jsonb)'::regprocedure),
  ('tool_catalog_key','1','termination','The recorded tool has a canonical catalog identity; qualification for the terminal remains separate.','public.harness_model_compute(jsonb)'::regprocedure),
- ('engineering_coverage','1','vehicle','This evaluation covers structure only. Electrical sizing, protection, geometry, construction and procurement release still require their own input-bound rules.','public.harness_model_compute(jsonb)'::regprocedure);
+ ('engineering_coverage','1','vehicle','This evaluation covers structure only. Electrical sizing, protection, geometry, construction and procurement release still require their own input-bound rules.','public.harness_model_compute(jsonb)'::regprocedure)
+) r(rule_key,version,subject_kind,description,implementation) JOIN (VALUES
+ ('circuit_segments','Physical pieces identified','Identify the physical pieces for this circuit before calculating its material or cut list.',10),
+ ('segment_links','Both piece ends identified','Identify both recorded ends and reconcile their circuit and connector assignments.',20),
+ ('segment_specification','Piece and stock specifications agree','Resolve the piece, circuit and stock disagreement; preserve any cut or built material as its own physical revision.',30),
+ ('wire_stock_key','Wire stock identified','Identify the exact wire stock and verify its gauge, insulation and colour against the design.',40),
+ ('material_source_status','Current material records agree','Resolve the recorded material blockers and current source revision before using this requirement.',50),
+ ('new_wire_demand','Existing physical work reconciled','Reconcile recorded cuts, measurements and stock allocation before adding wire to an order.',60),
+ ('planned_wire_amount','Piece length plan identified','Record a route-based length plan and its basis; verify the actual cut length at the build stage.',70),
+ ('termination_cavity_key','Connector cavity identified','Identify the connector cavity from its manufacturer drawing and resolve any ambiguous pin assignment.',80),
+ ('terminal_catalog_key','Contact identified','Identify the contact stock part, then qualify wire range and connector fit separately.',90),
+ ('seal_catalog_key','Seal applicability identified','Resolve whether this end requires a seal and identify the applicable stock part from the connector drawing.',100),
+ ('tool_catalog_key','Crimp tool identified','Identify the tool stock or library entry, then qualify it for the selected contact separately.',110),
+ ('engineering_coverage','Electrical and construction qualification incomplete','Complete the sizing, protection, route and contact-fit checks before final cutting or assembly; reconcile stock and supplier packs before ordering.',120)
+) l(rule_key,display_name,attention_action,attention_order) USING(rule_key);
 
 CREATE FUNCTION public.harness_model_logic_snapshot() RETURNS jsonb
 LANGUAGE sql STABLE SECURITY INVOKER SET search_path=public AS $$
@@ -347,7 +366,8 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path=public AS $$
   'harness_model_logic_key()',pg_get_functiondef(to_regprocedure('public.harness_model_logic_key()'))),
   'postgres_version',current_setting('server_version_num'),
   'rules',coalesce((SELECT jsonb_agg(jsonb_build_object('key',r.rule_key,'version',r.version,'subject',r.subject_kind,
-    'description',r.description,'implementation',r.implementation::text) ORDER BY r.rule_key)
+    'description',r.description,'display_name',r.display_name,'attention_action',r.attention_action,'attention_order',r.attention_order,
+    'implementation',r.implementation::text) ORDER BY r.rule_key)
     FROM public.harness_model_rules r WHERE r.is_current),'[]'::jsonb));
 $$;
 CREATE FUNCTION public.harness_model_logic_key() RETURNS text
@@ -517,6 +537,9 @@ graph AS (
  SELECT (i.payload->'model') || jsonb_build_object(
    'evaluation_id',r.id,'input_hash',r.input_hash,'logic_key',r.logic_key,'evaluated_at',r.evaluated_at,'coverage',r.coverage,
    'rule_definitions',i.payload->'rules',
+   'attention_check_ids',coalesce((SELECT jsonb_agg(c.id ORDER BY CASE c.result WHEN 'fail' THEN 0 ELSE 1 END,r.attention_order,c.id)
+     FROM checks c JOIN public.harness_model_rules r ON r.rule_key=c.rule_key AND r.version=c.rule_version
+     WHERE c.result<>'pass'),'[]'::jsonb),
    'electrical_nodes',coalesce((SELECT jsonb_agg(to_jsonb(n)-'evaluation_id' ORDER BY n.id) FROM nodes n),'[]'::jsonb),
    'segment_ends',coalesce((SELECT jsonb_agg(to_jsonb(a)-'evaluation_id' ORDER BY a.segment_id,a.side) FROM ends a),'[]'::jsonb),
    'model_checks',coalesce((SELECT jsonb_agg(to_jsonb(c)-'evaluation_id' ORDER BY c.id) FROM checks c),'[]'::jsonb),
@@ -677,6 +700,9 @@ COMMENT ON COLUMN public.harness_model_rules.rule_key IS 'Stable named predicate
 COMMENT ON COLUMN public.harness_model_rules.version IS 'Retained implementation contract version for the named predicate.';
 COMMENT ON COLUMN public.harness_model_rules.subject_kind IS 'Typed grain to which this rule applies.';
 COMMENT ON COLUMN public.harness_model_rules.description IS 'Exact meaning and qualification limits of a passing result.';
+COMMENT ON COLUMN public.harness_model_rules.display_name IS 'Builder-facing name of this retained predicate version; not a verdict.';
+COMMENT ON COLUMN public.harness_model_rules.attention_action IS 'Plain next resolution step for a held or failed result; no unrecorded physical work or release is inferred.';
+COMMENT ON COLUMN public.harness_model_rules.attention_order IS 'Resolution order within a result severity; current reader projects the ordered check IDs so clients do not invent build priorities.';
 COMMENT ON COLUMN public.harness_model_rules.implementation IS 'Native PostgreSQL function identity that computes this predicate.';
 COMMENT ON COLUMN public.harness_model_rules.is_current IS 'Whether this version participates in new evaluations.';
 COMMENT ON COLUMN public.harness_model_rules.recorded_at IS 'Database clock when this definition was admitted.';

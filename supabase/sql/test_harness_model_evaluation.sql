@@ -105,6 +105,10 @@ BEGIN
  IF n<>2 THEN RAISE EXCEPTION 'Persisted read lost physical grain'; END IF;
  IF jsonb_array_length(r->'model'->'model_checks')=0 THEN RAISE EXCEPTION 'Consumer received no stored checks'; END IF;
  IF jsonb_array_length(r->'model'->'rule_definitions')<>12 THEN RAISE EXCEPTION 'Consumer has no bound check meanings'; END IF;
+ IF EXISTS(SELECT FROM jsonb_array_elements(r#>'{model,rule_definitions}') x WHERE nullif(x->>'display_name','') IS NULL
+  OR nullif(x->>'attention_action','') IS NULL) THEN RAISE EXCEPTION 'Builder receives a hold without its named resolution step'; END IF;
+ IF jsonb_array_length(r#>'{model,attention_check_ids}')<>(SELECT count(*) FROM jsonb_array_elements(r#>'{model,model_checks}') x WHERE x->>'result'<>'pass')
+ THEN RAISE EXCEPTION 'Database did not order the actual unresolved result IDs'; END IF;
 END $$;
 
 -- Typed result guards cannot attach another asset or swap a physical piece's recorded side.
@@ -253,8 +257,8 @@ BEGIN
  SELECT failure_count INTO failures FROM public.harness_model_state;
  r:=public.harness_model_fold('e08bf694-970f-4cbe-8a74-8715158a0f2e');
  IF r->>'status'<>'backoff' OR (SELECT failure_count FROM public.harness_model_state)<>failures THEN RAISE EXCEPTION 'Retry backoff was ignored'; END IF;
- INSERT INTO public.harness_model_rules(rule_key,version,subject_kind,description,implementation)
- SELECT rule_key,'2',subject_kind,description,implementation FROM public.harness_model_rules WHERE rule_key='segment_links' AND version='1';
+ INSERT INTO public.harness_model_rules(rule_key,version,subject_kind,description,implementation,display_name,attention_action,attention_order)
+ SELECT rule_key,'2',subject_kind,description,implementation,display_name,attention_action,attention_order FROM public.harness_model_rules WHERE rule_key='segment_links' AND version='1';
  IF (SELECT failure_count FROM public.harness_model_state)<>0 THEN RAISE EXCEPTION 'New source contract did not reset backoff'; END IF;
  CALL public.model_fold_tick();
  IF public.harness_evaluated_model('e08bf694-970f-4cbe-8a74-8715158a0f2e')->>'status'<>'current'
