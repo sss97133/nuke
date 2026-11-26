@@ -15,7 +15,7 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO anon, authenticated, service_ro
 GRANT SELECT ON public.vehicles, public.vehicle_custom_circuits, public.vehicle_wiring_overlays,
   public.harness_designs, public.harness_endpoints, public.wire_termination_specs, public.catalog_parts TO anon, authenticated;
 
-CREATE TABLE IF NOT EXISTS public.wiring_decisions (id uuid PRIMARY KEY, vehicle_id uuid NOT NULL, is_superseded boolean NOT NULL DEFAULT false);
+CREATE TABLE IF NOT EXISTS public.wiring_decisions (id uuid PRIMARY KEY, vehicle_id uuid NOT NULL REFERENCES public.vehicles(id), is_superseded boolean NOT NULL DEFAULT false);
 
 CREATE TEMP TABLE material_fixture (name text PRIMARY KEY, vehicle_id uuid, overlay_id uuid, design_id uuid,
   circuit_id uuid, old_segment_id uuid, from_end uuid, to_end uuid, from_plug uuid, to_plug uuid, net_id uuid, route_id uuid);
