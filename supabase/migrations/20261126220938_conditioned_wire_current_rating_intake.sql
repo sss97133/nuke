@@ -155,8 +155,8 @@ BEGIN
   'actual_conductor_temperature','unestablished','normalization_version','ampere_identity_v1');
  identity_hash:=encode(extensions.digest(jsonb_build_object('reading',canon-'reader'-'read_at','profile_fingerprint',fingerprint,'property_id',prop.id,'condition_key',ck)::text,'sha256'),'hex');
  recipe:=jsonb_build_object('vehicle_id',NULL,'subject_id',NULL,'subject_type','vehicle','subject_organization_id',NULL,
-  'source_observation_id',NULL,'component_subject_id',NULL,'source_id',source_id,'kind','specification','property_id',prop.id,
-  'observed_at',read_at,'observed_at_basis','source_analysis_time','source_event_time_precision','unknown','source_event_at',NULL,
+  'source_observation_id',NULL,'source_vehicle_event_id',NULL,'auction_event_id',NULL,'component_subject_id',NULL,'source_id',source_id,'kind','specification','property_id',prop.id,
+  'observed_at',read_at,'observed_at_basis','source_analysis_time','source_event_time_precision','unknown','source_event_at',NULL,'source_event_date',NULL,
   'source_url',d.source_url,'source_identifier','wire-current-rating:'||identity_hash,'content_hash',identity_hash,
   'content_text',value_excerpt,'structured_data',fields,'observer_raw',jsonb_build_object('reader',p_reading->'reader'),
   'extraction_method','supplied_wire_current_rating_v1','raw_source_ref','sha256:'||d.file_hash,'analysis_deferred',true,
@@ -202,8 +202,8 @@ BEGIN
   SELECT FROM public.observation_properties p WHERE p.id=NEW.property_id AND p.property_key='wire_published_current_rating');
  IF NOT coalesce(old_reading,false) AND NOT coalesce(new_reading,false) THEN RETURN NEW; END IF;
  IF TG_OP='UPDATE' THEN
-  IF EXISTS(SELECT FROM unnest(ARRAY['vehicle_id','subject_id','subject_type','subject_organization_id','source_observation_id',
-   'component_subject_id','source_id','kind','property_id','observed_at','observed_at_basis','source_event_time_precision','source_event_at',
+  IF EXISTS(SELECT FROM unnest(ARRAY['vehicle_id','subject_id','subject_type','subject_organization_id','source_observation_id','source_vehicle_event_id','auction_event_id',
+   'component_subject_id','source_id','kind','property_id','observed_at','observed_at_basis','source_event_time_precision','source_event_at','source_event_date',
    'source_url','source_identifier','content_hash','content_text','structured_data','observer_raw','extraction_method','raw_source_ref',
    'analysis_deferred','confidence','confidence_score','rank','descriptor_id','citation_document_id','citation_secure_document_id',
    'citation_page_number','citation_excerpt','agent_model']) k WHERE to_jsonb(NEW)->k IS DISTINCT FROM to_jsonb(OLD)->k)

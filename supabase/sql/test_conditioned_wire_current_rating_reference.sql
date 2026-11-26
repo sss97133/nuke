@@ -18,6 +18,9 @@ ALTER TABLE public.vehicle_observations
  ADD COLUMN observed_at_basis text,
  ADD COLUMN source_event_time_precision text,
  ADD COLUMN source_event_at timestamptz,
+ ADD COLUMN source_event_date date,
+ ADD COLUMN source_vehicle_event_id uuid,
+ ADD COLUMN auction_event_id uuid,
  ADD COLUMN source_identifier text,
  ADD COLUMN content_hash text UNIQUE,
  ADD COLUMN content_text text,
@@ -101,11 +104,14 @@ DO $$ DECLARE r record; q jsonb; recipe jsonb; changed jsonb; field text; a nume
   END LOOP;
  END LOOP;
  recipe:=public.qualify_wire_current_rating_reference(pg_temp.current_rating_reading())->'recipe';
- FOREACH field IN ARRAY ARRAY['vehicle_id','property_id','source_id','extraction_method','source_identifier','observed_at_basis','analysis_deferred','confidence_score','content_text','structured_data'] LOOP
+ FOREACH field IN ARRAY ARRAY['vehicle_id','source_vehicle_event_id','auction_event_id','property_id','source_id','extraction_method','source_identifier','observed_at_basis','source_event_date','analysis_deferred','confidence_score','content_text','structured_data'] LOOP
   changed:=recipe||jsonb_build_object(field,CASE field
    WHEN 'vehicle_id' THEN to_jsonb('73000000-0000-0000-0000-000000000001'::text)
+   WHEN 'source_vehicle_event_id' THEN to_jsonb('73000000-0000-0000-0000-000000000001'::text)
+   WHEN 'auction_event_id' THEN to_jsonb('73000000-0000-0000-0000-000000000001'::text)
    WHEN 'property_id' THEN to_jsonb('73000000-0000-0000-0000-000000000001'::text)
    WHEN 'source_id' THEN to_jsonb('73000000-0000-0000-0000-000000000001'::text)
+   WHEN 'source_event_date' THEN to_jsonb('2026-01-01'::text)
    WHEN 'analysis_deferred' THEN 'false'::jsonb WHEN 'confidence_score' THEN '1'::jsonb
    WHEN 'structured_data' THEN recipe->'structured_data'||'{"owner_confirmed":true}'::jsonb ELSE '"altered"'::jsonb END);
   q:=public.wire_current_rating_observation_binding(jsonb_populate_record(NULL::vehicle_observations,changed));
