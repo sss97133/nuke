@@ -178,7 +178,7 @@ END $patch$;
 
 CREATE FUNCTION public.harness_model_check_context(p_vehicle_id uuid,p_evaluation_id uuid,p_check_id uuid)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path=pg_catalog,public SET timezone='UTC' AS $fn$
-DECLARE inp jsonb; receipt jsonb; c public.harness_model_checks; source_row jsonb; bindings jsonb;
+DECLARE inp jsonb; receipt jsonb; c public.harness_model_checks; source_row jsonb; bindings jsonb; ends jsonb; endpoint_contexts jsonb;
 BEGIN
  inp:=public.harness_model_inputs(p_vehicle_id);
  receipt:=public.harness_model_receipt_for_hash(p_vehicle_id,md5(inp::text));
@@ -196,12 +196,29 @@ BEGIN
   AND b.value_md5=md5(jsonb_build_object('present',source_row ? b.input_field,'value',source_row->b.input_field)::text);
  IF c.input_binding_count IS NOT NULL AND c.input_binding_count<>jsonb_array_length(bindings) THEN
   RETURN jsonb_build_object('status','incomplete_visibility','check',NULL,'inputs','[]'::jsonb); END IF;
+ SELECT coalesce(jsonb_agg(jsonb_build_object('side',sides.side,'requested_termination_id',source_row->(sides.side||'_termination_id'),
+  'termination_record_present',t IS NOT NULL,'termination_id',t->'id','endpoint_id',t->'endpoint_id',
+  'cavity',t->'cavity','cavity_layout_id',t->'cavity_layout_id','evaluated_node_id',a.node_id,'evaluated_node_basis',n.basis) ORDER BY sides.side),'[]'::jsonb)
+ INTO ends FROM(VALUES('from'),('to')) sides(side)
+ LEFT JOIN LATERAL(SELECT t FROM jsonb_array_elements(inp#>'{model,terminations}') t WHERE t->>'id'=source_row->>(sides.side||'_termination_id')) term ON true
+ LEFT JOIN public.harness_model_segment_ends a ON a.evaluation_id=p_evaluation_id AND a.segment_id=c.segment_id AND a.side=sides.side
+ LEFT JOIN public.harness_model_nodes n ON n.evaluation_id=a.evaluation_id AND n.id=a.node_id WHERE source_row IS NOT NULL;
+ SELECT coalesce(jsonb_agg(jsonb_build_object('endpoint_id',e->'id','endpoint_code',e->'code','recorded_node_kind',e->'node_kind',
+  'selected_piece_end_count',(SELECT count(*) FROM jsonb_array_elements(inp#>'{model,terminations}') t WHERE t->'endpoint_id'=e->'id'),
+  'selected_piece_ends_complete',(SELECT count(*)<=8 FROM jsonb_array_elements(inp#>'{model,terminations}') t WHERE t->'endpoint_id'=e->'id'),
+  'selected_piece_ends',(SELECT coalesce(jsonb_agg(jsonb_build_object('termination_id',t->'id','circuit_id',t->'circuit_id',
+   'cavity',t->'cavity','cavity_layout_id',t->'cavity_layout_id') ORDER BY t->>'id'),'[]'::jsonb)
+   FROM(SELECT t FROM jsonb_array_elements(inp#>'{model,terminations}') t WHERE t->'endpoint_id'=e->'id' ORDER BY t->>'id' LIMIT 8) page)
+  ) ORDER BY e->>'id'),'[]'::jsonb) INTO endpoint_contexts FROM jsonb_array_elements(inp#>'{model,endpoints}') e
+ WHERE e->>'id' IN(SELECT x->>'endpoint_id' FROM jsonb_array_elements(ends) x);
  RETURN jsonb_build_object('status','current','evaluation_id',p_evaluation_id,'input_hash',receipt->'input_hash','logic_key',receipt->'logic_key',
   'check',jsonb_build_object('id',c.id,'rule_key',c.rule_key,'rule_version',c.rule_version,'result',c.result,
    'segment_id',c.segment_id,'termination_id',c.termination_id,'circuit_id',c.circuit_id,'component_requirement_id',c.component_requirement_id),
   'subject',CASE WHEN source_row IS NOT NULL THEN (SELECT jsonb_object_agg(k,source_row->k) FROM unnest(ARRAY[
    'id','circuit_id','net_id','gauge_awg','colour','wire_part_id','keyed_part_number','expected_gauge_awg','expected_part_number',
    'planned_length_ft','planned_length_method','measured_length_ft','build_state']) k) ELSE NULL END,
+  'inspection_context',jsonb_build_object('role','recorded_design_addresses_only_not_consumed_witnesses_or_continuity',
+   'ends',ends,'endpoints',endpoint_contexts),
   'input_coverage',CASE WHEN c.input_binding_count IS NULL THEN 'not_recorded' ELSE 'direct_segment_predicate_v1' END,
   'source_lineage','not_assessed','inputs',bindings,'rule',(SELECT r FROM jsonb_array_elements(inp->'rules') r WHERE r->>'rule_key'=c.rule_key));
 END $fn$;
@@ -210,7 +227,7 @@ GRANT EXECUTE ON FUNCTION public.harness_model_check_context(uuid,uuid,uuid) TO 
 
 COMMENT ON FUNCTION public.harness_model_segment_check(text,jsonb) IS 'Canonical substep of harness_model_compute for five material/length predicates. Verdict and declared direct projected-segment inputs are produced together; unknown predicates return NULL, never invented coverage. Fields may themselves be derived; this is not transitive source/witness or engineering proof.';
 COMMENT ON FUNCTION public.harness_model_check_input_guard() IS 'Binds one derived direct-input edge to its exact immutable evaluation segment, canonical verdict, field presence and value fingerprint. No testimony or source row is written.';
-COMMENT ON FUNCTION public.harness_model_check_context(uuid,uuid,uuid) IS 'Bounded invoker-RLS inspection of one current canonical check and at most four direct projected-segment inputs. Values are recovered from the same current public allowlisted model and verified by fingerprints; private input/logic receipts are never exposed. Missing instrumentation remains not_recorded; transitive source/witness lineage is not_assessed.';
+COMMENT ON FUNCTION public.harness_model_check_context(uuid,uuid,uuid) IS 'Bounded invoker-RLS inspection of one current canonical check and at most four direct projected-segment inputs. Two recorded end addresses and at most eight same-endpoint records per endpoint provide explicitly labelled inspection context, not consumed witnesses or asserted continuity. Values come from the same current public allowlisted model and match fingerprints; private receipts stay hidden. Missing instrumentation is not_recorded; transitive source lineage is not_assessed.';
 COMMENT ON COLUMN public.harness_model_checks.input_binding_count IS 'Expected direct predicate input children; NULL means unrecorded coverage. It is not zero or complete transitive source coverage.';
 COMMENT ON COLUMN public.harness_model_evaluations.check_input_count IS 'Expected direct check-input child rows; incomplete visible children prevent a current receipt. Historical receipts retain zero and become stale on changed logic.';
 COMMENT ON TABLE public.harness_model_check_inputs IS 'Grain: one declared direct projected-segment field consumed by one canonical check in one immutable evaluation. Typed segment and check/evaluation FKs; presence and fingerprint distinguish absent from explicit null. No copied source value, testimony, independent verdict or transitive witness claim.';

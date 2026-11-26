@@ -82,6 +82,12 @@ DO $$ DECLARE e uuid; n integer; r jsonb; c public.harness_model_checks; BEGIN
  r:=public.harness_model_check_context('e08bf694-970f-4cbe-8a74-8715158a0f2e',e,c.id);
  IF r->>'input_coverage'<>'not_recorded' OR jsonb_array_length(r->'inputs')<>0 OR r#>>'{check,result}'<>'hold'
  THEN RAISE EXCEPTION 'Uninstrumented engineering rule claimed direct inputs or readiness'; END IF;
+ SELECT * INTO c FROM public.harness_model_checks WHERE evaluation_id=e AND rule_key='segment_links' LIMIT 1;
+ r:=public.harness_model_check_context('e08bf694-970f-4cbe-8a74-8715158a0f2e',e,c.id);
+ IF r->>'input_coverage'<>'not_recorded' OR jsonb_array_length(r#>'{inspection_context,ends}')<>2
+  OR r#>>'{inspection_context,role}'<>'recorded_design_addresses_only_not_consumed_witnesses_or_continuity'
+  OR jsonb_array_length(r#>'{inspection_context,endpoints}')>2
+ THEN RAISE EXCEPTION 'Recorded inspection context is missing or falsely claims predicate lineage'; END IF;
 END $$;
 
 SET ROLE anon;
@@ -178,6 +184,11 @@ DO $$ DECLARE e uuid; expected integer; c uuid; r jsonb; BEGIN
  r:=public.harness_model_check_context(md5('harness scale vehicle')::uuid,e,c);
  IF r->>'status'<>'current' OR jsonb_array_length(r->'inputs')<>2
  THEN RAISE EXCEPTION '500-piece current check inspection failed'; END IF;
+ IF EXISTS(SELECT FROM jsonb_array_elements(r#>'{inspection_context,endpoints}') ep
+  WHERE jsonb_array_length(ep->'selected_piece_ends')>8)
+  OR NOT EXISTS(SELECT FROM jsonb_array_elements(r#>'{inspection_context,endpoints}') ep
+   WHERE (ep->>'selected_piece_end_count')::int=500 AND ep->>'selected_piece_ends_complete'='false')
+ THEN RAISE EXCEPTION 'Large endpoint context lost its bound or truncation declaration'; END IF;
 END $$;
 RESET ROLE;
 SELECT 'test_harness_check_field_bindings: PASS' result;
