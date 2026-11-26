@@ -24,25 +24,27 @@ BEGIN
   SELECT s.id, s.wire_part_id, p.id
   FROM public.harness_segments s
   JOIN public.vehicle_custom_circuits c ON c.id = s.vehicle_custom_circuit_id
+  JOIN public.vehicle_wiring_overlays o ON o.id=c.overlay_id AND o.vehicle_id=s.vehicle_id
   CROSS JOIN LATERAL (
     SELECT cp.id FROM public.catalog_parts cp
     WHERE c.wire_type ~ '^M22759/(16|32)$'
       AND cp.part_number = c.wire_type || '-' || (CASE WHEN c.wire_gauge_awg>0 THEN c.wire_gauge_awg::text
         WHEN c.wire_type='M22759/16' AND c.wire_gauge_awg=0 THEN '01'
         WHEN c.wire_type='M22759/16' AND c.wire_gauge_awg=-1 THEN '02' END) || '-' || (
-        SELECT string_agg(CASE x WHEN 'black' THEN '0' WHEN 'brown' THEN '1' WHEN 'red' THEN '2' WHEN 'orange' THEN '3'
+        SELECT CASE WHEN count(*)=count(digit) THEN string_agg(digit, '' ORDER BY ord) END
+        FROM unnest(string_to_array(lower(c.wire_color), '/')) WITH ORDINALITY AS u(x, ord)
+        CROSS JOIN LATERAL(SELECT CASE btrim(x) WHEN 'black' THEN '0' WHEN 'brown' THEN '1' WHEN 'red' THEN '2' WHEN 'orange' THEN '3'
                                    WHEN 'yellow' THEN '4' WHEN 'green' THEN '5' WHEN 'blue' THEN '6' WHEN 'violet' THEN '7'
-                                   WHEN 'gray' THEN '8' WHEN 'white' THEN '9' END, '' ORDER BY ord)
-        FROM unnest(string_to_array(lower(c.wire_color), '/')) WITH ORDINALITY AS u(x, ord))
+                                   WHEN 'gray' THEN '8' WHEN 'white' THEN '9' END AS digit) colours)
     ORDER BY cp.id LIMIT 1) p
   WHERE s.vehicle_id = p_vehicle_id AND NOT s.is_superseded AND s.wire_part_id IS DISTINCT FROM p.id
-    -- The added aught path may key a design plan, never reinterpret material
-    -- already cut, measured or progressed on its circuit.
-    AND (c.wire_gauge_awg>0 OR (
-      s.build_state='uncut' AND s.measured_length_ft IS NULL AND s.measured_at IS NULL
+    -- Key a design plan, never reinterpret material already cut, measured or
+    -- progressed on its circuit, including newly recognized colours/sizes.
+    AND NOT coalesce(c.is_superseded,false)
+    AND s.build_state='uncut' AND s.measured_length_ft IS NULL AND s.measured_at IS NULL
       AND c.build_state='uncut' AND to_jsonb(c)->>'measured_length_ft' IS NULL
       AND NOT EXISTS(SELECT FROM public.harness_build_events b
-       WHERE b.vehicle_id=p_vehicle_id AND b.circuit_id=c.id AND b.to_state<>'uncut')));
+       WHERE b.vehicle_id=p_vehicle_id AND b.circuit_id=c.id AND b.to_state<>'uncut');
 
   SELECT count(*) FILTER (WHERE old_part IS NULL), count(*) FILTER (WHERE old_part IS NOT NULL) INTO n_keyed, n_rekeyed FROM segkey_part;
   UPDATE public.harness_segments s SET wire_part_id = k.part_id
@@ -67,7 +69,7 @@ BEGIN
   RETURN jsonb_build_object('segments_keyed_to_a_part', n_keyed, 'segments_rekeyed', n_rekeyed,
                             'option_links_added', n_links, 'segments_given_links', n_linked_segments);
 END $fn$;
-COMMENT ON FUNCTION public.key_harness_segments(uuid) IS 'Keys every live segment of the vehicle: wire_part_id to the catalog''s exact M22759/16 or /32 part for its wire''s spec, gauge and colour (the reshape v1 rule; a key the catalog cannot back is left alone), and an option link (wiring_decision_links coupled_with) for every option its wire-end plugs are coupled with (the RSI pass 1 rule). Idempotent; the registry loader calls it after the segments conform. The added /16 aught path maps AWG index0 to size01 and-1 to02 only for uncut/unmeasured material with no circuit physical progress; it makes no engineering or stock-availability claim. RSI pass 30, case ledger 13.12.3.';
+COMMENT ON FUNCTION public.key_harness_segments(uuid) IS 'Keys uncut/unmeasured live design pieces to exact existing M22759 stock from a current circuit of the same vehicle; every colour token must resolve, preserving base/stripe order. AWG index0 maps to /16 size01 and-1 to02; other nonpositive family/size combinations remain unsupported. Recorded piece/circuit cuts, measurements and build progress retain their material identity. Missing catalog stock remains unresolved. Existing option coupling propagation is preserved. Invoker/service-only; no gauge selection, physical fit or purchasing release.';
 REVOKE ALL ON FUNCTION public.key_harness_segments(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.key_harness_segments(uuid) TO service_role;
 

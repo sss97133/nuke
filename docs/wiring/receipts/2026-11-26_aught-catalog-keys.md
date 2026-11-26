@@ -12,17 +12,20 @@ The already retained document is81e85839-b5ba-464f-bbfe-3290af0f634d. This repai
 does not choose any of those gauges for the truck.
 
 Extend the two existing functions consistently: preserve ordinary positive-size
-behavior; support0/-1 only for/16 using01/02; leave other nonpositive indices
+tokens; support0/-1 only for/16 using01/02; leave other nonpositive indices
 unsupported. A catalog identity still requires an exact existing part match.
-The new aught key path applies only to uncut, unmeasured physical pieces whose
-circuit has no recorded physical progress. Existing measured/cut identity stays
+Every key change applies only to uncut, unmeasured physical pieces whose
+current circuit belongs to the same vehicle and has no recorded physical progress.
+Colour tokens use the same trimmed, ordered all-token rule as the reader. A
+partially unknown colour is not silently shortened into a different stock code. Existing measured/cut identity stays
 unchanged and the reader can expose a mismatch rather than silently rekey it.
 No new function, mapping table or source writer is introduced. Existing loader,
 source invalidation, model logic fingerprint and fold remain the owners.
 
 Implementation validation covers1AWG versus1/0 versus2/0, family boundaries,
 exact existing stock/missing stock, unsupported size, cut/measurement/build-history
-preservation, idempotency, public/private grants, and the actual evaluated reader
+preservation for positive and aught sizes, complete/partial/striped colour handling,
+foreign-circuit refusal, idempotency, public/private grants, and the actual evaluated reader
 after keying. The current production atlas/preflight request times out; no live
 schema, writer or source changes are authorized by this local proof. Release must
 still use the checked PR/CI path and actual refreshed schema/function/lock checks.

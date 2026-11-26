@@ -17,11 +17,19 @@ INSERT INTO aught_cases VALUES
  ('measured_piece',0,'M22759/16','red','M22759/16-01-2',false,'uncut',1.25,'uncut',false),
  ('unknown_circuit_state',0,'M22759/16','red','M22759/16-01-2',false,'uncut',NULL,NULL,false),
  ('progressed_circuit',0,'M22759/16','red','M22759/16-01-2',false,'uncut',NULL,'cut',false),
- ('recorded_progress',0,'M22759/16','red','M22759/16-01-2',false,'uncut',NULL,'uncut',true);
+ ('recorded_progress',0,'M22759/16','red','M22759/16-01-2',false,'uncut',NULL,'uncut',true),
+ ('normalised_colour',1,'M22759/16',' red ','M22759/16-1-2',true,'uncut',NULL,'uncut',false),
+ ('striped_aught',0,'M22759/16','black/red','M22759/16-01-02',true,'uncut',NULL,'uncut',false),
+ ('partial_unknown_colour',2,'M22759/16','red/unknown',NULL,false,'uncut',NULL,'uncut',false),
+ ('positive_cut_piece',2,'M22759/16','red','M22759/16-2-2',false,'cut',NULL,'uncut',false),
+ ('positive_measured_piece',2,'M22759/16','red','M22759/16-2-2',false,'uncut',1.25,'uncut',false),
+ ('positive_recorded_progress',2,'M22759/16','red','M22759/16-2-2',false,'uncut',NULL,'uncut',true);
 INSERT INTO public.catalog_parts(id,part_number) VALUES
  (md5('aught stock ordinary')::uuid,'M22759/16-1-2'),
  (md5('aught stock one')::uuid,'M22759/16-01-2'),
  (md5('aught stock two')::uuid,'M22759/16-02-2'),
+ (md5('aught stock striped')::uuid,'M22759/16-01-02'),
+ (md5('aught stock ordinary two')::uuid,'M22759/16-2-2'),
  -- Malformed legacy tokens must never win merely because they exist.
  (md5('aught stock zero wrong')::uuid,'M22759/16-0-2'),
  (md5('aught stock negative wrong')::uuid,'M22759/16--1-2');
@@ -38,7 +46,7 @@ INSERT INTO public.harness_segments(id,vehicle_id,vehicle_custom_circuit_id,net_
  SELECT md5('aught piece:'||name)::uuid,'e08bf694-970f-4cbe-8a74-8715158a0f2e',md5('aught circuit:'||name)::uuid,
  (SELECT id FROM public.harness_nets WHERE vehicle_id='e08bf694-970f-4cbe-8a74-8715158a0f2e' AND NOT is_superseded ORDER BY id LIMIT 1),
  md5('aught end:'||name||'from')::uuid,md5('aught end:'||name||'to')::uuid,
- md5('aught stock ordinary')::uuid,gauge,colour,segment_state,measured_ft,CASE WHEN measured_ft IS NOT NULL THEN now() END,
+ md5('aught stock zero wrong')::uuid,gauge,colour,segment_state,measured_ft,CASE WHEN measured_ft IS NOT NULL THEN now() END,
  2,'disposable plan','decided','fixture','fixture',now(),'T3'
  FROM aught_cases;
 INSERT INTO public.harness_build_events(vehicle_id,circuit_id,to_state)
@@ -62,7 +70,7 @@ DO $$ DECLARE g jsonb; s jsonb; row_ record; expected text; r jsonb; BEGIN
  g:=public.harness_schematic_model('e08bf694-970f-4cbe-8a74-8715158a0f2e');
  FOR row_ IN SELECT * FROM aught_cases LOOP
   SELECT x INTO STRICT s FROM jsonb_array_elements(g->'segments') x WHERE x->>'id'=md5('aught piece:'||row_.name)::uuid::text;
-  expected:=CASE WHEN row_.may_key THEN row_.expected_part ELSE 'M22759/16-1-2' END;
+  expected:=CASE WHEN row_.may_key THEN row_.expected_part ELSE 'M22759/16-0-2' END;
   IF s->>'keyed_part_number' IS DISTINCT FROM expected OR s->>'expected_part_number' IS DISTINCT FROM row_.expected_part
    OR (s->>'gauge_awg')::int IS DISTINCT FROM row_.gauge OR (s->>'circuit_gauge_awg')::int IS DISTINCT FROM row_.gauge
    OR (s->>'measured_length_ft')::numeric IS DISTINCT FROM row_.measured_ft
@@ -85,6 +93,21 @@ DO $$ DECLARE g jsonb; s jsonb; row_ record; expected text; r jsonb; BEGIN
   OR (SELECT prosecdef FROM pg_proc WHERE oid='public.key_harness_segments(uuid)'::regprocedure)
  THEN RAISE EXCEPTION 'Catalog key repair changed writer permission boundary'; END IF;
 END $$;
+BEGIN;
+INSERT INTO public.vehicles(id,is_public) VALUES(md5('aught foreign vehicle')::uuid,true);
+INSERT INTO public.vehicle_wiring_overlays(id,vehicle_id)
+ VALUES(md5('aught foreign overlay')::uuid,md5('aught foreign vehicle')::uuid);
+UPDATE public.vehicle_custom_circuits SET overlay_id=md5('aught foreign overlay')::uuid
+ WHERE id=md5('aught circuit:one_aught')::uuid;
+UPDATE public.harness_segments SET wire_part_id=md5('aught stock zero wrong')::uuid
+ WHERE id=md5('aught piece:one_aught')::uuid;
+DO $$ BEGIN
+ PERFORM public.key_harness_segments('e08bf694-970f-4cbe-8a74-8715158a0f2e');
+ IF (SELECT wire_part_id FROM public.harness_segments WHERE id=md5('aught piece:one_aught')::uuid)
+  IS DISTINCT FROM md5('aught stock zero wrong')::uuid
+ THEN RAISE EXCEPTION 'A foreign circuit supplied the material identity for this vehicle'; END IF;
+END $$;
+ROLLBACK;
 SET ROLE anon;
 DO $$ DECLARE r jsonb; BEGIN
  r:=public.harness_manual_index('e08bf694-970f-4cbe-8a74-8715158a0f2e');
