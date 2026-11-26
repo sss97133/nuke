@@ -16,6 +16,7 @@ MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_REQUIREMENTS = 32
 MAX_SOURCE_OCCURRENCES = 64
 MAX_PACKET_CHARACTERS = 32000
+TEXT_IDENTITY = 'sha256_exact_redacted_body_v1'
 
 
 def digest(value):
@@ -56,7 +57,9 @@ def record(item, platform, source_file, line):
     body = unicodedata.normalize('NFC', body.replace('\r\n', '\n').replace('\r', '\n'))
     raw_hash = item.get('raw_text_sha256') or digest(body)
     body = redact(body)
-    normalized_hash = digest(re.sub(r'\s+', ' ', body).strip())
+    # Formatting can carry meaning (for example Python indentation). Deduplicate
+    # only exact redacted bodies; FTS handles tokenized search independently.
+    normalized_hash = digest(body)
     sequence = item.get('sequence', item.get('source_line', item.get('line', line)))
     # Keep repeated occurrences and edited versions even when an app reuses a UUID.
     rid = digest('\0'.join(str(x) for x in [platform, source, locator, session, sequence, raw_hash]))
@@ -116,7 +119,7 @@ def build(root, manifest_path):
              'distinct_normalized_texts': db.execute('SELECT count(*) FROM texts').fetchone()[0],
              'roles': dict(db.execute('SELECT role,count(*) FROM messages GROUP BY role')),
              'kinds': dict(db.execute('SELECT kind,count(*) FROM messages GROUP BY kind')),
-             'machine_indexed_not_semantically_reviewed': True}
+             'machine_indexed_not_semantically_reviewed': True, 'text_identity': TEXT_IDENTITY}
     db.close()
     temp.replace(target)
     write_json(root / 'index-receipt.json', stats)
@@ -139,17 +142,28 @@ def search(root, query, role, limit):
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
+def context_ids(db, hit, before, after):
+    params = (hit['platform'], hit['session_id'], hit['source_path'])
+    # Edited versions can share a sequence number. Use a stable total order for
+    # neighbours, and include the exact cited occurrence independently of them.
+    position = (hit['sequence'], hit['sequence'], hit['id'])
+    prior = db.execute('''SELECT id FROM messages WHERE platform=? AND session_id=? AND source_path=?
+      AND (sequence<? OR (sequence=? AND id<?)) ORDER BY sequence DESC,id DESC LIMIT ?''',
+      (*params, *position, before)).fetchall()
+    later = db.execute('''SELECT id FROM messages WHERE platform=? AND session_id=? AND source_path=?
+      AND (sequence>? OR (sequence=? AND id>?)) ORDER BY sequence,id LIMIT ?''',
+      (*params, *position, after)).fetchall()
+    return [*[row['id'] for row in reversed(prior)], hit['id'], *[row['id'] for row in later]]
+
+
 def context(root, rid, before, after):
     with closing(connect(root)) as db:
         hit = db.execute('SELECT * FROM messages WHERE id=?', (rid,)).fetchone()
         if hit is None:
             raise ValueError('Unknown occurrence ID')
-        params = (hit['platform'], hit['session_id'], hit['source_path'])
-        prior = list(db.execute('SELECT id FROM messages WHERE platform=? AND session_id=? AND source_path=? AND sequence<? ORDER BY sequence DESC LIMIT ?', (*params, hit['sequence'], before)))
-        later = list(db.execute('SELECT id FROM messages WHERE platform=? AND session_id=? AND source_path=? AND sequence>=? ORDER BY sequence LIMIT ?', (*params, hit['sequence'], after + 1)))
         out = []
-        for item in [*reversed(prior), *later]:
-            row = db.execute('SELECT m.*,t.body FROM messages m JOIN texts t ON t.id=m.text_id WHERE m.id=?', (item[0],)).fetchone()
+        for item in context_ids(db, hit, before, after):
+            row = db.execute('SELECT m.*,t.body FROM messages m JOIN texts t ON t.id=m.text_id WHERE m.id=?', (item,)).fetchone()
             out.append(dict(row))
     print(json.dumps(out, indent=2, ensure_ascii=False))
 
@@ -184,6 +198,8 @@ def archive_health(root, verify_hashes=False):
         return result
     manifest = read_json(root / 'manifest.json')
     receipt = read_json(root / 'index-receipt.json')
+    if receipt.get('text_identity') != TEXT_IDENTITY:
+        result['failures'].append('text_identity_requires_rebuild_from_frozen_manifest')
     result['coverage'] = manifest.get('coverage', 'not_declared')
     result['limits'] = manifest.get('limits', [])
     if result['coverage'] != 'complete':
@@ -278,16 +294,13 @@ def packet(root, scope, before=1, after=1):
             if hit is None or hit['role'] != 'user':
                 value['failures'].append(f'{anchor}: original_user_record_unavailable')
                 continue
-            params = (hit['platform'], hit['session_id'], hit['source_path'])
-            prior = db.execute('SELECT id FROM messages WHERE platform=? AND session_id=? AND source_path=? AND sequence<? ORDER BY sequence DESC LIMIT ?', (*params, hit['sequence'], before)).fetchall()
-            later = db.execute('SELECT id FROM messages WHERE platform=? AND session_id=? AND source_path=? AND sequence>=? ORDER BY sequence LIMIT ?', (*params, hit['sequence'], after + 1)).fetchall()
-            for item in [*reversed(prior), *later]:
-                if item['id'] in seen:
+            for item in context_ids(db, hit, before, after):
+                if item in seen:
                     continue
                 if len(seen) >= MAX_SOURCE_OCCURRENCES:
                     value['failures'].append('context_occurrence_budget_exceeded')
                     break
-                row = dict(db.execute('SELECT m.*,t.body FROM messages m JOIN texts t ON t.id=m.text_id WHERE m.id=?', (item['id'],)).fetchone())
+                row = dict(db.execute('SELECT m.*,t.body FROM messages m JOIN texts t ON t.id=m.text_id WHERE m.id=?', (item,)).fetchone())
                 original_length = len(row['body'])
                 row['body'] = row['body'][:remaining]
                 row['text_truncated'] = len(row['body']) != original_length
@@ -318,6 +331,8 @@ def check(root, receipt_path):
     receipt = read_json(receipt_path)
     ledger, selected = requirements(root, receipt['scope'])
     failures = []
+    if not selected:
+        failures.append('No reviewed requirements for this scope; inspect source history and reconcile the receipt scope.')
     if receipt.get('requirements_sha256') != digest(json.dumps(ledger, sort_keys=True)):
         failures.append('Requirement version changed: reconcile the receipt against current owner decisions.')
     entries = {x['id']: x for x in receipt.get('requirements', [])}

@@ -144,6 +144,15 @@ class IntentContract(unittest.TestCase):
         self.assertEqual(result['archive']['input_verification'], 'current_hash')
         self.assertEqual(result['archive']['input_bytes_verified'], self.source.stat().st_size)
 
+    def test_old_text_deduplication_requires_rebuild(self):
+        path = self.root / 'index-receipt.json'
+        receipt = json.loads(path.read_text())
+        receipt.pop('text_identity')
+        path.write_text(json.dumps(receipt))
+        result, status = intent.packet(self.root, 'drawing')
+        self.assertEqual(status, 2)
+        self.assertIn('text_identity_requires_rebuild_from_frozen_manifest', result['archive']['failures'])
+
     def test_missing_original_link_is_explicit(self):
         self.requirement.pop('source_occurrence_ids')
         self.write_ledger([self.requirement])
@@ -184,6 +193,49 @@ class IntentContract(unittest.TestCase):
         b = intent.record(dict(text='Same words', uuid='second', role='user'), 'fixture', self.source, 2)
         self.assertNotEqual(a[0], b[0])
         self.assertEqual(a[-2:], b[-2:])
+
+    def test_whitespace_sensitive_occurrences_keep_their_own_text(self):
+        records = [dict(role='user', text=text, uuid=str(i), session_id='edited', sequence=i)
+                   for i, text in enumerate(['if ready:\n    launch()', 'if ready:\nlaunch()'])]
+        self.source.write_text(''.join(json.dumps(x) + '\n' for x in records))
+        with contextlib.redirect_stdout(io.StringIO()):
+            intent.build(self.root, self.manifest)
+        with contextlib.closing(intent.connect(self.root)) as db:
+            bodies = [row[0] for row in db.execute('SELECT t.body FROM messages m JOIN texts t ON t.id=m.text_id ORDER BY m.sequence')]
+        self.assertEqual(bodies, [x['text'] for x in records])
+
+    def test_tied_sequence_versions_return_the_exact_requested_anchor(self):
+        records = [dict(role='user', text=f'Edited instruction version {i}', uuid='edited',
+                        session_id='edited', sequence=2) for i in range(8)]
+        self.source.write_text(''.join(json.dumps(x) + '\n' for x in records))
+        with contextlib.redirect_stdout(io.StringIO()):
+            intent.build(self.root, self.manifest)
+        with contextlib.closing(intent.connect(self.root)) as db:
+            anchors = [dict(row) for row in db.execute('SELECT m.id,t.body FROM messages m JOIN texts t ON t.id=m.text_id')]
+        for anchor in anchors:
+            with self.subTest(anchor=anchor['id']):
+                self.requirement['source_occurrence_ids'] = [anchor['id']]
+                self.write_ledger([self.requirement])
+                for window in [0, 1]:
+                    result, status = intent.packet(self.root, 'drawing', before=window, after=window)
+                    self.assertEqual(status, 0)
+                    sources = {x['id']: x['body'] for x in result['sources']}
+                    self.assertEqual(sources[anchor['id']], anchor['body'])
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    intent.context(self.root, anchor['id'], before=0, after=0)
+                self.assertEqual([(x['id'], x['body']) for x in json.loads(output.getvalue())],
+                                 [(anchor['id'], anchor['body'])])
+
+    def test_receipt_scope_cannot_skip_reviewed_requirements(self):
+        receipt = self.base / 'receipt.json'
+        with contextlib.redirect_stdout(io.StringIO()):
+            intent.prepare(self.root, 'drawing', 'Synthetic inspection', receipt)
+        value = json.loads(receipt.read_text())
+        value.update(scope='mistyped-scope', requirements=[])
+        receipt.write_text(json.dumps(value))
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(intent.check(self.root, receipt), 1)
+        self.assertIn('No reviewed requirements for this scope', output.getvalue())
 
     def test_fresh_process_recovers_packet_outside_repository(self):
         result = subprocess.run([sys.executable, str(SCRIPT), '--root', str(self.root),
