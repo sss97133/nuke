@@ -232,6 +232,12 @@ machine-layer delivery does not close the unfinished renderer or estimate work.
 - **Row writes.** Only through the sanctioned writers: `ingest-observation`,
   `correct_vehicle_sale_provenance_batch`, `correct_vehicle_event_attribution` (a BaT event's organization,
   seller identity and metadata, by merge, with the before-image kept on the row), and the supersession functions.
+  - Account-signed physical work (from `20261126005947`): `record_account_work` is a private atomic source-admission
+    capability for five closed stock/build profiles. It accepts only the corresponding authenticated, explicitly
+    nonanonymous domain writers, derives actor/source/clock metadata and enforces its exact transaction capability
+    and registered caller at the observation table. Stock and harness writers retain their paired projection guards;
+    neither an agent nor the service key can sign for the account. It is not generic ingestion, an unsigned owner
+    statement or an owner evidence decision. Additions require a reviewed profile and runtime admission contract.
   - Image evidence store (from M1w, `20261021221000`; not live until it deploys). These writers write only the evidence
     store and touch no existing testimony table. Jobs call `evidence_open_run`, `evidence_close_run`,
     `evidence_record_answers`, `propose_image_candidates`, `propose_capture_time_claims`,

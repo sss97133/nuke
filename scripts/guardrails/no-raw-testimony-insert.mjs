@@ -326,6 +326,7 @@ export const SANCTIONED_WRITERS = [
   "propose_capture_time_claims", "confirm_capture_times_by_rule", "propose_evidence_links", "propose_account_entities",
   "propose_change_claim", "propose_claim_support", "record_day_context",
   "record_owner_statement", "record_owner_statement_link", "record_vehicle_statement",
+  "record_account_work",
 ];
 const SUPERSEDE_COLUMNS = new Set(["is_superseded", "superseded_by", "superseded_at", "superseded_reason", "superseded_by_id", "updated_at"]);
 const ALLOW_RE = /guardrail-allow\(([a-z-]+)\):[ \t]*([A-Za-z0-9_.]+)[ \t]*:[ \t]*(\S.*)$/gm;

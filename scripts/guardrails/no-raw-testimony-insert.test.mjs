@@ -79,6 +79,13 @@ INSERT INTO receipt_items (id) SELECT id FROM receipts ON CONFLICT (id) DO UPDAT
   assert.deepEqual(hits(sql), []);
 });
 
+test('declared account-work intake is sanctioned but stock and build callers cannot insert testimony themselves', () => {
+  const write = name => `CREATE FUNCTION public.${name}() RETURNS void LANGUAGE plpgsql AS $$ BEGIN INSERT INTO public.vehicle_observations(id) VALUES(gen_random_uuid()); END $$;`;
+  assert.deepEqual(hits(write('record_account_work')), []);
+  for (const caller of ['parts_stock_sign', 'record_parts_arrival', 'record_harness_build_operation', 'record_account_work_copy'])
+    assert.equal(hits(write(caller)).length, 1, `${caller} must delegate to canonical admission`);
+});
+
 test('an exception counts only when it names the writer and gives a reason', () => {
   const body = `CREATE FUNCTION public.backfill_x() RETURNS void LANGUAGE sql AS $$ INSERT INTO vehicle_events (id) VALUES (gen_random_uuid()) $$;`;
   assert.equal(hits(body).length, 1);
