@@ -155,7 +155,7 @@ CREATE POLICY harness_model_wire_requirements_read ON public.harness_model_wire_
 
 REVOKE ALL ON public.harness_model_rules,public.harness_model_evaluations,public.harness_model_nodes,
  public.harness_model_segment_ends,public.harness_model_checks,public.harness_model_wire_requirements,
- public.harness_model_state FROM anon,authenticated,service_role;
+ public.harness_model_state FROM PUBLIC,anon,authenticated,service_role;
 GRANT SELECT ON public.harness_model_rules,public.harness_model_nodes,public.harness_model_segment_ends,
  public.harness_model_checks,public.harness_model_wire_requirements,public.harness_model_state TO anon,authenticated,service_role;
 GRANT SELECT(id,vehicle_id,input_hash,logic_key,coverage,evaluated_at,node_count,segment_end_count,check_count,wire_requirement_count)
@@ -547,7 +547,8 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE cfg jsonb:=public.model_fold_config(); ids uuid[]; at_ timestamptz;
 BEGIN
  SELECT array_agg(x ORDER BY x) INTO ids FROM (SELECT DISTINCT unnest(p_vehicle_ids) AS x) u
-  WHERE public.harness_model_in_scope(x);
+  WHERE x::text NOT LIKE '9cf5b7a4%' AND (public.harness_model_in_scope(x)
+    OR EXISTS (SELECT FROM public.harness_model_state st WHERE st.vehicle_id=x));
  IF ids IS NULL THEN RETURN; END IF;
  INSERT INTO public.harness_model_state AS s(vehicle_id,source_epoch,source_changed_at)
   SELECT x,1,clock_timestamp() FROM unnest(ids) x
@@ -558,9 +559,10 @@ BEGIN
  -- Use the existing signal/work/tick machinery. No facet rows are locked by a harness source write.
  INSERT INTO public.model_fold_signal(vehicle_id,reason,priority,at)
  SELECT x,'harness:'||p_reason,2,at_ FROM unnest(ids) x
- WHERE NOT EXISTS (SELECT FROM public.model_fold_signal s WHERE s.vehicle_id=x);
+ WHERE public.harness_model_in_scope(x)
+  AND NOT EXISTS (SELECT FROM public.model_fold_signal s WHERE s.vehicle_id=x);
 END $$;
-COMMENT ON FUNCTION public.harness_model_signal(uuid[],text,boolean) IS 'Advances the harness source epoch and deduplicates an event in the existing model_fold signal table. Honors global enable/signals controls and the excluded vehicle prefix. A source write fails if invalidation cannot be recorded; it never leaves an accepted source with a silently current old evaluation.';
+COMMENT ON FUNCTION public.harness_model_signal(uuid[],text,boolean) IS 'Advances the harness source epoch and deduplicates an event in the existing model_fold signal table. Retains invalidations for already enrolled private/deleted vehicles while queue admission stays in public execution scope. Honors global enable/signals controls and the excluded vehicle prefix. A source write fails if invalidation cannot be recorded; it never leaves an accepted source with a silently current old evaluation.';
 REVOKE ALL ON FUNCTION public.harness_model_signal(uuid[],text,boolean) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.harness_model_signal(uuid[],text,boolean) TO service_role;
 
@@ -571,7 +573,11 @@ BEGIN
  IF TG_OP='UPDATE' AND to_jsonb(NEW) IS NOT DISTINCT FROM to_jsonb(OLD) THEN RETURN NULL; END IF;
  IF TG_OP<>'DELETE' THEN a:=to_jsonb(NEW); END IF;
  IF TG_OP<>'INSERT' THEN b:=to_jsonb(OLD); END IF;
- IF TG_TABLE_NAME='vehicle_custom_circuits' THEN
+ IF TG_TABLE_NAME='vehicles' THEN
+  -- Visibility changes only concern already enrolled harnesses; do not enroll the vehicle population.
+  IF NOT EXISTS (SELECT FROM public.harness_model_state st WHERE st.vehicle_id=NEW.id) THEN RETURN NULL; END IF;
+  ids:=ARRAY[NEW.id];
+ ELSIF TG_TABLE_NAME='vehicle_custom_circuits' THEN
   SELECT array_agg(DISTINCT o.vehicle_id) INTO ids FROM public.vehicle_wiring_overlays o
    WHERE o.id IN ((a->>'overlay_id')::uuid,(b->>'overlay_id')::uuid);
  ELSIF TG_TABLE_NAME='vehicle_wiring_overlays' THEN
@@ -624,6 +630,8 @@ COMMENT ON FUNCTION public.harness_model_enqueue_changed() IS 'Admits stale harn
 REVOKE ALL ON FUNCTION public.harness_model_enqueue_changed() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.harness_model_enqueue_changed() TO service_role;
 
+CREATE TRIGGER harness_model_visibility_changed AFTER UPDATE OF is_public,deleted_at ON public.vehicles FOR EACH ROW
+ WHEN (OLD.is_public IS DISTINCT FROM NEW.is_public OR OLD.deleted_at IS DISTINCT FROM NEW.deleted_at) EXECUTE FUNCTION public.harness_model_source_changed();
 CREATE TRIGGER harness_model_overlays_changed AFTER INSERT OR UPDATE OR DELETE ON public.vehicle_wiring_overlays FOR EACH ROW EXECUTE FUNCTION public.harness_model_source_changed();
 CREATE TRIGGER harness_model_circuits_changed AFTER INSERT OR UPDATE OR DELETE ON public.vehicle_custom_circuits FOR EACH ROW EXECUTE FUNCTION public.harness_model_source_changed();
 CREATE TRIGGER harness_model_endpoints_changed AFTER INSERT OR UPDATE OR DELETE ON public.harness_endpoints FOR EACH ROW EXECUTE FUNCTION public.harness_model_source_changed();
@@ -727,7 +735,7 @@ COMMENT ON COLUMN public.harness_model_state.last_attempt_logic_key IS 'Captured
 
 -- Public functions only read RLS-visible source/results. Only the existing trusted worker may produce results.
 REVOKE ALL ON FUNCTION public.harness_model_visible(uuid),public.harness_model_inputs(uuid),public.harness_model_compute(jsonb),
- public.harness_model_logic_snapshot(),public.harness_model_logic_key(),public.harness_model_in_scope(uuid) FROM PUBLIC;
+ public.harness_model_logic_snapshot(),public.harness_model_logic_key(),public.harness_model_in_scope(uuid) FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.harness_model_visible(uuid),public.harness_model_inputs(uuid),
  public.harness_model_logic_snapshot(),public.harness_model_logic_key() TO anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.harness_model_compute(jsonb),public.harness_model_in_scope(uuid) TO service_role;

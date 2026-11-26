@@ -43,7 +43,16 @@ BEGIN
   UPDATE public.model_fold_work SET state='done' WHERE vehicle_id=x.vehicle_id;
  END LOOP;
 END $$;
+-- Match hosted function default privileges: producer revokes must remove explicit role grants too.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon,authenticated,service_role;
 \i supabase/migrations/20261125233922_harness_model_evaluation_loop.sql
+
+DO $$ BEGIN
+ IF has_function_privilege('anon','public.harness_model_fold(uuid)','EXECUTE')
+  OR has_function_privilege('authenticated','public.harness_model_signal(uuid[],text,boolean)','EXECUTE')
+  OR has_function_privilege('anon','public.harness_model_compute(jsonb)','EXECUTE')
+ THEN RAISE EXCEPTION 'Hosted default grants reopened producer helpers'; END IF;
+END $$;
 
 DO $$
 DECLARE i jsonb; again jsonb; r jsonb; n int; ft numeric;
@@ -274,6 +283,7 @@ END $$;
 RESET ROLE;
 
 -- Retiring public visibility cannot expose a prior public receipt to an anonymous owner session.
+CREATE TEMP TABLE prior_public_model AS SELECT latest_evaluation_id,source_epoch FROM public.harness_model_state;
 UPDATE public.vehicles SET is_public=false,user_id='00000000-0000-0000-0000-00000000ff11'
  WHERE id='e08bf694-970f-4cbe-8a74-8715158a0f2e';
 SELECT set_config('test.auth_jwt','{"is_anonymous":true}',false);
@@ -287,8 +297,21 @@ DO $$ BEGIN
   THEN RAISE EXCEPTION 'Stored private metadata bypasses visibility'; END IF;
 END $$;
 RESET ROLE;
+-- A private edit must retain invalidation without admitting private work to the public loop.
+UPDATE public.harness_segments SET planned_length_ft=planned_length_ft+0.01 WHERE id=(SELECT id FROM public.harness_segments LIMIT 1);
+DO $$ BEGIN
+ IF (SELECT source_epoch FROM public.harness_model_state)<=(SELECT source_epoch FROM prior_public_model)
+  THEN RAISE EXCEPTION 'Enrolled private edit lost its invalidation'; END IF;
+ IF EXISTS (SELECT FROM public.model_fold_signal) THEN RAISE EXCEPTION 'Private harness queued in public execution scope'; END IF;
+END $$;
 UPDATE public.vehicles SET is_public=true WHERE id='e08bf694-970f-4cbe-8a74-8715158a0f2e';
 SELECT set_config('test.auth_jwt','{}',false);
+CALL public.model_fold_tick();
+DO $$ BEGIN
+ IF public.harness_evaluated_model('e08bf694-970f-4cbe-8a74-8715158a0f2e')->>'status'<>'current'
+  OR (SELECT latest_evaluation_id FROM public.harness_model_state)=(SELECT latest_evaluation_id FROM prior_public_model)
+ THEN RAISE EXCEPTION 'Public return did not recover through normal worker'; END IF;
+END $$;
 
 -- Physical progress keeps the gross plan but holds new stock eligibility, without changing source evidence.
 DO $$
