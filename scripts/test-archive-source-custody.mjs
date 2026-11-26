@@ -58,6 +58,7 @@ const sources = new Map([
   ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
   ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['wireResistanceReference',compile('../supabase/functions/ingest-observation/wireResistanceReference.ts')],
   ['financialEvidence',compile('../supabase/functions/ingest-observation/financialEvidence.ts')],
   ['financialDelegation',compile('../supabase/functions/ingest-observation/financialDelegation.ts')],
   ['financialProcessing',compile('../supabase/functions/ingest-observation/financialProcessing.ts')],
@@ -277,6 +278,7 @@ function fixture(options = {}) {
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
         if(specifier==='./imageProperties.ts')return load('property');
         if(specifier==='./componentEvidence.ts')return load('componentEvidence');
+        if(specifier==='./wireResistanceReference.ts')return load('wireResistanceReference');
         if(specifier==='../_shared/mccormickParser.ts')return load('mccormickParser');
         if(specifier==='./htmlToText.ts')return load('htmlToText');
         if(specifier==='./retainedInterior.ts')return load('retainedInterior');

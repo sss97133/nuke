@@ -27,6 +27,12 @@ ALTER TABLE public.vehicle_observations
  ADD COLUMN citation_secure_document_id uuid CHECK(citation_secure_document_id IS NULL),
  ADD COLUMN superseded_by uuid REFERENCES public.vehicle_observations(id),
  ADD COLUMN agent_model text;
+-- Match the deployed predecessor constraint, so a typed recipe alone cannot
+-- conceal an inadmissible clock basis. No observation INSERT is needed.
+ALTER TABLE public.vehicle_observations ADD CONSTRAINT vehicle_observations_clock_basis_check CHECK (
+ observed_at_basis IS NULL OR observed_at_basis IN
+  ('event_time','source_capture_time','source_publication_time')
+) NOT VALID;
 \i supabase/migrations/20261126094848_conditioned_wire_reference_intake.sql
 CREATE TABLE wire_reference_fixture_rows(size_code text PRIMARY KEY,gauge_label text,expected_awg integer,source_row text);
 INSERT INTO wire_reference_fixture_rows
@@ -82,6 +88,25 @@ DO $$ DECLARE r record; q jsonb; a jsonb; b jsonb; BEGIN
  PERFORM pg_temp.ok('pure qualifier creates no observations or projections',
   NOT EXISTS(SELECT FROM public.vehicle_observations) AND NOT EXISTS(SELECT FROM public.wire_resistance_conditions)
   AND NOT EXISTS(SELECT FROM public.wire_resistance_claims) AND NOT EXISTS(SELECT FROM public.observation_reference_spans));
+END $$;
+DO $$ DECLARE expr text; accepted boolean; recipe jsonb; basis text; BEGIN
+ SELECT pg_get_expr(conbin,conrelid) INTO STRICT expr FROM pg_constraint
+ WHERE conrelid='public.vehicle_observations'::regclass AND conname='vehicle_observations_clock_basis_check';
+ recipe:=public.qualify_wire_resistance_reference(public.test_wire_resistance_fixture())->'recipe';
+ EXECUTE 'SELECT ('||expr||') IS TRUE FROM jsonb_populate_record(NULL::public.vehicle_observations,$1)'
+ INTO accepted USING recipe;
+ PERFORM pg_temp.ok('actual table clock constraint admits the qualified analysis recipe',accepted);
+ FOREACH basis IN ARRAY ARRAY['event_time','source_capture_time','source_publication_time'] LOOP
+  EXECUTE 'SELECT ('||expr||') IS TRUE FROM jsonb_populate_record(NULL::public.vehicle_observations,$1)'
+  INTO accepted USING jsonb_build_object('observed_at_basis',basis);
+  PERFORM pg_temp.ok('existing clock basis retained: '||basis,accepted);
+ END LOOP;
+ EXECUTE 'SELECT ('||expr||') IS FALSE FROM jsonb_populate_record(NULL::public.vehicle_observations,$1)'
+ INTO accepted USING '{"observed_at_basis":"invented_clock"}'::jsonb;
+ PERFORM pg_temp.ok('unknown clock basis remains rejected',accepted);
+ PERFORM pg_temp.ok('historical constraint remains unvalidated without a table scan',
+  NOT (SELECT convalidated FROM pg_constraint WHERE conrelid='public.vehicle_observations'::regclass
+   AND conname='vehicle_observations_clock_basis_check'));
 END $$;
 CREATE FUNCTION pg_temp.wire_reference_refused(label text,p jsonb,reason text) RETURNS void LANGUAGE plpgsql AS $$ DECLARE q jsonb; BEGIN
  q:=public.qualify_wire_resistance_reference(p);

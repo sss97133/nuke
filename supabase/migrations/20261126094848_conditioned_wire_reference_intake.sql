@@ -3,6 +3,17 @@
 BEGIN;
 SET LOCAL statement_timeout='10s';
 SET LOCAL lock_timeout='2s';
+-- A document reading has an analysis clock, not the publication or capture clock
+-- of the source and never the date a wire was installed. Preserve the existing
+-- NOT VALID posture: enforce new writes without scanning historical testimony.
+ALTER TABLE public.vehicle_observations
+ DROP CONSTRAINT vehicle_observations_clock_basis_check,
+ ADD CONSTRAINT vehicle_observations_clock_basis_check CHECK (
+  observed_at_basis IS NULL OR observed_at_basis IN
+   ('event_time','source_capture_time','source_publication_time','source_analysis_time')
+ ) NOT VALID;
+COMMENT ON CONSTRAINT vehicle_observations_clock_basis_check ON public.vehicle_observations IS
+ 'Clock origin of the observation, including an attributed source analysis. Analysis time does not establish publication time, event time or physical installation. Historical validation remains a separate bounded operation.';
 CREATE FUNCTION public.wire_resistance_condition_key(p_spec uuid,p_document uuid,p_source_part text,p_awg integer,p_temperature numeric,p_role text)
 RETURNS text LANGUAGE sql IMMUTABLE STRICT SET search_path=pg_catalog AS $$
  SELECT 'wire-rdc:v1:'||p_spec::text||':doc='||p_document::text||':part='||p_source_part||':awg='||p_awg::text||':C='||trim_scale(p_temperature)::text||':role='||p_role
