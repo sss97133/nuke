@@ -182,8 +182,10 @@ DECLARE inp jsonb; receipt jsonb; c public.harness_model_checks; source_row json
 BEGIN
  inp:=public.harness_model_inputs(p_vehicle_id);
  receipt:=public.harness_model_receipt_for_hash(p_vehicle_id,md5(inp::text));
- IF receipt IS NULL OR receipt->>'id' IS DISTINCT FROM p_evaluation_id::text THEN
+ IF receipt IS NULL THEN
   RETURN jsonb_build_object('status',coalesce(public.harness_model_pending_status(p_vehicle_id,md5(inp::text)),'unavailable'),'check',NULL,'inputs','[]'::jsonb); END IF;
+ IF receipt->>'id' IS DISTINCT FROM p_evaluation_id::text THEN
+  RETURN jsonb_build_object('status','pending','check',NULL,'inputs','[]'::jsonb); END IF;
  SELECT * INTO c FROM public.harness_model_checks WHERE evaluation_id=p_evaluation_id AND id=p_check_id;
  IF NOT FOUND THEN RETURN jsonb_build_object('status','unavailable','check',NULL,'inputs','[]'::jsonb); END IF;
  SELECT s INTO source_row FROM jsonb_array_elements(inp#>'{model,segments}') s WHERE s->>'id'=c.segment_id::text;

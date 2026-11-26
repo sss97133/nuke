@@ -90,6 +90,9 @@ DO $$ DECLARE e uuid; c uuid; r jsonb; BEGIN
  SELECT id INTO c FROM public.harness_model_checks WHERE evaluation_id=e AND rule_key='planned_wire_amount' LIMIT 1;
  r:=public.harness_model_check_context('e08bf694-970f-4cbe-8a74-8715158a0f2e',e,c);
  IF r->>'status'<>'current' OR jsonb_array_length(r->'inputs')<>2 THEN RAISE EXCEPTION 'Anonymous direct check inspection failed: %',r; END IF;
+ r:=public.harness_model_check_context('e08bf694-970f-4cbe-8a74-8715158a0f2e','00000000-0000-0000-0000-000000000001',c);
+ IF r->>'status'<>'pending' OR r->'check'<>'null'::jsonb OR jsonb_array_length(r->'inputs')<>0
+ THEN RAISE EXCEPTION 'Different requested evaluation reused a current check or misreported visibility'; END IF;
  IF has_column_privilege(current_user,'public.harness_model_evaluations','input_snapshot','SELECT')
   OR has_column_privilege(current_user,'public.harness_model_evaluations','logic_snapshot','SELECT')
  THEN RAISE EXCEPTION 'Private evaluation receipts exposed'; END IF;
