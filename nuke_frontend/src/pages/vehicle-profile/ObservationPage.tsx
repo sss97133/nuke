@@ -21,6 +21,7 @@ import { withTimeout } from '../../lib/withTimeout';
 import { publicObservationData, publicObservationArtifact, publicCowlTagExtract, OBSERVATION_PRIVACY_NOTICE } from './observationPrivacy';
 import CowlTagExtract from './CowlTagExtract';
 import { readNativeListingHistory, nativeListingObservationData } from './auctionEvidenceDisplay';
+import HarnessObservationWitness from './HarnessObservationWitness';
 
 interface ObservationRow {
   id: string;
@@ -303,6 +304,7 @@ const ObservationPageContent: React.FC<{ publicViewer: boolean }> = ({ publicVie
   const sourceArtifact = publicObservationArtifact();
   const visibleData = useMemo(() => publicObservationData(obs?.structured_data ?? null), [obs]);
   const cowlExtract = !obs?.is_superseded && !obs?.superseded_by && publicCowlTagExtract(obs?.structured_data ?? null);
+  const isWiringObservation = obs?.kind === 'specification' && obs.structured_data?.domain === 'wiring';
 
   const vehLabel = vehicle && vehicle.id === vehicleId
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
@@ -423,14 +425,15 @@ const ObservationPageContent: React.FC<{ publicViewer: boolean }> = ({ publicVie
             }}
           >
             <summary>Source details</summary>
-            <p>{OBSERVATION_PRIVACY_NOTICE}</p>
+            <p>{isWiringObservation ? 'The public extract withholds source text and artifacts. Owner-authorized wiring evidence is requested separately below.' : OBSERVATION_PRIVACY_NOTICE}</p>
             <p>Observed {formatDate(obs.observed_at)} · Recorded {formatDate(obs.ingested_at)}</p>
             <p>Record: <code>{obs.id}</code></p>
             {obs.confidence_score != null && Number.isFinite(obs.confidence_score) && <p>
               Stored confidence: {Math.round(obs.confidence_score * 100)}% · Verification unassessed
             </p>}
           </details>
-          {!cowlExtract && !Object.keys(visibleData).length && !obs.public_source_url && <p>
+          {isWiringObservation && vehicleId && obsId && <HarnessObservationWitness vehicleId={vehicleId} observationId={obsId} />}
+          {!isWiringObservation && !cowlExtract && !Object.keys(visibleData).length && !obs.public_source_url && <p>
             A public source extract is not available for this record. <Link to={`/vehicle/${vehicleId}`}>Return to vehicle evidence</Link>
           </p>}
 

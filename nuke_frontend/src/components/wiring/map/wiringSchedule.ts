@@ -5,11 +5,11 @@ import { SECTIONS } from './useWiringMap';
 import { mask, publicName, type SiteFiles } from './useWorkspaceSelection';
 
 export type ScheduleCell = string | number | null;
-export type ScheduleId = 'wires' | 'pins' | 'conns';
+export type ScheduleId = 'wires' | 'pins' | 'conns' | 'segments' | 'ends' | 'endpoints' | 'circuits';
 export interface ScheduleColumn { key: string; label: string; width?: number; numeric?: boolean; link?: boolean }
 export interface ScheduleRow { id: string; selection: string; cells: Record<string, ScheduleCell> }
 export interface ScheduleTable { id: ScheduleId; title: string; columns: ScheduleColumn[]; rows: ScheduleRow[] }
-export interface WiringSchedule { tables: ScheduleTable[]; vehicleId: string; readAt: string | null; isOwner: boolean }
+export interface WiringSchedule { tables: ScheduleTable[]; vehicleId: string; readAt: string | null; isOwner: boolean; snapshotKey?: string; qualificationNote?: string }
 
 const finite = (n: number | null | undefined): number | null => typeof n === 'number' && Number.isFinite(n) ? n : null;
 const section = (id: string | null) => SECTIONS.find(s => s.id === id)?.label ?? id ?? null;
@@ -113,8 +113,8 @@ export async function wiringWorkbookBytes(schedule: WiringSchedule): Promise<Uin
     sheet.columns = table.columns.map(c => ({ key: c.key, width: c.width ?? 22 }));
     sheet.getCell('A1').value = table.title;
     sheet.getCell('A1').font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FF213548' } };
-    sheet.getCell('A2').value = `Vehicle ${schedule.vehicleId} · Read ${schedule.readAt ?? 'time not recorded'} · All loaded records`;
-    sheet.getCell('A3').value = 'Design state is not construction approval. Planned/modelled lengths require physical verification; blank means not recorded.';
+    sheet.getCell('A2').value = `Vehicle ${schedule.vehicleId} · Read ${schedule.readAt ?? 'time not recorded'} · ${schedule.snapshotKey ? `Snapshot ${schedule.snapshotKey}` : 'All loaded records'}`;
+    sheet.getCell('A3').value = schedule.qualificationNote ?? 'Design state is not construction approval. Planned/modelled lengths require physical verification; blank means not recorded.';
     sheet.mergeCells(2, 1, 2, table.columns.length);
     sheet.mergeCells(3, 1, 3, table.columns.length);
     sheet.getRow(2).height = 24; sheet.getRow(3).height = 30;

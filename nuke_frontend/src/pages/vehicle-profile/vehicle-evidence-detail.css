@@ -56,3 +56,13 @@
   .evidence-related-row { grid-template-columns: 104px minmax(0, 1fr); }
   .evidence-related-row > :last-child { grid-column: 1 / -1; }
 }
+.harness-owner-witness { margin:16px 0; padding:16px; border:1px solid var(--border); }
+.harness-owner-witness h2 { margin:0 0 12px; font-size:16px; }
+.harness-owner-witness h3 { margin-top:20px; font-size:13px; }
+.harness-owner-witness dl { display:grid; gap:10px; }
+.harness-owner-witness dt { font-size:12px; color:var(--text-secondary); }
+.harness-owner-witness dd { margin:3px 0 0; }
+.harness-owner-witness code { overflow-wrap:anywhere; }
+.harness-owner-witness a:focus-visible,.harness-owner-witness button:focus-visible { outline:2px solid var(--text); outline-offset:2px; }
+.harness-witness-text { white-space:pre-wrap; overflow-wrap:anywhere; }
+.harness-witness-history { border-left:3px solid var(--text-secondary); padding-left:10px; }

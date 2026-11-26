@@ -1,0 +1,18 @@
+// Synthetic contract fixture: one circuit, two physical pieces, a declared mate.
+// No production data or engineering approval is encoded here.
+import type { PhysicalWorkspace } from './physicalWorkspaceModel';
+export function physicalWorkspaceFixture(): PhysicalWorkspace {
+  const provenance = { source: null, method: null, observed_at: '2026-11-25T00:00:00Z', trust: 'T3' };
+  const revision = { is_superseded: false, superseded_by: null };
+  const circuit = { id: '00000000-0000-4000-8000-000000000110', circuit_code: '110', circuit_name: 'Coolant sensor — proposed placement', harness_section: 'engine', design_status: 'decided', wire_gauge_awg: 22, wire_color: 'yellow/red', wire_type: 'M22759/16', is_shielded: false,
+    recorded_checks: null, checked_at: '2026-10-16T00:00:00Z', checks_version: 'legacy-fixture', checks_invalidated_at: null, checks_invalidation_reason: null, check_applicability: 'unbound', ...provenance, ...revision };
+  const endpoints = ['ECU', 'CABIN', 'ENGINE', 'SENSOR'].map((code, i) => ({ id: `endpoint-${i}`, code, name: code, endpoint_type: 'connector', family: null, harness_section: 'engine', design_status: 'decided', work_status: 'open', part_number: null, catalog_part_id: null,
+    mates_with_endpoint_id: i === 1 ? 'endpoint-2' : i === 2 ? 'endpoint-1' : null, topology_node_id: null, ...provenance, ...revision }));
+  const ends = endpoints.map((endpoint, i) => ({ id: `end-${i}`, circuit_id: circuit.id, endpoint_id: endpoint.id, wire_code: '110', cavity: i === 3 ? 'signal (pin letter unknown until drawing is read)' : ['B04', 'w', 'w'][i], cavity_layout_id: null,
+    terminal_contact_pn: null, terminal_contact_catalog_id: null, pin_seal_pn: null, pin_seal_catalog_id: null, crimp_tool_pn: null, crimp_tool_catalog_id: null, connector_housing_pn: null, connector_housing_catalog_id: null, wedge_lock_pn: null, wedge_lock_catalog_id: null, physical_end: true, ...provenance, ...revision }));
+  const segments = [0, 1].map(i => ({ id: `piece-${i}-unique`, net_id: 'net-110', circuit_id: circuit.id, current_circuit_id: circuit.id, from_termination_id: ends[i * 2].id, to_termination_id: ends[i * 2 + 1].id, gauge_awg: 22, colour: 'yellow/red', wire_part_id: 'part-22', part_number: 'M22759/16-22-42', planned_length_ft: i === 0 ? 1.09 : 3.54, planned_length_method: 'route estimate', measured_length_ft: null, measured_at: null, build_state: 'uncut', design_status: 'decided', in_current_plan: true, expected_gauge_awg: 22, expected_colour: 'yellow/red', expected_part_number: 'M22759/16-22-42', expected_part_id: 'part-22', physical_progress: false, needs_revision: false, blockers: [] as string[], ...provenance }));
+  return { schema_version: 1, vehicle_id: 'vehicle-a', read_at: '2026-11-25T12:00:00Z', snapshot_key: 'snapshot-fixture-110', provenance_scope: 'keyed_evidence_only', evidence_edges: [], circuits: [circuit], segments, ends, endpoints,
+    nets: [{ id: 'net-110', net_code: '110', signal_id: '00000000-0000-4000-8000-000000001110', function: 'Coolant temperature signal', nominal_current_a: null, peak_current_a: null, protection_setting_a: null, ...provenance, ...revision }],
+    signals: [{ id: '00000000-0000-4000-8000-000000001110', signal_key: 'coolant-temperature', name: 'Coolant temperature', signal_type: 'analog', ...provenance, ...revision }], routings: [], branches: [], topology_nodes: [], mates: [{ from_endpoint_id: 'endpoint-1', to_endpoint_id: 'endpoint-2', relation: 'declared_endpoint_mate' }],
+    counts: { current_circuits: 1, physical_segments: 2, current_plan_segments: 2, physical_ends: 4, segments_with_material_blockers: 0, segments_with_planned_length: 2, segments_with_measured_length: 0, current_circuits_without_segments: 0, routed_segments: 0 } };
+}

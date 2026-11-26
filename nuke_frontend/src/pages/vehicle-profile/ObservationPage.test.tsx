@@ -8,7 +8,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({
   route: { vehicleId: 'offline-vehicle', obsId: 'offline-observation' },
   auth: { user: { id: 'viewer-a' } as { id: string } | null, loading: false }, read: vi.fn(), calls: [] as any[], history: [] as any[],
-  rpcCalls: [] as any[], rpcResult: null as any, rpcReject: null as Error | null,
+  rpcCalls: [] as any[], rpcResult: null as any, rpcReject: null as Error | null, witnessResult: null as any,
 }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => fixture.auth }));
 vi.mock('react-router-dom', async original => ({
@@ -31,6 +31,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from(table: string) {
   return query;
 }, rpc: (name: string, args: any) => ({ abortSignal: (signal: AbortSignal) => {
  fixture.rpcCalls.push({ name, args, signal });
+ if (name === 'harness_evidence_witness') return Promise.resolve({ data: fixture.witnessResult, error: null });
  if (fixture.rpcReject) return Promise.reject(fixture.rpcReject);
  return Promise.resolve(fixture.rpcResult ?? { data: [{
   vehicle_id: args.p_vehicle_ids[0], schema_version: 'vehicle_data_model_v1', native_listing_history: {
@@ -53,7 +54,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.auth = { user: { id: 'viewer-a' }, loading: false };
   fixture.route = { vehicleId: PARENT, obsId: OBS }; fixture.calls = []; fixture.history = [];
-  fixture.rpcCalls = []; fixture.rpcResult = null; fixture.rpcReject = null; fixture.read.mockReset();
+  fixture.rpcCalls = []; fixture.rpcResult = null; fixture.rpcReject = null; fixture.witnessResult = null; fixture.read.mockReset();
   fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call) : { data: observation(), error: null });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
@@ -90,6 +91,21 @@ it('keeps signed-in raw evidence ahead of an available sanitized claim', async (
  expect(host.textContent).toContain('731'); expect(host.textContent).not.toContain('67500');
  expect(fixture.rpcCalls).toEqual([]);
  expect(fixture.calls.map(c => c.table)).toEqual(['vehicles', 'vehicle_observations']);
+});
+it('requests the exact owner wiring projection only after a bound wiring observation is read', async () => {
+ fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call) : { data: observation({ kind: 'specification', structured_data: { domain: 'wiring', value: 'RAW VALUE MUST STAY HIDDEN' } }), error: null });
+ fixture.witnessResult = { schema_version: 1, visibility: 'vehicle_owner', vehicle_id: PARENT, observation_id: OBS, kind: 'specification', historical: false,
+  content_text: 'AUTHORIZED WIRING CLAIM', evidence_edges: [{ id: 'edge-1', observation_id: OBS, row_kind: 'endpoint', row_id: 'endpoint-a', relation: 'open', target_revision: 'current_record' }] };
+ await mount();
+ expect(fixture.rpcCalls).toHaveLength(1); expect(fixture.rpcCalls[0]).toMatchObject({ name: 'harness_evidence_witness', args: { p_vehicle_id: PARENT, p_observation_id: OBS } });
+ expect(host.textContent).toContain('AUTHORIZED WIRING CLAIM'); expect(host.textContent).not.toContain('RAW VALUE MUST STAY HIDDEN');
+});
+it('retains the public wiring privacy boundary without requesting owner evidence', async () => {
+ fixture.auth.user = null;
+ fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call) : { data: observation({ kind: 'specification', structured_data: { domain: 'wiring', value: 'PRIVATE WIRING' } }), error: null });
+ await mount();
+ expect(fixture.rpcCalls.every(call => call.name !== 'harness_evidence_witness')).toBe(true);
+ expect(host.textContent).not.toContain('PRIVATE WIRING'); expect(host.textContent).toContain('Sign in as the vehicle owner');
 });
 
 it('uses the original parent and raw-observation gates when no public claim matches', async () => {
