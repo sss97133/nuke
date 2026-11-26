@@ -10,11 +10,12 @@ globalThis.fetch = (async (input, init) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
   const headers = new Headers(init?.headers); assert(url.origin === project && headers.get('apikey') === secret, 'service credentials stay at project');
   calls.push(`${init?.method ?? 'GET'} ${url.pathname}`);
-  if (url.pathname.startsWith('/storage/v1/object/reference-docs/supplied/')) {
+  if (url.pathname.startsWith('/storage/v1/object/reference-docs/supplied/') && init?.method === 'POST') {
     assert(init?.method === 'POST' && headers.get('x-upsert') === 'false', 'immutable upload only');
     return duplicate ? Response.json({ statusCode: '409', error: 'Duplicate', message: 'The resource already exists' }, { status: 409 }) : Response.json({ Key: url.pathname, Id: docId });
   }
-  if (url.pathname.startsWith('/storage/v1/object/authenticated/reference-docs/supplied/')) {
+  if (url.pathname.startsWith('/storage/v1/object/authenticated/reference-docs/supplied/')
+    || url.pathname.startsWith('/storage/v1/object/reference-docs/supplied/') && init?.method === 'GET') {
     const f = await referenceFixture(); return new Response(wrongBytes ? 'wrong PDF' : atob(f.document.pdf_base64));
   }
   if (url.pathname === '/rest/v1/rpc/record_supplied_reference_document') {
@@ -48,6 +49,35 @@ Deno.test('actual replay verifies existing bytes and never overwrites', async ()
   duplicate = wrongBytes = false;
 });
 Deno.test('actual source withdrawal returns409 without legacy model routes', async () => {
-  calls.length = 0; rejectProjection = true; const response = await handler(await request()); const result = await response.json();
+  calls.length = 0; duplicate = wrongBytes = false; rejectProjection = true; const response = await handler(await request()); const result = await response.json();
   assert(response.status === 409 && result.model_calls === 0 && calls.length === 4); rejectProjection = false;
+});
+
+async function documentRequest(token = secret, change?: (input: any) => void) {
+  const { assembly: _, ...input } = await referenceFixture();
+  input.mode = 'supplied_document'; input.document.category = 'component_datasheet'; change?.(input);
+  return new Request(`${project}/functions/v1/index-reference-document`, {
+    method: 'POST', headers: { apikey: token, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+}
+Deno.test('actual supplied-document handler persists custody without assembly, observation or model work', async () => {
+  calls.length = 0; duplicate = wrongBytes = rejectProjection = false; intake = undefined;
+  const response = await handler(await documentRequest()), result = await response.json();
+  assert(response.status === 200 && result.success && result.custody_only === true && result.model_calls === 0);
+  assert(result.document_id === docId && calls.length === 2 && calls[0].startsWith('POST /storage/v1/object/reference-docs/supplied/')
+    && calls[1] === 'POST /rest/v1/rpc/record_supplied_reference_document' && intake === undefined);
+});
+Deno.test('actual document mode rejects anonymous credentials and assembly injection without effects', async () => {
+  calls.length = 0; const denied = await handler(await documentRequest('sb_publishable_fixture'));
+  assert(denied.status === 401 && calls.length === 0); await denied.body?.cancel();
+  const invalid = await handler(await documentRequest(secret, input => input.assembly = { name: 'invented' }));
+  assert(invalid.status === 400 && calls.length === 0); await invalid.body?.cancel();
+});
+Deno.test('actual document replay verifies bytes and refuses changed storage contents', async () => {
+  calls.length = 0; duplicate = true; wrongBytes = rejectProjection = false;
+  const replay = await handler(await documentRequest());
+  assert(replay.status === 200 && calls.length === 3 && calls[1].startsWith('GET /storage/v1/object/')
+    && calls[2] === 'POST /rest/v1/rpc/record_supplied_reference_document'); await replay.body?.cancel();
+  calls.length = 0; wrongBytes = true;
+  const changed = await handler(await documentRequest());
+  assert(changed.status === 409 && calls.length === 2); await changed.body?.cancel(); duplicate = wrongBytes = false;
 });

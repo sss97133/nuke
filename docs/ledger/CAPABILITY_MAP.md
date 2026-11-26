@@ -114,7 +114,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Receipt storage | `receipts` + `receipt_items` | vehicle_receipts (0 rows) |
 | Per-vehicle documents | `vehicle_documents` | documents (3 rows), deal_documents (dormant); secure_documents = sensitive docs only |
 | Document OCR | `document-ocr-worker` + `document_ocr_queue` (dormant — reactivate, don't mint) | extract-pdf-text, part-number-ocr, ds-extract-document (deleted, dangling refs) |
-| Reference/manual indexing | `scripts/ingest-service-manual.py` + `scripts/library_ingest_to_db.py` → service_manual_chunks / library_documents | parse-reference-document, index-reference-document (undeployed; Library.tsx call broken), index-service-manual (deleted) |
+| Reference/manual indexing | `scripts/ingest-service-manual.py` + `scripts/library_ingest_to_db.py` → service_manual_chunks / library_documents. Deployed `index-reference-document` supplied-reference modes reuse `record_supplied_reference_document` for retained byte/page custody; `supplied_reference` separately asserts/projects an assembly, while `supplied_document` retains a generic datasheet without assembly, vehicle, property or model inference (`2026-11-26_datasheet-source-custody` receipt). | parse-reference-document; the legacy Library.tsx indexing call still needs separate verification; index-service-manual (deleted); fake vehicle/assembly assertions for generic material references |
 | Title scan | `extract-title-data` | vault-* suite (deleted); vehicle_title_documents DOES NOT EXIST |
 | Manual page serving | `get-manual-pages` | vehicle_manuals / vehicle_manual_links (DO NOT EXIST) |
 | **PHOTOS** | | |
