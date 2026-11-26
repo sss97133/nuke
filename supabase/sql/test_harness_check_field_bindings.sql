@@ -102,6 +102,15 @@ DO $$ DECLARE e uuid; c uuid; r jsonb; BEGIN
  IF has_column_privilege(current_user,'public.harness_model_evaluations','input_snapshot','SELECT')
   OR has_column_privilege(current_user,'public.harness_model_evaluations','logic_snapshot','SELECT')
  THEN RAISE EXCEPTION 'Private evaluation receipts exposed'; END IF;
+ SELECT k.id INTO STRICT c FROM public.harness_model_checks k
+ JOIN public.harness_segments s ON s.id=k.segment_id
+ JOIN public.vehicle_custom_circuits vc ON vc.id=s.vehicle_custom_circuit_id
+ WHERE k.evaluation_id=e AND k.rule_key='segment_specification' AND vc.circuit_code='23';
+ r:=public.harness_model_check_context('e08bf694-970f-4cbe-8a74-8715158a0f2e',e,c);
+ IF r->>'status'<>'current' OR r#>>'{check,result}'<>'fail'
+  OR r#>>'{subject,gauge_awg}'<>'20' OR r#>>'{subject,circuit_gauge_awg}'<>'18'
+  OR r#>>'{subject,keyed_part_number}'<>'M22759/32-18-2'
+ THEN RAISE EXCEPTION 'Actual wire/circuit/catalog conflict context was lost: %',r; END IF;
 END $$;
 RESET ROLE;
 

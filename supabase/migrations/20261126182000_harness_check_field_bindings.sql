@@ -237,7 +237,8 @@ BEGIN
   'check',jsonb_build_object('id',c.id,'rule_key',c.rule_key,'rule_version',c.rule_version,'result',c.result,
    'segment_id',c.segment_id,'termination_id',c.termination_id,'circuit_id',c.circuit_id,'component_requirement_id',c.component_requirement_id),
   'subject',CASE WHEN source_row IS NOT NULL THEN (SELECT jsonb_object_agg(k,source_row->k) FROM unnest(ARRAY[
-   'id','circuit_id','net_id','gauge_awg','colour','wire_part_id','keyed_part_number','expected_gauge_awg','expected_part_number',
+   'id','circuit_id','net_id','gauge_awg','colour','circuit_gauge_awg','circuit_colour',
+   'wire_part_id','keyed_part_number','expected_gauge_awg','expected_part_number',
    'planned_length_ft','planned_length_method','measured_length_ft','build_state']) k) ELSE NULL END,
   'inspection_context',jsonb_build_object('role','recorded_design_addresses_only_not_consumed_witnesses_or_continuity',
    'ends',ends,'endpoints',endpoint_contexts,'component',component_context),

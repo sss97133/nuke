@@ -17,3 +17,10 @@ For a component subject, the same reader returns its exact existing requirement,
 These are **direct predicate inputs in the evaluated segment projection**. Fields such as `specification_state` and `physical_progress` are themselves derived. Transitive base-field/source/witness lineage remains `not_assessed`, and no nearby observation is claimed as consumed evidence. This does not complete electrical sizing, engineering coverage, purchasing, measured cuts or the public builder handoff.
 
 Contract: `supabase/sql/test_harness_check_field_bindings.sql`. It reuses existing source fixtures and preserves golden results across unknown/conflicting/physical-progress cases and 500 pieces; tests persisted FK/value admission, absence/null distinctions, public inspection/private receipt isolation, hidden-child completeness, append-only history, source changes and interpreter changes. The unchanged existing 500-piece source population is factored into one fixture helper for both the original evaluation contract and the new complete-producer assay. Runtime and deployed acceptance remain separate from these disposable tests.
+
+The stock-key contract installs these bindings before the aught-key repair and
+walks its actual persisted producer and anonymous inspector together. A1/0 stock
+choice must expose both expected and keyed `M22759/16-01-2` values in the same
+current check. The existing23 conflict must retain20AWG on the piece,18AWG on the
+circuit and the18AWG catalog identity in its inspection context; these actual
+circuit fields are returned separately from optional expected-design fields.
