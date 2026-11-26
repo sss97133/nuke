@@ -28,26 +28,26 @@ CREATE TABLE public.platform_config(id uuid PRIMARY KEY DEFAULT gen_random_uuid(
   config_value jsonb NOT NULL, description text, updated_at timestamptz DEFAULT now(), updated_by uuid);
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY, make text, model text, year int, vin text, description text, highlights text,
   equipment text, modifications text, numbers_quote text, title text, listing_title text, bat_listing_title text,
-  deleted_at timestamptz, merged_into_vehicle_id uuid);
-CREATE TABLE public.auction_events(id uuid PRIMARY KEY, vehicle_id uuid);
-CREATE TABLE public.auction_comments(id uuid PRIMARY KEY, auction_event_id uuid, vehicle_id uuid, comment_type text, comment_text text,
+  deleted_at timestamptz, merged_into_vehicle_id uuid REFERENCES public.vehicles(id));
+CREATE TABLE public.auction_events(id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles(id));
+CREATE TABLE public.auction_comments(id uuid PRIMARY KEY, auction_event_id uuid, vehicle_id uuid REFERENCES public.vehicles(id), comment_type text, comment_text text,
   has_question boolean);
-CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY, vehicle_id uuid, content_text text, is_superseded boolean DEFAULT false);
-CREATE TABLE public.field_evidence(id uuid PRIMARY KEY, vehicle_id uuid, proposed_value text, status text);
+CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles(id), content_text text, is_superseded boolean DEFAULT false);
+CREATE TABLE public.field_evidence(id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles(id), proposed_value text, status text);
 CREATE TYPE public.vision_gate_status AS ENUM ('pending','filed');
-CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid, vision_gate_status public.vision_gate_status DEFAULT 'pending');
+CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles(id), vision_gate_status public.vision_gate_status DEFAULT 'pending');
 CREATE TABLE public.vehicle_decode_rules(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), rule_key text, make text, code text,
   superseded_at timestamptz);
 CREATE TABLE public.vehicle_code_reading_runs(run_id text PRIMARY KEY, status text NOT NULL, reverted_at timestamptz);
-CREATE TABLE public.vehicle_code_readings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, kind text, code text,
+CREATE TABLE public.vehicle_code_readings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles(id), kind text, code text,
   origin_table text, origin_id uuid, origin_column text, match_text text, rule_version text, run_id text,
   state text NOT NULL DEFAULT 'active', reverted_at timestamptz);
 CREATE UNIQUE INDEX ON public.vehicle_code_readings (vehicle_id, kind, code, origin_table, origin_id, origin_column) WHERE state = 'active';
 CREATE TABLE public.data_set_runs(run_id text PRIMARY KEY, status text NOT NULL, reverted_at timestamptz);
-CREATE TABLE public.data_set_members(id bigserial PRIMARY KEY, run_id text, vehicle_id uuid, set_key text, basis_id uuid,
+CREATE TABLE public.data_set_members(id bigserial PRIMARY KEY, run_id text, vehicle_id uuid REFERENCES public.vehicles(id), set_key text, basis_id uuid,
   state text NOT NULL DEFAULT 'active', superseded_by_run text);
-CREATE TABLE public.data_set_member_plan(run_id text, action text, member_id bigint, vehicle_id uuid, set_key text, basis_id uuid);
-CREATE TABLE public.analysis_queue(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid UNIQUE, status text NOT NULL,
+CREATE TABLE public.data_set_member_plan(run_id text, action text, member_id bigint, vehicle_id uuid REFERENCES public.vehicles(id), set_key text, basis_id uuid);
+CREATE TABLE public.analysis_queue(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid REFERENCES public.vehicles(id) UNIQUE, status text NOT NULL,
   worker_id text, claimed_at timestamptz, lease_expires_at timestamptz, lease_token uuid,
   request_revision bigint NOT NULL DEFAULT 0, completed_revision bigint NOT NULL DEFAULT 0);
 
@@ -143,13 +143,13 @@ INSERT INTO vehicles (id, make, model, year, vin, description) VALUES
 
 create table if not exists public.model_fold_signal (
   id bigint generated always as identity primary key,
-  vehicle_id uuid not null,
+  vehicle_id uuid REFERENCES public.vehicles(id) not null,
   reason text not null,
   origin_id uuid,
   at timestamptz not null default now());
 
 create table if not exists public.model_fold_work (
-  vehicle_id uuid primary key,
+  vehicle_id uuid REFERENCES public.vehicles(id) primary key,
   state text not null default 'pending' check (state in ('pending','leased','done','dead')),
   priority smallint not null default 5,
   reasons text[] not null default '{}',
@@ -174,7 +174,7 @@ create index if not exists model_fold_work_leased_idx on public.model_fold_work 
 
 create table if not exists public.model_fold_scope_members (
   scope text not null,
-  vehicle_id uuid not null,
+  vehicle_id uuid REFERENCES public.vehicles(id) not null,
   gen int not null default 0,
   primary key (scope, vehicle_id));
 
@@ -220,7 +220,7 @@ create index if not exists model_fold_ticks_started_idx on public.model_fold_tic
 create table if not exists public.model_fold_tick_runs (
   id bigint generated always as identity primary key,
   tick_id uuid not null,
-  vehicle_id uuid not null,
+  vehicle_id uuid REFERENCES public.vehicles(id) not null,
   decode_run_id uuid,
   membership_run_id uuid,
   invalidated_reading_ids uuid[] not null default '{}',
@@ -242,10 +242,10 @@ ALTER TABLE public.vehicles ADD COLUMN is_public boolean NOT NULL DEFAULT true;
 CREATE TABLE public.harness_designs(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id));
 INSERT INTO public.harness_designs VALUES(md5('worker phase design')::uuid,:fb1);
 CREATE TABLE public.harness_model_evaluations(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id),logic_key text,UNIQUE(id,vehicle_id));
-CREATE TABLE public.harness_model_state(vehicle_id uuid PRIMARY KEY REFERENCES public.vehicles(id),source_epoch bigint NOT NULL DEFAULT 1,
+CREATE TABLE public.harness_model_state(vehicle_id uuid REFERENCES public.vehicles(id) PRIMARY KEY REFERENCES public.vehicles(id),source_epoch bigint NOT NULL DEFAULT 1,
  folded_epoch bigint,source_changed_at timestamptz NOT NULL DEFAULT clock_timestamp(),latest_evaluation_id uuid REFERENCES public.harness_model_evaluations(id),
  failure_count integer NOT NULL DEFAULT 0,retry_after timestamptz,last_error_code text,last_attempt_logic_key text);
-CREATE TABLE public.worker_phase_calls(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,vehicle_id uuid,phase text);
+CREATE TABLE public.worker_phase_calls(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id),phase text);
 CREATE FUNCTION public.model_fold_config() RETURNS jsonb LANGUAGE sql STABLE AS $$SELECT config_value FROM public.platform_config WHERE config_key='model_fold'$$;
 INSERT INTO public.platform_config(config_key,config_value) VALUES('model_fold','{"enabled":true,"signals_enabled":true,"decode_scopes":[],"scopes":[],"max_vehicles":5,"max_attempts":2,"budget_ms":6000,"settle_seconds":0,"max_delay_seconds":0,"lease_seconds":60,"max_lock_waiters":20,"max_active_backends":60,"circuit_bad_ticks":3,"stuck_tick_seconds":60,"yield_job":"model-fold-tick"}');
 CREATE FUNCTION public.model_fold_logic_key() RETURNS text LANGUAGE sql STABLE AS $$SELECT md5('generic fixture')$$;
