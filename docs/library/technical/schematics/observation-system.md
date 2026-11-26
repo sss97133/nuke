@@ -1049,3 +1049,21 @@ ORDER BY vo.observed_at DESC;
 SELECT * FROM vehicle_observations
 WHERE vehicle_match_signals->>'multiple_candidates' = 'true';
 ```
+
+## Public reference source qualification
+
+The existing `index-reference-document` supplied modes retain immutable PDF bytes through `record_supplied_reference_document`. They share `reference_documents` and `document_pages`; the generic `supplied_document` mode emits no vehicle, property or assembly observation. `reference_document_evidence(document_id)` rechecks Storage object/version/hash/size, the canonical supplied-page hash and the source metadata revision. `reference_assembly_evidence(observation_id)` reuses that qualifier before checking its observation binding, assembly shape, part numbers and page excerpts. Both internal qualifiers remain service-only; existing assembly readers retain their current grants. No new source table, queue or writer is introduced.
+
+```mermaid
+flowchart LR
+  PDF[Retained public PDF object/version] --> DOC[reference_documents]
+  DOC --> PAGE[document_pages: canonical supplied pages]
+  DOC --> CUSTODY[reference_document_evidence]
+  PAGE --> CUSTODY
+  PDF --> CUSTODY
+  CUSTODY --> ASSEMBLY[reference_assembly_evidence]
+  OBS[Source-bound assembly observation] --> ASSEMBLY
+  ASSEMBLY --> READER[Existing assembly readers]
+```
+
+A changed title, category, source URL or page count cannot continue to qualify under an old revision. This is source currentness on read; electrical property admission, dependency invalidation and harness calculation release remain separate work. Contract: `supabase/sql/test_reference_document_evidence.sql`; existing source-bound assembly contract also runs the shared qualifier and retains its native concurrency test.

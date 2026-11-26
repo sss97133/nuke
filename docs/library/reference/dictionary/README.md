@@ -417,3 +417,7 @@ The existing property proposal governs ratification. An intake implementation do
 7. **[kimball-2013-dw-toolkit]** Kimball & Ross (2013). *The Data Warehouse Toolkit (3rd ed.)*. Wiley.
 
 *Verification note: all seven confirmed real against primary sources. Do not add a citation here without the same verification.*
+
+### Retained reference custody
+
+A `reference_documents` row and its canonical supplied `document_pages` are retained source input, distinct from an observation about a vehicle or a technical property. `reference_document_evidence(uuid)` rechecks the content-addressed public Storage object, object version/hash/size, reviewed page fingerprint, and the admitted source metadata revision. It returns NULL for a withdrawn or changed source. An exact PDF/page identity establishes what was cited; it does not establish an installed part, electrical applicability, ampacity or build release. Technical claims must carry their own keyed applicability and witnesses. The existing assembly qualifier consumes this shared custody check.
