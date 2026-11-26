@@ -169,10 +169,20 @@ WITH raw AS MATERIALIZED (SELECT CASE WHEN public.harness_model_visible(p_vehicl
 c AS MATERIALIZED (
  SELECT x FROM raw CROSS JOIN LATERAL jsonb_array_elements(g->'circuits') a(x)
  WHERE x->>'design_status'='decided' AND NOT coalesce((x->>'is_superseded')::boolean,false)),
+progressed_circuits AS MATERIALIZED (
+ SELECT DISTINCT b.circuit_id FROM public.harness_build_events b WHERE b.vehicle_id=p_vehicle_id AND b.to_state<>'uncut'),
 s AS MATERIALIZED (
- SELECT x FROM raw CROSS JOIN LATERAL jsonb_array_elements(g->'segments') a(x)
- WHERE x->>'design_status'='decided' AND coalesce((x->>'in_current_plan')::boolean,true)
-  AND x->>'circuit_id' IN (SELECT x->>'id' FROM c)),
+ SELECT a.x || jsonb_build_object('physical_progress',
+   coalesce((a.x->>'physical_progress')::boolean,false) OR hs.build_state IS DISTINCT FROM 'uncut'
+   OR hs.measured_length_ft IS NOT NULL OR hs.measured_at IS NOT NULL
+   OR coalesce(vc.build_state,'uncut')<>'uncut' OR to_jsonb(vc)->>'measured_length_ft' IS NOT NULL
+   OR hs.vehicle_custom_circuit_id IN (SELECT circuit_id FROM progressed_circuits)) AS x
+ FROM raw CROSS JOIN LATERAL jsonb_array_elements(g->'segments') a(x)
+ LEFT JOIN public.harness_segments hs ON hs.id=(a.x->>'id')::uuid AND hs.vehicle_id=p_vehicle_id
+ LEFT JOIN public.vehicle_custom_circuits vc ON vc.id=hs.vehicle_custom_circuit_id
+  AND EXISTS (SELECT FROM public.vehicle_wiring_overlays vo WHERE vo.id=vc.overlay_id AND vo.vehicle_id=p_vehicle_id)
+ WHERE a.x->>'design_status'='decided' AND coalesce((a.x->>'in_current_plan')::boolean,true)
+  AND a.x->>'circuit_id' IN (SELECT c.x->>'id' FROM c)),
 t AS MATERIALIZED (
  SELECT a.x FROM raw CROSS JOIN LATERAL jsonb_array_elements(g->'terminations') a(x)
  WHERE EXISTS (SELECT FROM s WHERE a.x->>'id' IN (s.x->>'from_termination_id',s.x->>'to_termination_id'))),

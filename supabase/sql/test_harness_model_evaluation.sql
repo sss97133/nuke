@@ -9,7 +9,9 @@ $$;
 UPDATE public.harness_segments SET design_status='decided' WHERE NOT is_superseded;
 CREATE FUNCTION public.vein_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
  BEGIN RAISE EXCEPTION 'append only'; END $$;
-CREATE TABLE IF NOT EXISTS public.harness_build_events(id uuid DEFAULT gen_random_uuid(),vehicle_id uuid REFERENCES public.vehicles(id));
+CREATE TABLE IF NOT EXISTS public.harness_build_events(id uuid DEFAULT gen_random_uuid(),vehicle_id uuid REFERENCES public.vehicles(id),
+ circuit_id uuid REFERENCES public.vehicle_custom_circuits(id),to_state text);
+GRANT SELECT ON public.harness_build_events TO anon,authenticated;
 CREATE FUNCTION public.model_fold_config() RETURNS jsonb LANGUAGE sql STABLE AS $$
  SELECT '{"enabled":true,"signals_enabled":true,"max_attempts":3,"max_vehicles":2,"settle_seconds":1,"max_delay_seconds":60}'::jsonb;
 $$;
@@ -193,6 +195,25 @@ BEGIN
  SELECT source_epoch INTO before_epoch FROM public.harness_model_state;
  UPDATE public.harness_segments SET planned_length_ft=planned_length_ft;
  IF (SELECT source_epoch FROM public.harness_model_state)<>before_epoch THEN RAISE EXCEPTION 'No-op writes invalidate the model'; END IF;
+END $$;
+
+-- The legacy reader lacks physical_progress; circuit/event history must still hold new wire demand.
+DO $$
+DECLARE i jsonb; cid uuid; sid text;
+BEGIN
+ SELECT id INTO cid FROM public.vehicle_custom_circuits WHERE circuit_code='110';
+ UPDATE public.vehicle_custom_circuits SET build_state='cut' WHERE id=cid;
+ i:=public.harness_model_inputs('e08bf694-970f-4cbe-8a74-8715158a0f2e');
+ IF EXISTS(SELECT FROM jsonb_array_elements(i#>'{model,segments}') x WHERE x->>'circuit_id'=cid::text
+   AND x->>'physical_progress' IS DISTINCT FROM 'true') THEN RAISE EXCEPTION 'Circuit build state lost at physical grain'; END IF;
+ UPDATE public.vehicle_custom_circuits SET build_state='uncut' WHERE id=cid;
+ INSERT INTO public.harness_build_events(vehicle_id,circuit_id,to_state) VALUES('e08bf694-970f-4cbe-8a74-8715158a0f2e',cid,'terminated');
+ i:=public.harness_model_inputs('e08bf694-970f-4cbe-8a74-8715158a0f2e');
+ IF EXISTS(SELECT FROM jsonb_array_elements(i#>'{model,segments}') x WHERE x->>'circuit_id'=cid::text
+   AND x->>'physical_progress' IS DISTINCT FROM 'true') THEN RAISE EXCEPTION 'Recorded build history lost after scalar reset'; END IF;
+ CALL public.model_fold_tick();
+ IF public.harness_evaluated_model('e08bf694-970f-4cbe-8a74-8715158a0f2e')->>'status'<>'current'
+ THEN RAISE EXCEPTION 'Build history did not refold'; END IF;
 END $$;
 
 -- Code changes have no source-row trigger; the existing tick detects the changed implementation key.
