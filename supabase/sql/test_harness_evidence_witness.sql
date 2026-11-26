@@ -16,7 +16,7 @@ GRANT USAGE ON SCHEMA auth TO anon,authenticated,service_role;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO anon,authenticated,service_role;
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY,user_id uuid,owner_id uuid,uploaded_by uuid,is_public boolean,deleted_at timestamptz);
 CREATE TABLE public.observation_sources(id uuid PRIMARY KEY,display_name text,category text,base_trust_score numeric,updated_at timestamptz);
-CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid,kind text,observed_at timestamptz,ingested_at timestamptz,
+CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id),kind text,observed_at timestamptz,ingested_at timestamptz,
   source_id uuid REFERENCES public.observation_sources,source_url text,content_text text,structured_data jsonb,
   confidence text,confidence_score numeric,extraction_method text,submitted_by_user_id uuid,
   citation_excerpt text,citation_page_number integer,citation_document_id uuid,citation_secure_document_id uuid,citation_publication_id uuid,
