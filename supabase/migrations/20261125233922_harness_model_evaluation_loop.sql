@@ -516,6 +516,7 @@ complete AS MATERIALIZED (
 graph AS (
  SELECT (i.payload->'model') || jsonb_build_object(
    'evaluation_id',r.id,'input_hash',r.input_hash,'logic_key',r.logic_key,'evaluated_at',r.evaluated_at,'coverage',r.coverage,
+   'rule_definitions',i.payload->'rules',
    'electrical_nodes',coalesce((SELECT jsonb_agg(to_jsonb(n)-'evaluation_id' ORDER BY n.id) FROM nodes n),'[]'::jsonb),
    'segment_ends',coalesce((SELECT jsonb_agg(to_jsonb(a)-'evaluation_id' ORDER BY a.segment_id,a.side) FROM ends a),'[]'::jsonb),
    'model_checks',coalesce((SELECT jsonb_agg(to_jsonb(c)-'evaluation_id' ORDER BY c.id) FROM checks c),'[]'::jsonb),

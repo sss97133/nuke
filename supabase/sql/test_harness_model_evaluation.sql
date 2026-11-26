@@ -104,6 +104,7 @@ BEGIN
  SELECT count(*) INTO n FROM jsonb_array_elements(r->'model'->'segments') x WHERE x->>'circuit_code'='110';
  IF n<>2 THEN RAISE EXCEPTION 'Persisted read lost physical grain'; END IF;
  IF jsonb_array_length(r->'model'->'model_checks')=0 THEN RAISE EXCEPTION 'Consumer received no stored checks'; END IF;
+ IF jsonb_array_length(r->'model'->'rule_definitions')<>12 THEN RAISE EXCEPTION 'Consumer has no bound check meanings'; END IF;
 END $$;
 
 -- Typed result guards cannot attach another asset or swap a physical piece's recorded side.
