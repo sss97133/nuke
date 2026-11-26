@@ -3,22 +3,22 @@
 -- No artificial leakage, implicit ground, guessed resistance or auto-tripping fuse.
 CREATE OR REPLACE FUNCTION public.harness_model_dc_compute(p_input jsonb)
 RETURNS jsonb LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE SECURITY INVOKER
-SET search_path=public
+SET search_path=public SET extra_float_digits=3
 AS $fn$
 DECLARE
  base jsonb:=jsonb_build_object('contract_version',1,'analysis','dc_resistive_v1',
-  'solver_version','1','input_hash',md5(p_input::text),'qualification','conditional_simulation_only',
+  'solver_version','2','input_hash',NULL,'qualification','conditional_simulation_only',
   'nodes','[]'::jsonb,'branches','[]'::jsonb);
  issues jsonb:='[]'; nodes_ jsonb; branches_ jsonb; row_ jsonb; output_nodes jsonb:='[]'; output_branches jsonb:='[]';
  ids text[]; branch_ids text[]; reference_ text; kind_ text; state_ text;
  n integer; m integer; size_ integer; i integer; j integer; k integer; a integer; b integer;
  source_ integer:=0; pivot_ integer; rank_ integer:=0; pivot_cols integer[]:='{}';
- matrix_ double precision[][]; solution_ double precision[]; kcl_ double precision[];
- r double precision; g double precision; value_ double precision; temp_ double precision;
- factor_ double precision; scale_ double precision; score_ double precision; best_ double precision;
- va double precision; vb double precision; current_ double precision; power_ double precision;
- total_power double precision:=0; absolute_power double precision:=0; max_kcl double precision:=0;
- max_current double precision:=0; constraint_error double precision:=0; max_voltage double precision:=0;
+ matrix_ numeric[][]; solution_ numeric[]; kcl_ numeric[];
+ r numeric; g numeric; value_ numeric; temp_ numeric;
+ factor_ numeric; scale_ numeric; score_ numeric; best_ numeric;
+ va numeric; vb numeric; current_ numeric; power_ numeric;
+ total_power numeric:=0; absolute_power numeric:=0; max_kcl numeric:=0;
+ max_current numeric:=0; constraint_error numeric:=0; max_voltage numeric:=0;
  floating_ jsonb;
 BEGIN
  IF p_input IS NULL OR jsonb_typeof(p_input)<>'object' THEN
@@ -32,8 +32,11 @@ BEGIN
   RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','scenario_field_unsupported')));
  END IF;
  IF jsonb_array_length(p_input->'nodes') NOT BETWEEN 1 AND 64 OR jsonb_array_length(p_input->'branches')>128
-  OR octet_length(p_input::text)>262144 THEN
+  OR pg_column_size(p_input)>262144 THEN
   RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','scenario_bound_exceeded')));
+ END IF;
+ IF length(p_input->>'reference_node_id') NOT BETWEEN 1 AND 128 THEN
+  RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','reference_key_invalid')));
  END IF;
  reference_:=p_input->>'reference_node_id';
  FOR row_ IN SELECT x FROM jsonb_array_elements(p_input->'nodes') t(x) LOOP
@@ -61,7 +64,11 @@ BEGIN
    OR NOT (row_->>'to_node_id'=reference_ OR row_->>'to_node_id'=ANY(ids)) THEN
    RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','branch_identity_or_node_invalid','branch_id',row_->>'id')));
   END IF;
-  branch_ids:=array_append(branch_ids,row_->>'id'); kind_:=row_->>'kind';
+  branch_ids:=array_append(branch_ids,row_->>'id');
+  IF jsonb_typeof(row_->'kind') IS DISTINCT FROM 'string' OR length(row_->>'kind')>32 THEN
+   RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','element_kind_invalid','branch_id',row_->>'id')));
+  END IF;
+  kind_:=row_->>'kind';
   IF kind_ IS NULL OR kind_ NOT IN ('resistor','switch','voltage_source','current_source') THEN
    issues:=issues||jsonb_build_array(jsonb_build_object('code','element_model_unsupported','branch_id',row_->>'id'));
    CONTINUE;
@@ -74,20 +81,26 @@ BEGIN
    RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','element_field_unsupported','branch_id',row_->>'id')));
   END IF;
   IF kind_='switch' THEN
+   IF row_ ? 'state' AND jsonb_typeof(row_->'state') NOT IN ('string','null') THEN
+    RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','contact_state_invalid','branch_id',row_->>'id')));
+   END IF;
    state_:=row_->>'state';
    IF state_ IS NULL OR state_='unknown' THEN
     issues:=issues||jsonb_build_array(jsonb_build_object('code','contact_state_unknown','branch_id',row_->>'id')); CONTINUE;
    ELSIF state_ NOT IN ('open','closed') THEN
     RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','contact_state_invalid','branch_id',row_->>'id')));
-   ELSIF state_='open' THEN CONTINUE;
+   ELSIF state_='open' AND NOT row_ ? 'resistance_ohm' THEN CONTINUE;
    END IF;
   END IF;
   IF kind_ IN ('resistor','switch') THEN
    IF jsonb_typeof(row_->'resistance_ohm') IS DISTINCT FROM 'number' THEN
+    IF kind_='switch' AND state_='open' THEN
+     RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','open_contact_resistance_invalid','branch_id',row_->>'id')));
+    END IF;
     issues:=issues||jsonb_build_array(jsonb_build_object('code','resistance_unknown','branch_id',row_->>'id')); CONTINUE;
    END IF;
-   r:=(row_->>'resistance_ohm')::double precision;
-   IF NOT (r BETWEEN 1e-9 AND 1e12) THEN
+   r:=(row_->'resistance_ohm')::numeric;
+   IF NOT (r BETWEEN 1e-9 AND 1e12) OR scale(r)>24 THEN
     RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','resistance_outside_solver_domain','branch_id',row_->>'id')));
    END IF;
   ELSE
@@ -95,16 +108,22 @@ BEGIN
    IF jsonb_typeof(row_->kind_) IS DISTINCT FROM 'number' THEN
     issues:=issues||jsonb_build_array(jsonb_build_object('code','source_value_unknown','branch_id',row_->>'id')); CONTINUE;
    END IF;
-   value_:=(row_->>kind_)::double precision;
-   IF NOT (abs(value_)<=1e6) THEN
+   value_:=(row_->kind_)::numeric;
+   IF NOT (abs(value_)<=1e6) OR scale(value_)>24 THEN
     RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','source_outside_solver_domain','branch_id',row_->>'id')));
    END IF;
   END IF;
  END LOOP;
  IF jsonb_array_length(issues)>0 THEN RETURN base||jsonb_build_object('status','held','issues',issues); END IF;
- SELECT coalesce(jsonb_agg(x ORDER BY x->>'id'),'[]') INTO branches_ FROM jsonb_array_elements(p_input->'branches') t(x);
- SELECT count(*) INTO m FROM jsonb_array_elements(branches_) t(x) WHERE x->>'kind'='voltage_source';
+ SELECT count(*) INTO m FROM jsonb_array_elements(p_input->'branches') t(x) WHERE x->>'kind'='voltage_source';
  IF m>16 THEN RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','voltage_source_bound_exceeded'))); END IF;
+ -- All admitted scalar fields now have bounded type/length/magnitude/scale.
+ -- Rejected unbounded inputs have a null hash; hash only this bounded rendering.
+ IF octet_length(p_input::text)>262144 THEN
+  RETURN base||jsonb_build_object('status','invalid','issues',jsonb_build_array(jsonb_build_object('code','scenario_bound_exceeded')));
+ END IF;
+ base:=base||jsonb_build_object('input_hash',md5(p_input::text));
+ SELECT coalesce(jsonb_agg(x ORDER BY x->>'id'),'[]') INTO branches_ FROM jsonb_array_elements(p_input->'branches') t(x);
  -- A current source sets flow, not a conductive return path. An open contact
  -- adds no leakage. Unreferenced islands remain unknown instead of grounded.
  WITH RECURSIVE edges AS (
@@ -118,60 +137,68 @@ BEGIN
  END IF;
  size_:=n+m;
  IF size_>0 THEN
-  matrix_:=array_fill(0::double precision,ARRAY[size_,size_+1]);
-  solution_:=array_fill(0::double precision,ARRAY[size_]);
+  matrix_:=array_fill(0::numeric,ARRAY[size_,size_+1]);
+  solution_:=array_fill(0::numeric,ARRAY[size_]);
   FOR row_ IN SELECT x FROM jsonb_array_elements(branches_) t(x) LOOP
    a:=coalesce(array_position(ids,row_->>'from_node_id'),0); b:=coalesce(array_position(ids,row_->>'to_node_id'),0);
    kind_:=row_->>'kind';
    IF kind_='switch' AND row_->>'state'='open' THEN CONTINUE; END IF;
    IF kind_ IN ('resistor','switch') THEN
-    g:=1/(row_->>'resistance_ohm')::double precision;
+    g:=round(1::numeric(120,72)/(row_->'resistance_ohm')::numeric,72);
     IF a>0 THEN matrix_[a][a]:=matrix_[a][a]+g; END IF;
     IF b>0 THEN matrix_[b][b]:=matrix_[b][b]+g; END IF;
     IF a>0 AND b>0 THEN matrix_[a][b]:=matrix_[a][b]-g; matrix_[b][a]:=matrix_[b][a]-g; END IF;
    ELSIF kind_='current_source' THEN
-    value_:=(row_->>'current_a')::double precision;
+    value_:=(row_->'current_a')::numeric;
     IF a>0 THEN matrix_[a][size_+1]:=matrix_[a][size_+1]-value_; END IF;
     IF b>0 THEN matrix_[b][size_+1]:=matrix_[b][size_+1]+value_; END IF;
    ELSE
     source_:=source_+1; k:=n+source_;
     IF a>0 THEN matrix_[a][k]:=matrix_[a][k]+1; matrix_[k][a]:=matrix_[k][a]+1; END IF;
     IF b>0 THEN matrix_[b][k]:=matrix_[b][k]-1; matrix_[k][b]:=matrix_[k][b]-1; END IF;
-    matrix_[k][size_+1]:=(row_->>'voltage_v')::double precision;
+    matrix_[k][size_+1]:=(row_->'voltage_v')::numeric;
    END IF;
   END LOOP;
-  -- Scale each equation, then eliminate with partial pivoting. Track rank so
+  -- Decimal accumulation preserves small sources during large cancellation.
+  -- Round elimination to72decimal places to bound scale growth. Scale each
+  -- equation, then eliminate with partial pivoting. Track rank so
   -- conflicting ideal sources and underdetermined source currents differ.
   FOR i IN 1..size_ LOOP
    scale_:=0; FOR j IN 1..size_ LOOP scale_:=greatest(scale_,abs(matrix_[i][j])); END LOOP;
-   IF scale_>0 THEN FOR j IN 1..size_+1 LOOP matrix_[i][j]:=matrix_[i][j]/scale_; END LOOP; END IF;
+   IF scale_>0 THEN FOR j IN 1..size_+1 LOOP matrix_[i][j]:=round(matrix_[i][j]/scale_,72); END LOOP; END IF;
   END LOOP;
   FOR j IN 1..size_ LOOP
    pivot_:=0; best_:=0;
    FOR i IN rank_+1..size_ LOOP
     score_:=abs(matrix_[i][j]); IF score_>best_ THEN best_:=score_; pivot_:=i; END IF;
    END LOOP;
-   IF best_<=1e-12 THEN CONTINUE; END IF;
+   IF best_=0 THEN CONTINUE; END IF;
+   IF best_<1e-60 THEN
+    RETURN base||jsonb_build_object('status','numerical_failure','issues',jsonb_build_array(jsonb_build_object('code','pivot_below_numeric_resolution')));
+   END IF;
    rank_:=rank_+1; pivot_cols:=array_append(pivot_cols,j);
    IF pivot_<>rank_ THEN FOR k IN 1..size_+1 LOOP temp_:=matrix_[rank_][k]; matrix_[rank_][k]:=matrix_[pivot_][k]; matrix_[pivot_][k]:=temp_; END LOOP; END IF;
-   temp_:=matrix_[rank_][j]; FOR k IN j..size_+1 LOOP matrix_[rank_][k]:=matrix_[rank_][k]/temp_; END LOOP;
+   temp_:=matrix_[rank_][j]; FOR k IN j..size_+1 LOOP matrix_[rank_][k]:=round(matrix_[rank_][k]/temp_,72); END LOOP;
    FOR i IN 1..size_ LOOP
     IF i=rank_ THEN CONTINUE; END IF;
     factor_:=matrix_[i][j]; IF factor_=0 THEN CONTINUE; END IF;
-    FOR k IN j..size_+1 LOOP matrix_[i][k]:=matrix_[i][k]-factor_*matrix_[rank_][k]; END LOOP;
+    FOR k IN j..size_+1 LOOP matrix_[i][k]:=round(matrix_[i][k]-factor_*matrix_[rank_][k],72); END LOOP;
    END LOOP;
   END LOOP;
   IF rank_<size_ THEN
    FOR i IN rank_+1..size_ LOOP
-    IF abs(matrix_[i][size_+1])>1e-9 THEN
+    IF abs(matrix_[i][size_+1])>1e-60 THEN
      RETURN base||jsonb_build_object('status','inconsistent','issues',jsonb_build_array(jsonb_build_object('code','inconsistent_ideal_source_constraints')));
     END IF;
    END LOOP;
+   IF m=0 THEN
+    RETURN base||jsonb_build_object('status','numerical_failure','issues',jsonb_build_array(jsonb_build_object('code','unresolved_numeric_rank')));
+   END IF;
    RETURN base||jsonb_build_object('status','indeterminate','issues',jsonb_build_array(jsonb_build_object('code','dependent_ideal_source_currents')));
   END IF;
   FOR i IN 1..size_ LOOP solution_[pivot_cols[i]]:=matrix_[i][size_+1]; END LOOP;
  END IF;
- kcl_:=array_fill(0::double precision,ARRAY[n+1]); source_:=0;
+ kcl_:=array_fill(0::numeric,ARRAY[n+1]); source_:=0;
  output_nodes:=jsonb_build_array(jsonb_build_object('id',reference_,'voltage_v',0));
  FOR i IN 1..n LOOP
   max_voltage:=greatest(max_voltage,abs(solution_[i]));
@@ -182,13 +209,13 @@ BEGIN
   va:=CASE WHEN a=0 THEN 0 ELSE solution_[a] END; vb:=CASE WHEN b=0 THEN 0 ELSE solution_[b] END;
   kind_:=row_->>'kind';
   IF kind_='switch' AND row_->>'state'='open' THEN current_:=0;
-  ELSIF kind_ IN ('resistor','switch') THEN current_:=(va-vb)/(row_->>'resistance_ohm')::double precision;
-  ELSIF kind_='current_source' THEN current_:=(row_->>'current_a')::double precision;
+  ELSIF kind_ IN ('resistor','switch') THEN current_:=round((va-vb)/(row_->'resistance_ohm')::numeric,72);
+  ELSIF kind_='current_source' THEN current_:=(row_->'current_a')::numeric;
   ELSE
    source_:=source_+1; current_:=solution_[n+source_];
-   constraint_error:=greatest(constraint_error,abs(va-vb-(row_->>'voltage_v')::double precision));
+   constraint_error:=greatest(constraint_error,abs(va-vb-(row_->'voltage_v')::numeric));
   END IF;
-  power_:=(va-vb)*current_; total_power:=total_power+power_; absolute_power:=absolute_power+abs(power_);
+  power_:=round((va-vb)*current_,72); total_power:=total_power+power_; absolute_power:=absolute_power+abs(power_);
   max_current:=greatest(max_current,abs(current_));
   kcl_[a+1]:=kcl_[a+1]+current_; kcl_[b+1]:=kcl_[b+1]-current_;
   output_branches:=output_branches||jsonb_build_array(jsonb_build_object('id',row_->>'id','kind',kind_,
@@ -211,6 +238,6 @@ EXCEPTION WHEN numeric_value_out_of_range OR invalid_text_representation THEN
 END;
 $fn$;
 COMMENT ON FUNCTION public.harness_model_dc_compute(jsonb) IS
-'Pure bounded linear DC operating-point helper in the harness-model compute family. Explicit scenario nodes/branches/reference; resistor, open/closed finite-R contact, independent V/I source. SI units V/A/ohm/W; signed flow from_node to to_node and absorbed power positive. MNA/partial pivoting with KCL, source-voltage and power residual checks. At most64 nodes/128 elements/16 ideal voltage sources/256KiB. Numerical domain R[1e-9,1e12]ohm, absolute source[0,1e6]V/A; these are solver bounds, never engineering limits. Unbound state/parameter, floating island, dependent/conflicting ideal sources and unstable solve return no results. No implicit ground/leakage/zero resistance or physical release. Caller scenario is conditional input, not sanctioned source admission; no table access or public harness reader replacement.';
+'Pure bounded linear DC operating-point helper in the harness-model compute family. Explicit scenario nodes/branches/reference; resistor, open/closed finite-R contact, independent V/I source. SI units V/A/ohm/W; signed flow from_node to to_node and absorbed power positive. MNA/partial pivoting with KCL, source-voltage and power residual checks. At most64 nodes/128 elements/16 ideal voltage sources/256KiB. Decimal accumulation and72-place elimination; session-independent output. Numerical domain R[1e-9,1e12]ohm, absolute source[0,1e6]V/A, at most24fractional places; these are solver bounds, never engineering limits. Unvalidated inputs have null input_hash; render/hash only after scalar/count bounds. Unbound state/parameter, floating island, dependent/conflicting ideal sources and unstable solve return no results. No implicit ground/leakage/zero resistance or physical release. Caller scenario is conditional input, not sanctioned source admission; no table access or public harness reader replacement.';
 REVOKE ALL ON FUNCTION public.harness_model_dc_compute(jsonb) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.harness_model_dc_compute(jsonb) TO service_role;
