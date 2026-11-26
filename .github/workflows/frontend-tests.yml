@@ -50,6 +50,8 @@ jobs:
           supabase/functions/transfer-advance/partyGate_test.ts
           supabase/functions/index-reference-document/suppliedReference.test.ts
           supabase/functions/index-reference-document/suppliedReferenceHandler.test.ts
+          supabase/functions/ingest-observation/wireResistanceReference.test.ts
+          supabase/functions/ingest-observation/wireResistanceReferenceHandler.test.ts
       - name: Install native source-processing build dependencies
         timeout-minutes: 12
         run: |

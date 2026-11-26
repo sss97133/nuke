@@ -1,4 +1,5 @@
 import { delegatedFinancialEvidence } from "./financialDelegation.ts";
+import { ingestWireResistanceReference, WIRE_RESISTANCE_MODE, WIRE_RESISTANCE_METHOD } from "./wireResistanceReference.ts";
 /**
  * INGEST OBSERVATION
  *
@@ -312,6 +313,25 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    if(input.mode===WIRE_RESISTANCE_MODE){
+      const denied=await requireWriteAuth(req);if(denied)return denied;
+      const result=await ingestWireResistanceReference(input,{
+        async authorize(){const writer=await authenticateWriter(req);return writer.ok&&writer.caller.kind==='service_role';},
+        qualify:reading=>supabase.rpc('qualify_wire_resistance_reference',{p_reading:reading}).abortSignal(AbortSignal.timeout(5000)),
+        find:recipe=>supabase.from('vehicle_observations').select('id').eq('source_id',recipe.source_id)
+          .eq('source_identifier',recipe.source_identifier).eq('kind',recipe.kind).eq('content_hash',recipe.content_hash)
+          .abortSignal(AbortSignal.timeout(5000)).maybeSingle(),
+        insert:recipe=>supabase.from('vehicle_observations').insert(recipe).select('id')
+          .abortSignal(AbortSignal.timeout(5000)).single(),
+        project:id=>supabase.rpc('project_wire_resistance_reference',{p_observation_id:id}).abortSignal(AbortSignal.timeout(5000)),
+      });
+      return new Response(JSON.stringify(result.body),{status:result.status,headers:{...corsHeaders,'Content-Type':'application/json'}});
+    }
+    if(input.extraction_method===WIRE_RESISTANCE_METHOD||input.structured_data?.wire_reference_input!==undefined){
+      return new Response(JSON.stringify({error:'Wire reference receipt requires the protected source mode',writes:0,model_calls:0}),
+        {status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+    }
+
     let ecr: Extract<Awaited<ReturnType<typeof import("./retainedEcr.ts").readEcrCapture>>, { ok: true }> | undefined;
     if (input.mode === ECR_MODE) {
       const denied = await requireWriteAuth(req);
