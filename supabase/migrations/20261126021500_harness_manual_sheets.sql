@@ -203,6 +203,8 @@ unmodeled AS MATERIALIZED(SELECT c.x FROM circuits c CROSS JOIN receipt WHERE r 
 unmodeled_page AS MATERIALIZED(SELECT x FROM unmodeled WHERE p_unmodeled_after IS NULL OR (x->>'id')::uuid>p_unmodeled_after
  ORDER BY (x->>'id')::uuid LIMIT greatest(1,least(coalesce(p_limit,25),25))),
 body AS(SELECT jsonb_build_object('contract_version',1,'vehicle_id',p_vehicle_id,
+ 'vehicle_label',(SELECT nullif(concat_ws(' ',to_jsonb(v)->>'year',to_jsonb(v)->>'make',to_jsonb(v)->>'model'),'')
+   FROM public.vehicles v WHERE v.id=p_vehicle_id AND p IS NOT NULL),
  'status',CASE WHEN p IS NULL THEN 'unavailable' WHEN r IS NULL THEN public.harness_model_pending_status(p_vehicle_id,md5(p::text)) ELSE 'current' END,
  'current',r IS NOT NULL,'evaluation',r,'selection','decided_design','coverage','structural_v1',
  'source_epoch',(SELECT source_epoch FROM public.harness_model_state s WHERE s.vehicle_id=p_vehicle_id AND s.latest_evaluation_id=(r->>'id')::uuid),
@@ -244,6 +246,8 @@ checks AS MATERIALIZED(SELECT c.* FROM public.harness_model_checks c CROSS JOIN 
  OR c.circuit_id::text IN(SELECT x->>'id' FROM circuits) OR (c.segment_id IS NULL AND c.termination_id IS NULL AND c.circuit_id IS NULL
   AND to_jsonb(c)->>'component_requirement_id' IS NULL))),
 body AS(SELECT jsonb_build_object('contract_version',1,'vehicle_id',p_vehicle_id,
+ 'vehicle_label',(SELECT nullif(concat_ws(' ',to_jsonb(v)->>'year',to_jsonb(v)->>'make',to_jsonb(v)->>'model'),'')
+   FROM public.vehicles v WHERE v.id=p_vehicle_id AND p IS NOT NULL),
  'status',CASE WHEN p IS NULL THEN 'unavailable' WHEN r IS NULL THEN public.harness_model_pending_status(p_vehicle_id,md5(p::text))
   WHEN (r->>'id')::uuid<>p_evaluation_id THEN 'pending'
   WHEN NOT EXISTS(SELECT FROM sheet) THEN 'unavailable' ELSE 'current' END,
@@ -286,10 +290,14 @@ WITH input AS MATERIALIZED(SELECT public.harness_model_inputs(p_vehicle_id) AS p
 receipt AS MATERIALIZED(SELECT public.harness_model_receipt_for_hash(p_vehicle_id,md5(p::text)) AS r FROM input),
 origin AS MATERIALIZED(SELECT a.* FROM public.harness_model_segment_ends a CROSS JOIN receipt
  WHERE a.evaluation_id=(r->>'id')::uuid AND a.evaluation_id=p_evaluation_id AND a.segment_id=p_segment_id AND a.side=p_side),
-targets AS(SELECT a.segment_id,a.side,a.termination_id,a.node_id,h.sheet_id,
+targets AS(SELECT a.segment_id,a.side,a.termination_id,a.node_id,h.sheet_id,sh.title AS sheet_title,
+ c.circuit_code AS wire_code,e.code AS endpoint_code,t.cavity,
  a.segment_id::text||'/'||a.side AS sort_key FROM origin o
  JOIN public.harness_model_segment_ends a ON a.evaluation_id=o.evaluation_id AND a.node_id=o.node_id
  JOIN public.harness_model_sheet_ends h ON h.evaluation_id=a.evaluation_id AND h.segment_id=a.segment_id AND h.side=a.side
+ JOIN public.harness_model_sheets sh ON sh.evaluation_id=h.evaluation_id AND sh.id=h.sheet_id
+ JOIN public.wire_termination_specs t ON t.id=a.termination_id JOIN public.harness_endpoints e ON e.id=t.endpoint_id
+ JOIN public.harness_segments s ON s.id=a.segment_id JOIN public.vehicle_custom_circuits c ON c.id=s.vehicle_custom_circuit_id
  WHERE (a.segment_id,a.side)<>(o.segment_id,o.side)),
 page AS MATERIALIZED(SELECT * FROM targets WHERE p_after IS NULL OR sort_key>p_after ORDER BY sort_key
  LIMIT greatest(1,least(coalesce(p_limit,50),50)))
@@ -312,13 +320,17 @@ origin AS MATERIALIZED(SELECT a.*,n.endpoint_id,n.net_id FROM public.harness_mod
  WHERE a.evaluation_id=(r->>'id')::uuid AND a.evaluation_id=p_evaluation_id AND a.segment_id=p_segment_id AND a.side=p_side),
 mates AS(SELECT x FROM input CROSS JOIN LATERAL jsonb_array_elements(p->'model'->'connector_matings') a(x)),
 targets AS(
- SELECT DISTINCT a.segment_id,a.side,a.termination_id,a.node_id,n.endpoint_id,h.sheet_id,m.x AS recorded_mating,
+ SELECT DISTINCT a.segment_id,a.side,a.termination_id,a.node_id,n.endpoint_id,h.sheet_id,sh.title AS sheet_title,
+ c.circuit_code AS wire_code,e.code AS endpoint_code,t.cavity,m.x AS recorded_mating,
   a.segment_id::text||'/'||a.side||'/'||md5(m.x::text) AS sort_key FROM origin o
  JOIN mates m ON o.endpoint_id::text IN(m.x->>'from_endpoint_id',m.x->>'to_endpoint_id')
  JOIN public.harness_model_nodes n ON n.evaluation_id=o.evaluation_id AND n.net_id=o.net_id AND n.endpoint_id<>o.endpoint_id
   AND n.endpoint_id::text IN(m.x->>'from_endpoint_id',m.x->>'to_endpoint_id')
  JOIN public.harness_model_segment_ends a ON a.evaluation_id=n.evaluation_id AND a.node_id=n.id
- JOIN public.harness_model_sheet_ends h ON h.evaluation_id=a.evaluation_id AND h.segment_id=a.segment_id AND h.side=a.side),
+ JOIN public.harness_model_sheet_ends h ON h.evaluation_id=a.evaluation_id AND h.segment_id=a.segment_id AND h.side=a.side
+ JOIN public.harness_model_sheets sh ON sh.evaluation_id=h.evaluation_id AND sh.id=h.sheet_id
+ JOIN public.wire_termination_specs t ON t.id=a.termination_id JOIN public.harness_endpoints e ON e.id=t.endpoint_id
+ JOIN public.harness_segments s ON s.id=a.segment_id JOIN public.vehicle_custom_circuits c ON c.id=s.vehicle_custom_circuit_id),
 page AS MATERIALIZED(SELECT * FROM targets WHERE p_after IS NULL OR sort_key>p_after ORDER BY sort_key
  LIMIT greatest(1,least(coalesce(p_limit,50),50)))
 SELECT jsonb_build_object('vehicle_id',p_vehicle_id,'evaluation_id',r->>'id',
