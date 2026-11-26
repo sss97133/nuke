@@ -1,6 +1,16 @@
 -- Disposable PostgreSQL17 only; retain the original canonical model contracts.
 \set ON_ERROR_STOP on
 \i supabase/sql/test_harness_model_evaluation.sql
+-- Hosted anon has named public column grants, never whole-vehicle SELECT.
+ALTER TABLE public.vehicles ADD COLUMN year integer, ADD COLUMN make text, ADD COLUMN model text, ADD COLUMN license_plate text;
+UPDATE public.vehicles SET year=1977,make='Chevrolet',model='Blazer',license_plate='PRIVATE_PLATE_FIXTURE'
+ WHERE id='e08bf694-970f-4cbe-8a74-8715158a0f2e';
+REVOKE SELECT ON public.vehicles FROM anon;
+GRANT SELECT(id,is_public,user_id,owner_id,deleted_at,year,make,model) ON public.vehicles TO anon;
+DO $$ BEGIN
+ IF has_table_privilege('anon','public.vehicles','SELECT') OR has_column_privilege('anon','public.vehicles','license_plate','SELECT')
+ THEN RAISE EXCEPTION 'Fixture did not preserve hosted anonymous column restrictions'; END IF;
+END $$;
 -- Prior contract deliberately hid all checks as its final negative assay.
 DROP POLICY harness_model_checks_read ON public.harness_model_checks;
 CREATE POLICY harness_model_checks_read ON public.harness_model_checks FOR SELECT USING (
@@ -31,6 +41,8 @@ BEGIN
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  r:=public.harness_manual_index('e08bf694-970f-4cbe-8a74-8715158a0f2e',NULL,100000);
  IF r->>'status'<>'current' OR jsonb_array_length(r->'sheets')>25 THEN RAISE EXCEPTION 'Manual index missing or unbounded: %',r; END IF;
+ IF r->>'vehicle_label'<>'1977 Chevrolet Blazer' OR r::text LIKE '%PRIVATE_PLATE_FIXTURE%'
+ THEN RAISE EXCEPTION 'Anonymous label is wrong or leaked a withheld field'; END IF;
  eid:=(r->'evaluation'->>'id')::uuid;
   IF NOT coalesce((public.harness_manual_cursor('e08bf694-970f-4cbe-8a74-8715158a0f2e')->>'eligible_cursor')::boolean,false)
   THEN RAISE EXCEPTION 'Current manual cursor was not eligible'; END IF;
@@ -44,6 +56,7 @@ BEGIN
    OR jsonb_array_length(page->'model'->'segments')>8 THEN RAISE EXCEPTION 'Sheet lost its bounded physical pieces'; END IF;
   IF NOT EXISTS(SELECT FROM jsonb_array_elements(page->'model'->'model_checks') a(x) WHERE x->>'rule_key'='engineering_coverage' AND x->>'result'='hold')
   THEN RAISE EXCEPTION 'Manual sheet lost engineering qualification'; END IF;
+  IF page->>'vehicle_label'<>'1977 Chevrolet Blazer' THEN RAISE EXCEPTION 'Anonymous sheet label failed restricted vehicle grants'; END IF;
  END LOOP;
  page:=public.harness_manual_sheet('e08bf694-970f-4cbe-8a74-8715158a0f2e',gen_random_uuid(),(r->'sheets'->0->>'id')::uuid);
  IF page->>'status'<>'pending' OR page->'model'<>'null'::jsonb THEN RAISE EXCEPTION 'Old evaluation silently retargeted a sheet'; END IF;
@@ -62,8 +75,35 @@ BEGIN
   limit_:=25;
  END LOOP;
  IF total_<>500 OR cardinality(seen)<>63 THEN RAISE EXCEPTION 'Sheet keyset omitted physical population: %, %',total_,cardinality(seen); END IF;
+ r:=public.harness_manual_index(md5('harness scale vehicle')::uuid,NULL,25,'SCALE-1');
+ IF jsonb_array_length(r->'sheets')<>1 OR r->>'next_after' IS NOT NULL
+ THEN RAISE EXCEPTION 'Exact wire code was buried beneath fuzzy prefix matches'; END IF;
 END $$;
 RESET ROLE;
+
+-- A held source attachment must remain inspectable without manufacturing an evaluated edge.
+DO $$
+DECLARE v uuid:='e08bf694-970f-4cbe-8a74-8715158a0f2e'; seg uuid; old_end uuid; bad_end uuid; eid uuid; sid uuid; r jsonb;
+BEGIN
+ SELECT s.id,s.from_termination_id INTO seg,old_end FROM public.harness_segments s
+ JOIN public.vehicle_custom_circuits c ON c.id=s.vehicle_custom_circuit_id
+ WHERE s.vehicle_id=v AND c.circuit_code='110' AND NOT s.is_superseded ORDER BY s.id LIMIT 1;
+ SELECT t.id INTO bad_end FROM public.wire_termination_specs t JOIN public.harness_segments s ON s.id=seg
+ WHERE t.vehicle_id=v AND t.circuit_id<>s.vehicle_custom_circuit_id AND NOT coalesce(t.is_superseded,false) ORDER BY t.id LIMIT 1;
+ IF seg IS NULL OR bad_end IS NULL THEN RAISE EXCEPTION 'Missing unresolved-attachment fixture'; END IF;
+ UPDATE public.harness_segments SET from_termination_id=bad_end WHERE id=seg;
+ r:=public.harness_model_fold(v);eid:=(r->>'evaluation_id')::uuid;
+ IF r->>'status'<>'current' THEN RAISE EXCEPTION 'Held attachment could not be evaluated: %',r; END IF;
+ SELECT sheet_id INTO sid FROM public.harness_model_sheet_members WHERE evaluation_id=eid AND segment_id=seg;
+ r:=public.harness_manual_sheet(v,eid,sid);
+ IF NOT EXISTS(SELECT FROM jsonb_array_elements(r->'model'->'terminations') x WHERE x->>'id'=bad_end::text)
+  OR NOT EXISTS(SELECT FROM jsonb_array_elements(r->'model'->'model_checks') x WHERE x->>'termination_id'=bad_end::text)
+  OR EXISTS(SELECT FROM jsonb_array_elements(r->'model'->'segment_ends') x WHERE x->>'segment_id'=seg::text AND x->>'side'='from')
+ THEN RAISE EXCEPTION 'Source attachment/check was lost or an invalid evaluated edge was created'; END IF;
+ UPDATE public.harness_segments SET from_termination_id=old_end WHERE id=seg;
+ r:=public.harness_model_fold(v);
+ IF r->>'status'<>'current' THEN RAISE EXCEPTION 'Resolved attachment did not recover'; END IF;
+END $$;
 
 SET ROLE anon;
 DO $$

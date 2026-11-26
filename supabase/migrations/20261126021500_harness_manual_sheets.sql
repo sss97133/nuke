@@ -189,21 +189,23 @@ WITH input AS MATERIALIZED(SELECT CASE WHEN length(coalesce(p_query,''))<=160 AN
 receipt AS MATERIALIZED(SELECT public.harness_model_receipt_for_hash(p_vehicle_id,md5(p::text)) AS r FROM input),
 circuits AS MATERIALIZED(SELECT x FROM input CROSS JOIN LATERAL jsonb_array_elements(p->'model'->'circuits') a(x)),
 segments AS MATERIALIZED(SELECT x FROM input CROSS JOIN LATERAL jsonb_array_elements(p->'model'->'segments') a(x)),
+exact_code AS MATERIALIZED(SELECT x->>'id' AS id FROM circuits WHERE lower(x->>'code')=lower(btrim(p_query))),
 matched_sheets AS(SELECT DISTINCT m.sheet_id FROM public.harness_model_sheet_members m CROSS JOIN receipt
  JOIN segments s ON (s.x->>'id')::uuid=m.segment_id JOIN circuits c ON c.x->>'id'=s.x->>'circuit_id'
- WHERE m.evaluation_id=(r->>'id')::uuid AND (strpos(lower(c.x->>'code'),lower(p_query))>0 OR strpos(lower(c.x->>'name'),lower(p_query))>0)),
+ WHERE m.evaluation_id=(r->>'id')::uuid AND CASE WHEN EXISTS(SELECT FROM exact_code) THEN c.x->>'id' IN(SELECT id FROM exact_code)
+ ELSE strpos(lower(c.x->>'code'),lower(p_query))>0 OR strpos(lower(c.x->>'name'),lower(p_query))>0 END),
 page AS MATERIALIZED(SELECT h.* FROM public.harness_model_sheets h CROSS JOIN receipt
  WHERE h.evaluation_id=(r->>'id')::uuid AND (p_after IS NULL OR h.sort_key>p_after)
- AND (nullif(btrim(p_query),'') IS NULL OR strpos(lower(h.section),lower(p_query))>0 OR h.id IN(SELECT sheet_id FROM matched_sheets))
+ AND (nullif(btrim(p_query),'') IS NULL OR (NOT EXISTS(SELECT FROM exact_code) AND strpos(lower(h.section),lower(p_query))>0) OR h.id IN(SELECT sheet_id FROM matched_sheets))
  ORDER BY h.sort_key LIMIT greatest(1,least(coalesce(p_limit,25),25))),
 unmodeled AS MATERIALIZED(SELECT c.x FROM circuits c CROSS JOIN receipt WHERE r IS NOT NULL
  AND NOT EXISTS(SELECT FROM segments s WHERE s.x->>'circuit_id'=c.x->>'id')
- AND (nullif(btrim(p_query),'') IS NULL OR strpos(lower(c.x->>'code'),lower(p_query))>0
-  OR strpos(lower(c.x->>'name'),lower(p_query))>0 OR strpos(lower(c.x->>'section'),lower(p_query))>0)),
+ AND (nullif(btrim(p_query),'') IS NULL OR CASE WHEN EXISTS(SELECT FROM exact_code) THEN c.x->>'id' IN(SELECT id FROM exact_code)
+ ELSE strpos(lower(c.x->>'code'),lower(p_query))>0 OR strpos(lower(c.x->>'name'),lower(p_query))>0 OR strpos(lower(c.x->>'section'),lower(p_query))>0 END)),
 unmodeled_page AS MATERIALIZED(SELECT x FROM unmodeled WHERE p_unmodeled_after IS NULL OR (x->>'id')::uuid>p_unmodeled_after
  ORDER BY (x->>'id')::uuid LIMIT greatest(1,least(coalesce(p_limit,25),25))),
 body AS(SELECT jsonb_build_object('contract_version',1,'vehicle_id',p_vehicle_id,
- 'vehicle_label',(SELECT nullif(concat_ws(' ',to_jsonb(v)->>'year',to_jsonb(v)->>'make',to_jsonb(v)->>'model'),'')
+ 'vehicle_label',(SELECT nullif(concat_ws(' ',v.year,v.make,v.model),'')
    FROM public.vehicles v WHERE v.id=p_vehicle_id AND p IS NOT NULL),
  'status',CASE WHEN p IS NULL THEN 'unavailable' WHEN r IS NULL THEN public.harness_model_pending_status(p_vehicle_id,md5(p::text)) ELSE 'current' END,
  'current',r IS NOT NULL,'evaluation',r,'selection','decided_design','coverage','structural_v1',
@@ -218,7 +220,7 @@ body AS(SELECT jsonb_build_object('contract_version',1,'vehicle_id',p_vehicle_id
      WHERE m.evaluation_id=h.evaluation_id AND m.sheet_id=h.id)),'[]'::jsonb)) ORDER BY sort_key) FROM page h),'[]'::jsonb),
  'next_after',CASE WHEN EXISTS(SELECT FROM public.harness_model_sheets h WHERE h.evaluation_id=(r->>'id')::uuid
   AND h.sort_key>(SELECT max(sort_key) FROM page)
-  AND (nullif(btrim(p_query),'') IS NULL OR strpos(lower(h.section),lower(p_query))>0 OR h.id IN(SELECT sheet_id FROM matched_sheets)))
+  AND (nullif(btrim(p_query),'') IS NULL OR (NOT EXISTS(SELECT FROM exact_code) AND strpos(lower(h.section),lower(p_query))>0) OR h.id IN(SELECT sheet_id FROM matched_sheets)))
   THEN (SELECT max(sort_key) FROM page) END,
  'rule_definitions',CASE WHEN r IS NOT NULL THEN p->'rules' ELSE '[]'::jsonb END) AS payload FROM input CROSS JOIN receipt)
 SELECT payload||jsonb_build_object('snapshot_hash',md5(payload::text),'read_at',statement_timestamp()) FROM body;
@@ -238,15 +240,15 @@ segments AS MATERIALIZED(SELECT x FROM input CROSS JOIN LATERAL jsonb_array_elem
 circuits AS MATERIALIZED(SELECT x FROM input CROSS JOIN LATERAL jsonb_array_elements(p->'model'->'circuits') a(x)
  WHERE x->>'id' IN(SELECT x->>'circuit_id' FROM segments)),
 terms AS MATERIALIZED(SELECT x FROM input CROSS JOIN LATERAL jsonb_array_elements(p->'model'->'terminations') a(x)
- WHERE (x->>'id')::uuid IN(SELECT termination_id FROM ends)),
+ WHERE x->>'id' IN(SELECT x->>'from_termination_id' FROM segments UNION SELECT x->>'to_termination_id' FROM segments)),
 nodes AS MATERIALIZED(SELECT n.* FROM public.harness_model_nodes n CROSS JOIN receipt
  WHERE n.evaluation_id=(r->>'id')::uuid AND n.id IN(SELECT node_id FROM ends)),
 checks AS MATERIALIZED(SELECT c.* FROM public.harness_model_checks c CROSS JOIN receipt WHERE c.evaluation_id=(r->>'id')::uuid
- AND (c.segment_id IN(SELECT segment_id FROM members) OR c.termination_id IN(SELECT termination_id FROM ends)
+ AND (c.segment_id IN(SELECT segment_id FROM members) OR c.termination_id::text IN(SELECT x->>'id' FROM terms)
  OR c.circuit_id::text IN(SELECT x->>'id' FROM circuits) OR (c.segment_id IS NULL AND c.termination_id IS NULL AND c.circuit_id IS NULL
   AND to_jsonb(c)->>'component_requirement_id' IS NULL))),
 body AS(SELECT jsonb_build_object('contract_version',1,'vehicle_id',p_vehicle_id,
- 'vehicle_label',(SELECT nullif(concat_ws(' ',to_jsonb(v)->>'year',to_jsonb(v)->>'make',to_jsonb(v)->>'model'),'')
+ 'vehicle_label',(SELECT nullif(concat_ws(' ',v.year,v.make,v.model),'')
    FROM public.vehicles v WHERE v.id=p_vehicle_id AND p IS NOT NULL),
  'status',CASE WHEN p IS NULL THEN 'unavailable' WHEN r IS NULL THEN public.harness_model_pending_status(p_vehicle_id,md5(p::text))
   WHEN (r->>'id')::uuid<>p_evaluation_id THEN 'pending'
