@@ -726,6 +726,12 @@ jobs:
         run: |
           deno check --node-modules-dir=none supabase/functions/contributor-intake/index.ts supabase/functions/derive-dispatch/index.ts
           deno test --node-modules-dir=none --allow-env supabase/functions/contributor-intake/reviewWork.test.ts supabase/functions/derive-dispatch/handler.test.ts supabase/functions/index-reference-document/receiptProducts.test.ts
+      - name: Verify supplied catalog custody and selector-only property intake
+        run: >-
+          deno test --node-modules-dir=none --allow-env --allow-read
+          supabase/functions/index-reference-document/suppliedReference.test.ts
+          supabase/functions/index-reference-document/suppliedCatalogDocument.test.ts
+          supabase/functions/ingest-observation/catalogSupplyHandler.test.ts
       - name: Verify listing packages preserve contributor sources, supersession and private evidence boundaries
         run: |
           deno check --node-modules-dir=none supabase/functions/generate-listing-package/index.ts supabase/functions/compute-vehicle-valuation/index.ts
