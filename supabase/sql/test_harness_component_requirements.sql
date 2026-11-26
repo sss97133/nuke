@@ -467,4 +467,65 @@ BEGIN
 END $$;
 RESET ROLE;
 DROP POLICY component_fixture_hide_one ON public.harness_model_component_requirements;
+
+-- Nullable unresolved endpoint: keep every recorded assigned role under the
+-- exact end identity, held, rather than aborting the whole evaluation.
+BEGIN;
+UPDATE public.wire_termination_specs SET endpoint_id=NULL WHERE id=(SELECT end_a1 FROM demand_fixture);
+DO $$
+DECLARE ev uuid:=pg_temp.fold_current();
+BEGIN
+ IF (SELECT count(*) FROM public.harness_model_component_requirements q WHERE q.evaluation_id=ev
+ AND q.termination_id=(SELECT end_a1 FROM demand_fixture) AND q.id IS NOT NULL AND q.demand_key IS NOT NULL
+ AND q.endpoint_id IS NULL AND q.state='held' AND 'endpoint_unresolved'=ANY(q.blockers))<>5
+ THEN RAISE EXCEPTION 'Unresolved endpoint lost recorded contact/seal/housing/wedge/boot demand'; END IF;
+ IF (SELECT count(*) FROM public.harness_model_component_contributors c JOIN public.harness_model_component_requirements q
+ ON q.evaluation_id=c.evaluation_id AND q.id=c.requirement_id WHERE c.evaluation_id=ev
+ AND q.termination_id=(SELECT end_a1 FROM demand_fixture) AND c.segment_id=(SELECT segment_a FROM demand_fixture))<>5
+ THEN RAISE EXCEPTION 'Unresolved endpoint lost exact contributor edges'; END IF;
+END $$;
+ROLLBACK;
+
+-- The existing splice owner normalizes A02/A_002 to A2. Apply that same
+-- convention in material grouping/reach and the persisted contributor guard.
+BEGIN;
+UPDATE public.wire_termination_specs SET cavity=CASE WHEN id=(SELECT end_a1 FROM demand_fixture) THEN 'A02' ELSE 'A_002' END
+ WHERE id IN((SELECT end_a1 FROM demand_fixture),(SELECT end_a2 FROM demand_fixture));
+INSERT INTO public.harness_splices(id,vehicle_id,splice_code,placement,endpoint_id,cavity,part_number,part_id)
+ SELECT md5('component at-pin normalized splice')::uuid,vehicle_id,'NORMALIZED-PIN','at_pin',endpoint_a,'A2',
+ 'DEMAND-SPLICE',(SELECT id FROM public.catalog_parts WHERE part_number='DEMAND-SPLICE') FROM demand_fixture;
+INSERT INTO public.harness_splice_members(splice_id,circuit_id,ordinal,member_label)
+ SELECT md5('component at-pin normalized splice')::uuid,circuit_a,1,'A' FROM demand_fixture
+ UNION ALL SELECT md5('component at-pin normalized splice')::uuid,circuit_b,2,'B' FROM demand_fixture;
+DO $$
+DECLARE ev uuid:=pg_temp.fold_current(); q uuid; r jsonb; sid uuid;
+BEGIN
+ SELECT id INTO STRICT q FROM public.harness_model_component_requirements WHERE evaluation_id=ev
+ AND splice_id=md5('component at-pin normalized splice')::uuid;
+ IF (SELECT count(*) FROM public.harness_model_component_contributors WHERE evaluation_id=ev AND requirement_id=q)<>2
+ OR EXISTS(SELECT FROM public.harness_model_component_requirements WHERE evaluation_id=ev AND id=q
+ AND blockers && ARRAY['splice_member_endpoint_unresolved','splice_member_unmodeled'])
+ THEN RAISE EXCEPTION 'Established at-pin cavity normalization lost exact physical reach'; END IF;
+ IF NOT EXISTS(SELECT FROM public.harness_model_component_requirements WHERE evaluation_id=ev
+ AND endpoint_id=(SELECT endpoint_a FROM demand_fixture) AND role='terminal_contact' AND state='held'
+ AND quantity IS NULL AND 'shared_contact_quantity_unresolved'=ANY(blockers))
+ THEN RAISE EXCEPTION 'One normalized shared pin was counted as two contact assemblies'; END IF;
+ SELECT sheet_id INTO sid FROM public.harness_model_sheet_members WHERE evaluation_id=ev AND segment_id=(SELECT segment_a FROM demand_fixture);
+ r:=public.harness_manual_sheet((SELECT vehicle_id FROM demand_fixture),ev,sid);
+ IF NOT EXISTS(SELECT FROM jsonb_array_elements(r#>'{model,component_requirements}') x WHERE x->>'id'=q::text)
+ THEN RAISE EXCEPTION 'Normalized at-pin splice disappeared from the drawing'; END IF;
+END $$;
+-- Case is an identity distinction (for example D38999 F/f), never normalized.
+UPDATE public.wire_termination_specs SET cavity='a02' WHERE id=(SELECT end_a2 FROM demand_fixture);
+DO $$
+DECLARE ev uuid:=pg_temp.fold_current(); q uuid;
+BEGIN
+ SELECT id INTO STRICT q FROM public.harness_model_component_requirements WHERE evaluation_id=ev
+ AND splice_id=md5('component at-pin normalized splice')::uuid;
+ IF (SELECT count(*) FROM public.harness_model_component_contributors WHERE evaluation_id=ev AND requirement_id=q)<>1
+ OR NOT EXISTS(SELECT FROM public.harness_model_component_requirements WHERE evaluation_id=ev AND id=q
+ AND state='held' AND 'splice_member_endpoint_unresolved'=ANY(blockers))
+ THEN RAISE EXCEPTION 'Differently cased at-pin claims were silently joined'; END IF;
+END $$;
+ROLLBACK;
 SELECT 'test_harness_component_requirements: PASS' AS result;

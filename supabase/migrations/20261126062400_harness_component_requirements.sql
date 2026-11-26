@@ -199,11 +199,15 @@ LANGUAGE sql IMMUTABLE SECURITY INVOKER SET search_path=pg_catalog,public AS $co
 WITH
 s AS MATERIALIZED (SELECT * FROM jsonb_to_recordset(p_input#>'{model,segments}') x(
  id uuid,circuit_id uuid,from_termination_id uuid,to_termination_id uuid)),
-t AS MATERIALIZED (SELECT * FROM jsonb_to_recordset(p_input#>'{model,terminations}') x(
+t_raw AS MATERIALIZED (SELECT * FROM jsonb_to_recordset(p_input#>'{model,terminations}') x(
  id uuid,circuit_id uuid,endpoint_id uuid,cavity text,cavity_layout_id uuid,is_superseded boolean,superseded_by uuid,
  terminal_contact_catalog_id uuid,terminal_contact_pn text,pin_seal_catalog_id uuid,pin_seal_pn text,
  connector_housing_catalog_id uuid,connector_housing_pn text,wedge_lock_catalog_id uuid,wedge_lock_pn text,
  boot_catalog_id uuid,boot_pn text)),
+-- Existing load_harness_splices/v_harness_pin_occupancy convention, not a
+-- manufacturer alias inference. Preserve raw cavity and letter case.
+t AS MATERIALIZED (SELECT t_raw.*,regexp_replace(btrim(cavity),
+ '^([A-Za-z]+)_?0*([0-9]+)$','\1\2') AS material_cavity FROM t_raw),
 e AS MATERIALIZED (SELECT * FROM jsonb_to_recordset(p_input#>'{model,endpoints}') x(
  id uuid,type text,node_kind text,design_status text,is_superseded boolean,superseded_by uuid)),
 c AS MATERIALIZED (SELECT * FROM jsonb_to_recordset(p_input#>'{model,circuits}') x(id uuid)),
@@ -230,10 +234,10 @@ edges AS MATERIALIZED (
 end_stats AS MATERIALIZED (
  SELECT termination_id,bool_and(source_ok) AS source_ok,count(DISTINCT segment_id) AS segment_count FROM edges GROUP BY termination_id),
 mixed_cavities AS MATERIALIZED (
- SELECT t.endpoint_id,t.cavity FROM t JOIN end_stats n ON n.termination_id=t.id
+ SELECT t.endpoint_id,t.material_cavity AS cavity FROM t JOIN end_stats n ON n.termination_id=t.id
  JOIN e ON e.id=t.endpoint_id AND e.node_kind IS DISTINCT FROM 'bus'
  WHERE nullif(btrim(t.cavity),'') IS NOT NULL
- GROUP BY t.endpoint_id,t.cavity HAVING count(*)>1 AND count(DISTINCT coalesce(t.cavity_layout_id::text,'unkeyed'))>1),
+ GROUP BY t.endpoint_id,t.material_cavity HAVING count(*)>1 AND count(DISTINCT coalesce(t.cavity_layout_id::text,'unkeyed'))>1),
 physical_ends AS MATERIALIZED (
  SELECT t.*,e.node_kind,e.type AS endpoint_type,e.design_status AS endpoint_design_status,
  array_remove(ARRAY[
@@ -248,13 +252,13 @@ physical_ends AS MATERIALIZED (
  ((t.cavity_layout_id IS NULL AND nullif(btrim(t.cavity),'') IS NULL)
   OR t.cavity ~* '[?]|(^|[^a-z])(unknown|open|tbd)([^a-z]|$)') AS cavity_unknown
  FROM t JOIN end_stats n ON n.termination_id=t.id LEFT JOIN e ON e.id=t.endpoint_id
- LEFT JOIN mixed_cavities m ON m.endpoint_id=t.endpoint_id AND m.cavity=t.cavity),
+ LEFT JOIN mixed_cavities m ON m.endpoint_id=t.endpoint_id AND m.cavity=t.material_cavity),
 member_pairs AS MATERIALIZED (SELECT DISTINCT splice_id,circuit_id FROM sm WHERE circuit_id IS NOT NULL),
 splice_end_edges AS MATERIALIZED (
  SELECT sp.id AS splice_id,ed.*,mp.circuit_id IS NOT NULL AS declared_member
  FROM sp JOIN edges ed ON ed.endpoint_id=sp.endpoint_id
  JOIN t ON t.id=ed.termination_id
- LEFT JOIN member_pairs mp ON mp.splice_id=sp.id AND mp.circuit_id=ed.circuit_id WHERE sp.placement<>'at_pin' OR t.cavity=sp.cavity),
+ LEFT JOIN member_pairs mp ON mp.splice_id=sp.id AND mp.circuit_id=ed.circuit_id WHERE sp.placement<>'at_pin' OR t.material_cavity=sp.cavity),
 member_reach AS MATERIALIZED (
  SELECT sm.id,sm.splice_id,sm.circuit_id,c.id IS NOT NULL AS selected_circuit,
  count(DISTINCT s.id)>0 AS modeled,count(DISTINCT se.termination_id)>0 AS reaches
@@ -267,11 +271,11 @@ splice_stats AS MATERIALIZED (
  FROM sp LEFT JOIN member_reach m ON m.splice_id=sp.id GROUP BY sp.id),
 roles AS MATERIALIZED (
  SELECT en.*,r.role,r.part_id,r.pn,
- CASE WHEN r.role IN('connector_housing','wedge_lock') OR (r.role='boot' AND en.node_kind IS DISTINCT FROM 'bus')
+ CASE WHEN en.endpoint_id IS NOT NULL AND (r.role IN('connector_housing','wedge_lock') OR (r.role='boot' AND en.node_kind IS DISTINCT FROM 'bus'))
   THEN 'endpoint:'||en.endpoint_id||':'||r.role
- WHEN r.role IN('terminal_contact','pin_seal') AND en.node_kind IS DISTINCT FROM 'bus'
+ WHEN en.endpoint_id IS NOT NULL AND r.role IN('terminal_contact','pin_seal') AND en.node_kind IS DISTINCT FROM 'bus'
   AND (en.cavity_layout_id IS NOT NULL OR nullif(btrim(en.cavity),'') IS NOT NULL)
-  THEN 'contact:'||en.endpoint_id||':'||coalesce(en.cavity_layout_id::text,'recorded:'||en.cavity)||':'||r.role
+  THEN 'contact:'||en.endpoint_id||':'||coalesce(en.cavity_layout_id::text,'recorded:'||en.material_cavity)||':'||r.role
  ELSE 'end:'||en.id||':'||r.role END AS demand_key
  FROM physical_ends en CROSS JOIN LATERAL(VALUES
  ('terminal_contact',en.terminal_contact_catalog_id,en.terminal_contact_pn),
@@ -571,7 +575,7 @@ BEGIN
   WHERE s.id=NEW.segment_id AND s.vehicle_custom_circuit_id=NEW.circuit_id
    AND t.id IN(s.from_termination_id,s.to_termination_id)
    AND (q.termination_id=t.id OR q.endpoint_id=t.endpoint_id OR (sp.endpoint_id=t.endpoint_id
-     AND (sp.placement<>'at_pin' OR sp.cavity=t.cavity)))) THEN
+     AND (sp.placement<>'at_pin' OR sp.cavity=regexp_replace(btrim(t.cavity),'^([A-Za-z]+)_?0*([0-9]+)$','\1\2'))))) THEN
   RAISE EXCEPTION 'component contributor is not the recorded physical owner edge' USING ERRCODE='23514';
  END IF;
  END IF;
