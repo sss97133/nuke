@@ -79,6 +79,12 @@ struct LaborSegment: Decodable, Equatable, Identifiable {
 }
 
 struct LaborAppraisal: Decodable, Equatable {
+    struct FoldState: Decodable, Equatable {
+        var fresh: Bool?
+        var computed: Bool?
+        var computed_at: String?
+        var error: String?
+    }
     struct WitnessedTotal: Decodable, Equatable {
         var hours_min: Double?
         var hours_typical: Double?
@@ -104,6 +110,8 @@ struct LaborAppraisal: Decodable, Equatable {
     var vehicle_id: String?
     var as_of: String?
     var logic_version: String?
+    var status: String?
+    var state: FoldState?
     var applicable: Bool?
     var segments: [LaborSegment]
     var totals: Totals?
@@ -120,6 +128,19 @@ struct LaborNames: Decodable, Equatable {
 
 /// The web renderer's words (LaborAppraisal.tsx), ported one function to one function.
 enum LaborWords {
+    /// A stored fold can be older than its inputs or have failed to update.
+    static func foldStatus(_ a: LaborAppraisal) -> String? {
+        guard let state = a.state else { return nil }
+        if state.computed == false {
+            return state.error == nil
+                ? "Labor appraisal has not been calculated yet."
+                : "Labor appraisal could not be calculated."
+        }
+        guard state.fresh == false else { return nil }
+        let date = ProfileClock.day(state.computed_at ?? a.as_of)
+        let prefix = date.map { "Last calculated \($0). " } ?? ""
+        return prefix + (state.error == nil ? "An update is needed." : "The update failed.")
+    }
     private static let number: NumberFormatter = {
         let f = NumberFormatter()
         f.locale = Locale(identifier: "en_US"); f.numberStyle = .decimal; f.maximumFractionDigits = 2
@@ -317,10 +338,16 @@ struct LaborAppraisalContent: View {
     private var priced: [LaborSegment] { appraisal.segments.filter { $0.hours_typical != nil } }
 
     var body: some View {
-        if appraisal.applicable == true, appraisal.totals?.priced_segments == 0, !appraisal.segments.isEmpty {
-            section { caption("Not appraised: the reader has no segment with hours for this car yet.") }
+        if appraisal.state?.computed == false {
+            section { if let status = LaborWords.foldStatus(appraisal) { caption(status) } }
+        } else if appraisal.applicable == true, appraisal.totals?.priced_segments == 0, !appraisal.segments.isEmpty {
+            section {
+                if let status = LaborWords.foldStatus(appraisal) { caption(status) }
+                caption("Not appraised: the reader has no segment with hours for this car yet.")
+            }
         } else if appraisal.applicable == true, !priced.isEmpty {
             section {
+                if let status = LaborWords.foldStatus(appraisal) { caption(status) }
                 caption("Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.")
                 if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed ?? totals.with_unwitnessed_purchases) {
                     Text("Hours, two totals side by side").font(.caption.weight(.semibold)).padding(.top, 4)
@@ -350,6 +377,8 @@ struct LaborAppraisalContent: View {
                     .accessibilityIdentifier("labor-segment-\(segment.segment)")
                 }
             }
+        } else if let status = LaborWords.foldStatus(appraisal) {
+            section { caption(status) }
         }
     }
 
@@ -358,7 +387,9 @@ struct LaborAppraisalContent: View {
             HStack(alignment: .firstTextBaseline) {
                 Label("Labor appraisal by segment", systemImage: "wrench.and.screwdriver")
                 Spacer()
-                Text(LaborWords.coverage(appraisal)).foregroundStyle(.secondary)
+                if appraisal.state?.computed != false {
+                    Text(LaborWords.coverage(appraisal)).foregroundStyle(.secondary)
+                }
             }.font(.caption)
             content()
         }

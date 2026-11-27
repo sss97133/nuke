@@ -109,4 +109,28 @@ final class LaborAppraisalTests: XCTestCase {
         ProfileClock.timeZone = TimeZone(identifier: "UTC")!
         XCTAssertEqual(LaborWords.coverage(a), "4 of 5 segments with hours · Nov 25, 2026")
     }
+
+    func testStoredFoldStatusKeepsStaleAndFailedResultsQualified() throws {
+        let zone = ProfileClock.timeZone
+        defer { ProfileClock.timeZone = zone }
+        ProfileClock.timeZone = TimeZone(identifier: "UTC")!
+        var a = try appraisal()
+        XCTAssertNil(LaborWords.foldStatus(a), "older readers need no invented status")
+        a.state = .init(fresh: true, computed: true, computed_at: a.as_of)
+        XCTAssertNil(LaborWords.foldStatus(a))
+        a.state?.fresh = false
+        XCTAssertEqual(LaborWords.foldStatus(a), "Last calculated Nov 25, 2026. An update is needed.")
+        a.state?.error = "internal error"
+        XCTAssertEqual(LaborWords.foldStatus(a), "Last calculated Nov 25, 2026. The update failed.")
+    }
+
+    func testNotYetComputedFoldDecodesWithoutPretendingThereAreNoWorkRecords() throws {
+        let pending = Data("""
+        {"status":"not_yet_computed","segments":[],"state":{"fresh":false,"computed":false,"error":null}}
+        """.utf8)
+        var a = try JSONDecoder().decode(LaborAppraisal.self, from: pending)
+        XCTAssertEqual(LaborWords.foldStatus(a), "Labor appraisal has not been calculated yet.")
+        a.state?.error = "internal error"
+        XCTAssertEqual(LaborWords.foldStatus(a), "Labor appraisal could not be calculated.")
+    }
 }
