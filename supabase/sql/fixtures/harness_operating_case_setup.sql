@@ -22,10 +22,11 @@ end $$;
 SELECT public.t_assert(md5(prosrc)='876dc0513327e0bc5b66a03eb7d5ca70',
  'existing worker body matches the retained integration target')
  FROM pg_proc WHERE oid='public.model_fold_tick()'::regprocedure;
-CREATE TABLE public.harness_endpoints(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id));
-CREATE TABLE public.wire_termination_specs(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id),
+-- Endpoint ownership follows the existing design key; no vehicle_id exists here.
+CREATE TABLE public.harness_endpoints(id uuid PRIMARY KEY,design_id uuid NOT NULL REFERENCES public.harness_designs(id));
+CREATE TABLE public.wire_termination_specs(id uuid PRIMARY KEY,vehicle_id uuid NOT NULL REFERENCES public.vehicles(id),
  endpoint_id uuid REFERENCES public.harness_endpoints(id));
-CREATE TABLE public.harness_segments(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id),
+CREATE TABLE public.harness_segments(id uuid PRIMARY KEY,vehicle_id uuid NOT NULL REFERENCES public.vehicles(id),
  from_termination_id uuid REFERENCES public.wire_termination_specs(id),to_termination_id uuid REFERENCES public.wire_termination_specs(id));
 CREATE TABLE public.wire_resistance_conditions(condition_key text PRIMARY KEY);
 CREATE TABLE public.wire_resistance_claims(observation_id uuid PRIMARY KEY REFERENCES public.vehicle_observations(id),
@@ -37,8 +38,10 @@ CREATE TABLE public.harness_model_checks(id uuid PRIMARY KEY,evaluation_id uuid,
  rule_key text,rule_version text,result text);
 ALTER TABLE public.harness_model_evaluations ADD COLUMN input_hash text;
 CREATE TABLE public.fixture_operating_source(vehicle_id uuid PRIMARY KEY REFERENCES public.vehicles(id),p jsonb,qualified boolean NOT NULL DEFAULT true);
-INSERT INTO public.harness_endpoints VALUES
- ('b0000000-0000-4000-8000-000000000001',:fb1),('b0000000-0000-4000-8000-000000000002',:fb1);
+INSERT INTO public.harness_endpoints
+ SELECT x.id,d.id FROM (VALUES('b0000000-0000-4000-8000-000000000001'::uuid),
+ ('b0000000-0000-4000-8000-000000000002'::uuid)) x(id)
+ CROSS JOIN public.harness_designs d WHERE d.vehicle_id=:fb1;
 INSERT INTO public.wire_termination_specs VALUES
  ('b0000000-0000-4000-8000-000000000011',:fb1,'b0000000-0000-4000-8000-000000000001'),
  ('b0000000-0000-4000-8000-000000000012',:fb1,'b0000000-0000-4000-8000-000000000002');

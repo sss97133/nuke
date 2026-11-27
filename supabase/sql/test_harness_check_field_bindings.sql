@@ -239,6 +239,11 @@ DO $$ DECLARE e uuid; expected integer; c uuid; r jsonb; BEGIN
   OR NOT EXISTS(SELECT FROM jsonb_array_elements(r#>'{inspection_context,endpoints}') ep
    WHERE (ep->>'selected_piece_end_count')::int=500 AND ep->>'selected_piece_ends_complete'='false')
  THEN RAISE EXCEPTION 'Large endpoint context lost its bound or truncation declaration'; END IF;
+END $$;
+-- These are two independent reader requests. Keep each under the unchanged
+-- statement timeout instead of accumulating both worst-case reads in one DO.
+DO $$ DECLARE e uuid; c uuid; r jsonb; BEGIN
+ SELECT latest_evaluation_id INTO e FROM public.harness_model_state WHERE vehicle_id=md5('harness scale vehicle')::uuid;
  SELECT k.id INTO STRICT c FROM public.harness_model_checks k
  JOIN public.harness_model_component_requirements q ON q.evaluation_id=k.evaluation_id AND q.id=k.component_requirement_id
  WHERE k.evaluation_id=e AND q.role='terminal_contact' AND q.endpoint_id=md5('harness scale connector')::uuid

@@ -4,9 +4,16 @@
 \set ON_ERROR_STOP on
 \i supabase/sql/fixtures/harness_operating_case_setup.sql
 \i supabase/migrations/20261126181729_harness_model_dc_compute.sql
+\if :{?operating_installation}
+\i supabase/sql/fixtures/harness_operating_case_installation_proposal.sql
+\endif
 CREATE TEMP TABLE operating_relations_before AS SELECT relname FROM pg_class
  WHERE relnamespace='public'::regnamespace AND relkind IN('r','p');
+\if :{?operating_installation}
+\i supabase/migrations/20261127031811_harness_operating_case_runtime_installation.sql
+\else
 \i supabase/sql/harness_operating_case_runtime.sql
+\endif
 SELECT public.t_assert((SELECT array_agg(relname::text ORDER BY relname) FROM(
  SELECT relname FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind IN('r','p')
  EXCEPT SELECT relname FROM operating_relations_before) new_tables)=ARRAY[
@@ -209,3 +216,73 @@ DO $$ BEGIN
 END $$;
 SELECT public.t_assert((SELECT count(*)=6 FROM public.harness_model_dc_node_results),
  'sealed numerical children cannot be appended or edited by direct owner SQL');
+
+-- Canonical endpoint ownership is endpoint.design_id -> design.vehicle_id.
+SELECT public.t_assert(NOT EXISTS(SELECT FROM information_schema.columns WHERE table_schema='public'
+ AND table_name='harness_endpoints' AND column_name='vehicle_id'),
+ 'the runtime fixture cannot hide an invented endpoint vehicle column');
+INSERT INTO public.vehicles(id) VALUES(:fb2);
+INSERT INTO public.harness_designs VALUES('e0000000-0000-4000-8000-000000000001',:fb2),
+ ('e0000000-0000-4000-8000-000000000002',NULL);
+INSERT INTO public.harness_endpoints VALUES
+ ('e0000000-0000-4000-8000-000000000011',md5('worker phase design')::uuid),
+ ('e0000000-0000-4000-8000-000000000012','e0000000-0000-4000-8000-000000000001'),
+ ('e0000000-0000-4000-8000-000000000013','e0000000-0000-4000-8000-000000000002');
+INSERT INTO public.wire_termination_specs VALUES
+ ('e0000000-0000-4000-8000-000000000021',:fb1,'e0000000-0000-4000-8000-000000000011'),
+ ('e0000000-0000-4000-8000-000000000022',:fb1,'e0000000-0000-4000-8000-000000000011');
+INSERT INTO public.harness_segments VALUES('e0000000-0000-4000-8000-000000000031',:fb1,
+ 'e0000000-0000-4000-8000-000000000021','e0000000-0000-4000-8000-000000000022');
+CREATE FUNCTION public.fixture_operating_endpoint_recipe(p_case uuid,p_endpoint uuid)
+RETURNS jsonb LANGUAGE sql STABLE AS $$
+ WITH x AS(SELECT public.fixture_operating_recipe(p_case,'unknown') AS p)
+ SELECT p||jsonb_build_object('requested_state','draft',
+  'reference_termination_id','e0000000-0000-4000-8000-000000000021',
+  'wires',jsonb_build_array((p#>'{wires,0}')||jsonb_build_object('segment_id','e0000000-0000-4000-8000-000000000031')),
+  'elements',jsonb_build_array(((p#>'{elements,0}')-'voltage_v')||jsonb_build_object('law_kind','unknown',
+   'source_endpoint_id',p_endpoint,'from_termination_id','e0000000-0000-4000-8000-000000000021',
+   'to_termination_id','e0000000-0000-4000-8000-000000000022'))) FROM x $$;
+SET ROLE service_role;
+SELECT public.harness_operating_case_record(public.fixture_operating_endpoint_recipe(
+ 'c0000000-0000-4000-8000-000000000010','e0000000-0000-4000-8000-000000000011'));
+RESET ROLE;
+SELECT public.t_assert((SELECT e.source_endpoint_id='e0000000-0000-4000-8000-000000000011'
+ FROM public.harness_operating_case_elements e JOIN public.harness_operating_cases c ON c.current_revision_id=e.revision_id
+ WHERE c.id='c0000000-0000-4000-8000-000000000010'),
+ 'service writer accepts a real same-vehicle design-owned endpoint and its two exact terminal ports');
+
+SET ROLE service_role;
+\set ON_ERROR_STOP off
+SELECT public.harness_operating_case_record(public.fixture_operating_endpoint_recipe(
+ 'c0000000-0000-4000-8000-000000000011','e0000000-0000-4000-8000-000000000012'));
+\set endpoint_sqlstate :SQLSTATE
+\set endpoint_message :LAST_ERROR_MESSAGE
+\set ON_ERROR_STOP on
+RESET ROLE;
+SELECT public.t_assert(:'endpoint_sqlstate'='23514' AND :'endpoint_message'='foreign source device'
+ AND NOT EXISTS(SELECT FROM public.harness_operating_cases WHERE id='c0000000-0000-4000-8000-000000000011'),
+ 'endpoint owned by another vehicle design refuses and rolls back the whole new recipe');
+
+SET ROLE service_role;
+\set ON_ERROR_STOP off
+SELECT public.harness_operating_case_record(public.fixture_operating_endpoint_recipe(
+ 'c0000000-0000-4000-8000-000000000012','e0000000-0000-4000-8000-000000000013'));
+\set endpoint_sqlstate :SQLSTATE
+\set endpoint_message :LAST_ERROR_MESSAGE
+\set ON_ERROR_STOP on
+RESET ROLE;
+SELECT public.t_assert(:'endpoint_sqlstate'='23514' AND :'endpoint_message'='foreign source device'
+ AND NOT EXISTS(SELECT FROM public.harness_operating_cases WHERE id='c0000000-0000-4000-8000-000000000012'),
+ 'endpoint whose design has no vehicle owner refuses and rolls back the whole new recipe');
+
+SET ROLE service_role;
+\set ON_ERROR_STOP off
+SELECT public.harness_operating_case_record(public.fixture_operating_endpoint_recipe(
+ 'c0000000-0000-4000-8000-000000000013','b0000000-0000-4000-8000-000000000001'));
+\set endpoint_sqlstate :SQLSTATE
+\set endpoint_message :LAST_ERROR_MESSAGE
+\set ON_ERROR_STOP on
+RESET ROLE;
+SELECT public.t_assert(:'endpoint_sqlstate'='23514' AND :'endpoint_message'='foreign or mismatched source-device terminal'
+ AND NOT EXISTS(SELECT FROM public.harness_operating_cases WHERE id='c0000000-0000-4000-8000-000000000013'),
+ 'same vehicle but different device terminal refuses and rolls back the whole new recipe');

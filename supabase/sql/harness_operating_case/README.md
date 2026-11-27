@@ -69,10 +69,13 @@ unique patch anchors reject an unexpected integration target.
 clocks, writer attribution and unknown/currentness semantics. There is no new
 queue, physical connectivity graph, source-value owner or public reader.
 
-Production installation requires the existing curator process for the table
-proposal, a reviewed migration through normal CI, current ownership/lock
-preflight, and live source/RLS/worker-budget verification. This candidate and
-its synthetic contract establish none of those production stages. Numerical
+The separate production installation is migration `20261127031811`. It follows
+the existing owner-authorized manual build pattern: exact proposal and runtime
+guards, one transaction, explicit agent recording of the already-authorized
+build, and no fabricated human review or signature. It preserves an existing
+approved decision. Normal checked CI deployment, current ownership/lock
+preflight and live source/RLS/worker-budget verification remain required. This
+candidate and its synthetic contract establish none of those production stages. Numerical
 results remain conditional simulation: device laws, material applicability,
 protection, physical fit, purchasing, cut lengths, assembly and builder-facing
 schematics require their own qualified inputs and consumer acceptance.
