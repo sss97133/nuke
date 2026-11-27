@@ -4,9 +4,16 @@
 \set ON_ERROR_STOP on
 \i supabase/sql/fixtures/harness_operating_case_setup.sql
 \i supabase/migrations/20261126181729_harness_model_dc_compute.sql
+\if :{?operating_installation}
+\i supabase/sql/fixtures/harness_operating_case_installation_proposal.sql
+\endif
 CREATE TEMP TABLE operating_relations_before AS SELECT relname FROM pg_class
  WHERE relnamespace='public'::regnamespace AND relkind IN('r','p');
+\if :{?operating_installation}
+\i supabase/migrations/20261127031811_harness_operating_case_runtime_installation.sql
+\else
 \i supabase/sql/harness_operating_case_runtime.sql
+\endif
 SELECT public.t_assert((SELECT array_agg(relname::text ORDER BY relname) FROM(
  SELECT relname FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind IN('r','p')
  EXCEPT SELECT relname FROM operating_relations_before) new_tables)=ARRAY[
