@@ -17,9 +17,10 @@ Run UNSANDBOXED (needs network):
   dotenvx run -- python3 scripts/clip-embed-image-observations.py --limit 50
   dotenvx run -- python3 scripts/clip-embed-image-observations.py --all
 """
-import os, sys, time, argparse, io, json, re
+import os, sys, time, argparse, json, re
 import requests
 import numpy as np
+from clip_embed_image_source import load_image, RenderAndOriginalUnreadable
 
 AP = argparse.ArgumentParser()
 AP.add_argument("--limit", type=int, default=50)
@@ -35,14 +36,6 @@ KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 if not URL or not KEY:
     print("missing VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY", file=sys.stderr); sys.exit(1)
 H = {"apikey": KEY, "Authorization": f"Bearer {KEY}"}
-
-def render_url(image_url: str) -> str:
-    # object/public → render/image/public, force JPEG thumbnail (HEIC-safe, small)
-    if "/storage/v1/object/public/" in image_url:
-        u = image_url.replace("/storage/v1/object/public/", "/storage/v1/render/image/public/")
-        sep = "&" if "?" in u else "?"
-        return f"{u}{sep}width=336&height=336&resize=contain"
-    return image_url
 
 # The model is loaded only when there is a row to embed: a scheduled fire that finds nothing costs one RPC, not a
 # model load (the job runs every few minutes so a photo is embedded soon after it lands).
@@ -61,9 +54,10 @@ def clip():
 
 # Rows whose bytes could not be read stay at the head of the RPC's order for good (a deleted object answers 400 on
 # every fire). The memo leaves such a row alone for --dead-hours, then tries it again; a row that embeds is forgotten.
-# Only a failure where storage itself says the object is not there (400 or 404 on the original; measured 2026-11-20:
-# 180 of the 185 rows that failed in a full drain) is remembered across fires. Everything else is left for the next fire: a
-# timeout, a refused connection, a 5xx, a failed write, and also bytes PIL cannot open. A phone original is often HEIC,
+# Storage saying the original is not there (400 or 404) is remembered across fires. A specific unsupported-render
+# response followed by an original that PIL cannot decode is also deferred, but is not classified as a missing source.
+# Everything else is left for the next fire: a
+# timeout, a refused connection, a 5xx, a failed write, and other bytes PIL cannot open. A phone original is often HEIC,
 # which only the render endpoint can turn into a JPEG, so "cannot identify image" on the original can mean the render
 # call failed that minute, and one bad minute must not park a fresh photo for a day.
 def source_is_gone(e):
@@ -111,19 +105,6 @@ def fetch_batch(n):
         out.append((row["obs_id"], row.get("image_url") or "", row.get("storage_path") or ""))
     return out
 
-def load_image(image_url, storage_path):
-    from PIL import Image
-    if image_url:
-        rr = requests.get(render_url(image_url), timeout=60)
-        if rr.status_code != 200 or not rr.content:
-            rr = requests.get(image_url, timeout=90)  # fall back to original bytes
-            rr.raise_for_status()
-        return Image.open(io.BytesIO(rr.content)).convert("RGB")
-    # no remote url — read the local file (gopro frames live on disk, image_url='')
-    if storage_path and os.path.exists(storage_path):
-        return Image.open(storage_path).convert("RGB")
-    raise FileNotFoundError(f"no usable source (url empty, local path missing: {storage_path[:60]})")
-
 def embed(image_url, storage_path=""):
     img = load_image(image_url, storage_path)
     torch, model, preprocess, device = clip()
@@ -155,7 +136,7 @@ def fetch_batch_resilient(n, retries=5):
     print("  fetch failed after retries — DB busy; exiting drain gracefully (launchd resumes next fire)", flush=True)
     return []
 
-done = fail = gone_n = 0
+done = fail = gone_n = deferred_n = 0
 memo = load_dead()
 # rows whose bytes could not be read, this run or within --dead-hours: the RPC keeps returning them, so ask past them
 dead = {k for k, at in memo.items() if at >= time.time() - args.dead_hours * 3600}
@@ -177,7 +158,11 @@ while remaining > 0:
             if gone:
                 memo[obs_id] = time.time()
                 gone_n += 1
-            print(f"  FAIL {obs_id[:8]}  {'source gone' if gone else 'read failed, retried next fire'}: {say(e)}", flush=True)
+            elif isinstance(e, RenderAndOriginalUnreadable):
+                memo[obs_id] = time.time()
+                deferred_n += 1
+            reason = 'source gone' if gone else ('render and original unreadable, deferred' if isinstance(e, RenderAndOriginalUnreadable) else 'read failed, retried next fire')
+            print(f"  FAIL {obs_id[:8]}  {reason}: {say(e)}", flush=True)
         if vec is not None:
             try:
                 write(obs_id, vec)
@@ -195,4 +180,4 @@ while remaining > 0:
 save_dead(memo)
 print(f"\ndone={done} fail={fail}", flush=True)
 print(json.dumps({"embedded": done, "failed": fail, "source_gone": gone_n, "left_alone_as_dead": skipped_dead,
-                  "model_loaded": _clip is not None}), flush=True)
+                  "render_unreadable_deferred": deferred_n, "model_loaded": _clip is not None}), flush=True)
