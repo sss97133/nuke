@@ -21,20 +21,12 @@ const recordColumn: ScheduleColumn = { key: 'record', label: 'Open record', widt
 /** Keep engineering uncertainty verbatim; redact amounts/order IDs with the same mask as the UI. */
 export const engineeringText = (value: string | null | undefined): string | null => value == null || value === '' ? null : mask(value);
 
-export function scheduleLength(wire: MapWire, site: SiteFiles, vehicleId?: string): { planned: number | null; kind: string | null; basis: string | null } {
+export function scheduleLength(wire: MapWire): { planned: number | null; kind: string | null; basis: string | null } {
   const planned = finite(wire.plannedLengthFt);
   if (planned !== null) return { planned, kind: word(wire.plannedLengthKind) ?? 'Basis not recorded', basis: wire.plannedLengthBasis ?? null };
-  const segments = site.segs.filter(s => s.w.includes(wire.code));
-  // A partial/missing value never becomes a zero-length contribution. The model
-  // route is explicitly labelled and dated; it is not an as-cut measurement.
-  if (!site.sourceVehicleId || (vehicleId && site.sourceVehicleId !== vehicleId) || !segments.length || !site.routesOn || segments.some(s => finite(s.len) === null)) {
-    return { planned: null, kind: null, basis: null };
-  }
-  return {
-    planned: Math.round(segments.reduce((sum, s) => sum + s.len!, 0) / 0.3048 * 1000) / 1000,
-    kind: `Model route estimate · ${site.routesOn}`,
-    basis: `Public route model dated ${site.routesOn}; verify on vehicle before cutting.`,
-  };
+  // The circuit reader owns this value. A browser route-model sum is a different
+  // claim and must not fill a missing database length in cards or worksheets.
+  return { planned: null, kind: null, basis: null };
 }
 
 export function buildWiringSchedule(map: WiringMapData, site: SiteFiles, vehicleId: string, isOwner: boolean): WiringSchedule {
@@ -53,7 +45,7 @@ export function buildWiringSchedule(map: WiringMapData, site: SiteFiles, vehicle
     col('source', 'Source', 55), col('trust', 'Source trust', 16));
   wireColumns.push(col('id', 'Circuit record ID', 38), recordColumn);
   const wireRows: ScheduleRow[] = map.wires.slice().sort((a, b) => compare(a.code, b.code)).map(w => {
-    const length = scheduleLength(w, site, vehicleId), selection = 'w:' + w.code;
+    const length = scheduleLength(w), selection = 'w:' + w.code;
     const cells: ScheduleRow['cells'] = {
       code: w.code, name: publicName(w.name), from: nodes.get(w.fromId ?? '')?.code ?? engineeringText(w.fromText),
       fromCavity: engineeringText(w.fromCavity), to: nodes.get(w.toId ?? '')?.code ?? engineeringText(w.toText), toCavity: engineeringText(w.toCavity),
