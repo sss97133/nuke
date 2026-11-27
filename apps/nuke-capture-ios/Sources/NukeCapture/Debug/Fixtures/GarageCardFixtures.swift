@@ -98,12 +98,12 @@ enum GarageCardFixtures {
     }
 
     /// vehicle_statements for a tied viewer: words shown.
-    /// get_my_garage_owner_corrections: one account-stated vehicle no photo has identified yet (Identity pending).
+    /// get_my_garage_owner_corrections: a synthetic account statement without an identified vehicle.
     static let corrections = """
     [{"id":"00000000-0000-4000-8000-00000000d301","vehicle_id":null,"observed_at":"2026-11-10T18:00:00+00:00",
-      "cover_image_url":null,"source_excerpt":null,
+      "cover_image_url":null,"source_excerpt":"Fixture: I have a shared interest in this pickup.",
       "correction":{"relationship":null,"cover_image_id":null,
-        "unresolved_vehicle":{"label":"Fixture pending pickup","stated_roles":["owner"]}}}]
+        "unresolved_vehicle":{"label":"Fixture pending pickup","stated_roles":["shared_interest"]}}}]
     """
 
     static let statements = """
