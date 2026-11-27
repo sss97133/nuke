@@ -36,6 +36,7 @@ import { join, extname } from 'path';
 import { homedir, tmpdir } from 'os';
 import dns from 'dns';
 import { ingestReviewedRenditions, reconcileReviewedRenditions } from './lib/ingest-image-identity-payload.mjs';
+import { isPlistExport } from './photos/reject-plist-export.mjs';
 
 // ─── DNS fix (same as iphoto-intake/hd-intake — some networks break supabase DNS) ─
 const resolver = new dns.Resolver();
@@ -224,6 +225,7 @@ function exportPhotos(uuids, destDir) {
 //   location_name  → exif_data.place_name
 async function uploadPhoto(filePath, filename, meta) {
   const bytes = readFileSync(filePath);
+  if (isPlistExport(bytes)) return { ok: false, invalidExport: true, err: 'Photos exported a property list instead of image bytes' };
   const contentSha256 = createHash('sha256').update(bytes).digest('hex'); // identity sealed at the source, pre-upload
   const fileSize = bytes.length;
   const ext = extname(filename).toLowerCase();
@@ -440,23 +442,29 @@ async function main() {
   const metaByUuid = new Map(images.map(p => [String(p.uuid).toLowerCase(), p]));
 
   let ok = 0, dup = 0, failed = 0;
+  const usableExportUuids = new Set();
   for (const file of exported) {
     const meta = metaByUuid.get(file.replace(/\.[^.]+$/, '').toLowerCase());
     if (!meta) { failed++; if (failed <= 3) log(`  no metadata for exported file ${file}`); continue; }
     // Stored under the Photos UUID: two photos sharing one original name can never collide
     // in the bucket (the old {original_name} path silently reused the first object's bytes).
     const res = await uploadPhoto(join(destDir, file), file, meta);
+    if (res.invalidExport) {
+      log(`  invalid export [${meta.original_filename || file}]: ${res.err}`);
+      continue;
+    }
+    usableExportUuids.add(String(meta.uuid).toLowerCase());
     if (res.ok) landed[meta.uuid] = meta.date_added || meta.date || runStartedAt;
     if (res.ok && res.dup) dup++;
     else if (res.ok) ok++;
     else { failed++; if (failed <= 3) log(`  upload failed [${meta.original_filename || file}]: ${res.err}`); }
   }
 
-  // Photos of the batch that produced no file: count an attempt; give up after GIVE_UP.
-  const exportedUuids = new Set(exported.map(f => f.replace(/\.[^.]+$/, '').toLowerCase()));
+  // Photos with no usable export, including a sidecar in place of the image:
+  // count an attempt; after GIVE_UP record the gap rather than inventing pixels.
   let stillOwed = 0, gaveUp = 0;
   for (const p of images) {
-    if (exportedUuids.has(String(p.uuid).toLowerCase())) continue;
+    if (usableExportUuids.has(String(p.uuid).toLowerCase())) continue;
     const t = tries[p.uuid] || { attempts: 0, added: p.date_added || p.date || null, filename: p.original_filename };
     t.attempts += 1; t.last = runStartedAt; tries[p.uuid] = t;
     if (t.attempts >= GIVE_UP) {
