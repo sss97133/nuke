@@ -198,19 +198,57 @@ def directory_modes(workspace, files):
     return result
 
 
+def worktree_state(workspace, administrative_dir=None):
+    result = {}
+    administrative_dir = administrative_dir or Path(os.fsdecode(git(workspace, 'rev-parse', '--absolute-git-dir')).strip())
+    for name in ['config.worktree', 'info/sparse-checkout']:
+        path = administrative_dir / name
+        if not path.exists():
+            continue
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024 * 1024:
+            raise ValueError('Unsupported Git worktree state: ' + name)
+        raw = path.read_bytes()
+        if name == 'config.worktree':
+            allowed = {'core.sparsecheckout', 'core.sparsecheckoutcone', 'index.sparse', 'core.longpaths'}
+            for entry in git(workspace, 'config', '--file', str(path), '--null', '--list').split(b'\0'):
+                if not entry:
+                    continue
+                key, _, value = entry.partition(b'\n')
+                key = os.fsdecode(key).lower()
+                safe_boolean = key in allowed and value.lower() in (b'true', b'false')
+                hook_binding = key == 'core.hookspath' and value and b'\n' not in value
+                if not (safe_boolean or hook_binding):
+                    raise ValueError('Unsupported per-worktree configuration; preserve separately')
+        result[name] = {'data_b64': base64.b64encode(raw).decode(), 'mode': stat.S_IMODE(path.stat().st_mode)}
+    return result
+
+
 def reject_special_git_state(workspace):
+    administrative_dir = Path(os.fsdecode(git(workspace, 'rev-parse', '--absolute-git-dir')).strip())
     for name in ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge',
                  'rebase-apply', 'sequencer', 'BISECT_START']:
-        path = Path(os.fsdecode(git(workspace, 'rev-parse', '--path-format=absolute', '--git-path', name)).strip())
+        path = administrative_dir / name
         if path.exists():
             raise ValueError('In-progress Git operation needs separate preservation: ' + name)
+    worktree_state(workspace, administrative_dir)
+    for key in ['core.autocrlf', 'core.eol']:
+        value = subprocess.run(['git', '-C', str(workspace), 'config', '--get', key], capture_output=True, timeout=15)
+        if value.returncode not in (0, 1):
+            raise ValueError('Cannot verify Git normalization configuration')
+        allowed = (b'false',) if key == 'core.autocrlf' else (b'lf', b'native')
+        if value.returncode == 0 and value.stdout.strip().lower() not in allowed:
+            raise ValueError('Git normalization state requires separate raw-file preservation: ' + key)
     staged = git(workspace, 'ls-files', '--stage', '-z')
     if any(x.startswith(b'160000 ') for x in staged.split(b'\0')):
         raise ValueError('Submodule payload needs separate preservation; leave checkout intact')
     names = git(workspace, 'ls-files', '-z')
-    attrs = git(workspace, 'check-attr', '--stdin', '-z', 'filter', data=names).split(b'\0')
-    if any(attrs[i] not in (b'unspecified', b'unset') for i in range(2, len(attrs), 3)):
-        raise ValueError('Git filter payload needs separate preservation; leave checkout intact')
+    attrs = git(workspace, 'check-attr', '--stdin', '-z', 'filter', 'text', 'eol',
+                'working-tree-encoding', 'ident', data=names).split(b'\0')
+    for i in range(0, len(attrs) - 2, 3):
+        if attrs[i + 2] not in (b'unspecified', b'unset'):
+            if attrs[i + 1] == b'filter':
+                raise ValueError('Git filter payload needs separate preservation; leave checkout intact')
+            raise ValueError('Git normalization attributes require separate raw-file preservation')
 
 
 def snapshot(repo, workspace, record):
@@ -231,6 +269,7 @@ def snapshot(repo, workspace, record):
     status_before, changed = changes(workspace)
     flags = index_flags(workspace)
     intent = intent_to_add(workspace)
+    administrative = worktree_state(workspace)
     changed = sorted(set(changed).union(*flags.values()))
     files = [file_record(workspace, rel) for rel in changed]
     if any(x['kind'] == 'directory' for x in files):
@@ -285,6 +324,7 @@ def snapshot(repo, workspace, record):
                 files != [file_record(workspace, rel) for rel in changed] or
                 flags != index_flags(workspace) or
                 intent != intent_to_add(workspace) or
+                administrative != worktree_state(workspace) or
                 modes != directory_modes(workspace, files + locals_before) or
                 locals_before != ([] if primary else ignored_records(workspace)) or
                 exclude_bytes != (exclude_path.read_bytes() if exclude_path.exists() else b'')):
@@ -295,6 +335,7 @@ def snapshot(repo, workspace, record):
                     'index_flags': flags,
                     'intent_to_add': intent,
                     'directory_modes': modes,
+                    'worktree_state': administrative,
                     'working_files': files, 'local_files': locals_before,
                     'local_data_policy': 'retained_in_primary_checkout' if primary else 'archived_non_cache_files',
                     'bundle_sha256': sha(bundle), 'local_sha256': sha(staging / 'local.tar.gz'),
@@ -353,7 +394,12 @@ def restore(repo, record, target):
                 directories.append((p, member.mode))
             elif member.issym():
                 p.parent.mkdir(parents=True, exist_ok=True)
-                p.symlink_to(member.linkname)
+                if p.is_symlink() and os.readlink(p) == member.linkname:
+                    pass  # Staged removal can put the same link in both inventories.
+                elif p.exists() or p.is_symlink():
+                    raise ValueError('Conflicting restored symlink: ' + member.name)
+                else:
+                    p.symlink_to(member.linkname)
             elif member.islnk():
                 source = local_path(target, member.linkname)
                 if not source.is_file() or source.is_symlink():
@@ -376,6 +422,21 @@ def restore(repo, record, target):
         names = data['index_flags'][key]
         if names:
             git(target, 'update-index', option, '-z', '--stdin', data=b''.join(os.fsencode(x) + b'\0' for x in names))
+    administrative = data.get('worktree_state', {})
+    if 'config.worktree' in administrative:
+        enabled = subprocess.run(['git', '-C', str(repo), 'config', '--bool', '--get',
+                                  'extensions.worktreeConfig'], capture_output=True, timeout=15)
+        if enabled.stdout.strip() != b'true':
+            raise ValueError('Restore into the original repository with worktree configuration enabled')
+    for name, item in administrative.items():
+        if name not in ['config.worktree', 'info/sparse-checkout']:
+            raise ValueError('Unexpected archived Git state')
+        path = Path(os.fsdecode(git(target, 'rev-parse', '--path-format=absolute', '--git-path', name)).strip())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(base64.b64decode(item['data_b64']))
+        path.chmod(item['mode'])
+    if worktree_state(target) != administrative:
+        raise ValueError('Restored Git worktree configuration differs')
     actual_status = changes(target)[0]
     if git(target, 'rev-parse', 'HEAD').decode().strip() != data['head'] or actual_status != base64.b64decode(data['status_b64']):
         write_json(record / 'restore-status-diagnostic.json', {
@@ -391,6 +452,9 @@ def restore(repo, record, target):
         raise ValueError('Restored intent-to-add entries differ')
     for rel, mode in sorted(data.get('directory_modes', {}).items(), key=lambda x: len(PurePosixPath(x[0]).parts), reverse=True):
         path = local_path(target, rel) if rel else target
+        # Git removes empty parents after tracked deletions; the original
+        # checkout may still contain them, with meaningful private modes.
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
         if not path.is_dir() or path.is_symlink():
             raise ValueError('Restored parent directory differs: ' + rel)
         path.chmod(mode)
@@ -411,6 +475,8 @@ def verify(record):
         shutil.copy2(record / 'git-info-exclude', parent / '.git/info/exclude')
         git(parent, 'update-ref', 'refs/heads/base', data['base'])
         git(parent, 'symbolic-ref', 'HEAD', 'refs/heads/base')
+        if 'config.worktree' in data.get('worktree_state', {}):
+            git(parent, 'config', 'extensions.worktreeConfig', 'true')
         target = Path(temp) / 'restored'
         restore(parent, record, target)
     data.update(verified=True, verified_at=time.time())
@@ -460,6 +526,7 @@ def unchanged(data, record, workspace):
                 changes(workspace)[0] != base64.b64decode(data['status_b64']) or
                 index_flags(workspace) != data['index_flags'] or
                 intent_to_add(workspace) != data.get('intent_to_add', []) or
+                worktree_state(workspace) != data.get('worktree_state', {}) or
                 any(stat.S_IMODE((local_path(workspace, rel) if rel else workspace).stat().st_mode) != mode
                     for rel, mode in data.get('directory_modes', {}).items()) or
                 any(file_record(workspace, item['path']) != item for item in data['working_files']) or

@@ -169,6 +169,21 @@ class Preservation(unittest.TestCase):
             self.snapshot()
         self.assertTrue(self.work.exists())
 
+    def test_deleted_tracked_directory_keeps_its_empty_parent_and_mode(self):
+        parent = self.work / 'private-parent'
+        parent.mkdir(mode=0o700)
+        (parent / 'source.txt').write_text('previous source')
+        self.git(self.work, 'add', 'private-parent/source.txt')
+        self.git(self.work, 'commit', '--quiet', '-m', 'Directory source')
+        (parent / 'source.txt').unlink()
+        self.snapshot()
+        closeout.verify(self.record)
+        target = self.base / '.worktrees/restored'
+        closeout.restore(self.repo, self.record, target)
+        self.assertTrue((target / 'private-parent').is_dir())
+        self.assertFalse((target / 'private-parent/source.txt').exists())
+        self.assertEqual((target / 'private-parent').stat().st_mode & 0o777, 0o700)
+
     def test_new_operation_after_snapshot_blocks_retirement(self):
         value = self.snapshot()
         closeout.verify(self.record)
@@ -178,6 +193,68 @@ class Preservation(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'In-progress Git operation'):
                 closeout.retire(self.record, [])
         self.assertTrue(self.work.exists())
+
+    def test_sparse_checkout_patterns_and_settings_survive_recovery(self):
+        self.git(self.work, 'reset', '--hard', 'HEAD')
+        self.git(self.work, 'sparse-checkout', 'set', '--no-cone', 'code.txt')
+        patterns = self.git(self.work, 'sparse-checkout', 'list')
+        self.snapshot()
+        closeout.verify(self.record)
+        with patch.object(closeout, 'references', return_value=[]):
+            closeout.retire(self.record, [])
+        closeout.restore(self.repo, self.record, self.work)
+        self.assertEqual(self.git(self.work, 'sparse-checkout', 'list'), patterns)
+        self.assertEqual(self.git(self.work, 'config', '--worktree', '--get', 'core.sparseCheckout').strip(), b'true')
+
+    def test_unhandled_worktree_configuration_is_refused(self):
+        self.git(self.repo, 'config', 'extensions.worktreeConfig', 'true')
+        self.git(self.work, 'config', '--worktree', 'core.fsmonitor', 'false')
+        with self.assertRaisesRegex(ValueError, 'per-worktree configuration'):
+            self.snapshot()
+
+    def test_native_agent_hook_binding_is_preserved_without_running_it(self):
+        self.git(self.repo, 'config', 'extensions.worktreeConfig', 'true')
+        self.git(self.work, 'config', '--worktree', 'core.longpaths', 'true')
+        hooks = self.base / 'archived-hooks'
+        hooks.mkdir()
+        marker = self.base / 'archived-hook-ran'
+        hook = hooks / 'post-checkout'
+        hook.write_text('#!/bin/sh\ntouch "' + str(marker) + '"\n')
+        hook.chmod(0o755)
+        self.git(self.work, 'config', '--worktree', 'core.hooksPath', str(hooks))
+        value = self.snapshot()
+        closeout.verify(self.record)
+        target = self.base / '.worktrees/restored'
+        closeout.restore(self.repo, self.record, target)
+        self.assertEqual(closeout.worktree_state(target), value['worktree_state'])
+        self.assertFalse(marker.exists())
+
+    def test_git_clean_normalized_crlf_file_is_not_silently_certified(self):
+        (self.work / '.gitattributes').write_text('normalized.txt text\n')
+        (self.work / 'normalized.txt').write_bytes(b'first\nsecond\n')
+        self.git(self.work, 'add', '.gitattributes', 'normalized.txt')
+        self.git(self.work, 'commit', '--quiet', '-m', 'Normalized text fixture')
+        (self.work / 'normalized.txt').write_bytes(b'first\r\nsecond\r\n')
+        self.git(self.work, 'add', 'normalized.txt')
+        self.assertNotIn(b'normalized.txt', closeout.changes(self.work)[0])
+        with self.assertRaisesRegex(ValueError, 'normalization'):
+            self.snapshot()
+
+    def test_normalizing_repository_configuration_is_refused(self):
+        self.git(self.repo, 'config', 'core.autocrlf', 'input')
+        with self.assertRaisesRegex(ValueError, 'normalization'):
+            self.snapshot()
+
+    def test_ignored_staged_removal_symlink_in_both_inventories_recovers(self):
+        (self.work / 'private.env').unlink()
+        (self.work / 'private.env').symlink_to(self.base / 'private-target')
+        self.git(self.work, 'add', '--force', 'private.env')
+        self.git(self.work, 'commit', '--quiet', '-m', 'Tracked private link fixture')
+        self.git(self.work, 'rm', '--cached', 'private.env')
+        value = self.snapshot()
+        self.assertTrue(any(p['path'] == 'private.env' for p in value['working_files']))
+        self.assertTrue(any(p['path'] == 'private.env' for p in value['local_files']))
+        closeout.verify(self.record)
 
     def test_intent_to_add_survives_independent_recovery(self):
         (self.work / 'planned.txt').write_text('planned source')
