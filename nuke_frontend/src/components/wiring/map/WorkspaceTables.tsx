@@ -6,7 +6,7 @@ import type { Colorway } from '../connector-inspector/colorways';
 import { frame, rule } from '../connector-inspector/colorways';
 import type { WiringMapData } from './useWiringMap';
 import { kindOf, mask, valOf, type Rel, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
-import { buildWiringSchedule, wiringWorkbookBytes, type ScheduleRow } from './wiringSchedule';
+import { buildWiringSchedule, scheduleCellValue, wiringWorkbookBytes, type ScheduleRow } from './wiringSchedule';
 
 type Tab = 'wires' | 'pins' | 'conns' | 'open';
 interface Col<T> { h: string; v: (r: T) => string | number; td?: (r: T) => React.ReactNode; mono?: boolean; num?: boolean; w?: number; searchable?: boolean }
@@ -28,11 +28,11 @@ export function WorkspaceTables({ cw, map, site, sel, rel, isOwner, onSelect, ve
       id: (r: ScheduleRow) => r.selection,
       linked: (r: ScheduleRow) => r.selection.startsWith('w:') ? rel.wires.has(r.selection.slice(2)) : rel.nodes.has(r.selection.slice(2)),
       cols: table.columns.map(c => ({
-        h: c.label, v: (r: ScheduleRow) => r.cells[c.key] ?? '', num: c.numeric, w: (c.width ?? 24) * 9,
+        h: c.label, v: (r: ScheduleRow) => scheduleCellValue(c, r.cells[c.key] ?? null) ?? '', num: c.numeric, w: (c.width ?? 24) * 9,
         searchable: !c.link && !/id$/i.test(c.key),
         td: (r: ScheduleRow) => c.link && r.cells[c.key]
           ? <a href={String(r.cells[c.key])} onClick={e => e.stopPropagation()} style={{ color: cw.accent }}>Open record</a>
-          : r.cells[c.key] == null || r.cells[c.key] === '' ? <span style={{ color: cw.inkFaint }}>—</span> : String(r.cells[c.key]),
+          : r.cells[c.key] == null || r.cells[c.key] === '' ? <span style={{ color: cw.inkFaint }}>—</span> : String(scheduleCellValue(c, r.cells[c.key])),
       })),
     }])) as Record<Exclude<Tab, 'open'>, DisplayTable>;
     const calls = map.calls.slice().sort((a, b) => Number(a.decided) - Number(b.decided));

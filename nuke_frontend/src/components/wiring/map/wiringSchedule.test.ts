@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../lib/supabase', () => ({ supabase: {} }));
-import { buildWiringSchedule, scheduleLength, wiringWorkbookBytes } from './wiringSchedule';
+import { buildWiringSchedule, scheduleCellValue, scheduleLength, wiringWorkbookBytes } from './wiringSchedule';
 import type { MapNode, MapWire, WiringMapData } from './useWiringMap';
 import type { SiteFiles, SiteSeg } from './useWorkspaceSelection';
 
@@ -22,6 +22,25 @@ const segment = (id: string, len: number | null): SiteSeg => ({ id, b: null, od:
 const site: SiteFiles = { loaded: true, sourceVehicleId: vehicleId, ends: {}, segs: [segment('s1', 1)], models: null, routesOn: '2026-09-29' };
 
 describe('current wiring schedule', () => {
+  it('keeps numeric aught keys and exports trade notation as literal XLSX text', async () => {
+    const gauges = [0, -1, -2, -3, 1, 2, 3, null];
+    const schedule = buildWiringSchedule({ ...map, wires: gauges.map((gauge, i) => wire({ id: `wire-${i}`, code: String(i), gauge })) }, site, vehicleId, false);
+    const table = schedule.tables[0], column = table.columns.find(c => c.key === 'gauge')!;
+    const expected = ['1/0', '2/0', '3/0', '4/0', 1, 2, 3, null];
+    expect(table.rows.map(r => r.cells.gauge)).toEqual(gauges);
+    expect(table.rows.map(r => scheduleCellValue(column, r.cells.gauge))).toEqual(expected);
+    expect(scheduleCellValue({ key: 'planned' }, 0)).toBe(0);
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await wiringWorkbookBytes(schedule) as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const sheet = workbook.getWorksheet(table.title)!, columnIndex = table.columns.indexOf(column) + 1;
+    expect(table.rows.map((_, i) => sheet.getRow(i + 6).getCell(columnIndex).value)).toEqual(expected);
+    for (let i = 0; i < 4; i++) {
+      const cell = sheet.getRow(i + 6).getCell(columnIndex);
+      expect(cell.numFmt).toBe('@');
+      expect(cell.formula).toBeUndefined();
+    }
+  });
   it('keeps typed endpoints, pin uncertainty, design state and measured blanks', () => {
     const rows = buildWiringSchedule(map, site, vehicleId, false).tables[0].rows;
     expect(rows[0].cells).toMatchObject({ id: 'wire-112', from: 'M130', to: 'SENSOR',
