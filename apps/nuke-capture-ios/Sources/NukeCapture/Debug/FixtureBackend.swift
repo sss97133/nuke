@@ -225,6 +225,14 @@ enum FixtureBackend {
             return ok(scenario == "receipt-withdrawn" ? ReceiptDepthFixtures.withdrawn : ReceiptDepthFixtures.day)
         case "get_vehicle_receipt_work_context" where scenario.hasPrefix("receipt-"):
             return ok(ReceiptDepthFixtures.work)
+        case "get_vehicle_receipt_readings_for_session" where scenario.hasPrefix("receipt-"):
+            if scenario == "receipt-session-denied" { return ok(#"{"available":false,"readings":[]}"#) }
+            if scenario == "receipt-session-error" { return (503, Data(#"{"message":"fixture session read failed"}"#.utf8)) }
+            guard (args["p_vehicle_id"] as? String).flatMap(UUID.init(uuidString:)) == UUID(uuidString: navigationVehicleId),
+                  (args["p_session_id"] as? String).flatMap(UUID.init(uuidString:)) == UUID(uuidString: "00000000-0000-4000-8000-00000000e201") else {
+                return ok(#"{"available":false,"readings":[]}"#)
+            }
+            return ok(ReceiptDepthFixtures.sessionReadings)
         case "get_orphan_sessions" where scenario == "source-inspection":
             return ok("""
             [{"session_day":"2026-10-31","gps_cell":"fixture","photo_count":1,"image_ids":["00000000-0000-4000-8000-00000000e001"],"sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
@@ -240,7 +248,7 @@ enum FixtureBackend {
         case "vehicle_statements" where scenario == "garage-cards": return ok(GarageCardFixtures.statements)
         case "vehicle_statements": return ok("null")
         case "vehicle_labor_appraisal": return ok("null")
-        case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
+        case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "receipt-session-denied", "receipt-session-error", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             {"vehicle_id":"\(navigationVehicleId)","viewer":"\((scenario.hasPrefix("receipt-") || scenario.hasPrefix("financial-")) ? "owner" : "anon")","read_at":"2026-10-31T12:00:00Z",
              "sections":[\(scenario == "financial-qualification" ? InvestmentEvidenceFixtures.mastheadSection : ""){"kind":"strip","coverage":{"n":1,"of":1,"grain":"source claims","as_of":"2026-10-31T12:00:00Z"},
@@ -248,13 +256,13 @@ enum FixtureBackend {
                  "source":{"kind":"listing","label":"Dealer seller listing","method":"dealer_microdata_v2","url":"https://example.com/vehicle"},
                  "trust":0.6,"qualification":{"role":"seller_claim","factory_configuration_status":"unknown","current_configuration_status":"unknown"}}}]}]}
             """)
-        case "get_user_garage" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
+        case "get_user_garage" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "receipt-session-denied", "receipt-session-error", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             [{"vehicle_id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe",
               "trim_name":null,"image_url":null,"current_value":null,"image_count":0,"relationship":"profile_record"}]
             """)
-        case "get_my_garage_owner_corrections" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("[]")
-        case "my_unorganized_photo_count" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("0")
+        case "get_my_garage_owner_corrections" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "receipt-session-denied", "receipt-session-error", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("[]")
+        case "my_unorganized_photo_count" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "receipt-session-denied", "receipt-session-error", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("0")
         case "listing_work_plan_read": return ok(PlanFixtures.plan)
         case "my_suggested_provider_links": return ok(ParityFixtures.suggestions)
         case "work_order_publication_read":
@@ -416,7 +424,7 @@ enum FixtureBackend {
             return ok(ReceiptDepthFixtures.links)
         case "vehicles" where scenario == "garage-cards": return ok(GarageCardFixtures.metadata)
         case "vehicle_images" where scenario == "garage-cards": return ok("[]")
-        case "vehicles" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
+        case "vehicles" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "receipt-session-denied", "receipt-session-error", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             [{"id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe","vin":"TEST1234567",
               "trim":null,"primary_image_url":null,"image_count":0}]
@@ -424,7 +432,7 @@ enum FixtureBackend {
         case "vehicle_images" where scenario == "source-inspection":
             return ok(#"[{"id":"00000000-0000-4000-8000-00000000e001","image_url":"https://fixture.nuke.invalid/photo.png","auto_suggested_vehicle_id":null,"auto_suggestion_reasons":null}]"#)
         case "vehicle_images" where scenario == "navigation-garage": return ok("[]")
-        case "vehicle_images_public" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("[]")
+        case "vehicle_images_public" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "receipt-session-denied", "receipt-session-error", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("[]")
         case "vehicle_images": return ok(persona == .client ? PostJobFixtures.photos : "[]")
         case "profiles": return ok(ParityFixtures.ownRow)
         case "tool_requirement_key_map": return ok(ParityFixtures.toolKeys)

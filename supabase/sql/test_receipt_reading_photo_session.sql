@@ -3,9 +3,9 @@
 \ir test_receipt_work_judgment_currentness.sql
 ALTER TABLE public.work_sessions ADD COLUMN user_id uuid, ADD COLUMN title text, ADD COLUMN session_type text;
 ALTER TABLE public.vehicle_images ADD COLUMN user_id uuid;
-CREATE TABLE public.organization_vehicles(organization_id uuid, vehicle_id uuid, linked_by_user_id uuid);
+CREATE TABLE public.organization_vehicles(organization_id uuid, vehicle_id uuid REFERENCES public.vehicles(id), linked_by_user_id uuid);
 CREATE TABLE public.organization_contributors(organization_id uuid, user_id uuid, status text);
-CREATE TABLE public.vehicle_user_permissions(vehicle_id uuid, user_id uuid, is_active boolean, role text);
+CREATE TABLE public.vehicle_user_permissions(vehicle_id uuid REFERENCES public.vehicles(id), user_id uuid, is_active boolean, role text);
 CREATE FUNCTION public.organization_vehicle_link_grants(p_vehicle_id uuid, p_linker uuid)
 RETURNS boolean LANGUAGE sql STABLE AS $$
   SELECT EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = p_vehicle_id AND v.user_id = p_linker)

@@ -51,6 +51,18 @@ final class ReceiptEvidenceTests: XCTestCase {
         XCTAssertEqual(context.session?.id, UUID(uuidString: "00000000-0000-4000-8000-00000000e201"))
         XCTAssertEqual(context.session?.session_date, "2026-03-12")
     }
+    func testSessionReadingKeepsReceiptItemPhotoAndSourceDateSeparate() throws {
+        let read = try JSONDecoder().decode(ReceiptSessionReadings.self, from: Data(ReceiptDepthFixtures.sessionReadings.utf8))
+        XCTAssertTrue(read.available)
+        let line = try XCTUnwrap(read.readings.first)
+        XCTAssertEqual(line.evidence_id, UUID(uuidString: "00000000-0000-4000-8000-00000000f101"))
+        XCTAssertEqual(line.question_id, UUID(uuidString: "00000000-0000-4000-8000-00000000f301"))
+        XCTAssertEqual(line.receipt_id, receipt)
+        XCTAssertEqual(line.item_id, UUID(uuidString: "00000000-0000-4000-8000-00000000f201"))
+        XCTAssertEqual(line.photo_id, UUID(uuidString: "00000000-0000-4000-8000-00000000e001"))
+        XCTAssertEqual(line.source_date, "2026-03-09")
+        XCTAssertEqual(line.photo_taken_at, "2026-03-12T15:00:00+00:00")
+    }
     func reads(day: ReceiptEvidenceDay? = nil, work: ReceiptWorkContextRead? = nil) -> ReceiptEvidenceReaders.Reads {
         let row = link(), payload = day ?? self.day()
         return .init(links: { _ in [row] }, day: { _, _ in payload }, work: { _, _ in

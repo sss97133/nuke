@@ -95,16 +95,54 @@ final class ReceiptEvidenceUITests: XCTestCase {
         }
         XCTAssertTrue(context.exists && context.isHittable)
         context.tap()
-        let session = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Photo's linked session")).firstMatch
+        let session = app.buttons["receipt-reading-photo-session"].firstMatch
         for _ in 0..<8 {
             if session.exists && session.isHittable { break }
             app.swipeUp()
         }
         XCTAssertTrue(session.exists && session.isHittable)
         session.tap()
-        XCTAssertTrue(app.staticTexts["Fixture photo session"].waitForExistence(timeout: 5))
+        let heading = app.staticTexts["Fixture photo session"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 5) && heading.isHittable)
         XCTAssertTrue(app.staticTexts["2026-03-12"].exists)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "do not establish the part's installation date")).firstMatch.exists)
+        let related = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Corrected gasket reading")).firstMatch
+        for _ in 0..<4 {
+            if related.exists && related.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(related.exists && related.isHittable)
+        related.tap()
+        let sourceLines = app.staticTexts.matching(identifier: "Corrected gasket reading")
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline && !sourceLines.allElementsBoundByIndex.contains(where: { $0.isHittable }) {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertTrue(sourceLines.allElementsBoundByIndex.contains { $0.isHittable })
+        noWrites(app)
+    }
+    func testSessionPermissionLossDoesNotShowOldSessionDetails() {
+        let app = open("receipt-session-denied")
+        XCTAssertTrue(app.staticTexts["Corrected gasket reading"].waitForExistence(timeout: 10))
+        let context = app.buttons["Proposed work context"].firstMatch
+        for _ in 0..<6 {
+            if context.exists && context.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(context.exists && context.isHittable)
+        context.tap()
+        let session = app.buttons["receipt-reading-photo-session"].firstMatch
+        for _ in 0..<8 {
+            if session.exists && session.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(session.exists && session.isHittable)
+        session.tap()
+        let unavailable = app.staticTexts["This photo session is unavailable to this account."]
+        XCTAssertTrue(unavailable.waitForExistence(timeout: 5) && unavailable.isHittable)
+        XCTAssertFalse(app.staticTexts["Fixture photo session"].exists)
+        XCTAssertFalse(app.staticTexts["Corrected gasket reading"].firstMatch.isHittable)
+        app.buttons["Close photo session"].tap()
         noWrites(app)
     }
     func testWithdrawnCanonicalReceiptShowsUnavailableAndDoesNotSubstituteOldItems() {

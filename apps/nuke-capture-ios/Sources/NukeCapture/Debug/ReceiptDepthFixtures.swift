@@ -12,6 +12,13 @@ enum ReceiptDepthFixtures {
      "audit":{"receipts":[{"id":"\(receiptId)","source":"receipt","vendor":"Fixture Parts Shop","amount":35,"date":"2026-03-09"}]}}
     """
     static let withdrawn = #"{"date":"2026-03-09","tied":true,"documents":[]}"#
+    static let sessionReadings = """
+    {"available":true,"readings":[{"evidence_id":"00000000-0000-4000-8000-00000000f101","question_id":"00000000-0000-4000-8000-00000000f301",
+      "receipt_id":"\(receiptId)","item_id":"00000000-0000-4000-8000-00000000f201",
+      "line_number":1,"description":"Corrected gasket reading","part_number":"TEST-G1","reading_status":"current",
+      "source_date":"2026-03-09","photo_id":"00000000-0000-4000-8000-00000000e001",
+      "photo_taken_at":"2026-03-12T15:00:00+00:00","visible":"yes","installed":"cannot_tell"}]}
+    """
     static let day = """
     {"date":"2026-03-09","tied":true,"documents":[{"receipt_id":"\(receiptId)",
       "document_id":"00000000-0000-4000-8000-00000000d001","date":"2026-03-09","date_source":"transaction_date",
