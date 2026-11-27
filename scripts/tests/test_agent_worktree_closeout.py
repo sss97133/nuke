@@ -156,6 +156,50 @@ class Preservation(unittest.TestCase):
         self.assertEqual((target / 'restricted').stat().st_mode & 0o777, 0o700)
         self.assertEqual((target / 'restricted/private.env').stat().st_mode & 0o777, 0o644)
 
+    def test_clean_tracked_file_and_directory_keep_private_modes(self):
+        parent = self.work / 'clean-private'
+        parent.mkdir()
+        (parent / 'source.txt').write_text('clean source')
+        self.git(self.work, 'add', 'clean-private/source.txt')
+        self.git(self.work, 'commit', '--quiet', '-m', 'Clean private source')
+        parent.chmod(0o700)
+        (parent / 'source.txt').chmod(0o600)
+        (self.work / 'branch.txt').chmod(0o600)
+        self.assertNotIn(b'branch.txt', closeout.changes(self.work)[0])
+        self.assertNotIn(b'clean-private', closeout.changes(self.work)[0])
+        self.snapshot()
+        closeout.verify(self.record)
+        target = self.base / '.worktrees/restored'
+        closeout.restore(self.repo, self.record, target)
+        self.assertEqual((target / 'branch.txt').stat().st_mode & 0o777, 0o600)
+        self.assertEqual((target / 'clean-private').stat().st_mode & 0o777, 0o700)
+        self.assertEqual((target / 'clean-private/source.txt').stat().st_mode & 0o777, 0o600)
+
+    def test_legacy_record_restores_in_private_root_and_cannot_retire_again(self):
+        self.snapshot()
+        value = closeout.read_json(self.record / 'record.json')
+        value.pop('tracked_modes')
+        closeout.write_json(self.record / 'record.json', value)
+        closeout.verify(self.record)
+        target = self.base / '.worktrees/restored'
+        closeout.restore(self.repo, self.record, target)
+        self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+        with self.assertRaisesRegex(ValueError, 'complete permission inventory'):
+            closeout.retire(self.record, [])
+
+    def test_permission_inventory_does_not_stat_symlink_targets(self):
+        link = self.work / 'tracked-link'
+        link.symlink_to(self.base / 'private-external-target')
+        self.git(self.work, 'add', 'tracked-link')
+        original = Path.is_file
+        def no_follow(path, *args, **kwargs):
+            if path.is_symlink():
+                raise AssertionError('Do not inspect a symlink target for permission inventory')
+            return original(path, *args, **kwargs)
+        with patch.object(Path, 'is_file', new=no_follow):
+            value = closeout.capture_permissions(self.work, [])
+        self.assertNotIn('tracked-link', value['tracked_modes'])
+
     def test_resolved_uncommitted_merge_is_refused_before_snapshot(self):
         self.git(self.repo, 'checkout', '--quiet', '-b', 'merge-peer', self.base_head)
         (self.repo / 'merge-peer.txt').write_text('peer source')
@@ -360,6 +404,19 @@ class Preservation(unittest.TestCase):
         hook.chmod(0o755)
         closeout.restore(self.repo, self.record, self.base / '.worktrees/restored')
         self.assertFalse(marker.exists())
+
+    def test_snapshot_does_not_execute_workspace_index_hooks_or_change_config(self):
+        hooks = self.work / 'untrusted-hooks'
+        hooks.mkdir()
+        marker = self.base / 'index-hook-ran'
+        hook = hooks / 'post-index-change'
+        hook.write_text('#!/bin/sh\ntouch "' + str(marker) + '"\n')
+        hook.chmod(0o755)
+        self.git(self.work, 'config', 'core.hooksPath', str(hooks))
+        config = (self.repo / '.git/config').read_bytes()
+        self.snapshot()
+        self.assertFalse(marker.exists())
+        self.assertEqual((self.repo / '.git/config').read_bytes(), config)
 
     def test_hidden_edits_are_not_treated_as_clean_committed_content(self):
         self.git(self.work, 'update-index', '--assume-unchanged', 'branch.txt')

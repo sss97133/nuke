@@ -18,6 +18,10 @@ import time
 
 
 def run(args, cwd=None, env=None, data=None):
+    if args and args[0] == 'git':
+        # Private recovery plumbing must not execute an unfinished checkout's
+        # hooks. This command-only override never changes normal repo checks.
+        args = ['git', '-c', 'core.hooksPath=/dev/null', *args[1:]]
     result = subprocess.run(args, cwd=cwd, env=env, input=data, capture_output=True, timeout=180)
     if result.returncode:
         raise ValueError(result.stderr.decode(errors='replace')[:1500] or 'Command failed')
@@ -187,15 +191,29 @@ def intent_to_add(workspace):
 
 
 def directory_modes(workspace, files):
-    result = {'': stat.S_IMODE(workspace.stat().st_mode)}
+    parents = {''}
     for item in files:
         parent = PurePosixPath(item['path']).parent
         while str(parent) != '.':
-            path = local_path(workspace, str(parent))
-            if path.is_dir() and not path.is_symlink():
-                result[str(parent)] = stat.S_IMODE(path.stat().st_mode)
+            parents.add(str(parent))
             parent = parent.parent
+    result = {}
+    for rel in sorted(parents):
+        path = local_path(workspace, rel) if rel else workspace
+        if not path.is_symlink() and path.is_dir():
+            result[rel] = stat.S_IMODE(path.stat().st_mode)
     return result
+
+
+def capture_permissions(workspace, archived_files):
+    names = [os.fsdecode(p) for p in git(workspace, 'ls-files', '-z').split(b'\0') if p]
+    modes = {}
+    for rel in names:
+        path = local_path(workspace, rel)
+        if not path.is_symlink() and path.is_file():
+            modes[rel] = stat.S_IMODE(path.stat().st_mode)
+    return {'tracked_modes': modes,
+            'directory_modes': directory_modes(workspace, archived_files + [{'path': p} for p in names])}
 
 
 def worktree_state(workspace, administrative_dir=None):
@@ -232,7 +250,7 @@ def reject_special_git_state(workspace):
             raise ValueError('In-progress Git operation needs separate preservation: ' + name)
     worktree_state(workspace, administrative_dir)
     for key in ['core.autocrlf', 'core.eol']:
-        value = subprocess.run(['git', '-C', str(workspace), 'config', '--get', key], capture_output=True, timeout=15)
+        value = subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', '-C', str(workspace), 'config', '--get', key], capture_output=True, timeout=15)
         if value.returncode not in (0, 1):
             raise ValueError('Cannot verify Git normalization configuration')
         allowed = (b'false',) if key == 'core.autocrlf' else (b'lf', b'native')
@@ -278,7 +296,8 @@ def snapshot(repo, workspace, record):
     # The primary checkout is never removable. Its potentially large local data
     # remains in place; only code/staging state is checkpointed here.
     locals_before = [] if primary else ignored_records(workspace)
-    modes = directory_modes(workspace, files + locals_before)
+    permissions = capture_permissions(workspace, files + locals_before)
+    modes = permissions['directory_modes']
     record.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with tempfile.TemporaryDirectory(prefix='.snapshot-', dir=record.parent) as temp:
         staging = Path(temp)
@@ -325,7 +344,7 @@ def snapshot(repo, workspace, record):
                 flags != index_flags(workspace) or
                 intent != intent_to_add(workspace) or
                 administrative != worktree_state(workspace) or
-                modes != directory_modes(workspace, files + locals_before) or
+                permissions != capture_permissions(workspace, files + locals_before) or
                 locals_before != ([] if primary else ignored_records(workspace)) or
                 exclude_bytes != (exclude_path.read_bytes() if exclude_path.exists() else b'')):
             raise ValueError('Source changed during snapshot; leave checkout intact')
@@ -335,6 +354,7 @@ def snapshot(repo, workspace, record):
                     'index_flags': flags,
                     'intent_to_add': intent,
                     'directory_modes': modes,
+                    'tracked_modes': permissions['tracked_modes'],
                     'worktree_state': administrative,
                     'working_files': files, 'local_files': locals_before,
                     'local_data_policy': 'retained_in_primary_checkout' if primary else 'archived_non_cache_files',
@@ -379,7 +399,7 @@ def restore(repo, record, target):
         if item['kind'] == 'file':
             p = local_path(target, item['path'])
             with p.open('wb') as stream:
-                result = subprocess.run(['git', '-C', str(repo), 'cat-file', 'blob',
+                result = subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', '-C', str(repo), 'cat-file', 'blob',
                                          data['working_commit'] + ':' + item['path']],
                                         stdout=stream, stderr=subprocess.PIPE, timeout=180)
             if result.returncode:
@@ -424,7 +444,7 @@ def restore(repo, record, target):
             git(target, 'update-index', option, '-z', '--stdin', data=b''.join(os.fsencode(x) + b'\0' for x in names))
     administrative = data.get('worktree_state', {})
     if 'config.worktree' in administrative:
-        enabled = subprocess.run(['git', '-C', str(repo), 'config', '--bool', '--get',
+        enabled = subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', '-C', str(repo), 'config', '--bool', '--get',
                                   'extensions.worktreeConfig'], capture_output=True, timeout=15)
         if enabled.stdout.strip() != b'true':
             raise ValueError('Restore into the original repository with worktree configuration enabled')
@@ -437,6 +457,13 @@ def restore(repo, record, target):
         path.chmod(item['mode'])
     if worktree_state(target) != administrative:
         raise ValueError('Restored Git worktree configuration differs')
+    for rel, mode in data.get('tracked_modes', {}).items():
+        path = local_path(target, rel)
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('Restored tracked permission path differs: ' + rel)
+        path.chmod(mode)
+    if 'tracked_modes' in data and capture_permissions(target, [])['tracked_modes'] != data['tracked_modes']:
+        raise ValueError('Restored tracked file permissions differ')
     actual_status = changes(target)[0]
     if git(target, 'rev-parse', 'HEAD').decode().strip() != data['head'] or actual_status != base64.b64decode(data['status_b64']):
         write_json(record / 'restore-status-diagnostic.json', {
@@ -452,6 +479,8 @@ def restore(repo, record, target):
         raise ValueError('Restored intent-to-add entries differ')
     for rel, mode in sorted(data.get('directory_modes', {}).items(), key=lambda x: len(PurePosixPath(x[0]).parts), reverse=True):
         path = local_path(target, rel) if rel else target
+        if not rel and 'tracked_modes' not in data:
+            mode = 0o700  # Legacy records have no complete clean-file permission inventory.
         # Git removes empty parents after tracked deletions; the original
         # checkout may still contain them, with meaningful private modes.
         path.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -527,6 +556,8 @@ def unchanged(data, record, workspace):
                 index_flags(workspace) != data['index_flags'] or
                 intent_to_add(workspace) != data.get('intent_to_add', []) or
                 worktree_state(workspace) != data.get('worktree_state', {}) or
+                ('tracked_modes' in data and capture_permissions(workspace, data['working_files'] + data['local_files']) !=
+                 {'tracked_modes': data['tracked_modes'], 'directory_modes': data['directory_modes']}) or
                 any(stat.S_IMODE((local_path(workspace, rel) if rel else workspace).stat().st_mode) != mode
                     for rel, mode in data.get('directory_modes', {}).items()) or
                 any(file_record(workspace, item['path']) != item for item in data['working_files']) or
@@ -567,6 +598,8 @@ def retire(record, protected):
         raise ValueError('Only registered unlocked linked checkouts can be retired; never the primary checkout')
     if not data.get('verified'):
         raise ValueError('A successful restore verification is required')
+    if 'tracked_modes' not in data:
+        raise ValueError('A complete permission inventory is required before retirement')
     if workspace.stat().st_dev != record.stat().st_dev:
         raise ValueError('Retirement requires an atomic move on the same filesystem')
     refs = references(workspace, protected)
