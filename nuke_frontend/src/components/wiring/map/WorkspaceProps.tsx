@@ -12,7 +12,7 @@ import { rule } from '../connector-inspector/colorways';
 import { DevicePhoto, WhereOnTruck } from './MountsPanel';
 import { SECTIONS, type WiringMapData } from './useWiringMap';
 import { openEndOf } from './MissingList';
-import { kindOf, mask, modelsOf, partNo, publicName, valOf, weakestBasis, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
+import { kindOf, mask, modelsOf, partNo, publicName, valOf, weakestBasis, wireGaugeDisplay, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 import { engineeringText, scheduleLength } from './wiringSchedule';
 
 const FRONT_AXLE = -1.853, IN = 0.0254;
@@ -77,7 +77,7 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
         return (
           <tr key={wc} onClick={() => onSelect('w:' + wc)} style={{ cursor: 'pointer', background: sel === 'w:' + wc ? `${cw.accent}22` : 'transparent' }}>
             <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw) }}>{wc}</td>
-            <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw), textAlign: 'right' }}>{w?.gauge ?? ''}</td>
+            <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw), textAlign: 'right' }}>{wireGaugeDisplay(w?.gauge) ?? ''}</td>
             <td style={{ padding: '2px 4px', borderBottom: rule(cw) }}>{w?.color ?? ''}</td>
             <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw) }}>{far.length ? far.map((h, i) => <span key={i}>{i ? ' → ' : ''}{h!.code}{h!.cav ? ':' + h!.cav : ''}</span>) : pending}</td>
             <td style={{ ...mono, padding: '2px 4px', borderBottom: rule(cw), textAlign: 'right' }}>{L ?? '—'}</td>
@@ -165,7 +165,7 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
         {open && <F cw={cw} k={ch.length ? 'OPEN END' : 'ENDS'}><NotOnFile cw={cw} closes={open} /></F>}
 
         <H cw={cw}>THE WIRE</H>
-        <F cw={cw} k="GAUGE">{w.gauge != null ? <span style={mono}>{w.gauge} AWG</span> : <NotOnFile cw={cw} closes={GAP.gauge} />}</F>
+        <F cw={cw} k="GAUGE">{w.gauge != null ? <span style={mono}>{wireGaugeDisplay(w.gauge)} AWG</span> : <NotOnFile cw={cw} closes={GAP.gauge} />}</F>
         <F cw={cw} k="COLOUR">{w.color ? w.color : <NotOnFile cw={cw} closes={GAP.color} />}</F>
         <F cw={cw} k="SPEC">{w.spec ? <span style={mono}>{w.spec}</span> : <NotOnFile cw={cw} closes={GAP.spec} />}</F>
         <F cw={cw} k="PLANNED LENGTH">{length.planned !== null ? <span style={mono}>{length.planned} FT</span> : <NotOnFile cw={cw} closes={GAP.length} />}</F>

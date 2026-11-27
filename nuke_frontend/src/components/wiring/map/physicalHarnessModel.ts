@@ -1,5 +1,5 @@
 // Physical edges come from segment keys, never from sorting a circuit's ends.
-import { cavOf } from './useWorkspaceSelection';
+import { cavOf, wireGaugeDisplay } from './useWorkspaceSelection';
 export interface PhysicalCircuit {
   id: string; code: string; name: string; section: string | null; design_status: string;
 }
@@ -70,11 +70,11 @@ export function physicalSchematicPieces(model: PhysicalHarnessModel, section: st
 
 export function physicalPieceLabel(p: SchematicPiece): string {
   const s = p.segment;
-  const gauge = s.gauge_awg == null ? 'Gauge unknown' : `${s.gauge_awg} AWG`;
+  const gauge = s.gauge_awg == null ? 'Gauge unknown' : `${wireGaugeDisplay(s.gauge_awg)} AWG`;
   const length = s.measured_length_ft != null ? `${s.measured_length_ft} ft measured`
     : s.planned_length_ft != null ? `${s.planned_length_ft} ft planned` : 'Length unknown';
   const state = s.specification_state === 'conflict'
-    ? `Specification conflict: segment ${s.gauge_awg ?? '?'} AWG; circuit ${s.circuit_gauge_awg ?? '?'} AWG; part ${s.keyed_part_number ?? 'unknown'}`
+    ? `Specification conflict: segment ${wireGaugeDisplay(s.gauge_awg) ?? '?'} AWG; circuit ${wireGaugeDisplay(s.circuit_gauge_awg) ?? '?'} AWG; part ${s.keyed_part_number ?? 'unknown'}`
     : s.specification_state === 'incomplete' ? 'Specification incomplete' : 'Stored specifications agree';
   const connection = s.link_state === 'linked' ? '' : s.link_state === 'stale'
     ? ' · Connection references need repair' : ' · Connection incomplete';

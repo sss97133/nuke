@@ -173,6 +173,12 @@ export function useSelection(): [string | null, (id: string | null) => void] {
   return [sel, set];
 }
 
+/** Presentation only: stored numeric AWG keys remain untouched. */
+export function wireGaugeDisplay(value: number | null | undefined): string | number | null {
+  if (value == null) return null;
+  return Number.isInteger(value) && value <= 0 && value >= -3 ? `${1 - value}/0` : value;
+}
+
 /** What the page may print of free text from the records: amounts, order and listing numbers are masked. */
 export function mask(t: string | null | undefined): string {
   return String(t ?? '')
