@@ -52,6 +52,13 @@ together. Failed periodic preparation probes remain visible in failure_count;
 that field is not a numerical evaluator-entry counter. A completed freshness
 probe cannot renew an unchanged exhausted numerical budget.
 
+`worker_pending_identity.sql` preserves the last prepared identity and failure
+accounting when the current structural dependency temporarily lacks a complete
+receipt. It schedules a bounded freshness wait instead of forgetting the old
+input or repeatedly probing it immediately. Restoration of the exact same
+dependency cannot renew an exhausted budget; a genuinely different authored or
+compiled input still receives its own accounting.
+
 `worker_consumers.sql` extends the existing monitoring and revert owners.
 Timing denominators stay separate by phase. Reverting generic worker effects
 does not erase immutable private calculation history or report a complete

@@ -5,6 +5,22 @@
 \i supabase/migrations/20261126181729_harness_model_dc_compute.sql
 \i supabase/sql/harness_operating_case_runtime.sql
 UPDATE public.platform_config SET config_value=config_value||'{"max_attempts":1}' WHERE config_key='model_fold';
+CREATE TABLE public.fixture_operating_dependency(pending boolean,age_completions boolean);
+INSERT INTO public.fixture_operating_dependency VALUES(false,false);
+-- An unchanged fixture interpreter reads temporary qualification availability.
+-- Its definition/worker key stays fixed throughout failure and recovery.
+DO $fixture$
+DECLARE b text:=pg_get_functiondef('public.harness_operating_case_compile(uuid,uuid)'::regprocedure);
+ a text:=E'BEGIN\n SELECT * INTO r';
+ z text:=$z$BEGIN
+ IF (SELECT pending FROM public.fixture_operating_dependency) THEN
+  RETURN '{"status":"held","network":null,"issues":[]}'::jsonb;
+ END IF;
+ SELECT * INTO r$z$;
+BEGIN
+ IF (length(b)-length(replace(b,a,'')))/length(a)<>1 THEN RAISE EXCEPTION 'Fixture dependency availability anchor drift'; END IF;
+ EXECUTE replace(b,a,z);
+END $fixture$;
 CREATE SEQUENCE public.fixture_operating_evaluations;
 CREATE FUNCTION public.fixture_operating_evaluate_error() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -19,11 +35,11 @@ CREATE TRIGGER fixture_operating_evaluate_error BEFORE INSERT ON public.harness_
 CREATE FUNCTION public.fixture_operating_advance_failure_clock() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF OLD.attempt_tick_id IS NOT NULL AND NEW.attempt_tick_id IS NULL
-  AND NEW.failure_count>OLD.failure_count
   AND NEW.answered_generation IS NOT DISTINCT FROM OLD.answered_generation
   AND NEW.latest_run_id IS NOT DISTINCT FROM OLD.latest_run_id THEN
-  NEW.attempted_at:=clock_timestamp()-interval '16 minutes';
-  NEW.retry_after:=clock_timestamp()-interval '1 second';
+  IF NEW.failure_count>OLD.failure_count OR (SELECT age_completions FROM public.fixture_operating_dependency) THEN
+   NEW.attempted_at:=clock_timestamp()-interval '16 minutes';END IF;
+  IF NEW.failure_count>OLD.failure_count THEN NEW.retry_after:=clock_timestamp()-interval '1 second';END IF;
  END IF;
  RETURN NEW;
 END $$;
@@ -45,8 +61,21 @@ SELECT public.t_assert((SELECT last_value=1 AND is_called FROM public.fixture_op
  AND (SELECT count(*)=0 FROM public.harness_model_dc_wire_inputs)
  AND (SELECT count(*)=0 FROM public.harness_model_dc_node_results),
  'one genuine failed evaluation leaves no partial numerical run or children');
+CREATE TEMP TABLE operating_failed_dependency AS SELECT attempt_dependency_key hash
+ FROM public.harness_operating_cases WHERE id='c0000000-0000-4000-8000-000000000009';
+UPDATE public.fixture_operating_dependency SET pending=true,age_completions=true;
 SET ROLE service_role;
 CALL public.model_fold_tick();
+CALL public.model_fold_tick();
+RESET ROLE;
+SELECT public.t_assert((SELECT c.attempt_dependency_key=b.hash AND c.failure_count=1
+ AND c.answered_generation IS NULL AND c.latest_run_id IS NULL AND c.attempt_tick_id IS NULL
+ FROM public.harness_operating_cases c CROSS JOIN operating_failed_dependency b
+ WHERE c.id='c0000000-0000-4000-8000-000000000009')
+ AND (SELECT last_value=1 FROM public.fixture_operating_evaluations),
+ 'temporary missing qualification retains the exhausted prepared identity and failure accounting');
+UPDATE public.fixture_operating_dependency SET pending=false,age_completions=false;
+SET ROLE service_role;
 CALL public.model_fold_tick();
 CALL public.model_fold_tick();
 CALL public.model_fold_tick();
@@ -54,8 +83,9 @@ RESET ROLE;
 SELECT public.t_assert((SELECT last_value=1 FROM public.fixture_operating_evaluations)
  AND (SELECT failure_count=1 AND answered_generation IS NULL AND attempt_tick_id IS NULL
  FROM public.harness_operating_cases WHERE id='c0000000-0000-4000-8000-000000000009'),
- 'a freshness probe cannot invoke the evaluator again for an unchanged exhausted input');
-SELECT public.t_assert((SELECT count(*)=2 AND count(*) FILTER(WHERE dc_status='failed' AND dc_error_code='22023')=1
+ 'return of the exact dependency cannot invoke the evaluator again for an unchanged exhausted input');
+SELECT public.t_assert((SELECT count(*)=3 AND count(*) FILTER(WHERE dc_status='failed' AND dc_error_code='22023')=1
+ AND count(*) FILTER(WHERE dc_status='dependency_pending' AND dc_error_code IS NULL)=1
  AND count(*) FILTER(WHERE dc_status='budget_exhausted' AND dc_error_code IS NULL)=1
  AND bool_and(NOT dc_output_retained) FROM public.model_fold_tick_runs WHERE fold_phase='dc'),
  'failed evaluation and budget-only freshness probe retain separate truthful typed outcomes');

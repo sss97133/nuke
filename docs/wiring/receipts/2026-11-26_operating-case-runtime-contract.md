@@ -36,6 +36,9 @@ and make an unchanged exhausted input look new to a periodic freshness probe.
 Non-ready preparation instead commits its cursor, typed telemetry and vehicle
 lease release together. Failed preparation probes remain visible in the failure
 counter; they cannot restart an unchanged exhausted numerical calculation.
+Temporary loss of a complete structural receipt retains the last prepared hash
+and its failure accounting. Its bounded freshness wait prevents immediate
+repeated probes; restoring the exact same dependency cannot renew its budget.
 
 Grounding: `docs/ledger/theory/data-machine-cases.md` section13.12 criteria1-8
 and10; existing structural evaluation migration`20261125233922`, component
