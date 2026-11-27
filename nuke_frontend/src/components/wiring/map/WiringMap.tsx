@@ -20,8 +20,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useVehiclePermissions } from '../../../hooks/useVehiclePermissions';
 import {
-  COLORWAYS, COLORWAY_LIST, COLORWAY_STORAGE_KEY, ColorwayContext, DEFAULT_COLORWAY,
-  frame, isColorwayId, rule, textOn, type Colorway, type ColorwayId,
+  COLORWAYS, ColorwayContext, frame, rule, textOn, type Colorway,
 } from '../connector-inspector/colorways';
 import { useWiringFacts, type WiringFact, type PurchaseRecord, type ListingRecord } from '../connector-inspector/useWiringFacts';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
@@ -120,21 +119,16 @@ function useNarrow(px: number): boolean {
 // the results; the owner also sees what needs him, the open calls and decisions, and each record's proof and sources.
 export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const [params, setParams] = useSearchParams();
-  const rawCw = params.get('cw');
-  let storedCw: string | null = null;
-  try { storedCw = window.localStorage.getItem(COLORWAY_STORAGE_KEY); } catch { /* private mode */ }
-  const colorwayId: ColorwayId = isColorwayId(rawCw) ? rawCw : isColorwayId(storedCw) ? storedCw : DEFAULT_COLORWAY;
-  const cw = COLORWAYS[colorwayId];
+  const cw = COLORWAYS.paper;
+  useEffect(() => {
+    if (!params.has('cw')) return;
+    setParams(prev => { const p = new URLSearchParams(prev); p.delete('cw'); return p; }, { replace: true });
+  }, [params, setParams]);
   const set = (patch: Record<string, string | null>) => setParams(prev => {
     const p = new URLSearchParams(prev);
     for (const [k, v] of Object.entries(patch)) { if (v === null) p.delete(k); else p.set(k, v); }
     return p;
   }, { replace: true });
-  const setColorway = (id: ColorwayId) => {
-    try { window.localStorage.setItem(COLORWAY_STORAGE_KEY, id); } catch { /* private mode */ }
-    set({ cw: id });
-  };
-
   // The owner's layer takes the profile's owner check (useVehiclePermissions: the profile's isRowOwner). ?asOwner=1
   // previews it on the dev server only (import.meta.env.DEV), for local screenshots; a build never honours it.
   const { session } = useAuth();
@@ -283,12 +277,6 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
             <button onClick={() => setTablesOpen(o => !o)} aria-expanded={tablesOpen} style={barBtn(tablesOpen)}>{tablesOpen ? 'TABLES ▾' : 'TABLES ▴'}</button>
           </>
         )}
-        {door !== 'schedule' && COLORWAY_LIST.map(c => (
-          <button key={c.id} onClick={() => setColorway(c.id)} title={`${c.label} colours`} style={{
-            background: c.id === colorwayId ? cw.accent : cw.surface, color: c.id === colorwayId ? cw.onAccent : cw.ink,
-            border: frame(cw), fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, padding: '2px 7px', cursor: 'pointer',
-          }}>{c.label}</button>
-        ))}
       </span>
     </div>
   );

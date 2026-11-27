@@ -5,13 +5,9 @@
 // same ?wb=/?mg= toggles as the WORKBENCH tab) → four instantly-swappable
 // skins: FACE | TABLE | BUILD | PRINT. Swap = render flip, zero refetch.
 // All inspector state lives in URL params: ?ci= connector, ?skin= skin,
-// ?sel= selected cavity, ?cw= colorway (localStorage fallback).
+// ?sel= selected cavity. Connector sheets use one paper appearance.
 //
-// COLORWAYS (Skylar's directive 2026-06-11): adopters are hard-core
-// one-man-shop harness engineers coming from Excel sheets and paper layouts —
-// traditional engineering tooling, never gimmick. PAPER (default) / LEDGER /
-// CAD / SHOP — full visual swap, one click, same data. Tokens in
-// connector-inspector/colorways.ts; zero hardcoded chrome below.
+// Shared presentation tokens live in connector-inspector/colorways.ts.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -22,8 +18,7 @@ import { buildConnectorModels } from './connector-inspector/buildConnectorModels
 import { useBuildState } from './connector-inspector/useBuildState';
 import { useWiringFacts } from './connector-inspector/useWiringFacts';
 import {
-  COLORWAYS, COLORWAY_LIST, COLORWAY_STORAGE_KEY, ColorwayContext,
-  DEFAULT_COLORWAY, frame, isColorwayId, rule, textOn, type ColorwayId,
+  COLORWAYS, ColorwayContext, frame, rule, textOn,
 } from './connector-inspector/colorways';
 import { FaceSkin } from './connector-inspector/FaceSkin';
 import { TableSkin } from './connector-inspector/TableSkin';
@@ -62,11 +57,11 @@ export function ConnectorInspector({ devices, vehicleId }: Props) {
   const skin: SkinId = SKIN_IDS.has(rawSkin) ? (rawSkin as SkinId) : 'face';
   const selectedKey = searchParams.get('sel');
 
-  // colorway: ?cw= wins, localStorage fallback, DEFAULT = PAPER
-  const rawCw = searchParams.get('cw');
-  const storedCw = typeof window !== 'undefined' ? window.localStorage.getItem(COLORWAY_STORAGE_KEY) : null;
-  const colorwayId: ColorwayId = isColorwayId(rawCw) ? rawCw : isColorwayId(storedCw) ? storedCw : DEFAULT_COLORWAY;
-  const cw = COLORWAYS[colorwayId];
+  const cw = COLORWAYS.paper;
+  useEffect(() => {
+    if (!searchParams.has('cw')) return;
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.delete('cw'); return p; }, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const setParams = (patch: Record<string, string | null>) => {
     setSearchParams(prev => {
@@ -77,11 +72,6 @@ export function ConnectorInspector({ devices, vehicleId }: Props) {
       }
       return p;
     }, { replace: true });
-  };
-
-  const setColorway = (id: ColorwayId) => {
-    try { window.localStorage.setItem(COLORWAY_STORAGE_KEY, id); } catch { /* private mode */ }
-    setParams({ cw: id });
   };
 
   // ── ONE derivation — same toggle params as the WORKBENCH tab (?wb=, ?mg=) ──
@@ -181,33 +171,6 @@ export function ConnectorInspector({ devices, vehicleId }: Props) {
                 fontFamily: cw.fontBody, fontSize: 14, fontWeight: 700, letterSpacing: 1,
                 padding: '6px 16px', cursor: 'pointer',
               }}>{s.label}</button>
-            );
-          })}
-        </span>
-
-        {/* colorway picker — swatch dots + label; Winamp-skin one-click swap */}
-        <span style={{ marginLeft: 10, fontFamily: cw.fontBody, fontSize: 14, color: cw.inkFaint, marginRight: 4 }}>COLORWAY</span>
-        <span style={{ display: 'inline-flex', gap: 4 }}>
-          {COLORWAY_LIST.map(c => {
-            const active = c.id === colorwayId;
-            return (
-              <button key={c.id} onClick={() => setColorway(c.id)} title={c.label} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: active ? cw.elevated : 'transparent',
-                border: `${cw.borderStyle === 'standard' ? 2 : 1}px solid ${active ? cw.accent : cw.border}`,
-                padding: '4px 8px', cursor: 'pointer',
-              }}>
-                {/* two half-blocks: theme bg | theme accent — no gradients */}
-                <span style={{ display: 'inline-flex', width: 14, height: 14, border: `1px solid ${cw.border}` }}>
-                  <span style={{ flex: 1, background: c.bg }} />
-                  <span style={{ flex: 1, background: c.accent }} />
-                </span>
-                {active && (
-                  <span style={{ fontFamily: cw.fontBody, fontSize: 14, fontWeight: 700, letterSpacing: 0.5, color: cw.ink }}>
-                    {c.label}
-                  </span>
-                )}
-              </button>
             );
           })}
         </span>
