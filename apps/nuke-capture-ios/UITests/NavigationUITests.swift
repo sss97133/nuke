@@ -279,6 +279,9 @@ final class NavigationUITests: XCTestCase {
                 XCTAssertTrue(status.label.contains("Last calculated"))
                 let engine = app.buttons.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "engine", "8 h to 16 h")).firstMatch
                 XCTAssertTrue(reveal(engine, in: app), app.debugDescription)
+                engine.tap()
+                XCTAssertTrue(app.staticTexts["labor-source-unavailable-engine"].waitForExistence(timeout: 5))
+                let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "labor-stale-source-unavailable"; shot.lifetime = .keepAlways; add(shot)
             } else {
                 XCTAssertFalse(app.staticTexts["0 of 0 segments with hours"].exists)
             }

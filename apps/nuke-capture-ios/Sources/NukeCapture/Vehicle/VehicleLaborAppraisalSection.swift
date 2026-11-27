@@ -306,7 +306,6 @@ struct VehicleLaborAppraisalSection: View {
                 }.padding(.horizontal, 16)
             }
         }
-        .accessibilityIdentifier("vehicle-labor-appraisal")
         .task(id: vehicleId) { await load() }
     }
 
@@ -336,6 +335,10 @@ struct LaborAppraisalContent: View {
     let appraisal: LaborAppraisal
 
     private var priced: [LaborSegment] { appraisal.segments.filter { $0.hours_typical != nil } }
+    private var calculationClock: String {
+        ProfileClock.day(appraisal.state?.computed_at ?? appraisal.as_of).map { "Calculated \($0)" }
+            ?? "Calculation date not returned"
+    }
 
     var body: some View {
         if appraisal.state?.computed == false {
@@ -348,7 +351,8 @@ struct LaborAppraisalContent: View {
         } else if appraisal.applicable == true, !priced.isEmpty {
             section {
                 if let status = LaborWords.foldStatus(appraisal) { caption(status) }
-                caption("Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.")
+                caption("Appraised hours are estimates. Segments show any evidence details returned; totals come from the appraisal.")
+                if appraisal.totals != nil { caption("This appraisal cannot open the underlying sources here yet.") }
                 if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed ?? totals.with_unwitnessed_purchases) {
                     Text("Hours, two totals side by side").font(.caption.weight(.semibold)).padding(.top, 4)
                     row("Witnessed", (LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
@@ -365,16 +369,15 @@ struct LaborAppraisalContent: View {
                     DisclosureGroup {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(Array(LaborWords.lines(segment, appraisal.names).enumerated()), id: \.offset) { _, line in caption(line) }
+                            caption("This appraisal cannot open the underlying sources here yet.")
+                                .accessibilityIdentifier("labor-source-unavailable-\(segment.segment)")
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
                     } label: {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(ItemText.codeText(segment.segment)).font(.subheadline).foregroundStyle(Color.primary)
-                            Spacer()
-                            Text(LaborWords.range(segment.hours_min, segment.hours_typical, segment.hours_max) ?? "No hours")
-                                .font(.subheadline.monospacedDigit()).foregroundStyle(Color.primary)
-                        }
+                        RootedValueView(label: ItemText.codeText(segment.segment),
+                            value: LaborWords.range(segment.hours_min, segment.hours_typical, segment.hours_max) ?? "No hours",
+                            status: .projected, decay: calculationClock)
+                            .accessibilityIdentifier("labor-segment-\(segment.segment)")
                     }
-                    .accessibilityIdentifier("labor-segment-\(segment.segment)")
                 }
             }
         } else if let status = LaborWords.foldStatus(appraisal) {
@@ -386,6 +389,7 @@ struct LaborAppraisalContent: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Label("Labor appraisal by segment", systemImage: "wrench.and.screwdriver")
+                    .accessibilityIdentifier("vehicle-labor-appraisal")
                 Spacer()
                 if appraisal.state?.computed != false {
                     Text(LaborWords.coverage(appraisal)).foregroundStyle(.secondary)
@@ -401,10 +405,6 @@ struct LaborAppraisalContent: View {
     }
 
     private func row(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label).font(.caption)
-            Spacer()
-            Text(value).font(.caption.monospacedDigit()).multilineTextAlignment(.trailing)
-        }
+        RootedValueView(label: label, value: value, status: .projected, decay: calculationClock)
     }
 }
