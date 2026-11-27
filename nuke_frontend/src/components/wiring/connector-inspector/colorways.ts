@@ -1,15 +1,6 @@
-// connector-inspector/colorways.ts — the COLORWAY layer of the Winamp model.
-// Skylar's directive (2026-06-11): the adopters are hard-core one-man-shop
-// harness engineers coming from Excel sheets and paper layouts — the UI must
-// read as traditional engineering tooling, never gimmick. Same data, full
-// visual swap, one click. Four colorways:
-//   PAPER  (DEFAULT) — printed connector sheet that happens to be interactive
-//   LEDGER — spreadsheet: cell grid, system-ui, color only as accents/swatches
-//   CAD    — black field, thin white/yellow line-art, color on hover/selection
-//   SHOP   — dark navy field, CAD's discipline: dark desaturated chips, white
-//            letters, group identity as colored rings, ONE accent family
-//            (rebuilt 2026-06-11 per adversarial review — the original pastel
-//            render read as video game)
+// Shared paper appearance for the wiring workspace and connector sheets.
+// Alternate shop, CAD and ledger appearances are retired. Wire-insulation
+// colours remain source data and do not change with presentation.
 //
 // TEXT-ON-CHIP LAW (adversarial review fix, 2026-06-11): cavity letters and
 // labels ALWAYS render at full contrast against their chip — pure black on
@@ -27,7 +18,7 @@
 import { createContext, useContext } from 'react';
 import type { BuildState } from './useBuildState';
 
-export type ColorwayId = 'paper' | 'ledger' | 'cad' | 'shop';
+export type ColorwayId = 'paper';
 export type GroupKey = 'sensor' | 'drive' | 'power' | 'can' | 'spare' | 'overflow';
 
 // Legibility floors (Skylar's readability directive, receipt 2026-06-10):
@@ -123,143 +114,15 @@ const PAPER: Colorway = {
   borderStyle: 'hairline',
 };
 
-// ── LEDGER — spreadsheet ────────────────────────────────────────────────
-const LEDGER: Colorway = {
-  id: 'ledger',
-  label: 'LEDGER',
-  bg: '#F6F7F8',
-  surface: '#FFFFFF',
-  elevated: '#ECEFF1',
-  gridLine: '#D7DBDF',             // cell-grid lines
-  ink: '#1A1D21',
-  inkMuted: '#41464C',
-  inkFaint: '#5C636B',
-  border: '#C6CBD1',
-  swatchBorder: '#9AA1A8',
-  accent: '#0B57D0',               // spreadsheet selection blue
-  onAccent: '#FFFFFF',
-  danger: '#B42318',
-  warn: '#8A4B00',
-  ok: '#1E7E34',
-  okTint: '#E3F1E7',
-  fontBody: "-apple-system, 'Segoe UI', Roboto, system-ui, Arial, sans-serif",
-  fontMono: "'SF Mono', Menlo, Consolas, 'Courier New', monospace",
-  faceStroke: '#9AA1A8',
-  // saturated accent colors — used as rings and small swatches, never as
-  // broad fills (faceFillOpacity keeps the face restrained). Row accent
-  // edges REMOVED 2026-06-11: a per-row colored bar repeated down the table
-  // reads as a status stripe that never varies — noise, not signal.
-  functionGroupPalette: {
-    sensor: '#1D6FD2', drive: '#C92A2A', power: '#B45309',
-    can: '#0C8599', spare: '#A8AFB6', overflow: '#D9480F',
-  },
-  faceFillOpacity: 0.16,
-  faceOccupiedStroke: 'group',
-  monochromeFace: false,
-  faceCursor: 'grab',
-  tableStripe: '#EDF0F3',
-  barUncut: '#DDE1E5',
-  buildState: BUILD_STATE_SHARED,
-  borderStyle: 'hairline',
-};
-
-// ── CAD — black line-art ────────────────────────────────────────────────
-const CAD: Colorway = {
-  id: 'cad',
-  label: 'CAD',
-  bg: '#000000',
-  surface: '#0A0A0A',
-  elevated: '#161616',
-  gridLine: '#1C1C1C',
-  ink: '#F2F2F2',
-  inkMuted: '#C8C8C8',
-  inkFaint: '#8A8A8A',
-  border: '#3A3A3A',
-  swatchBorder: '#555555',
-  accent: '#FFE600',               // dimension yellow
-  onAccent: '#000000',
-  danger: '#FF4D4D',
-  warn: '#FFAA00',
-  ok: '#3FE060',
-  okTint: '#0A1F10',
-  // condensed annotation faces — true condensed-mono isn't a cross-platform
-  // system font; Arial Narrow carries the dimension-annotation register
-  fontBody: "'Arial Narrow', 'Helvetica Neue', Arial, sans-serif",
-  fontMono: "'Courier New', monospace",
-  faceStroke: '#E8E8E8',           // thin white line-art (shell outlines)
-  // group color appears ONLY on hover/selection (monochromeFace).
-  // SELECTED = solid accent-yellow chip + black letter; everything else is a
-  // hollow chip with a thin dim ring + WHITE letter (2026-06-11 review fix —
-  // selected vs de-emphasized must differ in shape AND brightness).
-  functionGroupPalette: {
-    sensor: '#5CB3FF', drive: '#FF6666', power: '#FFC04D',
-    can: '#5CE1E6', spare: '#3A3A3A', overflow: '#FF9500',
-  },
-  faceFillOpacity: 1,
-  faceOccupiedStroke: 'group',
-  monochromeFace: true,
-  faceCursor: 'crosshair',
-  tableStripe: '#0D0D0D',
-  barUncut: '#1E1E1E',
-  buildState: { ...BUILD_STATE_SHARED, uncut: '#555555' },
-  borderStyle: 'hairline',
-};
-
-// ── SHOP — dark navy field, rebuilt with CAD's discipline ───────────────
-// REBUILT 2026-06-11 (adversarial review): the original pastel-chips-on-navy
-// render read as a video game, not engineering tooling. Same navy field and
-// cyan identity, but: NO pastel fills — occupied cavities are dark
-// desaturated chips (saturated group color at low fill opacity over navy)
-// with WHITE letters and a saturated group-color RING carrying identity.
-// ONE accent family (the cyan); orange/red/green remain semantic-only
-// (warn / danger / ok). Hairline borders — the 2px frames were part of the
-// game-HUD feel.
-const SHOP: Colorway = {
-  id: 'shop',
-  label: 'SHOP',
-  bg: '#1a1a2e',
-  surface: '#1f1f35',
-  elevated: '#252540',
-  gridLine: '',
-  ink: '#e0e0e8',
-  inkMuted: '#a0a0b0',
-  inkFaint: '#666680',
-  border: '#333355',
-  swatchBorder: '#555577',
-  accent: '#00ddff',
-  onAccent: '#15151c',
-  danger: '#ef4444',
-  warn: '#E67300',
-  ok: '#22c55e',
-  okTint: '#1c2b22',
-  fontBody: 'Arial',
-  fontMono: "'Courier New', monospace",
-  faceStroke: '#8888aa',
-  // saturated ring/identity colors — rendered as dark desaturated chip fills
-  // via faceFillOpacity, never as broad pastel fills
-  functionGroupPalette: {
-    sensor: '#5CB3FF', drive: '#FF6666', power: '#FFC04D',
-    can: '#5CE1E6', spare: '#3a3a55', overflow: '#E67300',
-  },
-  faceFillOpacity: 0.18,
-  faceOccupiedStroke: 'group',
-  monochromeFace: false,
-  faceCursor: 'grab',
-  tableStripe: '',
-  barUncut: '#2a2a45',
-  buildState: BUILD_STATE_SHARED,
-  borderStyle: 'hairline',
-};
-
 export const COLORWAYS: Record<ColorwayId, Colorway> = {
-  paper: PAPER, ledger: LEDGER, cad: CAD, shop: SHOP,
+  paper: PAPER,
 };
-export const COLORWAY_LIST: Colorway[] = [PAPER, LEDGER, CAD, SHOP];
+export const COLORWAY_LIST: Colorway[] = [PAPER];
 export const DEFAULT_COLORWAY: ColorwayId = 'paper';
 export const COLORWAY_STORAGE_KEY = 'nuke_ci_colorway';
 
 export function isColorwayId(v: unknown): v is ColorwayId {
-  return v === 'paper' || v === 'ledger' || v === 'cad' || v === 'shop';
+  return v === 'paper';
 }
 
 // ── context ─────────────────────────────────────────────────────────────
