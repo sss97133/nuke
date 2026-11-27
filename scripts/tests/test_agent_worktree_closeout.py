@@ -124,6 +124,22 @@ class Preservation(unittest.TestCase):
             self.snapshot()
         self.assertEqual((self.record / 'record.json').read_bytes(), original)
 
+    def test_linked_repo_argument_does_not_allow_archive_inside_primary(self):
+        destination = self.repo / 'private-archive'
+        with self.assertRaises(ValueError):
+            closeout.snapshot(self.work, self.work, destination)
+        self.assertFalse(destination.exists())
+
+    def test_intent_to_add_survives_independent_recovery(self):
+        (self.work / 'planned.txt').write_text('planned source')
+        self.git(self.work, 'add', '-N', 'planned.txt')
+        self.snapshot()
+        closeout.verify(self.record)
+        target = self.base / '.worktrees/restored'
+        closeout.restore(self.repo, self.record, target)
+        self.assertEqual(closeout.intent_to_add(target), ['planned.txt'])
+        self.assertEqual(closeout.changes(target)[0], closeout.changes(self.work)[0])
+
     def test_tampered_bundle_or_local_archive_is_rejected(self):
         self.snapshot()
         for name in ['source.bundle', 'local.tar.gz']:
@@ -294,6 +310,24 @@ class Preservation(unittest.TestCase):
 
     def test_explicit_protection_does_not_require_process_inspection(self):
         self.assertEqual(closeout.references(self.work, [str(self.work)]), ['explicitly protected task'])
+
+    def test_protected_descendant_keeps_the_whole_checkout(self):
+        self.assertEqual(closeout.references(self.work, [str(self.work / 'code.txt')]),
+                         ['explicitly protected task'])
+
+    def test_interrupted_quarantine_is_recovered_before_registry_validation(self):
+        self.snapshot()
+        value = closeout.verify(self.record)
+        quarantine = self.record / '.retiring'
+        value['retirement_pending'] = {'original': value['workspace'], 'preserved_path': str(quarantine.resolve())}
+        closeout.write_json(self.record / 'record.json', value)
+        self.git(self.repo, 'worktree', 'move', str(self.work), str(quarantine))
+        with patch.object(closeout, 'references', return_value=['active task']):
+            with self.assertRaisesRegex(ValueError, 'Referenced checkout'):
+                closeout.retire(self.record, [])
+        self.assertTrue(self.work.exists())
+        self.assertFalse(quarantine.exists())
+        self.assertNotIn('retirement_pending', closeout.read_json(self.record / 'record.json'))
 
     def test_changed_ignored_evidence_blocks_retirement(self):
         self.snapshot()

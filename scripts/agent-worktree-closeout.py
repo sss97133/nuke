@@ -178,6 +178,14 @@ def index_flags(workspace):
     return result
 
 
+def intent_to_add(workspace):
+    def added(option):
+        return set(git(workspace, 'diff', '--cached', '--name-only', '-z',
+                       '--diff-filter=A', option).split(b'\0')) - {b''}
+    return sorted(os.fsdecode(p) for p in
+                  added('--ita-visible-in-index') - added('--ita-invisible-in-index'))
+
+
 def reject_special_git_state(workspace):
     staged = git(workspace, 'ls-files', '--stage', '-z')
     if any(x.startswith(b'160000 ') for x in staged.split(b'\0')):
@@ -192,17 +200,18 @@ def snapshot(repo, workspace, record):
     if Path(workspace).is_symlink():
         raise ValueError('Snapshot the real checkout, not an alias')
     repo, workspace, record = Path(repo).resolve(), Path(workspace).resolve(), Path(record).resolve()
+    repo = Path(registered(repo)[0]['worktree']).resolve()
     if record.is_relative_to(workspace) or record.is_relative_to(repo) or record.exists():
         raise ValueError('Snapshot must be a new path outside the source workspace')
     if common_dir(repo) != common_dir(workspace):
         raise ValueError('Workspace belongs to another repository')
-    repo = Path(registered(repo)[0]['worktree']).resolve()
     reject_special_git_state(workspace)
     head = git(workspace, 'rev-parse', 'HEAD').decode().strip()
     branch = git(workspace, 'symbolic-ref', '-q', 'HEAD').decode().strip() if git(workspace, 'rev-parse', '--abbrev-ref', 'HEAD').strip() != b'HEAD' else None
     base = git(repo, 'rev-parse', 'origin/main').decode().strip()
     status_before, changed = changes(workspace)
     flags = index_flags(workspace)
+    intent = intent_to_add(workspace)
     changed = sorted(set(changed).union(*flags.values()))
     files = [file_record(workspace, rel) for rel in changed]
     if any(x['kind'] == 'directory' for x in files):
@@ -255,6 +264,7 @@ def snapshot(repo, workspace, record):
                 status_before != changes(workspace)[0] or end_tree != staged_tree or
                 files != [file_record(workspace, rel) for rel in changed] or
                 flags != index_flags(workspace) or
+                intent != intent_to_add(workspace) or
                 locals_before != ([] if primary else ignored_records(workspace)) or
                 exclude_bytes != (exclude_path.read_bytes() if exclude_path.exists() else b'')):
             raise ValueError('Source changed during snapshot; leave checkout intact')
@@ -262,6 +272,7 @@ def snapshot(repo, workspace, record):
                     'head': head, 'branch': branch, 'base': base, 'working_commit': commits['working'],
                     'index_commit': commits['index'], 'status_b64': base64.b64encode(status_before).decode(),
                     'index_flags': flags,
+                    'intent_to_add': intent,
                     'working_files': files, 'local_files': locals_before,
                     'local_data_policy': 'retained_in_primary_checkout' if primary else 'archived_non_cache_files',
                     'bundle_sha256': sha(bundle), 'local_sha256': sha(staging / 'local.tar.gz'),
@@ -334,6 +345,9 @@ def restore(repo, record, target):
                 raise ValueError('Unsafe archive member')
     for p, mode in reversed(directories):
         p.chmod(mode)
+    intent = data.get('intent_to_add', [])
+    if intent:
+        git(target, 'add', '--intent-to-add', '--force', '--', *intent)
     for key, option in [('assume_unchanged', '--assume-unchanged'), ('skip_worktree', '--skip-worktree')]:
         names = data['index_flags'][key]
         if names:
@@ -349,6 +363,8 @@ def restore(repo, record, target):
             raise ValueError('Restored content differs: ' + item['path'])
     if index_flags(target) != data['index_flags']:
         raise ValueError('Restored index flags differ')
+    if intent_to_add(target) != intent:
+        raise ValueError('Restored intent-to-add entries differ')
     return data
 
 
@@ -372,8 +388,9 @@ def verify(record):
 
 
 def references(workspace, protected):
-    workspace = str(Path(workspace).resolve())
-    if workspace in {str(Path(p).resolve()) for p in protected}:
+    root = Path(workspace).resolve()
+    workspace = str(root)
+    if any(Path(p).resolve().is_relative_to(root) for p in protected):
         return ['explicitly protected task']
     found = []
     result = subprocess.run(['lsof', '-nP', '-u', getpass.getuser(), '-F', 'n'], capture_output=True, text=True, timeout=30)
@@ -410,6 +427,7 @@ def unchanged(data, record, workspace):
         if (git(workspace, 'rev-parse', 'HEAD').decode().strip() != expected or
                 changes(workspace)[0] != base64.b64decode(data['status_b64']) or
                 index_flags(workspace) != data['index_flags'] or
+                intent_to_add(workspace) != data.get('intent_to_add', []) or
                 any(file_record(workspace, item['path']) != item for item in data['working_files']) or
                 ignored_records(workspace) != data['local_files']):
             raise ValueError('Source changed after snapshot; keep checkout')
@@ -427,19 +445,27 @@ def retire(record, protected):
     data = validate_archives(record)
     repo, workspace = Path(data['repo']), Path(data['workspace'])
     registry = registered(repo)
+    quarantine = record / '.retiring'
+    if workspace == Path(registry[0]['worktree']).resolve():
+        raise ValueError('Only registered unlocked linked checkouts can be retired; never the primary checkout')
+    if quarantine.exists():
+        pending = data.get('retirement_pending', {})
+        moved = next((r for r in registry if Path(r['worktree']).resolve() == quarantine), None)
+        if workspace.exists() or workspace.is_symlink():
+            raise ValueError('Both original and pending paths exist; inspect without overwriting either')
+        if (pending.get('original') != str(workspace) or not moved or
+                'locked' in moved or 'prunable' in moved):
+            raise ValueError('Pending retirement does not match the registered recovery path')
+        git(repo, 'worktree', 'move', str(quarantine), str(workspace))
+        data.pop('retirement_pending', None)
+        write_json(record / 'record.json', data)
+        registry = registered(repo)
     member = next((r for r in registry if Path(r['worktree']).resolve() == workspace), None)
     if (workspace == Path(registry[0]['worktree']).resolve() or workspace.is_symlink() or
             not member or 'locked' in member or 'prunable' in member):
         raise ValueError('Only registered unlocked linked checkouts can be retired; never the primary checkout')
     if not data.get('verified'):
         raise ValueError('A successful restore verification is required')
-    quarantine = record / '.retiring'
-    if quarantine.exists():
-        if workspace.exists():
-            raise ValueError('Both original and pending paths exist; inspect without overwriting either')
-        git(repo, 'worktree', 'move', str(quarantine), str(workspace))
-        data.pop('retirement_pending', None)
-        write_json(record / 'record.json', data)
     if workspace.stat().st_dev != record.stat().st_dev:
         raise ValueError('Retirement requires an atomic move on the same filesystem')
     refs = references(workspace, protected)
