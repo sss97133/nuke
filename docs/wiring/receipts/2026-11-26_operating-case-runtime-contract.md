@@ -30,6 +30,13 @@ The existing service-role entrypoint works without direct private table DML.
 The same monitoring/revert owners distinguish retained private calculation
 history from reverted generic effects.
 
+A separate preparation transaction makes a ready dependency hash durable before
+the numerical evaluator runs. Otherwise evaluator rollback could erase that hash
+and make an unchanged exhausted input look new to a periodic freshness probe.
+Non-ready preparation instead commits its cursor, typed telemetry and vehicle
+lease release together. Failed preparation probes remain visible in the failure
+counter; they cannot restart an unchanged exhausted numerical calculation.
+
 Grounding: `docs/ledger/theory/data-machine-cases.md` section13.12 criteria1-8
 and10; existing structural evaluation migration`20261125233922`, component
 requirements`20261126062400`, isolated worker phase`20261126071000`, conditioned
@@ -48,6 +55,12 @@ explicit test source and resistance are analytical inputs, never vehicle facts.
 Independent local two-backend receipts additionally cover cancellation,
 overrun/expired-lease recovery, contention and resumption; they do not establish
 production source/RLS, scheduling capacity or the physical builder workflow.
+The separate retry contract counts genuine constructor entries despite rollback
+and proves that a later freshness probe cannot exceed the unchanged numerical
+budget. Independent old/new native assays reproduce the old extra numerical
+entry and its correction. Observed cancellation after non-ready preparation
+commits confirms that cursor, telemetry and lease release survive together,
+without duplicate private or generic charges during the next tick.
 
 Unresolved product acceptance remains outside this implementation contract:
 curator/runtime installation, live currentness and the unchanged worker budget,

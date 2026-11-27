@@ -11,4 +11,5 @@
 \i supabase/sql/harness_operating_case/worker_recovery.sql
 \i supabase/sql/harness_operating_case/worker_consumers.sql
 \i supabase/sql/harness_operating_case/worker_callers.sql
+\i supabase/sql/harness_operating_case/worker_prepared_commit.sql
 \i supabase/sql/harness_operating_case/metadata.sql

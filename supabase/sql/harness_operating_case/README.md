@@ -13,7 +13,7 @@ The native repository contract uses synthetic public-source/qualification
 adapters and the existing worker fixtures:
 
 ```sh
-scripts/ci/run-db-contracts.sh test_harness_operating_case_runtime.sql
+scripts/ci/run-db-contracts.sh test_harness_operating_case_runtime.sql test_harness_operating_case_retry.sql
 ```
 
 `recipe.sql` owns complete, immutable agent-authored revisions, typed wire,
@@ -43,6 +43,14 @@ service-role callers retain helper execution without direct private table DML.
 The claim, prepare, finish and recovery mutators still enforce their genuine
 tick/backend and exact vehicle-attempt context. Read/eligibility helpers and
 the bounded seeder remain callable by the existing service role.
+
+`worker_prepared_commit.sql` makes a ready prepared receipt durable before
+numerical evaluation, so an evaluator exception cannot roll its input hash
+back and revive an unchanged exhausted calculation budget. Non-ready
+preparation commits its cursor, typed telemetry and vehicle-lease release
+together. Failed periodic preparation probes remain visible in failure_count;
+that field is not a numerical evaluator-entry counter. A completed freshness
+probe cannot renew an unchanged exhausted numerical budget.
 
 `worker_consumers.sql` extends the existing monitoring and revert owners.
 Timing denominators stay separate by phase. Reverting generic worker effects
