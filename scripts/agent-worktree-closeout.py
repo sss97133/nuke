@@ -186,7 +186,24 @@ def intent_to_add(workspace):
                   added('--ita-visible-in-index') - added('--ita-invisible-in-index'))
 
 
+def directory_modes(workspace, files):
+    result = {'': stat.S_IMODE(workspace.stat().st_mode)}
+    for item in files:
+        parent = PurePosixPath(item['path']).parent
+        while str(parent) != '.':
+            path = local_path(workspace, str(parent))
+            if path.is_dir() and not path.is_symlink():
+                result[str(parent)] = stat.S_IMODE(path.stat().st_mode)
+            parent = parent.parent
+    return result
+
+
 def reject_special_git_state(workspace):
+    for name in ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge',
+                 'rebase-apply', 'sequencer', 'BISECT_START']:
+        path = Path(os.fsdecode(git(workspace, 'rev-parse', '--path-format=absolute', '--git-path', name)).strip())
+        if path.exists():
+            raise ValueError('In-progress Git operation needs separate preservation: ' + name)
     staged = git(workspace, 'ls-files', '--stage', '-z')
     if any(x.startswith(b'160000 ') for x in staged.split(b'\0')):
         raise ValueError('Submodule payload needs separate preservation; leave checkout intact')
@@ -200,8 +217,10 @@ def snapshot(repo, workspace, record):
     if Path(workspace).is_symlink():
         raise ValueError('Snapshot the real checkout, not an alias')
     repo, workspace, record = Path(repo).resolve(), Path(workspace).resolve(), Path(record).resolve()
-    repo = Path(registered(repo)[0]['worktree']).resolve()
-    if record.is_relative_to(workspace) or record.is_relative_to(repo) or record.exists():
+    registry = registered(repo)
+    repo = Path(registry[0]['worktree']).resolve()
+    if (record.exists() or record.is_relative_to(workspace) or
+            any(record.is_relative_to(Path(r['worktree']).resolve()) for r in registry)):
         raise ValueError('Snapshot must be a new path outside the source workspace')
     if common_dir(repo) != common_dir(workspace):
         raise ValueError('Workspace belongs to another repository')
@@ -220,6 +239,7 @@ def snapshot(repo, workspace, record):
     # The primary checkout is never removable. Its potentially large local data
     # remains in place; only code/staging state is checkpointed here.
     locals_before = [] if primary else ignored_records(workspace)
+    modes = directory_modes(workspace, files + locals_before)
     record.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with tempfile.TemporaryDirectory(prefix='.snapshot-', dir=record.parent) as temp:
         staging = Path(temp)
@@ -265,6 +285,7 @@ def snapshot(repo, workspace, record):
                 files != [file_record(workspace, rel) for rel in changed] or
                 flags != index_flags(workspace) or
                 intent != intent_to_add(workspace) or
+                modes != directory_modes(workspace, files + locals_before) or
                 locals_before != ([] if primary else ignored_records(workspace)) or
                 exclude_bytes != (exclude_path.read_bytes() if exclude_path.exists() else b'')):
             raise ValueError('Source changed during snapshot; leave checkout intact')
@@ -273,6 +294,7 @@ def snapshot(repo, workspace, record):
                     'index_commit': commits['index'], 'status_b64': base64.b64encode(status_before).decode(),
                     'index_flags': flags,
                     'intent_to_add': intent,
+                    'directory_modes': modes,
                     'working_files': files, 'local_files': locals_before,
                     'local_data_policy': 'retained_in_primary_checkout' if primary else 'archived_non_cache_files',
                     'bundle_sha256': sha(bundle), 'local_sha256': sha(staging / 'local.tar.gz'),
@@ -307,6 +329,8 @@ def restore(repo, record, target):
     prefix = 'refs/recovery/' + hashlib.sha256(str(record).encode()).hexdigest()[:16]
     git(repo, 'fetch', '--no-tags', str(record / 'source.bundle'),
         f'refs/heads/working:{prefix}/working', f'refs/heads/index:{prefix}/index')
+    # Keep restored evidence private while files and parent modes are reconstructed.
+    target.mkdir(parents=True, mode=0o700)
     git(repo, '-c', 'core.hooksPath=/dev/null', 'worktree', 'add', '--detach', str(target), data['head'])
     git(target, 'read-tree', '--reset', '-u', data['working_commit'])
     git(target, 'read-tree', data['index_commit'])
@@ -365,6 +389,13 @@ def restore(repo, record, target):
         raise ValueError('Restored index flags differ')
     if intent_to_add(target) != intent:
         raise ValueError('Restored intent-to-add entries differ')
+    for rel, mode in sorted(data.get('directory_modes', {}).items(), key=lambda x: len(PurePosixPath(x[0]).parts), reverse=True):
+        path = local_path(target, rel) if rel else target
+        if not path.is_dir() or path.is_symlink():
+            raise ValueError('Restored parent directory differs: ' + rel)
+        path.chmod(mode)
+        if stat.S_IMODE(path.stat().st_mode) != mode:
+            raise ValueError('Restored parent permissions differ: ' + rel)
     return data
 
 
@@ -421,6 +452,7 @@ def unchanged(data, record, workspace):
     repo = Path(data['repo'])
     if common_dir(repo) != common_dir(workspace):
         raise ValueError('Repository identity changed')
+    reject_special_git_state(workspace)
     with tempfile.TemporaryDirectory(prefix='.source-proof-', dir=record.parent) as temp:
         tree, _ = index_tree(workspace, Path(temp))
         expected = git(repo, 'rev-parse', data['head']).decode().strip()
@@ -428,6 +460,8 @@ def unchanged(data, record, workspace):
                 changes(workspace)[0] != base64.b64decode(data['status_b64']) or
                 index_flags(workspace) != data['index_flags'] or
                 intent_to_add(workspace) != data.get('intent_to_add', []) or
+                any(stat.S_IMODE((local_path(workspace, rel) if rel else workspace).stat().st_mode) != mode
+                    for rel, mode in data.get('directory_modes', {}).items()) or
                 any(file_record(workspace, item['path']) != item for item in data['working_files']) or
                 ignored_records(workspace) != data['local_files']):
             raise ValueError('Source changed after snapshot; keep checkout')

@@ -130,6 +130,55 @@ class Preservation(unittest.TestCase):
             closeout.snapshot(self.work, self.work, destination)
         self.assertFalse(destination.exists())
 
+    def test_archive_cannot_live_inside_a_sibling_linked_checkout(self):
+        sibling = self.base / '.worktrees/sibling'
+        self.git(self.repo, 'worktree', 'add', '--quiet', '-b', 'sibling', str(sibling))
+        destination = sibling / 'private-archive'
+        with self.assertRaises(ValueError):
+            closeout.snapshot(self.work, self.work, destination)
+        self.assertFalse(destination.exists())
+
+    def test_private_file_keeps_restrictive_parent_containing_tracked_source(self):
+        parent = self.work / 'restricted'
+        parent.mkdir(mode=0o700)
+        (parent / 'source.txt').write_text('tracked source')
+        self.git(self.work, 'add', 'restricted/source.txt')
+        self.git(self.work, 'commit', '--quiet', '-m', 'Source in private directory')
+        self.git(self.work, 'config', 'core.sharedRepository', 'false')
+        with (self.repo / '.git/info/exclude').open('a') as stream:
+            stream.write('/restricted/private.env\n')
+        (parent / 'private.env').write_text('private evidence')
+        (parent / 'private.env').chmod(0o644)
+        self.snapshot()
+        closeout.verify(self.record)
+        target = self.base / '.worktrees/restored'
+        closeout.restore(self.repo, self.record, target)
+        self.assertEqual((target / 'restricted').stat().st_mode & 0o777, 0o700)
+        self.assertEqual((target / 'restricted/private.env').stat().st_mode & 0o777, 0o644)
+
+    def test_resolved_uncommitted_merge_is_refused_before_snapshot(self):
+        self.git(self.repo, 'checkout', '--quiet', '-b', 'merge-peer', self.base_head)
+        (self.repo / 'merge-peer.txt').write_text('peer source')
+        self.git(self.repo, 'add', 'merge-peer.txt')
+        self.git(self.repo, 'commit', '--quiet', '-m', 'Peer change')
+        # Clear setup edits only in this disposable fixture before starting its merge.
+        self.git(self.work, 'reset', '--hard', 'HEAD')
+        self.git(self.work, 'merge', '--no-ff', '--no-commit', 'merge-peer')
+        self.assertFalse(self.git(self.work, 'ls-files', '--unmerged'))
+        with self.assertRaisesRegex(ValueError, 'In-progress Git operation'):
+            self.snapshot()
+        self.assertTrue(self.work.exists())
+
+    def test_new_operation_after_snapshot_blocks_retirement(self):
+        value = self.snapshot()
+        closeout.verify(self.record)
+        merge_head = Path(self.git(self.work, 'rev-parse', '--path-format=absolute', '--git-path', 'MERGE_HEAD').decode().strip())
+        merge_head.write_text(value['head'] + '\n')
+        with patch.object(closeout, 'references', return_value=[]):
+            with self.assertRaisesRegex(ValueError, 'In-progress Git operation'):
+                closeout.retire(self.record, [])
+        self.assertTrue(self.work.exists())
+
     def test_intent_to_add_survives_independent_recovery(self):
         (self.work / 'planned.txt').write_text('planned source')
         self.git(self.work, 'add', '-N', 'planned.txt')
