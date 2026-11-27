@@ -44,7 +44,9 @@ enum ReceiptDepthFixtures {
            "frame":{"image_id":"00000000-0000-4000-8000-00000000e002","image_url":"https://fixture.nuke.invalid/earlier.jpg","taken_at":"2026-03-10"}},
        "judgment":{"question_id":"00000000-0000-4000-8000-00000000f301","status":"answered","question":"receipt_part_visible",
                    "asked_at":"2026-03-13T00:00:00+00:00","holder":null,
-                   "answer":{"visible":"yes","installed":"cannot_tell","confidence":0.6,"image_id":"00000000-0000-4000-8000-00000000e001","quote":"gasket visible"}}}],
+                   "answer":{"visible":"yes","installed":"cannot_tell","confidence":0.6,"image_id":"00000000-0000-4000-8000-00000000e001","quote":"gasket visible",
+                       "frame_context":{"image_id":"00000000-0000-4000-8000-00000000e001","photo_taken_at":"2026-03-12T15:00:00+00:00",
+                           "session":{"id":"00000000-0000-4000-8000-00000000e201","session_date":"2026-03-12","title":"Fixture photo session","session_type":"auto_detected"}}}}}],
      "withdrawn":[{"evidence_id":"00000000-0000-4000-8000-00000000f102","receipt_id":"\(receiptId)","item_id":null,"line_number":2,
                    "status":"withdrawn","reason":"line_removed","prior_evidence_id":null,"prior_conclusion":"receipt_day_photographed"}]}
     """

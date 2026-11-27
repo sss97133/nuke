@@ -85,6 +85,28 @@ final class ReceiptEvidenceUITests: XCTestCase {
         app.buttons["Close"].tap()
         noWrites(app)
     }
+    func testCitedPhotoOpensItsOwnSession() {
+        let app = open("receipt-depth")
+        XCTAssertTrue(app.staticTexts["Corrected gasket reading"].waitForExistence(timeout: 10))
+        let context = app.buttons["Proposed work context"].firstMatch
+        for _ in 0..<6 {
+            if context.exists && context.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(context.exists && context.isHittable)
+        context.tap()
+        let session = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Photo's linked session")).firstMatch
+        for _ in 0..<8 {
+            if session.exists && session.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(session.exists && session.isHittable)
+        session.tap()
+        XCTAssertTrue(app.staticTexts["Fixture photo session"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["2026-03-12"].exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "do not establish the part's installation date")).firstMatch.exists)
+        noWrites(app)
+    }
     func testWithdrawnCanonicalReceiptShowsUnavailableAndDoesNotSubstituteOldItems() {
         let app = open("receipt-withdrawn")
         XCTAssertTrue(app.staticTexts["Receipt detail unavailable"].waitForExistence(timeout: 10))

@@ -99,6 +99,17 @@ struct ReceiptWorkContextLine: Decodable {
     }
     struct Labelled: Decodable { let value: String? }
     struct Custodian: Decodable { let masked: Bool? }
+    struct FrameContext: Decodable {
+        struct Session: Decodable, Identifiable {
+            let id: UUID
+            let session_date: String?
+            let title: String?
+            let session_type: String?
+        }
+        let image_id: UUID
+        let photo_taken_at: String?
+        let session: Session?
+    }
     struct Judgment: Decodable {
         struct Holder: Decodable { let claimed_by: String? }
         struct Answer: Decodable {
@@ -107,6 +118,7 @@ struct ReceiptWorkContextLine: Decodable {
             let confidence: Double?
             let quote: String?
             let image_id: UUID?
+            let frame_context: FrameContext?
         }
         let status: String
         let holder: Holder?
@@ -418,6 +430,9 @@ struct ReceiptWorkContextDisclosure: View {
             if let judgment = line.judgment {
                 RootedValueView(label: "Question", value: ReceiptWorkWords.judgment(judgment), status: judgment.status == "answered" ? .projected : .pending)
                 if let quote = judgment.answer?.quote { Text("“\(quote)”").font(.caption).textSelection(.enabled) }
+                if let answer = judgment.answer, let context = answer.frame_context, context.image_id == answer.image_id {
+                    ReceiptReadingFrameContext(context: context)
+                }
                 if let imageID = judgment.answer?.image_id,
                    let frame = line.frames.first(where: { $0.image_id == imageID }),
                    let url = frame.image_url, !url.isEmpty {
@@ -429,6 +444,9 @@ struct ReceiptWorkContextDisclosure: View {
             if let historical = line.historical_judgment {
                 RootedValueView(label: "Earlier reading", value: ReceiptWorkWords.historical(historical), status: .attributed)
                 if let quote = historical.answer?.quote { Text("“\(quote)”").font(.caption).textSelection(.enabled) }
+                if let answer = historical.answer, let context = answer.frame_context, context.image_id == answer.image_id {
+                    ReceiptReadingFrameContext(context: context)
+                }
                 if let frame = historical.frame, let url = frame.image_url, !url.isEmpty {
                     Button("View photo from earlier reading") {
                         selectedPhoto = ReadingPhoto(id: frame.image_id, url: url, takenAt: frame.taken_at)
@@ -445,5 +463,41 @@ struct ReceiptWorkContextDisclosure: View {
                 is_primary: nil, taken_at: photo.takenAt, labels: nil, ai_processing_status: nil,
                 image_category: nil, created_at: nil, vision_gate_agent_reasoning: nil)])
         }
+    }
+}
+
+/// This session comes from the cited photo's actual foreign key, not the receipt's date window.
+private struct ReceiptReadingFrameContext: View {
+    let context: ReceiptWorkContextLine.FrameContext
+
+    var body: some View {
+        if let session = context.session {
+            NavigationLink {
+                ReceiptReadingSessionDetail(context: context, session: session)
+            } label: {
+                Text("Photo's linked session" + (session.session_date.map { " · \($0)" } ?? ""))
+            }
+            .accessibilityIdentifier("receipt-reading-photo-session")
+        }
+    }
+}
+
+private struct ReceiptReadingSessionDetail: View {
+    let context: ReceiptWorkContextLine.FrameContext
+    let session: ReceiptWorkContextLine.FrameContext.Session
+
+    var body: some View {
+        List {
+            Section("Photo's linked session") {
+                if let title = session.title, !title.isEmpty { Text(title) }
+                RootedValueView(label: "Session day", value: session.session_date ?? "Not recorded", status: .recorded)
+                if let type = session.session_type { RootedValueView(label: "Session source", value: JobWords.humanize(type), status: .attributed) }
+                RootedValueView(label: "Photo timestamp", value: context.photo_taken_at ?? "Not recorded", status: .recorded)
+                Text("The photo is linked to this session. The photo and session do not establish the part's installation date.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Photo session")
+        .accessibilityIdentifier("receipt-reading-session-detail")
     }
 }

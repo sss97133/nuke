@@ -45,6 +45,11 @@ final class ReceiptEvidenceTests: XCTestCase {
         let citedID = try XCTUnwrap(line.judgment?.answer?.image_id)
         let frame = try XCTUnwrap(line.frames.first { $0.image_id == citedID })
         XCTAssertEqual(frame.image_url, "https://fixture.nuke.invalid/current.jpg")
+        let context = try XCTUnwrap(line.judgment?.answer?.frame_context)
+        XCTAssertEqual(context.image_id, citedID)
+        XCTAssertEqual(context.photo_taken_at, "2026-03-12T15:00:00+00:00")
+        XCTAssertEqual(context.session?.id, UUID(uuidString: "00000000-0000-4000-8000-00000000e201"))
+        XCTAssertEqual(context.session?.session_date, "2026-03-12")
     }
     func reads(day: ReceiptEvidenceDay? = nil, work: ReceiptWorkContextRead? = nil) -> ReceiptEvidenceReaders.Reads {
         let row = link(), payload = day ?? self.day()
