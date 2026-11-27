@@ -28,7 +28,7 @@ CREATE TABLE public.wire_termination_specs(id uuid PRIMARY KEY,vehicle_id uuid R
 CREATE TABLE public.harness_segments(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id),
  from_termination_id uuid REFERENCES public.wire_termination_specs(id),to_termination_id uuid REFERENCES public.wire_termination_specs(id));
 CREATE TABLE public.wire_resistance_conditions(condition_key text PRIMARY KEY);
-CREATE TABLE public.wire_resistance_claims(observation_id uuid PRIMARY KEY,
+CREATE TABLE public.wire_resistance_claims(observation_id uuid PRIMARY KEY REFERENCES public.vehicle_observations(id),
  condition_key text REFERENCES public.wire_resistance_conditions(condition_key));
 CREATE TABLE public.harness_model_nodes(evaluation_id uuid,id uuid,PRIMARY KEY(evaluation_id,id));
 CREATE TABLE public.harness_model_segment_ends(evaluation_id uuid,segment_id uuid,side text,termination_id uuid,node_id uuid,
@@ -36,7 +36,7 @@ CREATE TABLE public.harness_model_segment_ends(evaluation_id uuid,segment_id uui
 CREATE TABLE public.harness_model_checks(id uuid PRIMARY KEY,evaluation_id uuid,segment_id uuid,
  rule_key text,rule_version text,result text);
 ALTER TABLE public.harness_model_evaluations ADD COLUMN input_hash text;
-CREATE TABLE public.fixture_operating_source(vehicle_id uuid PRIMARY KEY,p jsonb,qualified boolean NOT NULL DEFAULT true);
+CREATE TABLE public.fixture_operating_source(vehicle_id uuid PRIMARY KEY REFERENCES public.vehicles(id),p jsonb,qualified boolean NOT NULL DEFAULT true);
 INSERT INTO public.harness_endpoints VALUES
  ('b0000000-0000-4000-8000-000000000001',:fb1),('b0000000-0000-4000-8000-000000000002',:fb1);
 INSERT INTO public.wire_termination_specs VALUES
