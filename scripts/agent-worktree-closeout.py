@@ -165,6 +165,19 @@ def index_tree(workspace, directory, name='staged.index'):
     return git(workspace, 'write-tree', env=env).decode().strip(), env
 
 
+def index_flags(workspace):
+    result = {'assume_unchanged': [], 'skip_worktree': []}
+    for item in git(workspace, 'ls-files', '-v', '-z').split(b'\0'):
+        if not item:
+            continue
+        path = os.fsdecode(item[2:])
+        if item[:1].islower():
+            result['assume_unchanged'].append(path)
+        if item[:1].upper() == b'S':
+            result['skip_worktree'].append(path)
+    return result
+
+
 def reject_special_git_state(workspace):
     staged = git(workspace, 'ls-files', '--stage', '-z')
     if any(x.startswith(b'160000 ') for x in staged.split(b'\0')):
@@ -189,6 +202,8 @@ def snapshot(repo, workspace, record):
     branch = git(workspace, 'symbolic-ref', '-q', 'HEAD').decode().strip() if git(workspace, 'rev-parse', '--abbrev-ref', 'HEAD').strip() != b'HEAD' else None
     base = git(repo, 'rev-parse', 'origin/main').decode().strip()
     status_before, changed = changes(workspace)
+    flags = index_flags(workspace)
+    changed = sorted(set(changed).union(*flags.values()))
     files = [file_record(workspace, rel) for rel in changed]
     if any(x['kind'] == 'directory' for x in files):
         raise ValueError('Embedded repository or directory change needs separate preservation')
@@ -199,6 +214,9 @@ def snapshot(repo, workspace, record):
     record.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with tempfile.TemporaryDirectory(prefix='.snapshot-', dir=record.parent) as temp:
         staging = Path(temp)
+        exclude_path = Path(os.fsdecode(git(workspace, 'rev-parse', '--path-format=absolute', '--git-path', 'info/exclude')).strip())
+        exclude_bytes = exclude_path.read_bytes() if exclude_path.exists() else b''
+        (staging / 'git-info-exclude').write_bytes(exclude_bytes)
         staged_tree, staged_env = index_tree(workspace, staging)
         working_env = private_env(workspace, staging, 'working.index')
         git(workspace, 'read-tree', staged_tree, env=working_env)
@@ -233,18 +251,22 @@ def snapshot(repo, workspace, record):
         if (head != git(workspace, 'rev-parse', 'HEAD').decode().strip() or
                 status_before != changes(workspace)[0] or end_tree != staged_tree or
                 files != [file_record(workspace, rel) for rel in changed] or
-                locals_before != ([] if primary else ignored_records(workspace))):
+                flags != index_flags(workspace) or
+                locals_before != ([] if primary else ignored_records(workspace)) or
+                exclude_bytes != (exclude_path.read_bytes() if exclude_path.exists() else b'')):
             raise ValueError('Source changed during snapshot; leave checkout intact')
         metadata = {'schema_version': 1, 'created_at': time.time(), 'repo': str(repo), 'workspace': str(workspace),
                     'head': head, 'branch': branch, 'base': base, 'working_commit': commits['working'],
                     'index_commit': commits['index'], 'status_b64': base64.b64encode(status_before).decode(),
+                    'index_flags': flags,
                     'working_files': files, 'local_files': locals_before,
                     'local_data_policy': 'retained_in_primary_checkout' if primary else 'archived_non_cache_files',
                     'bundle_sha256': sha(bundle), 'local_sha256': sha(staging / 'local.tar.gz'),
+                    'git_exclude_sha256': sha(staging / 'git-info-exclude'),
                     'publication': 'private recovery only; no feature acceptance or remote push', 'verified': False}
         output = staging / 'output'
         output.mkdir(mode=0o700)
-        for name in ['source.bundle', 'local.tar.gz']:
+        for name in ['source.bundle', 'local.tar.gz', 'git-info-exclude']:
             shutil.move(str(staging / name), output / name)
             (output / name).chmod(0o600)
         write_json(output / 'record.json', metadata)
@@ -257,6 +279,8 @@ def validate_archives(record):
     data = read_json(record / 'record.json')
     if sha(record / 'source.bundle') != data['bundle_sha256'] or sha(record / 'local.tar.gz') != data['local_sha256']:
         raise ValueError('Archive checksum mismatch')
+    if sha(record / 'git-info-exclude') != data['git_exclude_sha256']:
+        raise ValueError('Saved Git ignore checksum mismatch')
     return data
 
 
@@ -302,11 +326,21 @@ def restore(repo, record, target):
                 raise ValueError('Unsafe archive member')
     for p, mode in reversed(directories):
         p.chmod(mode)
-    if git(target, 'rev-parse', 'HEAD').decode().strip() != data['head'] or changes(target)[0] != base64.b64decode(data['status_b64']):
-        raise ValueError('Restored Git state differs; retained for inspection')
+    for key, option in [('assume_unchanged', '--assume-unchanged'), ('skip_worktree', '--skip-worktree')]:
+        names = data['index_flags'][key]
+        if names:
+            git(target, 'update-index', option, '-z', '--stdin', data=b''.join(os.fsencode(x) + b'\0' for x in names))
+    actual_status = changes(target)[0]
+    if git(target, 'rev-parse', 'HEAD').decode().strip() != data['head'] or actual_status != base64.b64decode(data['status_b64']):
+        write_json(record / 'restore-status-diagnostic.json', {
+            'expected_status_b64': data['status_b64'], 'actual_status_b64': base64.b64encode(actual_status).decode(),
+            'target': str(target), 'saved_ignore_policy': str(record / 'git-info-exclude')})
+        raise ValueError('Restored Git view differs; inspect saved ignore policy and restore-status-diagnostic.json')
     for item in data['working_files'] + data['local_files']:
         if file_record(target, item['path']) != item:
             raise ValueError('Restored content differs: ' + item['path'])
+    if index_flags(target) != data['index_flags']:
+        raise ValueError('Restored index flags differ')
     return data
 
 
@@ -317,6 +351,9 @@ def verify(record):
         parent = Path(temp) / 'repo'
         run(['git', 'init', '--quiet', str(parent)])
         (parent / '.git/objects/info/alternates').write_text(str(common_dir(data['repo']) / 'objects') + '\n')
+        # Repository-local exclusions are not part of Git commits. Reproduce them
+        # only in the private proof repository; never overwrite the live repo policy.
+        shutil.copy2(record / 'git-info-exclude', parent / '.git/info/exclude')
         git(parent, 'update-ref', 'refs/heads/base', data['base'])
         git(parent, 'symbolic-ref', 'HEAD', 'refs/heads/base')
         target = Path(temp) / 'restored'
@@ -364,6 +401,7 @@ def unchanged(data, record, workspace):
         expected = git(repo, 'rev-parse', data['head']).decode().strip()
         if (git(workspace, 'rev-parse', 'HEAD').decode().strip() != expected or
                 changes(workspace)[0] != base64.b64decode(data['status_b64']) or
+                index_flags(workspace) != data['index_flags'] or
                 any(file_record(workspace, item['path']) != item for item in data['working_files']) or
                 ignored_records(workspace) != data['local_files']):
             raise ValueError('Source changed after snapshot; keep checkout')

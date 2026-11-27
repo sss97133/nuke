@@ -201,6 +201,47 @@ class Preservation(unittest.TestCase):
         self.assertEqual((self.work / 'branch.txt').read_text(), 'committed branch work\n')
         self.assertEqual((self.work / self.special).read_text(), 'untracked source\n')
 
+    def test_repository_local_ignored_symlink_policy_is_preserved(self):
+        (self.repo / '.git/info/exclude').write_text('/private-link\n')
+        (self.work / 'private-link').symlink_to(self.base / 'external-target')
+        self.assertNotIn(b'private-link', closeout.changes(self.work)[0])
+        self.snapshot()
+        closeout.verify(self.record)
+        self.assertEqual((self.record / 'git-info-exclude').read_text(), '/private-link\n')
+        self.assertEqual((self.repo / '.git/info/exclude').read_text(), '/private-link\n')
+
+    def test_recovery_does_not_execute_checkout_hooks(self):
+        self.snapshot()
+        marker = self.base / 'hook-ran'
+        hook = self.repo / '.git/hooks/post-checkout'
+        hook.write_text('#!/bin/sh\ntouch "' + str(marker) + '"\n')
+        hook.chmod(0o755)
+        closeout.restore(self.repo, self.record, self.base / '.worktrees/restored')
+        self.assertFalse(marker.exists())
+
+    def test_hidden_edits_are_not_treated_as_clean_committed_content(self):
+        self.git(self.work, 'update-index', '--assume-unchanged', 'branch.txt')
+        (self.work / 'branch.txt').write_text('hidden unique edit')
+        self.assertNotIn(b'branch.txt', closeout.changes(self.work)[0])
+        self.snapshot()
+        closeout.verify(self.record)
+        target = self.base / '.worktrees' / 'restored'
+        closeout.restore(self.repo, self.record, target)
+        self.assertEqual((target / 'branch.txt').read_text(), 'hidden unique edit')
+        self.assertIn('branch.txt', closeout.index_flags(target)['assume_unchanged'])
+        self.assertEqual((self.work / 'branch.txt').read_text(), 'hidden unique edit')
+
+    def test_sparse_missing_files_and_flags_are_preserved(self):
+        self.git(self.work, 'update-index', '--skip-worktree', 'branch.txt')
+        (self.work / 'branch.txt').unlink()
+        self.assertNotIn(b'branch.txt', closeout.changes(self.work)[0])
+        self.snapshot()
+        closeout.verify(self.record)
+        target = self.base / '.worktrees' / 'restored'
+        closeout.restore(self.repo, self.record, target)
+        self.assertFalse((target / 'branch.txt').exists())
+        self.assertIn('branch.txt', closeout.index_flags(target)['skip_worktree'])
+
     def test_changed_working_file_blocks_removal(self):
         self.snapshot()
         closeout.verify(self.record)
