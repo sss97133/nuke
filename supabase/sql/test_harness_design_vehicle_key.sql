@@ -10,6 +10,7 @@ END $$;
 CREATE FUNCTION public.t_assert(ok boolean,label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'assertion failed: %',label; END IF;END $$;
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY);
+-- guardrail-allow(center-key-fk): harness_designs.vehicle_id: disposable PG17 pre-migration counterexample intentionally reproduces the legacy missing FK; the exact production migration below supplies it without changing source rows.
 CREATE TABLE public.harness_designs(id uuid PRIMARY KEY,vehicle_id uuid,name text NOT NULL);
 INSERT INTO public.vehicles VALUES('10000000-0000-4000-8000-000000000001');
 INSERT INTO public.harness_designs VALUES
