@@ -1,0 +1,17 @@
+---
+change_type: substrate_correction
+scope: distinguish recorded plan agreement from keyed stock agreement in the canonical structural harness evaluator
+unknowns: []
+---
+
+The existing harness_model_rules row segment_specification deliberately combines recorded piece/circuit agreement and exact keyed catalog identity (20261125233922_harness_model_evaluation_loop.sql). The source reader marks a missing catalog key incomplete (20261125224228_harness_schematic_model_reader.sql); the canonical segment predicate consumes that aggregate (20261126182000_harness_check_field_bindings.sql). Consequently an unkeyed planned piece cannot answer the narrower question of whether its recorded gauge and ordered colour agree with its current circuit.
+
+Add segment_plan_agreement version1 to the existing rule owner and computation. Its four direct projected inputs are gauge_awg, circuit_gauge_awg, colour and circuit_colour. Integral numeric gauges and nonblank string colour labels must be recorded on both sides. A known gauge or full ordered-colour mismatch fails; otherwise missing or incompatible scalar inputs hold; complete matching values pass. Matching labels do not establish that the labels describe valid or physically installed material. No independent segment-family field exists in this projection, so this rule makes no insulation-family agreement claim.
+
+The four coolant pieces in the retained exact production source at2026-11-26T22:36:28.055766Z agree on22AWG and their recorded ordered colours but have no wire_part_id. This is a validation cohort, not coverage of the482-piece population. Their existing compound specification and wire-stock holds must remain. The new rule is an additional answer, not a replacement for either rule or the component/procurement gates. It does not change the private DC compiler, source admission, physical assignments, scheduler, authored source rows, or UI. The existing rule-change trigger performs normal invalidation, including the enrolled harness source epoch; this migration does not write that cursor directly.
+
+Reuse harness_model_segment_check, harness_model_compute, harness_model_check_inputs and harness_model_check_context; no new function, table, queue or reader. Bind the four fields through the existing exact-check/evaluation/segment keys and presence/value fingerprints. The existing input snapshot includes current rule definitions and the logic snapshot fingerprints the canonical predicate. A deployment therefore invalidates old evaluations through normal currentness and recomputes through the existing fold.
+
+Grounding: data-machine-cases.md13.12 requires functional keyed specifications and honest gaps; K5_WIRING_STATE.md sections1–4 and chapters/16-wire-and-protection-canon.md continue to control actual material, measurement and construction decisions. This correction compares existing values and assigns no new part, colour, family, rating, route, device pin or physical measurement. Those unresolved physical facts do not block testing this narrower derived predicate. No new engineering specification or part-number claim requires a library lookup.
+
+Acceptance: missing/null and known-conflict cases, full ordered stripe preservation, unchanged old predicates and procurement output, source-to-fold typed input edges, stale/current and invoker-RLS behavior, and an exact-source coolant replay. Tests and local replays do not establish deployed behavior or full builder order/cut/assembly readiness.
