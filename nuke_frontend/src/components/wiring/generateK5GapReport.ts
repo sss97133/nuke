@@ -219,7 +219,7 @@ function emitMarkdown(rows: Row[]): string {
       const pins = dev.pin_count ?? '—';
       const amps = dev.power_draw_amps ?? '—';
       const zone = dev.location_zone || '—';
-      const bought = dev.purchased ? 'yes' : 'no';
+      const bought = dev.purchased == null ? 'unknown' : dev.purchased ? 'yes' : 'no';
       const ctr = r.contract ? r.contract.device_id : '—';
       lines.push(`| ${statusBadge(r.status)} | ${dev.device_name} | ${mfrPart} | ${conn} | ${pins} | ${amps} | ${zone} | ${bought} | ${ctr} |`);
     });
@@ -323,7 +323,7 @@ function emitHTML(markdown: string, rows: Row[]): string {
         <td class="n">${dev.pin_count ?? '—'}</td>
         <td class="n">${dev.power_draw_amps ?? '—'}</td>
         <td>${dev.location_zone || '—'}</td>
-        <td class="n">${dev.purchased ? '✓' : ''}</td>
+        <td class="n">${dev.purchased == null ? 'unknown' : dev.purchased ? '✓' : 'no'}</td>
       </tr>`;
     });
     body += `</tbody></table>`;

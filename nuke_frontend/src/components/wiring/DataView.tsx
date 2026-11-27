@@ -256,6 +256,7 @@ export function DataView({
       }}>
         <span>{filteredDevices.length} / {devices.length} DEVICES</span>
         <span>PURCHASED: {devices.filter(d => d.purchased).length}/{devices.length}</span>
+        <span>PURCHASE UNKNOWN: {devices.filter(d => d.purchased == null).length}</span>
         <span>TOTAL: ${Math.round(result.partsCost).toLocaleString()}</span>
         <span>COMPLETION: {result.avgCompletion}%</span>
       </div>
@@ -364,7 +365,7 @@ function DeviceTable({ devices, selectedDeviceId, sortKey, sortDir, onSort, onDe
               <td style={{ ...tdStyle, fontSize: 8 }}>{d.part_number || '—'}</td>
               <td style={{
                 ...tdStyle,
-                color: d.purchased ? C.pass : d.price ? C.fail : C.muted,
+                color: d.purchased == null ? C.warn : d.purchased ? C.pass : d.price ? C.fail : C.muted,
               }}>
                 {d.price ? `$${d.price}` : '—'}
               </td>
@@ -417,9 +418,9 @@ function BOMView({ doc }: { doc: BOMDocument }) {
                   <td style={tdStyle}>{item.totalPrice ? `$${item.totalPrice.toFixed(2)}` : '—'}</td>
                   <td style={{
                     ...tdStyle,
-                    color: item.purchased ? C.pass : C.fail,
+                    color: item.purchased == null ? C.warn : item.purchased ? C.pass : C.fail,
                   }}>
-                    {item.purchased ? 'PURCHASED' : 'NEEDED'}
+                    {item.purchased == null ? 'PURCHASE UNKNOWN — VERIFY' : item.purchased ? 'PURCHASED' : 'NOT PURCHASED'}
                   </td>
                 </tr>
               ))}

@@ -450,7 +450,7 @@ export function WiringDetailPanel({
           <div style={row}>
             <span style={label}>PURCHASED</span>
             <span style={{ ...val, color: device.purchased ? 'var(--success, #16825d)' : 'var(--text-secondary, #666)' }}>
-              {device.purchased ? 'YES' : 'NO'}
+              {device.purchased == null ? 'UNKNOWN — VERIFY' : device.purchased ? 'YES' : 'NO'}
             </span>
           </div>
           <div style={row}>

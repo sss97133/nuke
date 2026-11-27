@@ -11,7 +11,7 @@ export interface ManifestDevice {
   supplier: string | null;
   price: number | null;
   price_source: string | null;
-  purchased: boolean;
+  purchased: boolean | null;
   status: string | null;
   invoice_ref: string | null;
   location_zone: string | null;

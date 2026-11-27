@@ -251,14 +251,21 @@ export function useDRC(
 
       // ── Rule 8: Unpurchased critical ──
       const isCritical = CRITICAL_CATEGORIES.has(device.device_category || '');
-      if (!device.purchased && isCritical) {
+      if (device.purchased == null) {
+        rules.push({
+          ruleId: 'unpurchased-critical',
+          label: 'Purchase evidence',
+          message: 'Purchase status unknown; verify acquisition before ordering',
+          severity: 'warn',
+        });
+      } else if (device.purchased === false && isCritical) {
         rules.push({
           ruleId: 'unpurchased-critical',
           label: 'Unpurchased Critical',
           message: `Critical ${device.device_category?.replace(/_/g, ' ')} device not purchased`,
           severity: 'fail',
         });
-      } else if (!device.purchased) {
+      } else if (device.purchased === false) {
         rules.push({
           ruleId: 'unpurchased-critical',
           label: 'Unpurchased Critical',
