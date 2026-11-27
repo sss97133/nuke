@@ -20,6 +20,26 @@ final class ReceiptEvidenceTests: XCTestCase {
     func workRead() throws -> ReceiptWorkContextRead {
         try JSONDecoder().decode(ReceiptWorkContextRead.self, from: Data(ReceiptDepthFixtures.work.utf8))
     }
+    func testHistoricalReadingKeepsItsOwnPhotoAndIsNotPresentedAsCurrent() throws {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(ReceiptDepthFixtures.work.utf8)) as? [String: Any])
+        var lines = try XCTUnwrap(object["lines"] as? [[String: Any]])
+        lines[0].removeValue(forKey: "historical_judgment")
+        object["lines"] = lines
+        let old = try JSONDecoder().decode(ReceiptWorkContextRead.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(old.lines.first?.historical_judgment, "Older reader payloads remain compatible")
+        let frameID = "00000000-0000-4000-8000-00000000d001"
+        lines[0]["historical_judgment"] = [
+            "answer": ["visible": "yes", "installed": "cannot_tell", "confidence": 0.6, "quote": "A part is visible"],
+            "frame": ["image_id": frameID, "image_url": "https://example.invalid/photo.jpg", "taken_at": "2026-03-09"]
+        ]
+        object["lines"] = lines
+        let decoded = try JSONDecoder().decode(ReceiptWorkContextRead.self, from: JSONSerialization.data(withJSONObject: object))
+        let reading = try XCTUnwrap(decoded.lines.first?.historical_judgment)
+        XCTAssertEqual(reading.frame?.image_id, UUID(uuidString: frameID))
+        XCTAssertEqual(reading.answer?.quote, "A part is visible")
+        XCTAssertTrue(ReceiptWorkWords.historical(reading).contains("photo context has since changed"))
+        XCTAssertTrue(ReceiptWorkWords.historical(reading).contains("installed cannot tell"))
+    }
     func reads(day: ReceiptEvidenceDay? = nil, work: ReceiptWorkContextRead? = nil) -> ReceiptEvidenceReaders.Reads {
         let row = link(), payload = day ?? self.day()
         return .init(links: { _ in [row] }, day: { _, _ in payload }, work: { _, _ in

@@ -72,6 +72,37 @@ export function judgmentFor(row, evidence, { runId, version }) {
 }
 export const questionHash = (params) => sha256(canonical({ params, answer_schema: ANSWER_SCHEMA }));
 
+// The database compares these photo lists as sets. Their order is a presentation
+// detail, so an old answer is not a new question merely because ordering changed.
+export function equivalentQuestionParams(a, b) {
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const normalize = (p) => {
+    const copy = structuredClone(p);
+    for (const [object, key] of [[copy, 'candidate_image_ids'], [copy.context, 'candidate_image_ids'], [copy.lineage, 'image_ids']]) {
+      if (object && Array.isArray(object[key]) && object[key].every((v) => typeof v === 'string')) {
+        object[key] = [...new Set(object[key])].sort();
+      }
+    }
+    return canonical(copy);
+  };
+  return normalize(a) === normalize(b);
+}
+
+// Photo discovery can alter a search window without changing the item, its
+// source or the question asked. Keep the earlier answer as historical testimony;
+// it is not a current answer for a different candidate set.
+export function sameQuestionApartFromPhotoContext(a, b) {
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const normalize = (p) => {
+    const copy = structuredClone(p);
+    for (const key of ['candidate_image_ids', 'days_to_first_photo', 'trigger_conclusion']) delete copy[key];
+    if (copy.context) for (const key of ['candidate_image_ids', 'zone_photos_total', 'zone_photos_in_window', 'first_photo_day', 'conclusion']) delete copy.context[key];
+    if (copy.lineage) delete copy.lineage.image_ids;
+    return canonical(copy);
+  };
+  return normalize(a) === normalize(b);
+}
+
 // Live questions (pending, claimed, answered) for a vehicle that this run did not ask again.
 export function staleJudgments(open, wanted) {
   return (open ?? []).filter((j) => ['pending', 'claimed', 'answered'].includes(j.status ?? 'pending') && !wanted.has(j.dedupe_key));
@@ -141,6 +172,19 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     try {
       const rows = await rpc('receipt_work_lines', { p_vehicle_id: vid, p_window_days: windowDays });
       const withdrawals = await rpc('receipt_work_withdrawals', { p_vehicle_id: vid });
+      // Fail before writing anything if the required database qualification is
+      // unavailable. One vehicle-wide snapshot replaces a query per answer.
+      const qualified = new Map();
+      if (keepAnswered && !noDb) {
+        const results = await rpc('receipt_work_judgment_qualification', { p_vehicle_id: vid });
+        if (!Array.isArray(results)) throw new Error('receipt-work qualification returned an invalid result');
+        for (const q of results) {
+          if (!q.judgment_id || !q.receipt_item_id || !q.link_id || !['current', 'historical_photo_context'].includes(q.qualification) || qualified.has(q.judgment_id)) {
+            throw new Error('receipt-work qualification returned an invalid or ambiguous judgment');
+          }
+          qualified.set(q.judgment_id, q);
+        }
+      }
       for (const w of withdrawals) vs.withdrawn_subjects[w.reason] = (vs.withdrawn_subjects[w.reason] ?? 0) + 1;
       const active = noDb ? [] : await db.req(`garage_derivation_evidence?select=id,subject_key,content_hash&kind=eq.receipt_work_correlation&vehicle_id=eq.${vid}&superseded_at=is.null&limit=100000`);
       const bySubject = new Map(active.map((a) => [a.subject_key, a]));
@@ -167,11 +211,39 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         if (ins?.id) { await supersede(w.evidence_id, ins.id, `source withdrawn (${w.reason}), run ${runId}`); summary.retracted++; }
       }
       if (noDb) continue;
-      // --keep-answered (the scheduled run): a receipt line whose question is answered keeps that answer. Its question is not
-      // re-asked when only its content changed (a vendor label, a frame added), and the answer is retired only when its
-      // receipt, line or frame was withdrawn. Until an answerer runs on a schedule, re-asking would leave the line unwitnessed.
-      const answeredSubjects = new Set(keepAnswered ? (await db.req(`evidence_judgment_requests?select=subject_id&department=eq.${DEPARTMENT}&question_kind=eq.${QUESTION}&vehicle_id=eq.${vid}&status=eq.answered&limit=100000`)).map((r) => r.subject_id) : []);
-      for (const [k, jr] of wanted) if (answeredSubjects.has(jr.subject_id)) { wanted.delete(k); summary.judgments_kept_answered++; }
+      // Preserve a current answer or a historical reading when only the photo
+      // search context changed. A historical reading is not promoted into a new answer.
+      const retainedAnswerIds = new Set();
+      const retainedAnswerKeys = new Set();
+      const historicalAnswerIds = new Set();
+      if (keepAnswered) {
+        const wantedBySubject = new Map();
+        for (const entry of wanted) {
+          const subject = entry[1].subject_id;
+          if (!wantedBySubject.has(subject)) wantedBySubject.set(subject, []);
+          wantedBySubject.get(subject).push(entry);
+        }
+        const answered = await db.req(`evidence_judgment_requests?select=id,subject_id,dedupe_key,params&department=eq.${DEPARTMENT}&question_kind=eq.${QUESTION}&vehicle_id=eq.${vid}&status=eq.answered&limit=100000`);
+        for (const a of answered) {
+          const exact = wanted.get(a.dedupe_key);
+          const match = exact?.subject_id === a.subject_id ? [a.dedupe_key, exact]
+            : (wantedBySubject.get(a.subject_id) ?? []).find(([, jr]) => equivalentQuestionParams(a.params, jr.params)
+              || sameQuestionApartFromPhotoContext(a.params, jr.params));
+          if (match) {
+            const q = qualified.get(a.id);
+            if (q && q.receipt_item_id === a.subject_id && q.link_id === match[1].params.context?.link_id) {
+              retainedAnswerIds.add(a.id);
+              retainedAnswerKeys.add(match[0]);
+              if (q.qualification === 'historical_photo_context') historicalAnswerIds.add(a.id);
+            } else if (a.dedupe_key === match[0]) {
+              // Inputs moved after this run read them. Do not re-raise the stale
+              // key; retire it below and let the next run read the new context.
+              wanted.delete(match[0]);
+            }
+          }
+        }
+      }
+      for (const key of retainedAnswerKeys) wanted.delete(key);
       const raised = new Map();
       for (const jr of wanted.values()) {
         const [r] = await rpc('raise_evidence_judgment', { p_row: jr, p_run_id: runId });
@@ -181,10 +253,17 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       const live = await db.req(`evidence_judgment_requests?select=id,dedupe_key,subject_id,status&department=eq.${DEPARTMENT}&question_kind=eq.${QUESTION}&vehicle_id=eq.${vid}&status=in.(pending,claimed,answered)&limit=100000`);
       const replacementFor = new Map([...wanted.values()].map((jr) => [jr.subject_id, raised.get(jr.dedupe_key)?.id]));
       for (const s of staleJudgments(live, wanted)) {
+        // This is the same vehicle-wide snapshot used above. If the source moves
+        // during the run, readers independently requalify and the next run can
+        // retire the old answer; it cannot be promoted by retaining testimony.
+        if (retainedAnswerIds.has(s.id)) {
+          summary.judgments_kept_answered++;
+          if (historicalAnswerIds.has(s.id)) summary.judgments_kept_historical = (summary.judgments_kept_historical ?? 0) + 1;
+          continue;
+        }
         const problems = await rpc('evidence_judgment_ineligibility', { p_id: s.id });
         const replacement = replacementFor.get(s.subject_id) ?? null;
         const { kind, reason } = retireKind(problems, replacement);
-        if (keepAnswered && s.status === 'answered' && !['source_withdrawn', 'frame_withdrawn'].includes(kind)) continue;
         const to = await rpc('retire_evidence_judgment', { p_id: s.id, p_run_id: runId, p_kind: kind, p_reason: `${reason} (run ${runId})`,
           p_superseded_by: kind === 'content_changed' ? replacement : null });
         if (to !== 'unchanged') summary.judgments_retired[`${kind}:${to}`] = (summary.judgments_retired[`${kind}:${to}`] ?? 0) + 1;

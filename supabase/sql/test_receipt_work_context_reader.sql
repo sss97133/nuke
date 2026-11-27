@@ -24,6 +24,8 @@ CREATE FUNCTION public.vehicle_user_has_access(p_vehicle uuid, p_user uuid) RETU
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid, taken_at timestamptz, is_duplicate boolean, is_superseded boolean,
   is_sensitive boolean, vision_gate_status text, vehicle_zone text, apple_ml_labels text[], ai_scan_metadata jsonb, work_session_id uuid, is_document boolean,
   redaction_level text DEFAULT 'none', image_url text, thumbnail_url text, photographer_attribution text, documented_by_user_id uuid);
+CREATE FUNCTION public.vehicle_image_gallery_eligible(i public.vehicle_images) RETURNS boolean LANGUAGE sql STABLE AS
+  $$ SELECT coalesce(i.is_sensitive, false) = false AND coalesce(i.ai_scan_metadata->>'fixture_withheld', 'false') <> 'true' $$;
 CREATE TABLE public.work_sessions(id uuid PRIMARY KEY, vehicle_id uuid, session_date date);
 CREATE TABLE public.timeline_events(id uuid PRIMARY KEY, vehicle_id uuid, event_date date);
 CREATE TABLE public.receipts(id uuid PRIMARY KEY, user_id uuid, vendor_name text, document_kind text, receipt_date date,
@@ -39,6 +41,15 @@ CREATE TABLE public.garage_derivation_evidence(id uuid PRIMARY KEY DEFAULT gen_r
 -- (after this point the migrations are applied)
 \ir ../migrations/20261111210500_receipt_work_reconciliation.sql
 \ir ../migrations/20261113090000_receipt_work_context_reader.sql
+-- The live question store has this generated receipt-item FK since 20261124193300.
+-- The historical fixtures omit actual item rows, so this disposable stub omits the FK itself.
+ALTER TABLE public.evidence_judgment_requests ADD COLUMN receipt_item_id uuid
+  GENERATED ALWAYS AS (CASE WHEN subject_table = 'receipt_items' THEN subject_id END) STORED;
+\if :{?baseline}
+\else
+\ir ../migrations/20261114120002_evidence_judgment_candidate_set_equality.sql
+\ir ../migrations/20261127011635_receipt_work_judgment_currentness.sql
+\endif
 
 DO $$
 DECLARE
@@ -145,11 +156,19 @@ BEGIN
   ASSERT (line ->> 'amount')::numeric = 652.99, line::text;
   ASSERT NOT (line::text ~* '"(owner|owned_by|paid_by|payer|installed_by|did_the_work)"'), 'ownership/payment/installation key: ' || line::text;
   -- judgment: answered; the answer cited a hidden frame, which is not revealed
-  ASSERT line #>> '{judgment,status}' = 'answered' AND line #>> '{judgment,answer,visible}' = 'yes' AND line #> '{judgment,answer,image_id}' = 'null'::jsonb
-     AND line #> '{judgment,holder}' = 'null'::jsonb, (line -> 'judgment')::text;
+  IF position('current_questions AS MATERIALIZED' IN pg_get_functiondef('public.get_vehicle_receipt_work_context(uuid,date)'::regprocedure)) > 0 THEN
+    ASSERT line -> 'judgment' = 'null'::jsonb, 'unverifiable hidden-frame answer must not appear current';
+  ELSE
+    ASSERT line #>> '{judgment,status}' = 'answered' AND line #>> '{judgment,answer,visible}' = 'yes' AND line #> '{judgment,answer,image_id}' = 'null'::jsonb
+       AND line #> '{judgment,holder}' = 'null'::jsonb, (line -> 'judgment')::text;
+  END IF;
   SELECT x INTO line FROM jsonb_array_elements(out -> 'lines') x WHERE (x ->> 'line_number')::int = 3;
-  ASSERT line #>> '{judgment,status}' = 'claimed' AND line #>> '{judgment,question_id}' = Q3::text AND line #>> '{judgment,holder,claimed_by}' = 'worker-b'
-     AND line #>> '{judgment,holder,label}' LIKE '%not a person on the document%' AND line #> '{judgment,answer}' = 'null'::jsonb, (line -> 'judgment')::text;
+  IF position('current_questions AS MATERIALIZED' IN pg_get_functiondef('public.get_vehicle_receipt_work_context(uuid,date)'::regprocedure)) > 0 THEN
+    ASSERT line -> 'judgment' = 'null'::jsonb, 'claimed question with no source context must not appear current';
+  ELSE
+    ASSERT line #>> '{judgment,status}' = 'claimed' AND line #>> '{judgment,question_id}' = Q3::text AND line #>> '{judgment,holder,claimed_by}' = 'worker-b'
+       AND line #>> '{judgment,holder,label}' LIKE '%not a person on the document%' AND line #> '{judgment,answer}' = 'null'::jsonb, (line -> 'judgment')::text;
+  END IF;
   -- page date filter
   ASSERT jsonb_array_length(get_vehicle_receipt_work_context(V, '2025-01-01') -> 'lines') = 2, 'page date match';
   ASSERT jsonb_array_length(get_vehicle_receipt_work_context(V, '2025-06-01') -> 'lines') = 0, 'page date miss';

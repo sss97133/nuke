@@ -110,6 +110,15 @@ struct ReceiptWorkContextLine: Decodable {
         let holder: Holder?
         let answer: Answer?
     }
+    struct HistoricalJudgment: Decodable {
+        struct Frame: Decodable {
+            let image_id: UUID
+            let image_url: String?
+            let taken_at: String?
+        }
+        let answer: Judgment.Answer?
+        let frame: Frame?
+    }
     let evidence_id: UUID
     let receipt_id: UUID
     let line_number: Int?
@@ -124,6 +133,7 @@ struct ReceiptWorkContextLine: Decodable {
     let printed_performer: Labelled?
     let custodian: Custodian?
     let judgment: Judgment?
+    let historical_judgment: HistoricalJudgment?
 }
 
 struct ReceiptWorkWithdrawal: Decodable {
@@ -169,6 +179,14 @@ enum ReceiptWorkWords {
                          a?.confidence.map { String(format: "confidence %.2f", $0) }].compactMap { $0 }
             return "Answered, a model's reading (not a sign): " + (parts.isEmpty ? "no detail" : parts.joined(separator: " · "))
         }
+    }
+    static func historical(_ j: ReceiptWorkContextLine.HistoricalJudgment) -> String {
+        let a = j.answer
+        let parts = [a?.visible.map { "visible \(JobWords.humanize($0))" },
+                     a?.installed.map { "installed \(JobWords.humanize($0))" },
+                     a?.confidence.map { String(format: "confidence %.2f", $0) }].compactMap { $0 }
+        return "Earlier model reading; the photo context has since changed: "
+            + (parts.isEmpty ? "no detail" : parts.joined(separator: " · "))
     }
 }
 
@@ -360,6 +378,7 @@ struct ReceiptEvidenceContent: View {
 /// One line's proposed receipt-to-work context, behind a disclosure, in the same rooted-row style as the line.
 struct ReceiptWorkContextDisclosure: View {
     let line: ReceiptWorkContextLine
+    @State private var showingHistoricalFrame = false
 
     var body: some View {
         DisclosureGroup("Proposed work context") {
@@ -393,8 +412,24 @@ struct ReceiptWorkContextDisclosure: View {
                 RootedValueView(label: "Question", value: ReceiptWorkWords.judgment(judgment), status: judgment.status == "answered" ? .projected : .pending)
                 if let quote = judgment.answer?.quote { Text("“\(quote)”").font(.caption).textSelection(.enabled) }
             }
+            if let historical = line.historical_judgment {
+                RootedValueView(label: "Earlier reading", value: ReceiptWorkWords.historical(historical), status: .attributed)
+                if let quote = historical.answer?.quote { Text("“\(quote)”").font(.caption).textSelection(.enabled) }
+                if let frame = historical.frame, let url = frame.image_url, !url.isEmpty {
+                    Button("View photo from earlier reading") { showingHistoricalFrame = true }
+                    Text("This opens the current photo record; the original image bytes were not recorded with the reading.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }
         .font(.callout)
         .accessibilityIdentifier("receipt-work-context")
+        .sheet(isPresented: $showingHistoricalFrame) {
+            if let frame = line.historical_judgment?.frame, let url = frame.image_url, !url.isEmpty {
+                FullScreenGalleryView(photos: [VehicleGalleryImage(id: frame.image_id, image_url: url, thumbnail_url: nil,
+                    is_primary: nil, taken_at: frame.taken_at, labels: nil, ai_processing_status: nil,
+                    image_category: nil, created_at: nil, vision_gate_agent_reasoning: nil)])
+            }
+        }
     }
 }
