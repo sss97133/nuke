@@ -678,7 +678,7 @@ function drawConnectors(
 
       // Price
       if (d.price) {
-        ctx.fillStyle = d.purchased ? '#22c55e' : '#ef4444';
+        ctx.fillStyle = d.purchased == null ? C.muted : d.purchased ? '#22c55e' : '#ef4444';
         ctx.font = `bold ${6 / zoom}px Courier New`;
         ctx.fillText(`$${d.price}`, x, infoY + 7 / zoom);
       }

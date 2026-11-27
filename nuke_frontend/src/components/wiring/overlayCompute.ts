@@ -24,7 +24,7 @@ export interface ManifestDevice {
   pos_x_pct?: number;
   pos_y_pct?: number;
   price?: number;
-  purchased?: boolean;
+  purchased?: boolean | null;
   pdm_controlled?: boolean;
   pdm_channel_group?: string;
   pct_complete?: number;
@@ -496,7 +496,7 @@ export function computeOverlay(devices: ManifestDevice[]): OverlayResult {
   // Costs
   const partsCost = devices.reduce((s, d) => s + (d.price || 0), 0);
   const devicesPurchased = devices.filter(d => d.purchased).length;
-  const devicesUnpurchased = devices.filter(d => !d.purchased).length;
+  const devicesUnpurchased = devices.filter(d => d.purchased === false).length;
   const avgCompletion = Math.round(devices.reduce((s, d) => s + (d.pct_complete || 0), 0) / devices.length);
   const devicesAtZero = devices.filter(d => (d.pct_complete || 0) === 0).length;
 

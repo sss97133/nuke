@@ -98,7 +98,7 @@ export function generateEZWireCSV(result: OverlayResult): string {
 
 export function generateBOMCSV(
   result: OverlayResult,
-  devices: { device_name: string; part_number?: string; manufacturer?: string; price?: number; purchased?: boolean; supplier?: string }[],
+  devices: { device_name: string; part_number?: string; manufacturer?: string; price?: number; purchased?: boolean | null; supplier?: string }[],
 ): string {
   const rows: string[] = [];
 
@@ -115,7 +115,7 @@ export function generateBOMCSV(
       '1',
       d.price ? String(d.price) : '',
       d.price ? String(d.price) : '',
-      d.purchased ? 'YES' : 'NO',
+      d.purchased == null ? 'UNKNOWN' : d.purchased ? 'YES' : 'NO',
       '',
     ];
     rows.push(values.join(','));

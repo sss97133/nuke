@@ -220,8 +220,8 @@ export function DeviceDetailPanel({
               {device.price != null && <Row label="PRICE" value={`$${device.price.toFixed(2)}`} />}
               <Row
                 label="STATUS"
-                value={device.purchased ? 'PURCHASED' : 'NOT PURCHASED'}
-                color={device.purchased ? C.pass : C.fail}
+                value={device.purchased == null ? 'PURCHASE UNKNOWN — VERIFY' : device.purchased ? 'PURCHASED' : 'NOT PURCHASED'}
+                color={device.purchased == null ? C.warn : device.purchased ? C.pass : C.fail}
               />
               {workOrderData.length > 0 && workOrderData.map((wo, i) => (
                 <Row key={i} label={`WO PART ${i + 1}`} value={`${wo.quantity}× $${wo.unit_price}`} />
@@ -371,7 +371,7 @@ export function DeviceDetailPanel({
                     <span style={{ ...valStyle, fontSize: 9 }}>{d.device_name}</span>
                     <span style={{
                       ...valStyle, fontSize: 9,
-                      color: d.purchased ? C.pass : C.fail,
+                      color: d.purchased == null ? C.warn : d.purchased ? C.pass : C.fail,
                     }}>
                       {d.price ? `$${d.price}` : '—'}
                     </span>

@@ -14,7 +14,7 @@ export interface BOMLineItem {
   totalPrice?: number;
   supplier?: string;
   inStock?: boolean;
-  purchased: boolean;
+  purchased: boolean | null;
   sourcingDifficulty?: string;
   notes?: string;
 }
@@ -38,6 +38,7 @@ export interface BOMDocument {
   unpricedItems: number;
   purchasedItems: number;
   unpurchasedItems: number;
+  unknownPurchaseItems: number;
   ecuCost: number;
   pdmCost: number;
   estimatedLaborHours: number;
@@ -62,7 +63,7 @@ export function generateBOM(
     quantity: 1,
     unitPrice: result.recommendedConfig.ecu.price,
     totalPrice: result.recommendedConfig.ecu.price,
-    purchased: devices.some(d => d.device_name === 'ECU' && d.purchased),
+    purchased: null, // A computed recommendation has no keyed acquisition witness.
     notes: `Computed from I/O: ${result.io.injectorOutputs}inj + ${result.io.ignitionOutputs}ign + ${result.io.analogInputs}an`,
   });
   motecItems.push({
@@ -72,7 +73,7 @@ export function generateBOM(
     quantity: 1,
     unitPrice: result.recommendedConfig.pdm.price,
     totalPrice: result.recommendedConfig.pdm.price,
-    purchased: devices.some(d => d.device_name === 'Power Distribution Module' && d.purchased),
+    purchased: null,
     notes: `${result.pdmChannels.length} channels used`,
   });
 
@@ -85,9 +86,8 @@ export function generateBOM(
     quantity: 1,
     unitPrice: 56.21,
     totalPrice: 56.21,
-    purchased: false,
+    purchased: null,
     supplier: 'ProWire USA',
-    inStock: true,
     notes: 'All 4 connector housings + 120 terminals',
   });
 
@@ -118,7 +118,7 @@ export function generateBOM(
       quantity: 1,
       unitPrice: d.price || undefined,
       totalPrice: d.price || undefined,
-      purchased: d.purchased || false,
+      purchased: d.purchased ?? null,
       supplier: (d as any).supplier || undefined,
       sourcingDifficulty: (d as any).sourcing_difficulty || undefined,
     }));
@@ -145,7 +145,7 @@ export function generateBOM(
     quantity: 1,
     unitPrice: Math.round(totalWireFt * 0.15),
     totalPrice: Math.round(totalWireFt * 0.15),
-    purchased: false,
+    purchased: null,
     supplier: 'ProWire USA',
     notes: `${result.shieldedWires} shielded + ${result.twistedPairs} twisted pair included`,
   });
@@ -169,7 +169,7 @@ export function generateBOM(
       wireItems.push({
         category: 'wire', partName: name, partNumber: pn,
         quantity: qty, unitPrice: 3.50, totalPrice: Math.round(qty * 3.50),
-        purchased: false, supplier: 'ProWire USA',
+        purchased: null, supplier: 'ProWire USA',
       });
     }
 
@@ -186,7 +186,7 @@ export function generateBOM(
       wireItems.push({
         category: 'wire', partName: 'Terminal Contact', partNumber: pn,
         quantity: qty, unitPrice: 0.85, totalPrice: Math.round(qty * 0.85),
-        purchased: false, supplier: 'ProWire USA',
+        purchased: null, supplier: 'ProWire USA',
       });
     }
 
@@ -202,7 +202,7 @@ export function generateBOM(
       wireItems.push({
         category: 'wire', partName: 'Pin Seal', partNumber: pn,
         quantity: qty, unitPrice: 0.35, totalPrice: Math.round(qty * 0.35),
-        purchased: false, supplier: 'ProWire USA',
+        purchased: null, supplier: 'ProWire USA',
       });
     }
 
@@ -218,7 +218,7 @@ export function generateBOM(
       wireItems.push({
         category: 'wire', partName: 'Connector Boot', partNumber: pn,
         quantity: qty, unitPrice: 2.50, totalPrice: Math.round(qty * 2.50),
-        purchased: false, supplier: 'ProWire USA',
+        purchased: null, supplier: 'ProWire USA',
       });
     }
 
@@ -236,7 +236,7 @@ export function generateBOM(
         category: 'wire', partName: `DR-25 Heat Shrink ${size}`, partNumber: pn,
         manufacturer: 'Raychem', quantity: ftNeeded,
         unitPrice: 5, totalPrice: ftNeeded * 5,
-        purchased: false, supplier: 'ProWire USA',
+        purchased: null, supplier: 'ProWire USA',
         notes: `${qty} pieces @ 6" each`,
       });
     }
@@ -246,7 +246,7 @@ export function generateBOM(
       category: 'wire', partName: 'Wire Labels (self-laminating)',
       quantity: terminations.length, unitPrice: 0.50,
       totalPrice: Math.round(terminations.length * 0.50),
-      purchased: false, supplier: 'ProWire USA',
+      purchased: null, supplier: 'ProWire USA',
     });
 
     // Crimp tools — deduplicate, qty = 1 each
@@ -261,7 +261,7 @@ export function generateBOM(
       wireItems.push({
         category: 'wire', partName: 'Crimp Tool', partNumber: pn,
         quantity: 1, unitPrice: 450, totalPrice: 450,
-        purchased: false, supplier: 'ProWire USA',
+        purchased: null, supplier: 'ProWire USA',
         notes: 'Reusable — one per tool type',
       });
     }
@@ -273,16 +273,16 @@ export function generateBOM(
       partName: `DTM Connector Kits (assorted 2-12 pin, ~${dtmCount} sets)`,
       manufacturer: 'ProWire USA',
       quantity: dtmCount, unitPrice: 7, totalPrice: dtmCount * 7,
-      purchased: false, supplier: 'ProWire USA',
+      purchased: null, supplier: 'ProWire USA',
     });
     wireItems.push({
       category: 'wire', partName: 'DR-25 Heat Shrink (assorted sizes)',
       manufacturer: 'Raychem', quantity: 1, unitPrice: 70, totalPrice: 70,
-      purchased: false, supplier: 'ProWire USA',
+      purchased: null, supplier: 'ProWire USA',
     });
     wireItems.push({
       category: 'wire', partName: 'Terminals, boots, tape, lacing cord, misc consumables',
-      quantity: 1, unitPrice: 100, totalPrice: 100, purchased: false,
+      quantity: 1, unitPrice: 100, totalPrice: 100, purchased: null,
     });
   }
 
@@ -300,7 +300,10 @@ export function generateBOM(
   const totalCost = sections.reduce((s, sec) => s + sec.subtotal, 0);
   const pricedItems = sections.reduce((s, sec) => s + sec.pricedCount, 0);
   const unpricedItems = sections.reduce((s, sec) => s + sec.unpricedCount, 0);
-  const purchasedItems = devices.filter(d => d.purchased).length;
+  // All three purchase counts refer to displayed BOM lines, not input devices
+  // or physical stock quantities. Computed/unbound lines remain unknown.
+  const lines = sections.flatMap(section => section.items);
+  const purchasedItems = lines.filter(line => line.purchased === true).length;
 
   // Labor estimate: ~30 min per wire for professional tier
   const laborHours = Math.round(result.wireCount * 0.5);
@@ -315,7 +318,8 @@ export function generateBOM(
     pricedItems,
     unpricedItems,
     purchasedItems,
-    unpurchasedItems: devices.filter(d => !d.purchased).length,
+    unpurchasedItems: lines.filter(line => line.purchased === false).length,
+    unknownPurchaseItems: lines.filter(line => line.purchased == null).length,
     ecuCost: result.recommendedConfig.ecu.price,
     pdmCost: result.recommendedConfig.pdm.price,
     estimatedLaborHours: laborHours,
@@ -338,7 +342,7 @@ export function bomToText(doc: BOMDocument, vehicleName = ''): string {
 
     for (const item of section.items) {
       const price = item.totalPrice ? `$${item.totalPrice.toLocaleString()}` : 'QUOTE';
-      const status = item.purchased ? '✓ PURCHASED' : '';
+      const status = item.purchased === true ? '✓ PURCHASED' : item.purchased === false ? 'NOT PURCHASED' : 'PURCHASE UNKNOWN — VERIFY';
       const pn = item.partNumber ? ` [${item.partNumber}]` : '';
       lines.push(`  ${item.quantity}× ${item.partName}${pn} — ${price} ${status}`);
       if (item.notes) lines.push(`     ${item.notes}`);
@@ -352,7 +356,7 @@ export function bomToText(doc: BOMDocument, vehicleName = ''): string {
   lines.push(`LABOR (${doc.estimatedLaborHours} hrs @ $${doc.estimatedLaborCost / doc.estimatedLaborHours}/hr): $${doc.estimatedLaborCost.toLocaleString()}`);
   lines.push(`GRAND TOTAL:        $${doc.grandTotal.toLocaleString()}`);
   lines.push('');
-  lines.push(`Priced: ${doc.pricedItems}/${doc.totalParts} | Purchased: ${doc.purchasedItems} | Still needed: ${doc.unpurchasedItems}`);
+  lines.push(`BOM lines — Priced: ${doc.pricedItems}/${doc.totalParts} | Purchased: ${doc.purchasedItems} | Not purchased: ${doc.unpurchasedItems} | Purchase unknown: ${doc.unknownPurchaseItems}`);
 
   return lines.join('\n');
 }
