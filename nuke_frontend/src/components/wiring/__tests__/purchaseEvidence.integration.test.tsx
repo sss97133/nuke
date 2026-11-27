@@ -6,6 +6,7 @@ import { computeOverlay, type ManifestDevice } from '../overlayCompute';
 import { generateBOM, bomToText } from '../generateBOM';
 import { generateBOMCSV } from '../generateEZWireCSV';
 import { useDRC } from '../useDRC';
+import { useOverlayCompute } from '../useOverlayCompute';
 import { DataView } from '../DataView';
 
 vi.mock('../WireMaterialPopup', () => ({ WireMaterialPopup: () => null }));
@@ -26,6 +27,24 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
+
+it('adding a local device without acquisition testimony stays unknown while explicit inputs are retained', async () => {
+  const empty: ManifestDevice[] = [];
+  let state!: ReturnType<typeof useOverlayCompute>;
+  function Probe() { state = useOverlayCompute(empty); return null; }
+  await act(async () => root.render(<Probe />));
+  await act(async () => { state.addDevice({ device_name: 'Unqualified planned sensor', device_category: 'sensors' }); });
+  expect(state.devices[0].purchased).toBeNull();
+  expect(state.result.devicesUnpurchased).toBe(0);
+  await act(async () => {
+    state.addDevice({ device_name: 'Explicit true', device_category: 'sensors', purchased: true });
+    state.addDevice({ device_name: 'Explicit false', device_category: 'sensors', purchased: false });
+    state.addDevice({ device_name: 'Explicit unknown', device_category: 'sensors', purchased: null });
+    state.addDevice({ device_name: 'Undefined input', device_category: 'sensors', purchased: undefined });
+  });
+  expect(state.devices.map(d => d.purchased)).toEqual([null, true, false, null, null]);
+  expect(state.result.devicesUnpurchased).toBe(1);
+});
 
 it('retains withdrawal as unknown through BOM and text/CSV exports without putting it in the not-purchased count', () => {
   const doc = generateBOM(overlay, devices);
