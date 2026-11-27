@@ -704,6 +704,8 @@ jobs:
         run: python3 scripts/discovery/inclusion_pass_test.py
       - name: Verify private owner-intent retrieval and incomplete-work contracts
         run: python3 -m unittest discover -s scripts/tests -p test_agent_intent.py
+      - name: Verify private worktree source, staging, local-evidence recovery and retirement guards
+        run: python3 -m unittest discover -s scripts/tests -p test_agent_worktree_closeout.py
 
   poller-ledger-contract:
     runs-on: ubuntu-latest

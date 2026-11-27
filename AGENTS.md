@@ -346,6 +346,12 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
   (`validate` runs it against a freshly fetched latest main) and fails the PR. When the PR is
   merged, `git worktree remove ~/.worktrees/<task>`; the branch may stay. A worktree is about 500 MB,
   and on 2026-10-13 the laptop held 404 of them (382 GB) with 14 GB of disk left.
+- For an owner-requested close-out of inactive unfinished work, use
+  `scripts/agent-worktree-closeout.py`: private `snapshot`, independent `verify`,
+  guarded `retire`, and `restore`. Keep records outside the public checkout under
+  `~/nuke-logs/workspace-archive/`. Recovery commits preserve working and staging
+  state; they are private backups, not reviewed changes or completed requirements.
+  Keep active task/runtime paths in the required protected-path manifest.
 - When several sessions run, one lane list says who owns what: `.claude/LANES.md` in the shared checkout
   (local, not committed). Codex threads register there too, with the path of their pickup file. Tell the
   others before you push. Handoffs go in `.claude/handoffs/`; finished work is logged to `DONE.md` with
