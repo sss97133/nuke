@@ -43,7 +43,17 @@ SELECT public.t_assert((SELECT e.manifest_device_id=m.id AND d.vehicle_id<>m.veh
  'before migration both existing ID foreign keys accept a different-vehicle device');
 ROLLBACK;
 SELECT md5(jsonb_agg(to_jsonb(e) ORDER BY e.id)::text) AS before_rows FROM public.harness_endpoints e \gset
-\ir ../migrations/20261127201511_harness_endpoint_manifest_scope.sql
+CREATE ROLE scope_migrator NOSUPERUSER;
+GRANT CREATE ON SCHEMA public TO scope_migrator;
+ALTER TABLE public.vehicles OWNER TO scope_migrator;
+ALTER TABLE public.harness_designs OWNER TO scope_migrator;
+ALTER TABLE public.vehicle_build_manifest OWNER TO scope_migrator;
+ALTER TABLE public.harness_endpoints OWNER TO scope_migrator;
+SET ROLE scope_migrator;
+SELECT public.t_assert((SELECT NOT rolsuper FROM pg_roles WHERE rolname=current_user),
+ 'actual migration executes as a non-superuser table owner');
+\ir ../migrations/20261127204956_harness_endpoint_manifest_scope_supported.sql
+RESET ROLE;
 SELECT public.t_assert((SELECT md5(jsonb_agg(to_jsonb(e)-'device_vehicle_id' ORDER BY e.id)::text)=:'before_rows'
  FROM public.harness_endpoints e),'installation preserves every original source field');
 SELECT public.t_assert((SELECT count(*)=0 FROM public.harness_endpoints WHERE device_vehicle_id IS NOT NULL),
@@ -98,23 +108,10 @@ END $$;
 UPDATE public.harness_endpoints SET device_vehicle_id='10000000-0000-4000-8000-000000000002';
 SELECT public.t_assert((SELECT device_vehicle_id='10000000-0000-4000-8000-000000000001' FROM public.harness_endpoints),
  'caller cannot forge the derived scope key');
-SET session_replication_role=replica;
-DO $$ BEGIN
- BEGIN
-  UPDATE public.harness_endpoints SET manifest_device_id='30000000-0000-4000-8000-000000000002';
-  RAISE EXCEPTION 'replication-role cross-vehicle link accepted';
- EXCEPTION WHEN foreign_key_violation THEN NULL;END;
- BEGIN
-  UPDATE public.vehicle_build_manifest SET vehicle_id='10000000-0000-4000-8000-000000000002'
-   WHERE id='30000000-0000-4000-8000-000000000001';
-  RAISE EXCEPTION 'replication-role parent reparent accepted';
- EXCEPTION WHEN foreign_key_violation THEN NULL;END;
-END $$;
-SET session_replication_role=origin;
-SELECT public.t_assert((SELECT count(*)=8 AND bool_and(g.tgenabled='A') FROM pg_trigger g
+SELECT public.t_assert((SELECT count(*)=8 AND bool_and(g.tgenabled='O') FROM pg_trigger g
  JOIN pg_constraint c ON c.oid=g.tgconstraint WHERE c.conrelid='public.harness_endpoints'::regclass
  AND c.conname IN('harness_endpoints_device_design_scope_fkey','harness_endpoints_device_manifest_scope_fkey')),
- 'only the new native FK guards enforce every write role, including parent reassignment');
+ 'new native FKs use supported default trigger enforcement');
 INSERT INTO public.harness_endpoints(id,design_id,manifest_device_id,name) VALUES
  ('40000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001','inserted link');
