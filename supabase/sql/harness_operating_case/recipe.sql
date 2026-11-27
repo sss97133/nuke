@@ -228,7 +228,8 @@ BEGIN
   NEW.design_length_m:=trim_scale(NEW.design_length_m);
  ELSIF TG_TABLE_NAME='harness_operating_case_elements' THEN
   IF NEW.source_endpoint_id IS NOT NULL AND NOT EXISTS(SELECT FROM public.harness_endpoints x
-   WHERE x.id=NEW.source_endpoint_id AND x.vehicle_id=NEW.vehicle_id) THEN
+   JOIN public.harness_designs d ON d.id=x.design_id
+   WHERE x.id=NEW.source_endpoint_id AND d.vehicle_id=NEW.vehicle_id) THEN
    RAISE EXCEPTION 'foreign source device' USING ERRCODE='23514';
   END IF;
   FOREACH t IN ARRAY ARRAY[NEW.from_termination_id,NEW.to_termination_id] LOOP

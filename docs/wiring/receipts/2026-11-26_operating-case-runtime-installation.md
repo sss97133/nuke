@@ -20,9 +20,13 @@ DC kernel and retained worker definition, owner, procedure kind, invoker mode,
 transaction configuration and service-only entrypoint are checked before DDL;
 the existing monitoring/revert modules also enforce their retained definitions.
 
-All twelve reviewed inner SQL modules are unchanged from the source candidate.
-Only their outer transaction and disposable-database guards are replaced by one
-production installation transaction. Ten tables, private authoring/compiler/
+Eleven reviewed inner SQL modules are unchanged from PR4059. The recipe guard
+now resolves endpoint ownership through `harness_endpoints.design_id` and
+`harness_designs.vehicle_id`, matching the existing component scope guard; it
+never queries an invented endpoint vehicle column. The source candidate and
+installer contain this same correction. Their outer transaction and
+disposable-database guards are replaced by one production installation
+transaction. Ten tables, private authoring/compiler/
 result functions, column definitions and existing-worker integration commit
 together. The final statement records authorized-build metadata only when the
 proposal remains open. No review row, measured-key gate marker, source claim,
@@ -37,7 +41,9 @@ wire specification, installed material or engineering conclusion is inferred.
 
 Validation uses the same complete native PG17 runtime behavior contract through
 the actual production migration, alongside the original candidate and retry
-contracts. The separate refusal contract reads the exact tracked migration on
+contracts. The endpoint fixture uses the actual design-owned shape and exercises
+null endpoint declarations, same-vehicle endpoints, foreign/unowned designs and
+mismatched terminal membership. The separate refusal contract reads the exact tracked migration on
 the psql client, checks changed/foreign/claimed/rejected states and interpreter/
 permission drift, and proves that a late consumer mismatch rolls back every new
 table, telemetry column and worker edit. It also verifies that an existing
