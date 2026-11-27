@@ -222,11 +222,12 @@ SELECT public.t_assert(NOT EXISTS(SELECT FROM information_schema.columns WHERE t
  AND table_name='harness_endpoints' AND column_name='vehicle_id'),
  'the runtime fixture cannot hide an invented endpoint vehicle column');
 INSERT INTO public.vehicles(id) VALUES(:fb2);
-INSERT INTO public.harness_designs VALUES('e0000000-0000-4000-8000-000000000001',:fb2);
+INSERT INTO public.harness_designs VALUES('e0000000-0000-4000-8000-000000000001',:fb2),
+ ('e0000000-0000-4000-8000-000000000002',NULL);
 INSERT INTO public.harness_endpoints VALUES
  ('e0000000-0000-4000-8000-000000000011',md5('worker phase design')::uuid),
  ('e0000000-0000-4000-8000-000000000012','e0000000-0000-4000-8000-000000000001'),
- ('e0000000-0000-4000-8000-000000000013',NULL);
+ ('e0000000-0000-4000-8000-000000000013','e0000000-0000-4000-8000-000000000002');
 INSERT INTO public.wire_termination_specs VALUES
  ('e0000000-0000-4000-8000-000000000021',:fb1,'e0000000-0000-4000-8000-000000000011'),
  ('e0000000-0000-4000-8000-000000000022',:fb1,'e0000000-0000-4000-8000-000000000011');
@@ -272,7 +273,7 @@ SELECT public.harness_operating_case_record(public.fixture_operating_endpoint_re
 RESET ROLE;
 SELECT public.t_assert(:'endpoint_sqlstate'='23514' AND :'endpoint_message'='foreign source device'
  AND NOT EXISTS(SELECT FROM public.harness_operating_cases WHERE id='c0000000-0000-4000-8000-000000000012'),
- 'endpoint without a vehicle-owning design refuses and rolls back the whole new recipe');
+ 'endpoint whose design has no vehicle owner refuses and rolls back the whole new recipe');
 
 SET ROLE service_role;
 \set ON_ERROR_STOP off

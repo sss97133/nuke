@@ -23,10 +23,10 @@ SELECT public.t_assert(md5(prosrc)='876dc0513327e0bc5b66a03eb7d5ca70',
  'existing worker body matches the retained integration target')
  FROM pg_proc WHERE oid='public.model_fold_tick()'::regprocedure;
 -- Endpoint ownership follows the existing design key; no vehicle_id exists here.
-CREATE TABLE public.harness_endpoints(id uuid PRIMARY KEY,design_id uuid REFERENCES public.harness_designs(id));
-CREATE TABLE public.wire_termination_specs(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id),
+CREATE TABLE public.harness_endpoints(id uuid PRIMARY KEY,design_id uuid NOT NULL REFERENCES public.harness_designs(id));
+CREATE TABLE public.wire_termination_specs(id uuid PRIMARY KEY,vehicle_id uuid NOT NULL REFERENCES public.vehicles(id),
  endpoint_id uuid REFERENCES public.harness_endpoints(id));
-CREATE TABLE public.harness_segments(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES public.vehicles(id),
+CREATE TABLE public.harness_segments(id uuid PRIMARY KEY,vehicle_id uuid NOT NULL REFERENCES public.vehicles(id),
  from_termination_id uuid REFERENCES public.wire_termination_specs(id),to_termination_id uuid REFERENCES public.wire_termination_specs(id));
 CREATE TABLE public.wire_resistance_conditions(condition_key text PRIMARY KEY);
 CREATE TABLE public.wire_resistance_claims(observation_id uuid PRIMARY KEY REFERENCES public.vehicle_observations(id),
