@@ -40,7 +40,9 @@ is an eligibility hint; the guarded claim locks and rechecks the case after the
 vehicle lease exists. A concurrently locked recipe is skipped without charging
 the private budget, followed by one generic turn and a yield. Existing
 service-role callers retain helper execution without direct private table DML.
-Direct helper calls still require the genuine tick, backend and vehicle lease.
+The claim, prepare, finish and recovery mutators still enforce their genuine
+tick/backend and exact vehicle-attempt context. Read/eligibility helpers and
+the bounded seeder remain callable by the existing service role.
 
 `worker_consumers.sql` extends the existing monitoring and revert owners.
 Timing denominators stay separate by phase. Reverting generic worker effects
