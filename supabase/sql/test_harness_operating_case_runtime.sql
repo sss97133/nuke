@@ -164,3 +164,48 @@ SELECT public.t_assert(r->>'revert_complete'='false' AND (r->>'private_dc_phases
 SELECT public.t_assert((SELECT count(*)=3 FROM public.harness_model_dc_runs)
  AND (SELECT count(*)=4 FROM public.harness_model_dc_node_results),
  'monitoring and reverting do not erase numerical history');
+-- Finite scoped values and correct child counts alone do not prove a result.
+-- Offset all node voltages during the genuine constructor. Differences and
+-- branch powers still look plausible, but the explicit reference is wrong.
+SET ROLE service_role;
+SELECT public.harness_operating_case_record(public.fixture_operating_recipe('c0000000-0000-4000-8000-000000000003','closed'));
+RESET ROLE;
+CREATE FUNCTION public.fixture_operating_offset_node() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN NEW.voltage_v:=NEW.voltage_v+1;RETURN NEW;END $$;
+CREATE TRIGGER zz_fixture_operating_offset_node BEFORE INSERT ON public.harness_model_dc_node_results
+ FOR EACH ROW EXECUTE FUNCTION public.fixture_operating_offset_node();
+SET ROLE service_role;
+\set ON_ERROR_STOP off
+SELECT public.harness_operating_case_evaluate('c0000000-0000-4000-8000-000000000003','b0000000-0000-4000-8000-000000000041');
+\set tampered_sqlstate :SQLSTATE
+\set tampered_message :LAST_ERROR_MESSAGE
+\set ON_ERROR_STOP on
+RESET ROLE;
+SELECT public.t_assert(:'tampered_sqlstate'='23514' AND :'tampered_message'='typed DC output differs from canonical computation'
+ AND (SELECT count(*)=3 FROM public.harness_model_dc_runs)
+ AND (SELECT count(*)=4 FROM public.harness_model_dc_node_results)
+ AND (SELECT count(*)=4 FROM public.harness_model_dc_branch_results)
+ AND (SELECT count(*)=3 FROM public.harness_model_dc_wire_inputs),
+ 'canonical numerical replay rejects tampered values and rolls back the whole incomplete run');
+DROP TRIGGER zz_fixture_operating_offset_node ON public.harness_model_dc_node_results;
+DROP FUNCTION public.fixture_operating_offset_node();
+SET ROLE service_role;
+SELECT public.harness_operating_case_evaluate('c0000000-0000-4000-8000-000000000003','b0000000-0000-4000-8000-000000000041');
+RESET ROLE;
+SELECT public.t_assert((SELECT count(*)=4 AND bool_and(sealed_at IS NOT NULL) FROM public.harness_model_dc_runs)
+ AND (public.harness_operating_case_result('c0000000-0000-4000-8000-000000000003',
+ 'b0000000-0000-4000-8000-000000000041')->>'current')::boolean,
+ 'the unchanged real constructor succeeds after removing the test-owned corruption');
+-- Owner SQL cannot append to or edit immutable numerical history either.
+DO $$ BEGIN
+ BEGIN
+  INSERT INTO public.harness_model_dc_node_results SELECT * FROM public.harness_model_dc_node_results LIMIT 1;
+  RAISE EXCEPTION 'sealed numerical child append accepted';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN
+  UPDATE public.harness_model_dc_branch_results SET current_a=current_a+1;
+  RAISE EXCEPTION 'sealed numerical branch edit accepted';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+SELECT public.t_assert((SELECT count(*)=6 FROM public.harness_model_dc_node_results),
+ 'sealed numerical children cannot be appended or edited by direct owner SQL');
