@@ -2,7 +2,7 @@
 // These are presentations of loaded rows, never another harness derivation.
 import type { MapWire, WiringMapData } from './useWiringMap';
 import { SECTIONS } from './useWiringMap';
-import { mask, publicName, type SiteFiles } from './useWorkspaceSelection';
+import { mask, publicName, wireGaugeDisplay, type SiteFiles } from './useWorkspaceSelection';
 
 export type ScheduleCell = string | number | null;
 export type ScheduleId = 'wires' | 'pins' | 'conns';
@@ -23,8 +23,7 @@ export const engineeringText = (value: string | null | undefined): string | null
 
 /** The shared numeric AWG keys stay in the records; screen and XLSX use trade notation. */
 export function scheduleCellValue(column: Pick<ScheduleColumn, 'key'>, value: ScheduleCell): ScheduleCell {
-  return column.key === 'gauge' && typeof value === 'number' && Number.isInteger(value) && value <= 0 && value >= -3
-    ? `${1 - value}/0` : value;
+  return column.key === 'gauge' && typeof value === 'number' ? wireGaugeDisplay(value) : value;
 }
 
 export function scheduleLength(wire: MapWire, site: SiteFiles, vehicleId?: string): { planned: number | null; kind: string | null; basis: string | null } {

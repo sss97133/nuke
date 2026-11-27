@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import type { Colorway } from '../connector-inspector/colorways';
 import { frame, rule } from '../connector-inspector/colorways';
 import { SECTIONS, type WiringMapData } from './useWiringMap';
-import { mask, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
+import { mask, wireGaugeDisplay, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 
 const norm = (t: string | null | undefined) => String(t ?? '').toLowerCase().replace(/[_#]/g, ' ').replace(/\s+/g, ' ').trim();
 const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -69,7 +69,7 @@ export function WireSearch({ cw, map, ix, site, sel, narrow, card, onSelect }: {
         cursor: 'pointer', fontFamily: cw.fontBody, fontSize: 13.5, lineHeight: 1.4, minWidth: 0 }}>
         <span style={{ fontFamily: cw.fontMono, fontWeight: 700, color: cw.accent }}>#{wc}</span> <span style={{ overflowWrap: 'anywhere' }}>{mask(w.name)}</span>
         <span style={{ display: 'block', fontSize: 12, color: cw.inkMuted, overflowWrap: 'anywhere' }}>
-          {[w.gauge != null ? `${w.gauge} AWG` : null, w.color].filter(Boolean).join(' ')}
+          {[w.gauge != null ? `${wireGaugeDisplay(w.gauge)} AWG` : null, w.color].filter(Boolean).join(' ')}
           {ch.length ? `${w.gauge != null || w.color ? ' · ' : ''}${endTxt(ch[0])}${ch.length > 1 ? ' → ' + endTxt(ch[ch.length - 1]) : ''}` : ''}
           {through && <b style={{ color: cw.ink }}> · passes through here</b>}
         </span>

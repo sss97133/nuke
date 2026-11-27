@@ -30,7 +30,7 @@ import {
   SECTIONS, useWiringMap, type MapCall, type MapEnd, type MapNode, type MapWire, type Section, type WiringMapData, type WorkStatus,
 } from './useWiringMap';
 import {
-  SHAPE_ORDER, coverage, kindOf, mask, publicName, relOf, useSelection, useSiteFiles, useWsIndex, valOf,
+  SHAPE_ORDER, coverage, kindOf, mask, publicName, relOf, useSelection, useSiteFiles, useWsIndex, valOf, wireGaugeDisplay,
   type SiteFiles, type WsIndex,
 } from './useWorkspaceSelection';
 import { WorkspaceTree } from './WorkspaceTree';
@@ -632,7 +632,7 @@ function NodeCard({ cw, n, map, byId, facts, recordsOnly, onNode, onCall }: {
             }}>
               <span style={{ fontFamily: cw.fontMono, fontWeight: 700, color: cw.accent }}>#{w.code}</span> {w.name}
               <span style={{ color: cw.inkFaint }}>
-                {' · '}{w.gauge ? `${w.gauge} AWG ` : ''}{w.color ?? ''}{cav ? ` · CAVITY ${cav}` : ''}
+                {' · '}{w.gauge != null ? `${wireGaugeDisplay(w.gauge)} AWG ` : ''}{w.color ?? ''}{cav ? ` · CAVITY ${cav}` : ''}
                 {' · '}{pathOf(w)}
                 {w.designStatus === 'concept' ? ' · CONCEPT' : ''}{isOpen ? ' ▾' : ' ▸'}
               </span>

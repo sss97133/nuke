@@ -74,6 +74,15 @@ it('keeps the specification conflict visible rather than displaying the imported
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('segment 20 AWG; circuit 18 AWG; part M22759/32-18-2');
   expect(host.querySelector('[role="alert"]')?.textContent).not.toContain('PASS');
 });
+it('uses trade gauge labels in accessible physical-piece and conflict descriptions', async () => {
+  model.segments = [{ ...model.segments[0], gauge_awg: 0, circuit_gauge_awg: -1,
+    specification_state: 'conflict' }];
+  await render();
+  expect(host.querySelector('[data-segment-id]')?.getAttribute('aria-label')).toContain('1/0 AWG');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('segment 1/0 AWG; circuit 2/0 AWG');
+  expect(model.segments[0].gauge_awg).toBe(0);
+  expect(model.segments[0].circuit_gauge_awg).toBe(-1);
+});
 it('never guesses a missing end from cavity labels or legacy ordering', () => {
   model.terminations = model.terminations.filter(t => t.id !== 't2');
   const pieces = physicalSchematicPieces(model, 'engine', false);
