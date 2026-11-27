@@ -64,6 +64,27 @@ final class ReceiptEvidenceUITests: XCTestCase {
         app.buttons["Close"].tap()
         noWrites(app)
     }
+    func testCurrentReadingOpensItsCitedPhoto() {
+        let app = open("receipt-depth")
+        XCTAssertTrue(app.staticTexts["Corrected gasket reading"].waitForExistence(timeout: 10))
+        let context = app.buttons["Proposed work context"].firstMatch
+        for _ in 0..<6 {
+            if context.exists && context.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(context.exists && context.isHittable)
+        context.tap()
+        let photo = app.buttons["View photo cited by reading"]
+        for _ in 0..<8 {
+            if photo.exists && photo.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(photo.exists && photo.isHittable)
+        photo.tap()
+        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
+        app.buttons["Close"].tap()
+        noWrites(app)
+    }
     func testWithdrawnCanonicalReceiptShowsUnavailableAndDoesNotSubstituteOldItems() {
         let app = open("receipt-withdrawn")
         XCTAssertTrue(app.staticTexts["Receipt detail unavailable"].waitForExistence(timeout: 10))

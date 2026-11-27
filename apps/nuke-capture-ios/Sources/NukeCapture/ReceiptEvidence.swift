@@ -80,6 +80,7 @@ struct ReceiptWorkContextLine: Decodable {
     struct Frame: Decodable {
         struct Photographer: Decodable { let attribution: String? }
         let image_id: UUID
+        let image_url: String?
         let taken_at: String?
         let photographer: Photographer?
     }
@@ -105,6 +106,7 @@ struct ReceiptWorkContextLine: Decodable {
             let installed: String?
             let confidence: Double?
             let quote: String?
+            let image_id: UUID?
         }
         let status: String
         let holder: Holder?
@@ -378,7 +380,12 @@ struct ReceiptEvidenceContent: View {
 /// One line's proposed receipt-to-work context, behind a disclosure, in the same rooted-row style as the line.
 struct ReceiptWorkContextDisclosure: View {
     let line: ReceiptWorkContextLine
-    @State private var showingHistoricalFrame = false
+    private struct ReadingPhoto: Identifiable {
+        let id: UUID
+        let url: String
+        let takenAt: String?
+    }
+    @State private var selectedPhoto: ReadingPhoto?
 
     var body: some View {
         DisclosureGroup("Proposed work context") {
@@ -411,12 +418,21 @@ struct ReceiptWorkContextDisclosure: View {
             if let judgment = line.judgment {
                 RootedValueView(label: "Question", value: ReceiptWorkWords.judgment(judgment), status: judgment.status == "answered" ? .projected : .pending)
                 if let quote = judgment.answer?.quote { Text("“\(quote)”").font(.caption).textSelection(.enabled) }
+                if let imageID = judgment.answer?.image_id,
+                   let frame = line.frames.first(where: { $0.image_id == imageID }),
+                   let url = frame.image_url, !url.isEmpty {
+                    Button("View photo cited by reading") {
+                        selectedPhoto = ReadingPhoto(id: imageID, url: url, takenAt: frame.taken_at)
+                    }
+                }
             }
             if let historical = line.historical_judgment {
                 RootedValueView(label: "Earlier reading", value: ReceiptWorkWords.historical(historical), status: .attributed)
                 if let quote = historical.answer?.quote { Text("“\(quote)”").font(.caption).textSelection(.enabled) }
                 if let frame = historical.frame, let url = frame.image_url, !url.isEmpty {
-                    Button("View photo from earlier reading") { showingHistoricalFrame = true }
+                    Button("View photo from earlier reading") {
+                        selectedPhoto = ReadingPhoto(id: frame.image_id, url: url, takenAt: frame.taken_at)
+                    }
                     Text("This opens the current photo record; the original image bytes were not recorded with the reading.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -424,12 +440,10 @@ struct ReceiptWorkContextDisclosure: View {
         }
         .font(.callout)
         .accessibilityIdentifier("receipt-work-context")
-        .sheet(isPresented: $showingHistoricalFrame) {
-            if let frame = line.historical_judgment?.frame, let url = frame.image_url, !url.isEmpty {
-                FullScreenGalleryView(photos: [VehicleGalleryImage(id: frame.image_id, image_url: url, thumbnail_url: nil,
-                    is_primary: nil, taken_at: frame.taken_at, labels: nil, ai_processing_status: nil,
-                    image_category: nil, created_at: nil, vision_gate_agent_reasoning: nil)])
-            }
+        .sheet(item: $selectedPhoto) { photo in
+            FullScreenGalleryView(photos: [VehicleGalleryImage(id: photo.id, image_url: photo.url, thumbnail_url: nil,
+                is_primary: nil, taken_at: photo.takenAt, labels: nil, ai_processing_status: nil,
+                image_category: nil, created_at: nil, vision_gate_agent_reasoning: nil)])
         }
     }
 }

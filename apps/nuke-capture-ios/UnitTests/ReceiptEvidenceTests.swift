@@ -40,6 +40,12 @@ final class ReceiptEvidenceTests: XCTestCase {
         XCTAssertTrue(ReceiptWorkWords.historical(reading).contains("photo context has since changed"))
         XCTAssertTrue(ReceiptWorkWords.historical(reading).contains("installed cannot tell"))
     }
+    func testCurrentReadingDecodesItsCitedFrameIdentity() throws {
+        let line = try XCTUnwrap(workRead().lines.first)
+        let citedID = try XCTUnwrap(line.judgment?.answer?.image_id)
+        let frame = try XCTUnwrap(line.frames.first { $0.image_id == citedID })
+        XCTAssertEqual(frame.image_url, "https://fixture.nuke.invalid/current.jpg")
+    }
     func reads(day: ReceiptEvidenceDay? = nil, work: ReceiptWorkContextRead? = nil) -> ReceiptEvidenceReaders.Reads {
         let row = link(), payload = day ?? self.day()
         return .init(links: { _ in [row] }, day: { _, _ in payload }, work: { _, _ in

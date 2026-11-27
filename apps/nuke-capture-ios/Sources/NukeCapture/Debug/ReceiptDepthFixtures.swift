@@ -29,7 +29,7 @@ enum ReceiptDepthFixtures {
        "line_number":1,"description":"Corrected gasket reading","amount":35,"conclusion":"install_window_photographed","confidence":0.57,
        "status":"proposed","kind":"receipt_time_context","not_asserted":["independent_corroboration","installation_proof","payment_proof","owner_sign"],
        "anchor_date":"2026-03-09","anchor_source":"page_date:receipt_date","zone":"engine","days_to_first_photo":3,
-       "frames":[{"image_id":"00000000-0000-4000-8000-00000000e001","taken_at":"2026-03-12T15:00:00+00:00","image_url":null,"thumbnail_url":null,
+       "frames":[{"image_id":"00000000-0000-4000-8000-00000000e001","taken_at":"2026-03-12T15:00:00+00:00","image_url":"https://fixture.nuke.invalid/current.jpg","thumbnail_url":null,
                   "photographer":{"label":"photographer (from the photo record)","attribution":"Fixture photographer","documented_by_user_id":null}}],
        "frames_hidden":1,
        "lineage":{"receipt_id":"\(receiptId)","source_document_table":"vehicle_documents","source_document_id":"00000000-0000-4000-8000-00000000d001",
@@ -44,7 +44,7 @@ enum ReceiptDepthFixtures {
            "frame":{"image_id":"00000000-0000-4000-8000-00000000e002","image_url":"https://fixture.nuke.invalid/earlier.jpg","taken_at":"2026-03-10"}},
        "judgment":{"question_id":"00000000-0000-4000-8000-00000000f301","status":"answered","question":"receipt_part_visible",
                    "asked_at":"2026-03-13T00:00:00+00:00","holder":null,
-                   "answer":{"visible":"yes","installed":"cannot_tell","confidence":0.6,"image_id":null,"quote":"gasket visible"}}}],
+                   "answer":{"visible":"yes","installed":"cannot_tell","confidence":0.6,"image_id":"00000000-0000-4000-8000-00000000e001","quote":"gasket visible"}}}],
      "withdrawn":[{"evidence_id":"00000000-0000-4000-8000-00000000f102","receipt_id":"\(receiptId)","item_id":null,"line_number":2,
                    "status":"withdrawn","reason":"line_removed","prior_evidence_id":null,"prior_conclusion":"receipt_day_photographed"}]}
     """
