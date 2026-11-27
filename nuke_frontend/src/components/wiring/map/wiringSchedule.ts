@@ -21,6 +21,12 @@ const recordColumn: ScheduleColumn = { key: 'record', label: 'Open record', widt
 /** Keep engineering uncertainty verbatim; redact amounts/order IDs with the same mask as the UI. */
 export const engineeringText = (value: string | null | undefined): string | null => value == null || value === '' ? null : mask(value);
 
+/** The shared numeric AWG keys stay in the records; screen and XLSX use trade notation. */
+export function scheduleCellValue(column: Pick<ScheduleColumn, 'key'>, value: ScheduleCell): ScheduleCell {
+  return column.key === 'gauge' && typeof value === 'number' && Number.isInteger(value) && value <= 0 && value >= -3
+    ? `${1 - value}/0` : value;
+}
+
 export function scheduleLength(wire: MapWire): { planned: number | null; kind: string | null; basis: string | null } {
   const planned = finite(wire.plannedLengthFt);
   if (planned !== null) return { planned, kind: word(wire.plannedLengthKind) ?? 'Basis not recorded', basis: wire.plannedLengthBasis ?? null };
@@ -114,7 +120,7 @@ export async function wiringWorkbookBytes(schedule: WiringSchedule): Promise<Uin
     sheet.addTable({ name: `Wiring_${table.id}`, ref: 'A5', headerRow: true, totalsRow: false,
       style: { theme: 'TableStyleMedium2', showRowStripes: true },
       columns: table.columns.map(c => ({ name: c.label, filterButton: true })),
-      rows: table.rows.map(row => table.columns.map(c => row.cells[c.key] ?? null)),
+      rows: table.rows.map(row => table.columns.map(c => scheduleCellValue(c, row.cells[c.key] ?? null))),
     });
     sheet.getRow(5).height = 32;
     sheet.getRow(5).font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -131,7 +137,7 @@ export async function wiringWorkbookBytes(schedule: WiringSchedule): Promise<Uin
       })));
       table.columns.forEach((c, j) => {
         const cell = excelRow.getCell(j + 1), value = row.cells[c.key];
-        if (c.numeric) cell.numFmt = c.key === 'gauge' ? '0' : '0.###';
+        if (c.numeric) cell.numFmt = c.key === 'gauge' ? typeof cell.value === 'string' ? '@' : '0' : '0.###';
         if (c.link && typeof value === 'string' && value.startsWith('https://nuke.ag/')) {
           cell.value = { text: 'Open record', hyperlink: value };
           cell.font = { name: 'Arial', size: 11, color: { argb: 'FF1764A0' }, underline: true };
