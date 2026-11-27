@@ -227,8 +227,11 @@ def snapshot(repo, workspace, record):
                 updates.append(b'0 ' + b'0' * 40 + b'\t' + os.fsencode(rel) + b'\0')
                 continue
             p = local_path(workspace, rel)
-            body = os.fsencode(item['target']) if item['kind'] == 'link' else p.read_bytes()
-            oid = git(workspace, 'hash-object', '-w', '--stdin', env=working_env, data=body).strip()
+            if item['kind'] == 'link':
+                oid = git(workspace, 'hash-object', '-w', '--stdin', env=working_env,
+                          data=os.fsencode(item['target'])).strip()
+            else:
+                oid = git(workspace, 'hash-object', '-w', '--no-filters', '--', str(p), env=working_env).strip()
             mode = b'120000' if item['kind'] == 'link' else (b'100755' if item['mode'] & 0o111 else b'100644')
             updates.append(mode + b' ' + oid + b'\t' + os.fsencode(rel) + b'\0')
         if updates:
@@ -299,7 +302,12 @@ def restore(repo, record, target):
     for item in data['working_files']:
         if item['kind'] == 'file':
             p = local_path(target, item['path'])
-            p.write_bytes(git(repo, 'cat-file', 'blob', data['working_commit'] + ':' + item['path']))
+            with p.open('wb') as stream:
+                result = subprocess.run(['git', '-C', str(repo), 'cat-file', 'blob',
+                                         data['working_commit'] + ':' + item['path']],
+                                        stdout=stream, stderr=subprocess.PIPE, timeout=180)
+            if result.returncode:
+                raise ValueError('Could not recover file bytes: ' + item['path'])
             p.chmod(item['mode'])
     directories = []
     with tarfile.open(record / 'local.tar.gz', 'r:gz') as tar:
@@ -319,8 +327,8 @@ def restore(repo, record, target):
                 os.link(source, p)
             elif member.isfile():
                 p.parent.mkdir(parents=True, exist_ok=True)
-                with tar.extractfile(member) as stream:
-                    p.write_bytes(stream.read())
+                with tar.extractfile(member) as stream, p.open('wb') as destination:
+                    shutil.copyfileobj(stream, destination, length=1024 * 1024)
                 p.chmod(member.mode)
             else:
                 raise ValueError('Unsafe archive member')
