@@ -41,9 +41,9 @@ export function useOverlayCompute(initialDevices: ManifestDevice[] = []) {
       location_zone: device.location_zone || 'dash',
       layer: device.layer || 'interior',
       price: device.price || 0,
-      purchased: false,
       pct_complete: 30,
       ...device,
+      purchased: device.purchased ?? null,
     };
     previousResult.current = result;
     setDevices(prev => [...prev, newDevice]);
