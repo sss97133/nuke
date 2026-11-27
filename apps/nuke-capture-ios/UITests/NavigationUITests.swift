@@ -259,6 +259,30 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue((search.value as? String)?.contains("1973 Coupe") == true, "returning must retain the Garage search")
     }
 
+    func testLaborFoldStatesAreVisibleOnTheVehicleProfile() {
+        for mode in ["pending", "stale"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+            app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_LABOR_STATE": mode]
+            app.launch()
+            let garage = app.tabBars.buttons["Garage"].firstMatch
+            XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+            let vehicle = app.staticTexts["1973 Fixture Coupe"].firstMatch
+            XCTAssertTrue(vehicle.waitForExistence(timeout: 10)); vehicle.tap()
+            let status = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", mode == "pending" ? "has not been calculated yet" : "An update is needed")).firstMatch
+            XCTAssertTrue(reveal(status, in: app, swipes: 20), app.debugDescription)
+            if mode == "stale" {
+                XCTAssertTrue(status.label.contains("Last calculated"))
+                let engine = app.buttons.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "engine", "8 h to 16 h")).firstMatch
+                XCTAssertTrue(reveal(engine, in: app), app.debugDescription)
+            } else {
+                XCTAssertFalse(app.staticTexts["0 of 0 segments with hours"].exists)
+            }
+            XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+            app.terminate()
+        }
+    }
+
     /// The garage cards (garage-cards fixture): newest activity first under year headings, the undated car last,
     /// the price only from the profile's masthead Claim, the log book read from the card's menu, and no writes.
     func testGarageCardsOrderByActivityAndOpenTheLogBook() {
@@ -381,6 +405,69 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 10), "a person must open within Explore's navigation stack")
         back.tap()
         XCTAssertTrue(person.waitForExistence(timeout: 5), "returning must preserve the search results")
+    }
+
+    private func openUnresolvedGarageStatement(_ mode: String = "") -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "garage-cards", "NUKE_FIXTURE_GARAGE_SOURCE": mode]
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let pending = app.descendants(matching: .any).matching(identifier: "garage.identityPending").firstMatch
+        XCTAssertTrue(reveal(pending, in: app), app.debugDescription); pending.tap()
+        let source = app.descendants(matching: .any).matching(identifier: "garage.unresolved.00000000-0000-4000-8000-00000000d301").firstMatch
+        XCTAssertTrue(reveal(source, in: app), app.debugDescription); source.tap()
+        return app
+    }
+
+    func testUnresolvedGarageStatementShowsItsCurrentSourceAndReturns() {
+        let app = openUnresolvedGarageStatement()
+        let text = app.staticTexts["garage.statement.source"]
+        XCTAssertTrue(text.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(text.label, "Fixture: I have a shared interest in this pickup.")
+        XCTAssertTrue(app.staticTexts["Stated relationship: shared interest"].exists)
+        XCTAssertTrue(app.staticTexts["No identified vehicle is linked to this statement."].exists)
+        let sessions = app.buttons["Review photo sessions"].firstMatch
+        XCTAssertTrue(reveal(sessions, in: app))
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "garage-unresolved-statement"; shot.lifetime = .keepAlways; add(shot)
+        sessions.tap()
+        XCTAssertTrue(app.navigationBars["Confirm Sessions"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons["Vehicle statement"].firstMatch.tap()
+        XCTAssertTrue(text.waitForExistence(timeout: 10))
+        app.navigationBars.buttons["Garage"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Fixture pending pickup"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testUnresolvedGarageStatementRechecksWithdrawalAndRetriesFailure() {
+        for mode in ["withdrawn", "failure"] {
+            let app = openUnresolvedGarageStatement(mode)
+            if mode == "withdrawn" {
+                XCTAssertTrue(app.staticTexts["This statement wasn't returned in the current Garage read."].waitForExistence(timeout: 10))
+                XCTAssertFalse(app.staticTexts["garage.statement.source"].exists)
+            } else {
+                let retry = app.buttons["Retry"].firstMatch
+                XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+                XCTAssertFalse(app.staticTexts["This statement wasn't returned in the current Garage read."].exists)
+                retry.tap()
+                XCTAssertTrue(app.staticTexts["garage.statement.source"].waitForExistence(timeout: 10), app.debugDescription)
+            }
+            XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+            app.terminate()
+        }
+    }
+
+    func testUnresolvedGarageStatementRechecksAfterPhotoReview() {
+        let app = openUnresolvedGarageStatement("withdrawn_on_return")
+        XCTAssertTrue(app.staticTexts["garage.statement.source"].waitForExistence(timeout: 10))
+        let sessions = app.buttons["Review photo sessions"].firstMatch
+        XCTAssertTrue(reveal(sessions, in: app)); sessions.tap()
+        XCTAssertTrue(app.navigationBars["Confirm Sessions"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons["Vehicle statement"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["This statement wasn't returned in the current Garage read."].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["garage.statement.source"].exists)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 
     /// The first-launch welcome (rooted directly; fixture launches skip it in the real root so
