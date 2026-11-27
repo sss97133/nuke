@@ -7,7 +7,9 @@ import { physicalSchematicPieces, readPhysicalHarnessModel, type PhysicalHarness
 import type { Rel } from './useWorkspaceSelection';
 
 const transport = vi.hoisted(() => ({ rpc: vi.fn() }));
+const viewer = vi.hoisted(() => ({ id: null as string | null }));
 vi.mock('../../../lib/supabase', () => ({ supabase: transport }));
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ session: viewer.id ? { user: { id: viewer.id } } : null }) }));
 import { SchematicBlock } from './SchematicBlock';
 
 const vehicleId = 'vehicle-fixture';
@@ -39,13 +41,23 @@ function fixture(): PhysicalHarnessModel {
     connector_matings: [{ from_endpoint_id: 'cab', to_endpoint_id: 'bay' }],
   };
 }
+function workspaceResponse(model: PhysicalHarnessModel) {
+  return {
+    contract_version: 1, vehicle_id: vehicleId, snapshot_hash: 'workspace-snapshot',
+    snapshot_kind: 'current_read_not_published_revision', source: model,
+    selection: { owner: 'harness_model_inputs', contract_version: 2, kind: 'decided_design',
+      circuit_ids: model.circuits.filter(c => c.design_status === 'decided').map(c => c.id),
+      segment_ids: model.segments.filter(s => s.design_status === 'decided'
+        && model.circuits.some(c => c.id === s.circuit_id && c.design_status === 'decided')).map(s => s.id) },
+  };
+}
 let host: HTMLDivElement, root: Root, model: PhysicalHarnessModel;
 const onSelect = vi.fn();
 const rel: Rel = { nodes: new Set(), wires: new Set(), pins: new Set(), segs: new Set(), devs: new Set(), sections: new Set() };
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  model = fixture(); transport.rpc.mockReset(); onSelect.mockReset();
-  transport.rpc.mockImplementation(async () => ({ data: model, error: null }));
+  model = fixture(); transport.rpc.mockReset(); onSelect.mockReset(); viewer.id = null;
+  transport.rpc.mockImplementation(() => ({ abortSignal: async () => ({ data: workspaceResponse(model), error: null }) }));
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
@@ -55,10 +67,10 @@ async function render(id = vehicleId, isOwner = false) {
 }
 it('draws exactly the two keyed physical pieces, retaining a separate connector mate', async () => {
   await render();
-  expect(transport.rpc).toHaveBeenCalledWith('harness_schematic_model', { p_vehicle_id: vehicleId });
+  expect(transport.rpc).toHaveBeenCalledWith('harness_source_workspace', { p_vehicle_id: vehicleId });
   expect([...host.querySelectorAll('[data-segment-id]')].map(n => n.getAttribute('data-segment-id'))).toEqual(['piece-cabin', 'piece-engine']);
   expect(host.querySelectorAll('[data-mating="connector"]')).toHaveLength(1);
-  expect(host.querySelector('[data-snapshot-hash]')?.getAttribute('data-snapshot-hash')).toBe('fixture-snapshot');
+  expect(host.querySelector('[data-snapshot-hash]')?.getAttribute('data-snapshot-hash')).toBe('workspace-snapshot');
   expect(host.textContent).toContain('1.09 ft planned'); expect(host.textContent).toContain('3.54 ft planned');
   await act(async () => host.querySelector('[data-segment-id]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   expect(onSelect).toHaveBeenCalledWith('w:110');
@@ -140,8 +152,45 @@ it('rejects wrong-vehicle and incompatible snapshots', () => {
 });
 it('removes the drawing when its new vehicle model is unavailable', async () => {
   await render(); expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(2);
-  transport.rpc.mockResolvedValue({ data: null, error: { message: 'Unavailable' } });
+  transport.rpc.mockReturnValue({ abortSignal: async () => ({ data: null, error: { message: 'Unavailable' } }) });
   await render('another-vehicle');
   expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(0);
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('could not be read');
+});
+
+it('rechecks actual source on focus and withdraws a previously readable drawing after access loss', async () => {
+  await render(); expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(2);
+  model.segments = [model.segments[0]];
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(1);
+  transport.rpc.mockReturnValue({ abortSignal: async () => ({ data: null, error: null }) });
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(0);
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('could not be read');
+});
+
+it('does not let a late read overwrite the new vehicle or continue after unmount', async () => {
+  let finish: (value: unknown) => void = () => {};
+  let signal: AbortSignal | undefined;
+  transport.rpc.mockReturnValue({ abortSignal: (s: AbortSignal) => {
+    signal = s; return new Promise(resolve => { finish = resolve; });
+  } });
+  await render();
+  const oldSignal = signal;
+  transport.rpc.mockReturnValue({ abortSignal: async () => ({ data: null, error: null }) });
+  await render('another-vehicle');
+  expect(oldSignal?.aborted).toBe(true);
+  await act(async () => finish({ data: workspaceResponse(fixture()), error: null }));
+  expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(0);
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('could not be read');
+});
+
+it('clears the previous viewer records as soon as the signed-in identity changes', async () => {
+  viewer.id = 'owner';
+  await render(); expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(2);
+  transport.rpc.mockReturnValue({ abortSignal: async () => new Promise(() => {}) });
+  viewer.id = null;
+  await render();
+  expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(0);
+  expect(host.textContent).toContain('Reading the physical wiring model');
 });

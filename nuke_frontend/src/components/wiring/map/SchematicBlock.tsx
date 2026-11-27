@@ -102,7 +102,7 @@ function layout(pieces: SchematicPiece[]) {
 export function SchematicBlock({ cw, vehicleId, section, sel, rel, isOwner, onSelect }: {
   cw: Colorway; vehicleId: string | undefined; section: string; sel: string | null; rel: Rel; isOwner: boolean; onSelect: (id: string) => void;
 }) {
-  const { model, loaded, error } = usePhysicalHarnessModel(vehicleId);
+  const { model, loaded, error, refreshing } = usePhysicalHarnessModel(vehicleId);
   const pieces = useMemo(() => model ? physicalSchematicPieces(model, section, isOwner) : [], [model, section, isOwner]);
   const L = useMemo(() => layout(pieces), [pieces]);
   const [z, setZ] = useState(1);
@@ -124,8 +124,8 @@ export function SchematicBlock({ cw, vehicleId, section, sel, rel, isOwner, onSe
   const conflicts = pieces.filter(p => p.segment.specification_state === 'conflict');
   const selected = pieces.filter(p => sel === 'w:' + p.code);
   return (
-    <div ref={box} data-snapshot-hash={model?.snapshot_hash} style={{ position: 'relative', height: '100%', overflow: 'auto', background: cw.surface }}>
-      <p>{pieces.length} physical wire pieces. Planned lengths need verification before cutting. Recorded rule checks are not tied to the current physical specifications.</p>
+    <div ref={box} aria-busy={refreshing} data-snapshot-hash={model?.snapshot_hash} style={{ position: 'relative', height: '100%', overflow: 'auto', background: cw.surface }}>
+      <p>{pieces.length} physical wire pieces. Planned lengths need verification before cutting. Recorded rule checks are not tied to the current physical specifications. {refreshing && 'Checking current source…'}</p>
       {conflicts.length > 0 && <p role="alert">{conflicts.map(p => `Wire ${p.code}: ${physicalPieceLabel(p)}`).join('; ')}</p>}
       {selected.length > 0 && <ul aria-label="Selected wire pieces">{selected.map(p => <li key={p.id}>{physicalPieceLabel(p)}</li>)}</ul>}
       {pieces.some(p => !p.from || !p.to) && <ul aria-label="Incomplete wire connections">{pieces.filter(p => !p.from || !p.to).map(p =>
