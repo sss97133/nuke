@@ -61,7 +61,7 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
   );
   const lenOf = (wc: string) => {
     const wire = ix.wireByCode.get(wc);
-    return wire ? scheduleLength(wire, site).planned : null;
+    return wire ? scheduleLength(wire).planned : null;
   };
   // a status word is the owner's; a visitor sees the result, or a dash where there is none yet
   const pending = isOwner ? <span style={{ color: cw.warn }}>ENDS PENDING</span> : '—';
@@ -133,7 +133,7 @@ export function WorkspaceProps({ cw, map, ix, site, sel, isOwner, onSelect, owne
   }
   if (k === 'w') {
     const w = ix.wireByCode.get(v); if (!w) return null;
-    const ch = ix.chain.get(v) ?? [], length = scheduleLength(w, site), segs = (ix.segsByWire.get(v) ?? []).map(s => ix.segById.get(s)!).filter(Boolean);
+    const ch = ix.chain.get(v) ?? [], length = scheduleLength(w), segs = (ix.segsByWire.get(v) ?? []).map(s => ix.segById.get(s)!).filter(Boolean);
     const open = openEndOf(w, ix);
     // Preserve each termination record; the drawing index shortens cavity labels
     // and must not decide what the selected record says about an unresolved pin.

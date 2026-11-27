@@ -67,18 +67,27 @@ describe('current wiring schedule', () => {
     expect(ends.find(r => r.id === 'end-2')!.cells).toMatchObject({ wire: null, node: null, circuitId: 'missing-wire', endpointId: 'missing-endpoint' });
   });
 
-  it('uses stored planned length ahead of a different model estimate', () => {
-    expect(scheduleLength(wire(), site, vehicleId).planned).toBe(4.6);
-    expect(scheduleLength(wire({ plannedLengthFt: 0 }), site, vehicleId).planned).toBe(0);
+  it('preserves the database planned value, including an explicit zero', () => {
+    expect(scheduleLength(wire()).planned).toBe(4.6);
+    expect(scheduleLength(wire({ plannedLengthFt: 0 })).planned).toBe(0);
   });
 
-  it('never sums unknown segment lengths as zero or uses undated/wrong-vehicle routes', () => {
-    const w = wire({ plannedLengthFt: null });
-    expect(scheduleLength(w, { ...site, segs: [segment('s1', 1), segment('s2', null)] }, vehicleId).planned).toBeNull();
-    expect(scheduleLength(w, { ...site, routesOn: null }, vehicleId).planned).toBeNull();
-    expect(scheduleLength(w, { ...site, sourceVehicleId: 'vehicle-b' }, vehicleId).planned).toBeNull();
-    expect(scheduleLength(w, { ...site, sourceVehicleId: null }, vehicleId).planned).toBeNull();
-    expect(scheduleLength(w, site, vehicleId)).toMatchObject({ planned: 3.281, kind: 'Model route estimate · 2026-09-29' });
+  it.each([null, NaN, Infinity, -Infinity])('keeps a missing or invalid database length unknown (%s)', plannedLengthFt => {
+    expect(scheduleLength(wire({ plannedLengthFt }))).toEqual({ planned: null, kind: null, basis: null });
+  });
+
+  it('keeps a database-unknown length blank in the schedule and Excel despite a complete dated route model', async () => {
+    const missing = wire({ code: 'ODY_NEG', plannedLengthFt: null, plannedLengthKind: null, plannedLengthBasis: null });
+    const routedSite = { ...site, segs: [{ ...segment('route-only', 1), w: ['ODY_NEG'] }] };
+    const schedule = buildWiringSchedule({ ...map, wires: [missing] }, routedSite, vehicleId, false);
+    expect(schedule.tables[0].rows[0].cells).toMatchObject({ planned: null, lengthKind: null, measured: null });
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await wiringWorkbookBytes(schedule) as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    for (const key of ['planned', 'lengthKind', 'measured']) {
+      const column = schedule.tables[0].columns.findIndex(c => c.key === key) + 1;
+      expect(workbook.worksheets[0].getRow(6).getCell(column).value).toBeNull();
+    }
   });
 
   it('round-trips a genuine XLSX with the identical records, values, filters and frozen headers', async () => {
