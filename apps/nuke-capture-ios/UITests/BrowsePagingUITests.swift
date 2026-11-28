@@ -30,7 +30,10 @@ final class BrowsePagingUITests: XCTestCase {
         let price = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Current bid")).firstMatch
         XCTAssertTrue(price.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(price.isHittable); price.tap()
-        XCTAssertTrue(app.navigationBars["Why this range"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.navigationBars["Price details"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["No fresh projection for this lot"].exists, app.debugDescription)
+        XCTAssertFalse(app.navigationBars["Why this range"].exists)
+        XCTAssertFalse(app.staticTexts["A projection from comparable finished lots. It is not a guarantee."].exists)
         app.buttons["Done"].tap()
         XCTAssertTrue(app.staticTexts["Fixture Coupe"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")

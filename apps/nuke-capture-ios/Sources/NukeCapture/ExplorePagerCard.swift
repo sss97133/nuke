@@ -69,7 +69,7 @@ struct ExplorePagerCard: View {
     let onOpenProfile: (ExploreFeedItem) -> Void
     let onOpenDiscussion: (ExploreFeedItem) -> Void
     let onChoice: (ExploreSignalEvent.Choice, ExploreFeedItem) -> Void
-    /// Opens the "why this range" stack for this card.
+    /// Opens the price evidence for this card.
     let onWhy: (ExploreFeedItem) -> Void
 
     private enum PageID: Hashable {
@@ -397,7 +397,10 @@ struct ExplorePagerCard: View {
     @ViewBuilder private var menu: some View {
         let hasTaste = ExplorePreferences.key(item) != nil
         if item.amount != nil {
-            Button { showWhy() } label: { Label("Why this range", systemImage: "chart.bar.doc.horizontal") }
+            Button { showWhy() } label: {
+                Label(ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh).detailsTitle,
+                      systemImage: "chart.bar.doc.horizontal")
+            }
         }
         Button { choose(.more) } label: { Label("Show more like this", systemImage: "hand.thumbsup") }
             .disabled(!hasTaste)
