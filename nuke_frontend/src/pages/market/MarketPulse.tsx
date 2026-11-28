@@ -582,7 +582,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const salesOutcome = params.get('salesOutcome');
   const salesLens: MarketSalesLens = {
     scopeKey: params.get('salesScope'), days: params.get('days') === '2' ? 2 : 7,
-    ...([...params.keys()].some(key=>['family','model','year','era','facet'].includes(key)||key.startsWith('truck_')) ? {recordedFamily:{
+    ...([...params.keys()].some(key=>['family','family_name','model','year','era','facet'].includes(key)||key.startsWith('truck_')) ? {recordedFamily:{
       familyKey:params.get('family'),familyName:params.get('family_name'),model:params.get('model'),
       year:params.get('year'),era:params.get('era'),
       unsupportedFilters:[...params.keys()].filter(key=>(key==='facet'||key.startsWith('truck_'))&&Boolean(params.get(key))),
@@ -612,7 +612,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (key === 'live' || key === 'make' || key === 'house') next.delete('bidRange');
     if (key === 'make') {
       next.delete('model');
-      ['family', 'family_name', 'year', 'era', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
+      ['family', 'family_name', 'year', 'era', 'mapFocus', 'mapChild','axis','facet',
+        ...[...next.keys()].filter(k=>k.startsWith('truck_'))].forEach(k => next.delete(k));
     }
     if (key === 'make') next.delete('mapBy');
     if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
@@ -626,7 +627,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
     const next = new URLSearchParams(params);
     next.set('make', nextMake ?? 'all');
-    ['model', 'family', 'family_name', 'year', 'era', 'bidRange', 'day', 'series', 'salesScope', 'salesOffset', 'salesSnapshot', 'salesOutcome', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
+    ['model', 'family', 'family_name', 'year', 'era', 'bidRange', 'day', 'series', 'salesScope', 'salesOffset', 'salesSnapshot', 'salesOutcome', 'mapFocus', 'mapChild', 'board','axis','facet',
+      ...[...next.keys()].filter(k=>k.startsWith('truck_'))].forEach(k => next.delete(k));
     if (scopeKey?.startsWith('subject:')||scopeKey?.startsWith('descriptive:')) next.set('salesScope', scopeKey);
     next.delete('lot');
     setParams(next);
@@ -680,8 +682,12 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     const next = new URLSearchParams(params);
     if(change.recordedFamily){
       const selected=change.recordedFamily;
-      ['family','family_name','model','year','era','axis','facet','salesScope','day','series','salesOffset','salesSnapshot','salesOutcome',
-        ...[...next.keys()].filter(k=>k.startsWith('truck_'))].forEach(k=>next.delete(k));
+      ['family','family_name','model','year','era','salesScope','day','series','salesOffset','salesSnapshot','salesOutcome'].forEach(k=>next.delete(k));
+      // Choosing the family over a conflicting sales group does not authorize
+      // dropping its configuration filters. Clear those only on that action.
+      if(selected.unsupportedFilters?.length===0){
+        ['axis','facet',...[...next.keys()].filter(k=>k.startsWith('truck_'))].forEach(k=>next.delete(k));
+      }
       for(const [key,value] of Object.entries({family:selected.familyKey,family_name:selected.familyName,model:selected.model,year:selected.year,era:selected.era})){
         if(value!==null)next.set(key,value);
       }

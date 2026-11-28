@@ -425,3 +425,12 @@ it.each(['invalid year','unkeyed model','unsupported configuration','conflicting
       expect(changed).toHaveBeenCalledWith({recordedFamily:{...selected,conflictingScope:false},drill:null});
     }else expect(container.textContent).toContain('make population is not substituted');
   });
+it('makes a series-name cohort visible before the evidence disclosure',async()=>{
+ const familyKey='95000000-0000-4000-8000-000000000005',r=capturedReceipt();
+ r.scope={kind:'recorded_family',label:'FIXTURE MAKE Silverado',family:'Silverado',family_key:familyKey,family_rule:{model_contains:['silverado']} as any};fixture.query.data=r;
+ const lens={scopeKey:null,days:7 as const,metric:'captured_sell_through' as const,drill:null,benchmark:false,
+ recordedFamily:{familyKey,familyName:'Silverado',year:null,era:null,model:null}};
+ await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={lens}/>));
+ const text=container.querySelector('p.market-scope-exclusions__family');expect(text?.textContent).toContain('containing “silverado”');
+ expect(text?.textContent).toContain('older truck series');expect(text?.closest('details')).toBeNull();
+});

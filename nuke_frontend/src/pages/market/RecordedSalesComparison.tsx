@@ -314,6 +314,10 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
       <p style={{ fontSize: 12, margin: '8px 0', overflowWrap: 'anywhere' }}>
         {day(receipt.event_from)} ≤ event time &lt; {day(receipt.event_to)} UTC.
       </p>
+      {receipt.scope.kind==='recorded_family'&&Boolean(receipt.scope.family_rule?.model_contains.length)&&<p className="market-scope-exclusions__family">
+        This group includes recorded model labels containing {receipt.scope.family_rule!.model_contains.map(word=>`“${word}”`).join(', ')}.
+        {' '}That can include older truck series; the label does not establish a factory model.
+      </p>}
       {captured && summary && !receipt.truncated && <p style={{ fontSize: 14, margin: '8px 0' }}>
         {selectedName}: {percent(summary.ratio)} recorded sold · {number(summary.numerator)}/{number(summary.denominator)} known bidding outcomes.
         {' '}{number(summary.withdrawn)} withdrawn · {number(summary.unresolved)} unresolved.
