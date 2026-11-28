@@ -39,7 +39,10 @@ vi.mock('./useMarketRowDetails', async importOriginal => ({
 }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
 vi.mock('./RecordedSalesComparison', () => ({
-  default: () => <section aria-label="Recorded sales comparison">Recorded sales chart</section>,
+  default: ({lens,onLensChange}: any) => <section aria-label="Recorded sales comparison" data-sales-lens={JSON.stringify(lens)}>Recorded sales chart
+    {lens?.recordedFamily?.conflictingScope&&<button onClick={()=>onLensChange({recordedFamily:{...lens.recordedFamily,conflictingScope:false},drill:null})}>Resolve sampled sales group</button>}
+    {!lens?.recordedFamily?.conflictingScope&&lens?.recordedFamily?.unsupportedFilters?.length>0&&<button onClick={()=>onLensChange({recordedFamily:{...lens.recordedFamily,unsupportedFilters:[]},drill:null})}>Clear sampled configuration</button>}
+  </section>,
   MarketScopeControls: ({ make, onMakeChange, onViewChange, children }: any) => <>
     <span>Comparison scope {make ?? 'all'}</span>
     <button onClick={() => onViewChange('sales')}>Use recorded sales view</button>
@@ -65,7 +68,7 @@ function lot(id: string, make: string, bid: number | null, hours: number): LiveA
 }
 async function render(query = '') {
   await act(async () => {
-    window.history.replaceState({}, '', '/?' + query);
+    window.history.replaceState({}, '', '/?' + query.replace(/^\?/,''));
     window.dispatchEvent(new PopStateEvent('popstate'));
     root.render(<BrowserRouter><MarketPulse onUnavailable={<div>Existing feed fallback</div>} /></BrowserRouter>);
   });
@@ -300,7 +303,7 @@ describe('market answer -> supporting lots', () => {
     await click('Bid sounds on');
     expect(button('Bid sounds off').getAttribute('aria-pressed')).toBe('false');
   });
-  it('drills recorded model labels into exactly their records and replaces inventory when switching views', async () => {
+  it('keeps the selected recorded model while changing between inventory and outcomes', async () => {
     fixture.pulse.data.auctions[0].model = 'Recorded model A';
     fixture.pulse.data.auctions[1].model = 'Recorded model B';
     fixture.pulse.data.auctions[2].model = 'Recorded model B';
@@ -311,10 +314,10 @@ describe('market answer -> supporting lots', () => {
     expect(container.querySelector('[aria-label="Inventory drill path"]')?.textContent).toContain('Recorded model B');
     await click('Use recorded sales view');
     expect(window.location.search).toContain('view=sales');
-    expect(window.location.search).not.toContain('model=');
+    expect(window.location.search).toContain('model=Recorded+model+B');
     expect(container.querySelector('[aria-label="Live lots"]')).toBeNull();
     await click('Use inventory view');
-    expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
+    expect(boardTitles()).toEqual(['first', 'unknown']);
   });
   it('attaches its map observer when an initially loading population becomes available', async () => {
     const data = fixture.pulse.data; fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
@@ -1041,4 +1044,37 @@ it('keeps the descriptive scope URL and clears the previous contributor snapshot
  await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Choose Ford model year')!.click());
  const params=new URLSearchParams(window.location.search);expect(params.get('make')).toBe('FORD');expect(params.get('salesScope')).toBe('descriptive:70000000-0000-4000-8000-000000000001');
  for(const key of ['day','series','salesOffset','salesSnapshot','salesOutcome'])expect(params.has(key)).toBe(false);
+});
+
+it('preserves the keyed family/year scope when switching to outcomes and clears the previous source receipt',async()=>{
+ const key='95000000-0000-4000-8000-000000000001';
+ await render('?make=PORSCHE&family='+key+'&family_name=911&year=2000&era=2000-2000&salesScope=descriptive:old&day=2026-10-03&series=selected&salesOffset=20&salesSnapshot='+('a'.repeat(32)));
+ await click('Use recorded sales view');
+ const params=new URLSearchParams(window.location.search);
+ expect(params.get('family')).toBe(key);expect(params.get('year')).toBe('2000');expect(params.get('era')).toBe('2000-2000');
+ for(const k of ['salesScope','day','series','salesOffset','salesSnapshot'])expect(params.has(k)).toBe(false);
+ const lens=JSON.parse(container.querySelector('[data-sales-lens]')!.getAttribute('data-sales-lens')!);
+ expect(lens.recordedFamily).toEqual({familyKey:key,familyName:'911',year:'2000',era:'2000-2000',model:null,unsupportedFilters:[],conflictingScope:false});
+});
+
+it('requires a separate action to clear configuration after choosing the vehicle family over a conflicting sales group',async()=>{
+ const family='95000000-0000-4000-8000-000000000001';
+ await render('?view=sales&make=PORSCHE&family='+family+'&family_name=911&year=2000&salesScope=descriptive:old&axis=drive&facet=2WD&truck_drive=2WD');
+ await click('Resolve sampled sales group');
+ let p=new URLSearchParams(window.location.search);expect(p.has('salesScope')).toBe(false);
+ expect(p.get('family')).toBe(family);expect(p.get('year')).toBe('2000');expect(p.get('facet')).toBe('2WD');expect(p.get('truck_drive')).toBe('2WD');
+ let lens=JSON.parse(container.querySelector('[data-sales-lens]')!.getAttribute('data-sales-lens')!);expect(lens.recordedFamily.unsupportedFilters).toEqual(['facet','truck_drive']);
+ await click('Clear sampled configuration');p=new URLSearchParams(window.location.search);
+ for(const key of ['axis','facet','truck_drive'])expect(p.has(key)).toBe(false);
+ expect(p.get('family')).toBe(family);expect(p.get('year')).toBe('2000');
+});
+it('clears dependent configuration when the user explicitly chooses another make',async()=>{
+ await render('?view=sales&make=PORSCHE&family=old&axis=drive&facet=2WD&truck_drive=2WD');
+ await click('Choose Ford cohort');const p=new URLSearchParams(window.location.search);
+ expect(p.get('make')).toBe('FORD');for(const key of ['family','axis','facet','truck_drive'])expect(p.has(key)).toBe(false);
+});
+it('treats a label-only family URL as an unkeyed scope rather than a make population',async()=>{
+ await render('view=sales&make=PORSCHE&family_name=911');
+ const lens=JSON.parse(container.querySelector('[data-sales-lens]')!.getAttribute('data-sales-lens')!);
+ expect(lens.recordedFamily.familyKey).toBeNull();expect(lens.recordedFamily.familyName).toBe('911');
 });

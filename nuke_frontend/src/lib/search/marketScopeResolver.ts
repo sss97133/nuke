@@ -645,6 +645,8 @@ export function isOnMarketTab(pathname: string, search: string): boolean {
 
 export function buildMarketScopeUrl(scope: ResolvedMarketScope, currentSearch = ''): string {
   const next = new URLSearchParams(currentSearch);
+  const scopeKeys=['make','family','model','year','era'];
+  const previousScope=scopeKeys.map(k=>next.get(k));
   next.set('tab', 'market');
   next.set('make', scope.make);
   if (scope.family) next.set('family', scope.family);
@@ -657,6 +659,12 @@ export function buildMarketScopeUrl(scope: ResolvedMarketScope, currentSearch = 
   else next.delete('year');
   if (scope.era) next.set('era', scope.era);
   else next.delete('era');
+  if(scopeKeys.some((key,i)=>next.get(key)!==previousScope[i])){
+    ['salesScope','day','series','salesOffset','salesSnapshot','salesOutcome'].forEach(key=>next.delete(key));
+    if(next.get('make')!==previousScope[0]||next.get('family')!==previousScope[1]){
+      ['axis','facet',...[...next.keys()].filter(k=>k.startsWith('truck_'))].forEach(key=>next.delete(key));
+    }
+  }
   ['lot', 'inspect', 'board', 'mapFocus', 'mapChild'].forEach((k) => next.delete(k));
   return `/?${next.toString()}`;
 }

@@ -6,7 +6,14 @@ export type SalesMetric = 'recorded_sale_events' | 'captured_sell_through';
 export type SalesOutcome = 'known_bidding_outcome' | 'sold' | 'no_sale' | 'withdrawn' | 'unresolved';
 export type SalesScope = { kind: 'canonical_make'; canonical_make_id: string }
   | { kind: 'supported_subject'; subject_id: string }
-  | { kind: 'descriptive_subject'; subject_id: string };
+  | { kind: 'descriptive_subject'; subject_id: string }
+  | { kind: 'recorded_family'; canonical_make_id: string; family_key: string;
+      year?: number; year_start?: number; year_end?: number; model_name?: string };
+export interface RecordedFamilySelection {
+  familyKey: string | null; familyName: string | null; year: string | null; era: string | null; model: string | null;
+  unsupportedFilters?: string[];
+  conflictingScope?: boolean;
+}
 export interface SalesScopeOption { key: string; label: string; make: string; scope: SalesScope;
   descriptive?: { model: string; grain: 'year' | 'model'; year: number | null; yearStart: number | null; yearEnd: number | null } }
 export interface DescriptiveScopeRule {
@@ -20,6 +27,24 @@ export interface DescriptiveScopeCatalog { candidateCount: number; options: Sale
 const SCOPE_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SCOPE_PURPOSE='captured_sell_through_descriptive';
 const SCOPE_METHOD='unique_exact_registered_model_alias_with_declared_year_scope_v1';
+const FAMILY_METHOD='recorded_market_family_membership_v1';
+
+/** Translate the existing keyed market URL; membership and all measurements stay in PostgreSQL. */
+export function recordedFamilySalesOption(make: SalesScopeOption | undefined, selected: RecordedFamilySelection): SalesScopeOption | undefined {
+  if (make?.scope.kind !== 'canonical_make' || !selected.familyKey || selected.unsupportedFilters?.length || selected.conflictingScope
+    || !(SCOPE_UUID.test(selected.familyKey) || selected.familyKey === 'other')) return undefined;
+  const year = selected.year == null ? undefined : /^\d{4}$/.test(selected.year) ? Number(selected.year) : NaN;
+  const range = selected.era == null ? null : /^(\d{4})-(\d{4})$/.exec(selected.era);
+  if (year !== undefined && (!Number.isInteger(year) || year < 1885 || year > 2100)
+    || selected.era != null && (!range || Number(range[1]) < 1885 || Number(range[2]) > 2100 || Number(range[1]) > Number(range[2]))
+    || range && year !== undefined && (year < Number(range[1]) || year > Number(range[2]))
+    || selected.model != null && (!selected.model.trim() || selected.model.trim().length > 160)) return undefined;
+  const scope: SalesScope = { kind: 'recorded_family', canonical_make_id: make.scope.canonical_make_id,
+    family_key: selected.familyKey, ...(year !== undefined ? { year } : range ? { year_start: Number(range[1]), year_end: Number(range[2]) } : {}),
+    ...(selected.model != null ? { model_name: selected.model.trim().toLowerCase() } : {}) };
+  return { key: `family:${JSON.stringify(scope)}`, make: make.make, scope,
+    label: `${make.make} ${selected.familyName ?? 'recorded family'}${year !== undefined ? ` · ${year}` : range ? ` · ${range[1]}–${range[2]}` : ''}${selected.model ? ` · ${selected.model}` : ''}` };
+}
 
 export interface SalesWindow { event_from: string; event_to: string }
 export interface SalesDrill { bucket: string; series: SalesSeries; offset?: number; snapshotHash?: string; outcome?: SalesOutcome }
@@ -51,28 +76,55 @@ export interface SalesContributor {
   outcome_class?: 'sold' | 'no_sale' | 'withdrawn' | 'unresolved'; source_outcome?: string | null;
   outcome_reason?: string; numerator_contribution?: number; denominator_contribution?: number;
   vehicle_identity?: { year: number | null; make: string | null; model: string | null };
+  membership?: RecordedFamilyMembership;
+  source_event_ids?: string[];
 }
-export interface SalesScopeExclusion {
+export interface RecordedFamilyMembership {
+  method: 'recorded_market_family_membership_v1'; resolved_make_id: string | null; requested_family_key: string;
+  recorded_family_id: string | null; recorded_family: string | null; matched_phrase: string | null;
+  family_year_start: number | null; family_year_end: number | null; current_longest_family_count: number | null;
+  matching_family_ids: string[]; matching_family_keys_limit: 20; matching_family_keys_truncated: boolean | null;
+  matching_family_keys_fingerprint: string | null; dictionary_reason: string | null;
+  dictionary_current: boolean | null; all_longest_families_in_scope: boolean | null; series_name_contains: string | null;
+  dictionary_source: 'mv_model_family_names'; dictionary_row_clock: 'unavailable'; family_rule_fingerprint: string;
+  identity_basis: 'current_parent_record'; factory_configuration_verified: false;
+}
+export interface RecordedFamilyRule {
+  contract_version: 1; state: 'available'; purpose: 'recorded_family_rule'; method: 'recorded_market_family_rule_v1';
+  brand: string; family_key: string; family: string; label_count: 1; bucket_kind: 'named';
+  family_keys: string[]; model_contains: string[]; fingerprint: string; metadata_as_of: string;
+  dictionary_source: 'mv_model_family_names'; dictionary_row_clock: 'unavailable';
+  historical_dictionary_versions_available: false; factory_configuration_verified: false;
+}
+interface SalesScopeExclusionBase {
   auction_event_id:string;source_event_ids:string[];vehicle_id:string;source_url:string;event_at:string;
   vehicle_identity:{year:number|null;make:string|null;model:string|null};vehicle_identity_basis:'current_representative_parent_record';
   source_observed_at:string|null;source_read_basis:'direct_fetch'|'cached_snapshot'|'unknown';
   source_outcome:string|null;recorded_outcome_class:'sold'|'no_sale'|'withdrawn'|'unresolved';
   membership_reason:string;conflicting_listing_aliases:boolean;recorded_canonical_make_id:string|null;resolved_make_id:string|null;
+}
+export interface SalesScopeExclusion extends SalesScopeExclusionBase {
   requested_canonical_model_id:string;exact_registered_model_count:number;matching_model_keys_limit:20;
   matching_model_keys_fingerprint:string|null;matching_model_keys_truncated:boolean;matching_model_ids:string[];
 }
-export interface SalesScopeExclusions {
-  contract_version:1;state:'partial'|'unavailable';reason:string;membership_method:string;snapshot_hash:string;
+export interface SalesFamilyScopeExclusion extends SalesScopeExclusionBase {
+  requested_family_key: string; membership: RecordedFamilyMembership;
+}
+interface SalesScopeExclusionsBase {
+  state:'partial'|'unavailable';reason:string;membership_method:string;snapshot_hash:string;
   record_limit:20;complete_external_capture:false;current_parent_identity_only:true;
   total:number|null;records_truncated:boolean|null;omitted_records:number|null;
-  reason_counts:{reason:string;episodes:number}[]|null;records:SalesScopeExclusion[];
+  reason_counts:{reason:string;episodes:number}[]|null;
 }
+export type SalesScopeExclusions = SalesScopeExclusionsBase & (
+  {contract_version:1;records:SalesScopeExclusion[]} | {contract_version:2;records:SalesFamilyScopeExclusion[]});
 export interface RecordedSalesReceipt extends SalesWindow {
   contract_version: number; metric_id: string; state: 'partial'; reason: string;
   unit?: string; method_id?: string; method_version?: number;
   scope: { kind?: SalesScope['kind']; canonical_make_id?: string; subject_id?: string;
     label?: string; comparison_basis?: string; comparison_scope_basis?: string; grain?: string; year?: number|null;
-    year_start?: number|null; year_end?: number|null; canonical_model_id?: string; membership_method?: string; admission_purpose?: string };
+    year_start?: number|null; year_end?: number|null; canonical_model_id?: string; membership_method?: string; admission_purpose?: string;
+    family_key?: string; family?: string; model_name?: string|null; family_rule?: RecordedFamilyRule; registry_inputs_fingerprint?: string };
   knowledge_cutoff: string; knowledge_mode: string; generated_at: string;
   candidate_limit: number; captured_candidates: number; truncated: boolean;
   coverage: {
@@ -229,7 +281,7 @@ function assertCapturedOutcomes(data: RecordedSalesReceipt, request: SalesReques
   };
   const unit = 'fraction_of_known_retained_bidding_outcomes';
   if (data.scope?.kind !== request.scope.kind
-    || (request.scope.kind === 'canonical_make' ? data.scope.canonical_make_id !== request.scope.canonical_make_id
+    || (request.scope.kind === 'canonical_make' || request.scope.kind === 'recorded_family' ? data.scope.canonical_make_id !== request.scope.canonical_make_id
       : data.scope.subject_id !== request.scope.subject_id)
     || Date.parse(data.event_from) !== Date.parse(request.event_from) || Date.parse(data.event_to) !== Date.parse(request.event_to)
     || data.unit !== unit || data.method_id !== 'captured_auction_outcomes' || data.method_version !== 1
@@ -249,6 +301,25 @@ function assertCapturedOutcomes(data: RecordedSalesReceipt, request: SalesReques
       ||scope.grain==='year'&&(scope.year===null||scope.year_start!==null||scope.year_end!==null)
       ||scope.grain==='model'&&scope.year!==null)fail();
   }
+  if(request.scope.kind==='recorded_family') {
+    const s=data.scope, r=s.family_rule;
+    if(s.admission_purpose!=='captured_sell_through_recorded_family'||s.membership_method!==FAMILY_METHOD
+      ||s.family_key!==request.scope.family_key||s.year!==(request.scope.year??null)
+      ||s.year_start!==(request.scope.year_start??null)||s.year_end!==(request.scope.year_end??null)
+      ||s.model_name!==(request.scope.model_name?.trim().toLowerCase()??null)||!s.label||!s.family
+      ||!(/^[a-f0-9]{32}$/).test(s.registry_inputs_fingerprint??'')
+      ||!r||r.contract_version!==1||r.state!=='available'||r.purpose!=='recorded_family_rule'
+      ||r.method!=='recorded_market_family_rule_v1'||r.family_key!==s.family_key||r.family!==s.family
+      ||r.label_count!==1||r.bucket_kind!=='named'||!Array.isArray(r.family_keys)||!r.family_keys.includes(s.family_key)
+      ||r.family_keys.length>1000||r.family_keys.some(k=>typeof k!=='string'||!SCOPE_UUID.test(k))
+      ||new Set(r.family_keys).size!==r.family_keys.length||!Array.isArray(r.model_contains)
+      ||r.model_contains.length>1||r.model_contains.some(w=>!['silverado','sierra'].includes(w))
+      ||!(/^[a-f0-9]{32}$/).test(r.fingerprint)||!Number.isFinite(Date.parse(data.knowledge_cutoff))||!Number.isFinite(Date.parse(r.metadata_as_of))
+      ||Date.parse(r.metadata_as_of)>Date.parse(data.knowledge_cutoff)
+      ||r.dictionary_source!=='mv_model_family_names'||r.dictionary_row_clock!=='unavailable'
+      ||r.historical_dictionary_versions_available!==false||r.factory_configuration_verified!==false
+      ||data.scope_exclusions?.contract_version!==2) fail();
+  }
   const keys = new Set<string>();
   for (const p of data.series) {
     const key = `${p.bucket_start}:${p.series}`;
@@ -260,8 +331,45 @@ function assertCapturedOutcomes(data: RecordedSalesReceipt, request: SalesReques
     if (!['sold', 'no_sale', 'withdrawn', 'unresolved'].includes(c.outcome_class ?? '')
       || c.numerator_contribution !== (c.outcome_class === 'sold' ? 1 : 0)
       || c.denominator_contribution !== (c.outcome_class === 'sold' || c.outcome_class === 'no_sale' ? 1 : 0)) fail();
+    if(request.scope.kind==='recorded_family'){
+      assertFamilyMembership(c.membership,data);
+      const m=c.membership!;
+      const uniqueFamily=m.current_longest_family_count===1&&m.recorded_family_id!==null
+        &&m.recorded_family_id===m.matching_family_ids[0]&&data.scope.family_rule!.family_keys.includes(m.recorded_family_id);
+      const unionMembership=m.all_longest_families_in_scope===true&&(m.current_longest_family_count??0)>1
+        &&m.matching_family_ids.every(id=>data.scope.family_rule!.family_keys.includes(id));
+      const selectedMembership=c.series!=='selected'||m.resolved_make_id===request.scope.canonical_make_id
+        &&(m.series_name_contains!==null||m.dictionary_current===true&&(uniqueFamily||unionMembership));
+      if(!selectedMembership||!['selected','benchmark'].includes(c.series)||!SCOPE_UUID.test(c.auction_event_id)||!SCOPE_UUID.test(c.vehicle_id)
+        ||!/^https:\/\/bringatrailer[.]com\/listing\/[^/?#]+\/$/.test(c.source_url)
+        ||!Array.isArray(c.source_event_ids)||!c.source_event_ids.includes(c.auction_event_id)
+        ||c.source_event_ids.some(id=>!SCOPE_UUID.test(id))||new Set(c.source_event_ids).size!==c.source_event_ids.length
+        ||!Number.isFinite(Date.parse(c.event_at))||Date.parse(c.event_at)<Date.parse(data.event_from)||Date.parse(c.event_at)>=Date.parse(data.event_to))fail();
+    }
   }
   if(data.scope_exclusions!==undefined)assertScopeExclusions(data);
+}
+
+function assertFamilyMembership(m:RecordedFamilyMembership|undefined,data:RecordedSalesReceipt){
+  const fail=():never=>{throw new Error('Unsupported recorded-family membership receipt');};
+  const nullableUuid=(v:unknown)=>v===null||typeof v==='string'&&SCOPE_UUID.test(v);
+  const nullableText=(v:unknown)=>v===null||typeof v==='string';
+  const nullableBoolean=(v:unknown)=>v===null||typeof v==='boolean';
+  if(!m||m.method!==FAMILY_METHOD||m.requested_family_key!==data.scope.family_key
+    ||m.family_rule_fingerprint!==data.scope.family_rule?.fingerprint||!nullableUuid(m.resolved_make_id)||!nullableUuid(m.recorded_family_id)
+    ||![m.recorded_family,m.matched_phrase,m.dictionary_reason].every(nullableText)
+    ||![m.family_year_start,m.family_year_end].every(v=>v===null||Number.isSafeInteger(v))
+    ||![m.dictionary_current,m.all_longest_families_in_scope,m.matching_family_keys_truncated].every(nullableBoolean)
+    ||m.identity_basis!=='current_parent_record'||m.factory_configuration_verified!==false
+    ||m.dictionary_source!=='mv_model_family_names'||m.dictionary_row_clock!=='unavailable'
+    ||m.matching_family_keys_limit!==20||!Array.isArray(m.matching_family_ids)
+    ||m.matching_family_ids.some(id=>!nullableUuid(id)||id===null)||new Set(m.matching_family_ids).size!==m.matching_family_ids.length
+    ||!(m.series_name_contains===null||data.scope.family_rule?.model_contains.includes(m.series_name_contains)))return fail();
+  const n=m.current_longest_family_count;
+  if(n===null){if(m.matching_family_ids.length||m.matching_family_keys_fingerprint!==null||m.matching_family_keys_truncated!==null)return fail();}
+  else if(!Number.isSafeInteger(n)||n<0||n>1000||m.matching_family_ids.length!==Math.min(n,20)
+    ||m.matching_family_keys_truncated!==(n>20)
+    ||(n===0?m.matching_family_keys_fingerprint!==null:!(/^[a-f0-9]{32}$/).test(m.matching_family_keys_fingerprint??'')))return fail();
 }
 
 /** Optional during the SQL rollout; once present, explanations must describe this exact population and snapshot. */
@@ -272,7 +380,7 @@ function assertScopeExclusions(data:RecordedSalesReceipt){
   const uuid=(v:unknown)=>typeof v==='string'&&SCOPE_UUID.test(v);
   const nullableUuid=(v:unknown)=>v===null||uuid(v);
   const nullableText=(v:unknown)=>v===null||typeof v==='string';
-  if(!x||data.scope.kind!=='descriptive_subject'||x.contract_version!==1||x.membership_method!==data.scope.membership_method
+  if(!x||!(data.scope.kind==='descriptive_subject'&&x.contract_version===1||data.scope.kind==='recorded_family'&&x.contract_version===2)||x.membership_method!==data.scope.membership_method
     ||x.snapshot_hash!==data.evidence.snapshot_hash||x.record_limit!==20||x.complete_external_capture!==false
     ||x.current_parent_identity_only!==true||!Array.isArray(x.records))return fail();
   if(data.truncated){
@@ -291,20 +399,27 @@ function assertScopeExclusions(data:RecordedSalesReceipt){
       ||typeof r.source_url!=='string'||!/^https:\/\/bringatrailer[.]com\/listing\/[^/?#]+\/$/.test(r.source_url)||urls.has(r.source_url)
       ||!Array.isArray(r.source_event_ids)||!r.source_event_ids.length||r.source_event_ids.some(v=>!uuid(v))
       ||new Set(r.source_event_ids).size!==r.source_event_ids.length||!r.source_event_ids.includes(r.auction_event_id)
-      ||!reasons.has(r.membership_reason)||r.requested_canonical_model_id!==data.scope.canonical_model_id
+      ||!reasons.has(r.membership_reason)
       ||!nullableUuid(r.recorded_canonical_make_id)||!nullableUuid(r.resolved_make_id)||typeof r.conflicting_listing_aliases!=='boolean'
       ||!r.vehicle_identity||r.vehicle_identity_basis!=='current_representative_parent_record'
       ||!nullableText(r.vehicle_identity.make)||!nullableText(r.vehicle_identity.model)
       ||!(r.vehicle_identity.year===null||Number.isSafeInteger(r.vehicle_identity.year))
       ||!nullableText(r.source_outcome)||!['sold','no_sale','withdrawn','unresolved'].includes(r.recorded_outcome_class)
-      ||!count(r.exact_registered_model_count)||r.matching_model_keys_limit!==20||!Array.isArray(r.matching_model_ids)
-      ||r.matching_model_ids.length!==Math.min(r.exact_registered_model_count,20)||r.matching_model_ids.some(v=>!uuid(v))
-      ||new Set(r.matching_model_ids).size!==r.matching_model_ids.length||r.matching_model_keys_truncated!==(r.exact_registered_model_count>20)
-      ||(r.exact_registered_model_count===0?r.matching_model_keys_fingerprint!==null:!(/^[a-f0-9]{32}$/).test(r.matching_model_keys_fingerprint??''))
       ||!Number.isFinite(Date.parse(r.event_at))||Date.parse(r.event_at)<Date.parse(data.event_from)||Date.parse(r.event_at)>=Date.parse(data.event_to)
       ||!['direct_fetch','cached_snapshot','unknown'].includes(r.source_read_basis)
       ||(r.source_read_basis==='unknown'?r.source_observed_at!==null:!r.source_observed_at||!Number.isFinite(Date.parse(r.source_observed_at))
         ||Date.parse(r.source_observed_at)>Date.parse(data.knowledge_cutoff)))return fail();
+    if('requested_canonical_model_id' in r){
+      if(x.contract_version!==1||r.requested_canonical_model_id!==data.scope.canonical_model_id
+        ||!count(r.exact_registered_model_count)||r.matching_model_keys_limit!==20||!Array.isArray(r.matching_model_ids)
+        ||r.matching_model_ids.length!==Math.min(r.exact_registered_model_count,20)||r.matching_model_ids.some(v=>!uuid(v))
+        ||new Set(r.matching_model_ids).size!==r.matching_model_ids.length||r.matching_model_keys_truncated!==(r.exact_registered_model_count>20)
+        ||(r.exact_registered_model_count===0?r.matching_model_keys_fingerprint!==null:!(/^[a-f0-9]{32}$/).test(r.matching_model_keys_fingerprint??'')))return fail();
+    }else{
+      if(x.contract_version!==2||r.requested_family_key!==data.scope.family_key)return fail();
+      assertFamilyMembership(r.membership,data);
+      if(r.membership.resolved_make_id!==r.resolved_make_id)return fail();
+    }
     ids.add(r.auction_event_id);urls.add(r.source_url);seenReasons.set(r.membership_reason,1+(seenReasons.get(r.membership_reason)??0));
   }
   if([...seenReasons].some(([reason,n])=>n>reasons.get(reason)!))return fail();

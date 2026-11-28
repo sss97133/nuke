@@ -3,8 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Text } from '../../kit';
-import { matchSalesMake, recordedSalesRequest, recordedSalesWindow, useRecordedSales, useSalesScopes, useDescriptiveSalesScopes,
-  type SalesDrill, type SalesMetric, type SalesOutcome, type SalesPoint, type SalesSeries, type SalesScopeOption, type RecordedSalesReceipt } from './useRecordedSales';
+import { matchSalesMake, recordedFamilySalesOption, recordedSalesRequest, recordedSalesWindow, useRecordedSales, useSalesScopes, useDescriptiveSalesScopes,
+  type SalesDrill, type SalesMetric, type SalesOutcome, type SalesPoint, type SalesSeries, type SalesScopeOption, type RecordedSalesReceipt,
+  type RecordedFamilySelection, type RecordedFamilyMembership } from './useRecordedSales';
 import './RecordedSalesComparison.css';
 
 const label: React.CSSProperties = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 };
@@ -15,7 +16,21 @@ const day = (date: string) => date.slice(0, 10);
 const utc = (date: string) => new Date(date).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
 const seriesName = (series: SalesSeries, selected: string, captured = false) => series === 'selected' ? selected : captured ? 'Rest of captured BaT' : 'Rest of BaT';
 export interface MarketSalesLens { scopeKey: string | null; days: 2 | 7; drill: SalesDrill | null; benchmark: boolean;
-  metric?: SalesMetric; weeksBack?: number }
+  metric?: SalesMetric; weeksBack?: number; recordedFamily?: RecordedFamilySelection }
+
+function FamilyMembershipKeys({membership:m}:{membership:RecordedFamilyMembership}){
+  return <details className="market-scope-exclusions__family"><summary>Recorded family membership</summary>
+    <p>{m.series_name_contains?`Declared series-name match: ${m.series_name_contains}.`:
+      m.dictionary_reason?.replace(/_/g,' ')??'Family assignment unavailable.'}
+      {m.all_longest_families_in_scope&&' Every longest matching family is inside this group; the specific family remains ambiguous.'}
+      {' '}Current parent identity; factory specification and build equivalence are unverified.</p>
+    <code>Requested family {m.requested_family_key}<br/>Recorded family {m.recorded_family_id??'unresolved'}<br/>
+      Matched phrase {m.matched_phrase??'unavailable'}<br/>Dictionary current {m.dictionary_current===null?'unknown':String(m.dictionary_current)}<br/>
+      Matching family count {number(m.current_longest_family_count)}<br/>Matching keys {m.matching_family_ids.join(', ')||'none'}<br/>
+      {m.matching_family_keys_truncated&&<>Additional matching keys omitted.<br/></>}
+      Rule {m.family_rule_fingerprint}<br/>Dictionary source {m.dictionary_source}; row clock unavailable</code>
+  </details>;
+}
 
 function CountBucket({ point, name, max, refused, active, onClick, captured = false }: {
   point: SalesPoint; name: string; max: number; refused: boolean; active: boolean; onClick: () => void; captured?: boolean;
@@ -62,11 +77,12 @@ function ScopeExclusionEvidence({receipt}:{receipt:RecordedSalesReceipt}){
         {row.source_read_basis==='unknown'?'Source read time unknown.':<>Source {row.source_read_basis==='direct_fetch'?'direct read':'cached snapshot'} <time dateTime={row.source_observed_at!}>{utc(row.source_observed_at!)}</time>.</>}</div>
       <details><summary>Membership keys and matches</summary>
         <code>Episode {row.auction_event_id}<br/>Source aliases {row.source_event_ids.join(', ')}<br/>
-          Requested model {row.requested_canonical_model_id}<br/>
+          {'requested_canonical_model_id' in row&&<>Requested model {row.requested_canonical_model_id}<br/></>}
           Recorded make key {row.recorded_canonical_make_id??'unknown'}<br/>Resolved make key {row.resolved_make_id??'unresolved'}</code>
-        <div>{number(row.exact_registered_model_count)} exact registered model match{row.exact_registered_model_count===1?'':'es'}; showing {number(row.matching_model_ids.length)} keys.
+        {'requested_canonical_model_id' in row&&<><div>{number(row.exact_registered_model_count)} exact registered model match{row.exact_registered_model_count===1?'':'es'}; showing {number(row.matching_model_ids.length)} keys.
           {row.matching_model_keys_truncated&&' Additional matching keys are omitted.'}</div>
-        {row.matching_model_ids.length>0&&<ul>{row.matching_model_ids.map(id=><li key={id}><code>{id}</code></li>)}</ul>}
+        {row.matching_model_ids.length>0&&<ul>{row.matching_model_ids.map(id=><li key={id}><code>{id}</code></li>)}</ul>}</>}
+        {'membership' in row&&<FamilyMembershipKeys membership={row.membership}/>}
       </details>
     </li>)}</ol>
     <p>Current PostgreSQL membership read · snapshot <code>{evidence.snapshot_hash}</code>. Refresh recorded evidence to read current inputs.</p>
@@ -114,20 +130,20 @@ function DescriptiveGroupControl({catalog,makeOption,selectedKey,onSelect}:{
 }
 
 /** The cohort select and the view pair for the market strip. Driven by the URL through its props; no state of its own. */
-export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onViewChange, children, makeSelect = true }: {
+export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onViewChange, children, makeSelect = true, recordedFamily }: {
   make: string | null; scopeKey: string | null; view: 'inventory' | 'sales';
   onMakeChange: (make: string | null, scopeKey?: string | null) => void; onViewChange: (view: 'inventory' | 'sales') => void;
   children?: React.ReactNode;
   /** False when the host offers the make another way (the live board's rows and map). */
-  makeSelect?: boolean;
+  makeSelect?: boolean; recordedFamily?: RecordedFamilySelection;
 }) {
   const catalog = useSalesScopes();
   const baseOptions = catalog.data ?? [];
   const makeOption = matchSalesMake(baseOptions,make);
-  const descriptive = useDescriptiveSalesScopes(makeOption?.make??null,view==='sales'&&makeSelect);
+  const descriptive = useDescriptiveSalesScopes(makeOption?.make??null,view==='sales'&&makeSelect&&!recordedFamily);
   const options = [...baseOptions,...(!descriptive.isError?descriptive.data?.options??[]:[])];
   const chosenOption = options.find(o => o.key === scopeKey);
-  const option = view === 'sales' && scopeKey != null
+  const option = recordedFamily ? makeOption : view === 'sales' && scopeKey != null
     ? chosenOption?.make.toUpperCase() === make?.toUpperCase() ? chosenOption : undefined
     : matchSalesMake(options, make);
   // A stored inventory label may have no unique registry entry; preserve that scope in the control.
@@ -150,7 +166,7 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
         {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
       </select>
     </label>}
-    {makeSelect&&view==='sales'&&<DescriptiveGroupControl catalog={descriptive} makeOption={makeOption} selectedKey={scopeKey}
+    {makeSelect&&view==='sales'&&!recordedFamily&&<DescriptiveGroupControl catalog={descriptive} makeOption={makeOption} selectedKey={scopeKey}
       onSelect={key=>onMakeChange(options.find(option=>option.key===key)?.make??makeOption?.make??null,key)}/>}
   </>;
 }
@@ -188,17 +204,18 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   // Porsche is the owner's initial comparison case; its ID still comes from the public registry.
   const requestedMake = onMakeChange ? make : make ?? 'PORSCHE';
   const makeOption = matchSalesMake(baseOptions,requestedMake);
-  const descriptive = useDescriptiveSalesScopes(makeOption?.make??null,view==='sales');
+  const familySelection=lens?.recordedFamily;
+  const descriptive = useDescriptiveSalesScopes(makeOption?.make??null,view==='sales'&&!familySelection);
   const options = [...baseOptions,...(!descriptive.isError?descriptive.data?.options??[]:[])];
   const chosenOption = options.find(o => o.key === chosen);
-  const option = view === 'sales' && chosen != null
+  const option = familySelection ? recordedFamilySalesOption(makeOption,familySelection) : view === 'sales' && chosen != null
     ? chosenOption?.make.toUpperCase() === requestedMake?.toUpperCase() ? chosenOption : undefined
     : matchSalesMake(options, requestedMake);
   // A stored inventory label may have no unique registry entry; preserve that scope in the control.
   const unmatchedMake = requestedMake && !makeOption ? requestedMake : null;
-  const makeSelectKey = option?.scope.kind==='descriptive_subject'?makeOption?.key:option?.key;
-  const descriptiveNeedsMetric = option?.scope.kind==='descriptive_subject'&&!captured;
-  const selectedDescriptive = chosen?.startsWith('descriptive:')??false;
+  const makeSelectKey = option?.scope.kind==='descriptive_subject'||familySelection?makeOption?.key:option?.key;
+  const descriptiveNeedsMetric = (option?.scope.kind==='descriptive_subject'||option?.scope.kind==='recorded_family')&&!captured;
+  const selectedDescriptive = !familySelection&&(chosen?.startsWith('descriptive:')??false);
   const request = useMemo(() => option && view === 'sales' && !descriptiveNeedsMetric ? recordedSalesRequest(option.scope, window, drill, metric) : null, [option, window, drill, view, metric, descriptiveNeedsMetric]);
   const query = useRecordedSales(request);
   const response = request ? query.data : undefined;
@@ -207,8 +224,10 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   const max = captured ? 1 : Math.max(1, ...receipt?.series.filter(p => showBenchmark || p.series === 'selected').map(p => p.value ?? 0) ?? []);
   const summary = receipt?.summary?.find(s => s.series === 'selected');
   const receiptName = receipt?.scope.kind==='descriptive_subject'
-    ? `${receipt.scope.label??'Recorded model'} · ${receipt.scope.grain==='year'?`${receipt.scope.year} model year`:'registered model group'}` : receipt?.scope.label;
-  const selectedName = (receipt?.scope.kind==='descriptive_subject'?receiptName:option?.label??receiptName) ?? 'Selected scope';
+    ? `${receipt.scope.label??'Recorded model'} · ${receipt.scope.grain==='year'?`${receipt.scope.year} model year`:'registered model group'}`
+    : receipt?.scope.kind==='recorded_family'
+      ? `${receipt.scope.label}${receipt.scope.year!=null?` · ${receipt.scope.year}`:receipt.scope.year_start!=null?` · ${receipt.scope.year_start}–${receipt.scope.year_end}`:''}${receipt.scope.model_name?` · ${receipt.scope.model_name}`:''}` : receipt?.scope.label;
+  const selectedName = (receipt?.scope.kind==='descriptive_subject'||receipt?.scope.kind==='recorded_family'?receiptName:option?.label??receiptName) ?? 'Selected scope';
   const contributors = (receipt?.evidence.contributors ?? []).filter(c => drill
     && c.series === drill.series && day(c.bucket_start) === day(drill.bucket));
   useEffect(() => {
@@ -248,7 +267,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
           {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
         </select>
       </label>}
-      {controls&&view==='sales'&&<DescriptiveGroupControl catalog={descriptive} makeOption={makeOption} selectedKey={chosen}
+      {controls&&view==='sales'&&!familySelection&&<DescriptiveGroupControl catalog={descriptive} makeOption={makeOption} selectedKey={chosen}
         onSelect={key=>{setChosen(key);setDrill(null);onMakeChange?.(options.find(option=>option.key===key)?.make??makeOption?.make??null,key);}}/>}
       {view === 'sales' && <label style={label}>Measure<br /><select aria-label="Market outcome measure" className="market-control k-body" value={metric}
         onChange={e => { const next = e.target.value as SalesMetric; setMetric(next); setDrill(null); setWeeksBack(0);
@@ -274,9 +293,16 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     </div>}
     {catalog.isError ? <div role="status">The scope registry could not be read. <button className="market-control k-body" onClick={() => void catalog.refetch()}>Retry scope registry</button></div>
       : catalog.isLoading ? <div role="status">Reading the public scope registry…</div>
+      : familySelection&&!option&&view==='sales' ? <div role="status">{familySelection.conflictingScope
+        ? <>This link names a vehicle family and a different sales grouping. Choose one population.
+          {onLensChange&&<button type="button" className="market-control" onClick={()=>onLensChange({recordedFamily:{...familySelection,conflictingScope:false},drill:null})}>Use this vehicle family</button>}</>
+        : familySelection.unsupportedFilters?.length
+        ? <>Auction-time membership is not yet qualified for the selected configuration filters ({familySelection.unsupportedFilters.join(', ')}). No broader population is substituted.
+          {onLensChange&&<button type="button" className="market-control" onClick={()=>onLensChange({recordedFamily:{...familySelection,unsupportedFilters:[]},drill:null})}>Clear configuration filters</button>}</>
+        : <>This vehicle scope needs a registered family key and a valid year or year range. Its make population is not substituted. Choose a keyed family with the vehicle scope above.</>}</div>
       : selectedDescriptive&&!option&&view==='sales' ? <div role="status">{descriptive.isPending?'Reading the requested model/year group…':descriptive.isError?'The requested group catalog could not be read. No make population is substituted.':'The requested group is not admitted in the current catalog. Choose a group or inspect its registry decision.'}</div>
       : !option && view === 'sales' ? <div role="status">{make ? `No unique registered make matches ${make}. ` : ''}Choose a registered make or grouping to compare its recorded sales with the rest of BaT.</div> : null}
-    {descriptiveNeedsMetric&&view==='sales'&&<div role="status">Recorded model/year groups currently measure captured sell-through. <button type="button" className="market-control" onClick={()=>{setMetric('captured_sell_through');setDrill(null);setWeeksBack(0);onLensChange?.({metric:'captured_sell_through',weeksBack:0,drill:null});}}>Show captured sell-through</button></div>}
+    {descriptiveNeedsMetric&&view==='sales'&&<div role="status">Recorded family and model/year groups currently measure captured sell-through. <button type="button" className="market-control" onClick={()=>{setMetric('captured_sell_through');setDrill(null);setWeeksBack(0);onLensChange?.({metric:'captured_sell_through',weeksBack:0,drill:null});}}>Show captured sell-through</button></div>}
     {request && view === 'sales' && query.isFetching && <div role="status">Reading recorded outcomes{drill ? ' and bucket contributors' : ''}…</div>}
     {request && view === 'sales' && query.isError && <div role="status">Recorded outcomes could not be refreshed.{receipt ? ' The previous read remains below.' : ''} <button className="market-control k-body" onClick={() => void query.refetch()}>Retry recorded outcomes</button></div>}
     {response?.state === 'unavailable' && <div role="status">This comparison is unavailable: {response.reason.replace(/_/g, ' ')}{response.scope_admission?.reason?` (${response.scope_admission.reason.replace(/_/g,' ')})`:''}. Missing coverage is not zero demand.</div>}
@@ -288,11 +314,15 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
       <p style={{ fontSize: 12, margin: '8px 0', overflowWrap: 'anywhere' }}>
         {day(receipt.event_from)} ≤ event time &lt; {day(receipt.event_to)} UTC.
       </p>
+      {receipt.scope.kind==='recorded_family'&&Boolean(receipt.scope.family_rule?.model_contains.length)&&<p className="market-scope-exclusions__family">
+        This group includes recorded model labels containing {receipt.scope.family_rule!.model_contains.map(word=>`“${word}”`).join(', ')}.
+        {' '}That can include older truck series; the label does not establish a factory model.
+      </p>}
       {captured && summary && !receipt.truncated && <p style={{ fontSize: 14, margin: '8px 0' }}>
         {selectedName}: {percent(summary.ratio)} recorded sold · {number(summary.numerator)}/{number(summary.denominator)} known bidding outcomes.
         {' '}{number(summary.withdrawn)} withdrawn · {number(summary.unresolved)} unresolved.
       </p>}
-      {captured&&receipt.scope.kind==='descriptive_subject'&&!receipt.truncated&&(receipt.coverage.unresolved_scope??0)>0&&<p className="market-descriptive-scope__note">
+      {captured&&(receipt.scope.kind==='descriptive_subject'||receipt.scope.kind==='recorded_family')&&!receipt.truncated&&(receipt.coverage.unresolved_scope??0)>0&&<p className="market-descriptive-scope__note">
         {number(receipt.coverage.unresolved_scope)} captured episodes have unresolved group membership and are excluded from both series. An unknown fraction can reflect missing or ambiguous model records.
       </p>}
       {captured&&!receipt.truncated&&<ScopeExclusionEvidence receipt={receipt}/>}
@@ -374,6 +404,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
               ? c.source_observed_at ? <>Source {c.source_read_basis === 'direct_fetch' ? 'direct read' : 'cached snapshot'} <time dateTime={c.source_observed_at}>{utc(c.source_observed_at)}</time>.</> : 'Source read time unknown.'
               : 'Source read time unknown.'}
           </div>
+          {c.membership&&<FamilyMembershipKeys membership={c.membership}/>}
         </li>)}</ol>
         {captured && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {(receipt.evidence.offset ?? 0) > 0 && <button className="market-control k-body" onClick={() => {

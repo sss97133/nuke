@@ -391,3 +391,46 @@ it('clears local evidence selection when changing between year and make scopes',
  await select('Recorded model and year group',desc.key);expect(fixture.request?.scope).toEqual(desc.scope);
  await select('Recorded model and year group','');expect(fixture.request?.scope).toEqual(make.scope);expect(fixture.request?.evidence_snapshot_hash).toBeUndefined();
 });
+
+it('uses the existing family/year hierarchy and the SQL label without adding a competing model catalog',async()=>{
+  const familyKey='95000000-0000-4000-8000-000000000001';
+  const lens={scopeKey:null,days:7 as const,metric:'captured_sell_through' as const,drill:null,benchmark:false,
+    recordedFamily:{familyKey,familyName:'Untrusted URL label',year:'1969',era:null,model:null}};
+  const r=capturedReceipt();r.scope={kind:'recorded_family',label:'FIXTURE MAKE SQL family',family:'SQL family',family_key:familyKey,year:1969};
+  fixture.query.data=r;
+  await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={lens}/>));
+  expect(fixture.request?.scope).toEqual({kind:'recorded_family',canonical_make_id:'fixture-make',family_key:familyKey,year:1969});
+  expect(container.querySelector('[aria-label="Recorded model and year group"]')).toBeNull();
+  expect(container.textContent).toContain('FIXTURE MAKE SQL family · 1969: 0% recorded sold');
+  expect(container.textContent).not.toContain('Untrusted URL label');
+});
+it.each(['invalid year','unkeyed model','unsupported configuration','conflicting sales group'])(
+  'refuses %s and withholds the previously rendered chart',async(reason)=>{
+    const selected={familyKey:'95000000-0000-4000-8000-000000000001',familyName:'Fixture',year:'1969',era:null,model:null} as any;
+    if(reason==='invalid year')selected.year='bad';
+    if(reason==='unkeyed model'){selected.familyKey=null;selected.model='Camaro';}
+    if(reason==='unsupported configuration')selected.unsupportedFilters=['truck_drive'];
+    if(reason==='conflicting sales group')selected.conflictingScope=true;
+    fixture.query.data=capturedReceipt();const changed=vi.fn();
+    const lens={scopeKey:null,days:7 as const,metric:'captured_sell_through' as const,drill:null,benchmark:false,recordedFamily:selected};
+    await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={lens} onLensChange={changed}/>));
+    expect(fixture.request).toBeNull();expect(container.querySelector('.sales-count-point')).toBeNull();
+    if(reason==='unsupported configuration'){
+      expect(container.textContent).toContain('No broader population is substituted');
+      await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Clear configuration filters')!.click());
+      expect(changed).toHaveBeenCalledWith({recordedFamily:{...selected,unsupportedFilters:[]},drill:null});
+    }else if(reason==='conflicting sales group'){
+      expect(container.textContent).toContain('Choose one population');
+      await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Use this vehicle family')!.click());
+      expect(changed).toHaveBeenCalledWith({recordedFamily:{...selected,conflictingScope:false},drill:null});
+    }else expect(container.textContent).toContain('make population is not substituted');
+  });
+it('makes a series-name cohort visible before the evidence disclosure',async()=>{
+ const familyKey='95000000-0000-4000-8000-000000000005',r=capturedReceipt();
+ r.scope={kind:'recorded_family',label:'FIXTURE MAKE Silverado',family:'Silverado',family_key:familyKey,family_rule:{model_contains:['silverado']} as any};fixture.query.data=r;
+ const lens={scopeKey:null,days:7 as const,metric:'captured_sell_through' as const,drill:null,benchmark:false,
+ recordedFamily:{familyKey,familyName:'Silverado',year:null,era:null,model:null}};
+ await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={lens}/>));
+ const text=container.querySelector('p.market-scope-exclusions__family');expect(text?.textContent).toContain('containing “silverado”');
+ expect(text?.textContent).toContain('older truck series');expect(text?.closest('details')).toBeNull();
+});

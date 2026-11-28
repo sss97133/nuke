@@ -283,3 +283,11 @@ describe('marketScopeResolver', () => {
     });
   });
 });
+
+it('clears old outcome group and source pins when the keyed vehicle scope changes',()=>{
+ const url=buildMarketScopeUrl({make:'Chevrolet',family:'new-family',family_name:'Camaro',year:1969},
+ '?tab=market&view=sales&make=Ford&family=old-family&salesScope=descriptive:old&day=2026-11-20&series=selected&salesOffset=20&salesSnapshot=old&salesOutcome=no_sale&days=2&benchmark=1&axis=trim&facet=Silverado&truck_drive=2WD');
+ const p=new URL(url,'https://fixture.invalid').searchParams;
+ for(const key of ['salesScope','day','series','salesOffset','salesSnapshot','salesOutcome','axis','facet','truck_drive'])expect(p.has(key)).toBe(false);
+ expect(p.get('family')).toBe('new-family');expect(p.get('year')).toBe('1969');expect(p.get('view')).toBe('sales');expect(p.get('days')).toBe('2');
+});

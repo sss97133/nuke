@@ -83,3 +83,6 @@ select.market-control { padding-right: 24px; }
 .market-scope-exclusions > ol { padding-left: 24px; }
 .market-scope-exclusions > ol > li { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .market-scope-exclusions code { font-size: 12px; overflow-wrap: anywhere; }
+.market-scope-exclusions__family { max-width: 100%; margin: 8px 0; font: 14px var(--font-family); overflow-wrap: anywhere; }
+.market-scope-exclusions__family > summary { min-height: 44px; align-content: center; cursor: pointer; }
+.market-scope-exclusions__family code { font-size: 12px; overflow-wrap: anywhere; white-space: normal; }
