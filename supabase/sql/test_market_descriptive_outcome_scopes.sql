@@ -246,3 +246,30 @@ SELECT assert_count((SELECT count(*)=1 AND bool_and(state='unavailable' AND reas
  FROM cohort_scope_rule(ARRAY['70000000-0000-4000-8000-000000000099'::uuid],'captured_sell_through_descriptive')),
  'descriptive: unknown explicit registry key is one unavailable result, not an empty or accepted catalog');
 RESET ROLE;
+
+-- Equivalent registry spellings are folded in SQL for a bounded catalog; no client-side alias choice.
+SET ROLE anon;
+SELECT assert_count((SELECT count(*)=2 AND bool_and(canonical_model='MODEL'
+ AND catalog_subject_id='70000000-0000-4000-8000-000000000001'::uuid AND equivalent_catalog_subjects=2)
+ AND count(DISTINCT registered_model_label)=2
+ FROM cohort_scope_rule(ARRAY['70000000-0000-4000-8000-000000000009'::uuid,
+ '70000000-0000-4000-8000-000000000001'::uuid,'70000000-0000-4000-8000-000000000001'::uuid],
+ 'captured_sell_through_descriptive')),
+ 'descriptive: SQL folds equivalent label subjects to one deterministic catalog representative; raw labels and distinct source keys remain');
+RESET ROLE;
+
+INSERT INTO vehicles(id,make,model,year,canonical_make_id)
+ SELECT ('7a000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,
+ CASE i WHEN 1 THEN 'syn' WHEN 2 THEN 'unregistered make spelling' ELSE 'BENCHMARK' END,'MODEL',1977,
+ CASE WHEN i=1 THEN NULL ELSE '10000000-0000-0000-0000-000000000001'::uuid END FROM generate_series(1,3) i;
+INSERT INTO auction_events(id,vehicle_id,source_url,auction_end_date,outcome,winning_bid)
+ SELECT ('7b000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,('7a000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,
+ 'https://bringatrailer.com/listing/descriptive-make-'||i,date_trunc('day',now())-interval '6 days'+interval '15 hours','sold',1000 FROM generate_series(1,3) i;
+SET ROLE anon;
+SELECT assert_count(captured_total(get_market_trends(descriptive_request()),'selected','denominator')=6
+ AND (SELECT count(*)=2 FROM jsonb_array_elements(get_market_trends(descriptive_request())#>'{evidence,contributors}') e
+ WHERE e->>'vehicle_id' IN('7a000000-0000-4000-8000-000000000001','7a000000-0000-4000-8000-000000000002'))
+ AND NOT EXISTS(SELECT FROM jsonb_array_elements(get_market_trends(descriptive_request())#>'{evidence,contributors}') e
+ WHERE e->>'vehicle_id'='7a000000-0000-4000-8000-000000000003'),
+ 'descriptive: resolved make alias and canonical make key feed model resolution; conflicting recognized make remains unresolved');
+RESET ROLE;

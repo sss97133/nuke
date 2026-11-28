@@ -5,11 +5,11 @@ SET LOCAL statement_timeout='10s';
 SET LOCAL lock_timeout='5s';
 DO $guard$ BEGIN
  IF (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.get_market_trends(jsonb)'::regprocedure)
-     NOT IN ('eb483b42ae1927944fad5cab59fef3dc','daa11911d955b20c21375601e4ef3c63') THEN
+     NOT IN ('eb483b42ae1927944fad5cab59fef3dc','68f1b1019e372a1c8f26211bd1e07df6') THEN
    RAISE EXCEPTION 'get_market_trends(jsonb) differs from the reviewed captured-outcomes reader';
  END IF;
  IF EXISTS(SELECT FROM pg_proc WHERE oid=to_regprocedure('public.cohort_scope_rule(uuid[],text)')
-   AND md5(prosrc)<>'de584bd7894cea83574dfe88ae9f4e51') THEN
+   AND md5(prosrc)<>'4ddfc5c42e7b467aa90eff328cad76d9') THEN
    RAISE EXCEPTION 'cohort_scope_rule(uuid[],text) already has another definition';
  END IF;
 END $guard$;
@@ -18,7 +18,8 @@ END $guard$;
 CREATE OR REPLACE FUNCTION public.cohort_scope_rule(p_subject_ids uuid[],p_purpose text)
 RETURNS TABLE(subject_id uuid,canonical_make text,canonical_model text,grain text,year integer,
  year_start integer,year_end integer,canonical_model_id uuid,comparison_scope_status text,
- admission_purpose text,membership_method text,state text,reason text)
+ admission_purpose text,membership_method text,state text,reason text,registered_model_label text,
+ catalog_subject_id uuid,equivalent_catalog_subjects integer)
 LANGUAGE plpgsql STABLE SECURITY INVOKER
 SET search_path=public,pg_temp
 AS $rule$
@@ -31,7 +32,7 @@ BEGIN
  WITH requested AS (
    SELECT DISTINCT requested_id FROM unnest(p_subject_ids) input(requested_id) WHERE requested_id IS NOT NULL
  ), evaluated AS (
-   SELECT input.requested_id,p.canonical_make,p.canonical_model,p.grain,p.year,p.year_start,p.year_end,
+   SELECT input.requested_id,p.canonical_make,cm.canonical_model,p.canonical_model AS registered_model_label,p.grain,p.year,p.year_start,p.year_end,
      p.canonical_model_id,p.comparison_scope_status,
      CASE
        WHEN p.subject_id IS NULL THEN 'unknown_subject'
@@ -60,14 +61,20 @@ BEGIN
    CASE WHEN e.decision='canonical_registry_scope_shape_supported_for_descriptive_outcomes'
      THEN 'unique_exact_registered_model_alias_with_declared_year_scope_v1' END,
    CASE WHEN e.decision='canonical_registry_scope_shape_supported_for_descriptive_outcomes' THEN 'admitted' ELSE 'unavailable' END,
-   e.decision
+   e.decision,e.registered_model_label,
+   CASE WHEN e.decision='canonical_registry_scope_shape_supported_for_descriptive_outcomes' THEN
+     (min(e.requested_id::text) FILTER(WHERE e.decision='canonical_registry_scope_shape_supported_for_descriptive_outcomes')
+       OVER(PARTITION BY e.canonical_model_id,e.grain,e.year,e.year_start,e.year_end))::uuid END,
+   CASE WHEN e.decision='canonical_registry_scope_shape_supported_for_descriptive_outcomes' THEN
+     (count(*) FILTER(WHERE e.decision='canonical_registry_scope_shape_supported_for_descriptive_outcomes')
+       OVER(PARTITION BY e.canonical_model_id,e.grain,e.year,e.year_start,e.year_end))::integer ELSE 0 END
  FROM evaluated e ORDER BY e.requested_id;
 END;
 $rule$;
 REVOKE ALL ON FUNCTION public.cohort_scope_rule(uuid[],text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.cohort_scope_rule(uuid[],text) TO anon,authenticated,service_role;
 COMMENT ON FUNCTION public.cohort_scope_rule(uuid[],text) IS
-'Bounded invoker overload of the scope-rule owner for captured sell-through descriptive year/model subjects. Existing canonical-model FK/make/name/aliases and explicit year or matching declared model bounds, including unknown ends, qualify metadata; unique exact source model resolution supplies membership in the outcome reader. Explicit at most1000 candidate IDs, one admitted/unavailable row with a reason per distinct nonnull requested ID, no duplicate amplification, no stored policy promotion, no valuation/condition/factory-generation claim. Original cohort_scope_rule(uuid), comparison policy and member resolver untouched.';
+'Bounded invoker overload of the scope-rule owner for captured sell-through descriptive year/model subjects. Existing canonical-model FK/make/name/aliases and explicit year or matching declared model bounds, including unknown ends, qualify metadata; unique exact source model resolution supplies membership in the outcome reader. Explicit at most1000 candidate IDs, one admitted/unavailable row with a reason per distinct nonnull requested ID; canonical display plus original label and a deterministic representative/count for equivalent scopes within the requested catalog candidates; no duplicate amplification, no stored policy promotion, no valuation/condition/factory-generation claim. Original cohort_scope_rule(uuid), comparison policy and member resolver untouched.';
 
 CREATE OR REPLACE FUNCTION public.get_market_trends(p_request jsonb)
  RETURNS jsonb
@@ -201,7 +208,8 @@ BEGIN
     scope_receipt:=jsonb_build_object('kind',scope_kind,'subject_id',scope_id,
       'label',scope_row.canonical_make||' '||scope_row.canonical_model,'grain',scope_row.grain,
       'year',scope_row.year,'year_start',scope_row.year_start,'year_end',scope_row.year_end,
-      'canonical_model_id',scope_row.canonical_model_id,'comparison_scope_status',scope_row.comparison_scope_status,
+      'canonical_model_id',scope_row.canonical_model_id,'registered_model_label',scope_row.registered_model_label,
+      'comparison_scope_status',scope_row.comparison_scope_status,
       'admission_purpose',scope_row.admission_purpose,'membership_method',scope_row.membership_method,
       'comparison_basis','descriptive recorded year and uniquely resolved model labels; no condition, factory generation or valuation equivalence');
   ELSE
@@ -307,7 +315,8 @@ BEGIN
               ((subject_year_start IS NULL OR b.year>=subject_year_start)
                 AND (subject_year_end IS NULL OR b.year<=subject_year_end)))))))
         AND NOT EXISTS(SELECT 1 FROM members m WHERE m.vehicle_id=b.vehicle_id)
-        AND lower(cm.make)=lower(b.make)
+        AND lower(cm.make)=CASE WHEN scope_kind='descriptive_subject'
+          THEN lower(make_entity.canonical_name) ELSE lower(b.make) END
         AND ((scope_kind='descriptive_subject' AND subject_grain='model' AND b.year IS NULL)
           OR ((cm.year_start IS NULL OR b.year>=cm.year_start) AND (cm.year_end IS NULL OR b.year<=cm.year_end)))
         AND (lower(cm.canonical_model)=lower(b.model)
