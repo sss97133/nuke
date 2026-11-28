@@ -79,6 +79,12 @@ struct LaborSegment: Decodable, Equatable, Identifiable {
 }
 
 struct LaborAppraisal: Decodable, Equatable {
+    struct FoldState: Decodable, Equatable {
+        var fresh: Bool?
+        var computed: Bool?
+        var computed_at: String?
+        var error: String?
+    }
     struct WitnessedTotal: Decodable, Equatable {
         var hours_min: Double?
         var hours_typical: Double?
@@ -104,6 +110,8 @@ struct LaborAppraisal: Decodable, Equatable {
     var vehicle_id: String?
     var as_of: String?
     var logic_version: String?
+    var status: String?
+    var state: FoldState?
     var applicable: Bool?
     var segments: [LaborSegment]
     var totals: Totals?
@@ -120,6 +128,19 @@ struct LaborNames: Decodable, Equatable {
 
 /// The web renderer's words (LaborAppraisal.tsx), ported one function to one function.
 enum LaborWords {
+    /// A stored fold can be older than its inputs or have failed to update.
+    static func foldStatus(_ a: LaborAppraisal) -> String? {
+        guard let state = a.state else { return nil }
+        if state.computed == false {
+            return state.error == nil
+                ? "Labor appraisal has not been calculated yet."
+                : "Labor appraisal could not be calculated."
+        }
+        guard state.fresh == false else { return nil }
+        let date = ProfileClock.day(state.computed_at ?? a.as_of)
+        let prefix = date.map { "Last calculated \($0). " } ?? ""
+        return prefix + (state.error == nil ? "An update is needed." : "The update failed.")
+    }
     private static let number: NumberFormatter = {
         let f = NumberFormatter()
         f.locale = Locale(identifier: "en_US"); f.numberStyle = .decimal; f.maximumFractionDigits = 2
@@ -234,7 +255,17 @@ enum LaborWords {
             (w?.unknown_min_segments ?? 0) > 0 ? "\(w!.unknown_min_segments!) segments with no witnessed minimum" : nil,
             (w?.unknown_max_segments ?? 0) > 0 ? "\(w!.unknown_max_segments!) with no witnessed maximum" : nil,
         ].compactMap { $0 }
-        return said.isEmpty ? "" : " (" + said.joined(separator: ", ") + ")"
+        return said.joined(separator: ", ")
+    }
+
+    /// A segment is attributed only when all displayed hours come directly from the reported shop-paper total.
+    /// A book range, a mixed basis, or a missing bound remains projected.
+    static func hoursStatus(_ segment: LaborSegment) -> RootStatus {
+        guard segment.hours_basis == "shop_paper", let paper = segment.paper_hours,
+              segment.hours_min == paper, segment.hours_typical == paper, segment.hours_max == paper else {
+            return .projected
+        }
+        return .attributed
     }
 
     /// How the segment's hours are known, then its witness, stages and parts: the web's caption lines in order.
@@ -285,7 +316,6 @@ struct VehicleLaborAppraisalSection: View {
                 }.padding(.horizontal, 16)
             }
         }
-        .accessibilityIdentifier("vehicle-labor-appraisal")
         .task(id: vehicleId) { await load() }
     }
 
@@ -315,17 +345,29 @@ struct LaborAppraisalContent: View {
     let appraisal: LaborAppraisal
 
     private var priced: [LaborSegment] { appraisal.segments.filter { $0.hours_typical != nil } }
+    private var calculationClock: String {
+        ProfileClock.day(appraisal.state?.computed_at ?? appraisal.as_of).map { "Calculated \($0)" }
+            ?? "Calculation date not returned"
+    }
 
     var body: some View {
-        if appraisal.applicable == true, appraisal.totals?.priced_segments == 0, !appraisal.segments.isEmpty {
-            section { caption("Not appraised: the reader has no segment with hours for this car yet.") }
+        if appraisal.state?.computed == false {
+            section { if let status = LaborWords.foldStatus(appraisal) { caption(status) } }
+        } else if appraisal.applicable == true, appraisal.totals?.priced_segments == 0, !appraisal.segments.isEmpty {
+            section {
+                if let status = LaborWords.foldStatus(appraisal) { caption(status) }
+                caption("Not appraised: the reader has no segment with hours for this car yet.")
+            }
         } else if appraisal.applicable == true, !priced.isEmpty {
             section {
-                caption("Each segment carries its own hours and how they are witnessed. Segments are not added into one figure.")
+                if let status = LaborWords.foldStatus(appraisal) { caption(status) }
+                caption("Reported hours and estimates are shown where available; totals come from the appraisal.")
+                if appraisal.totals != nil { caption("This appraisal cannot open the underlying sources here yet.") }
                 if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed ?? totals.with_unwitnessed_purchases) {
-                    Text("Hours, two totals side by side").font(.caption.weight(.semibold)).padding(.top, 4)
-                    row("Witnessed", (LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
-                        + LaborWords.witnessedUnknown(totals.witnessed))
+                    Text("Appraisal totals").font(.caption.weight(.semibold)).padding(.top, 4)
+                    row("Witnessed", LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
+                    let unknown = LaborWords.witnessedUnknown(totals.witnessed)
+                    if !unknown.isEmpty { caption(unknown) }
                     row("With work not witnessed", with)
                 }
                 if let byGrade = appraisal.totals?.by_grade, !byGrade.isEmpty {
@@ -338,18 +380,19 @@ struct LaborAppraisalContent: View {
                     DisclosureGroup {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(Array(LaborWords.lines(segment, appraisal.names).enumerated()), id: \.offset) { _, line in caption(line) }
+                            caption("This appraisal cannot open the underlying sources here yet.")
+                                .accessibilityIdentifier("labor-source-unavailable-\(segment.segment)")
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
                     } label: {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(ItemText.codeText(segment.segment)).font(.subheadline).foregroundStyle(Color.primary)
-                            Spacer()
-                            Text(LaborWords.range(segment.hours_min, segment.hours_typical, segment.hours_max) ?? "No hours")
-                                .font(.subheadline.monospacedDigit()).foregroundStyle(Color.primary)
-                        }
+                        RootedValueView(label: ItemText.codeText(segment.segment),
+                            value: LaborWords.range(segment.hours_min, segment.hours_typical, segment.hours_max) ?? "No hours",
+                            status: LaborWords.hoursStatus(segment), decay: calculationClock)
+                            .accessibilityIdentifier("labor-segment-\(segment.segment)")
                     }
-                    .accessibilityIdentifier("labor-segment-\(segment.segment)")
                 }
             }
+        } else if let status = LaborWords.foldStatus(appraisal) {
+            section { caption(status) }
         }
     }
 
@@ -357,8 +400,11 @@ struct LaborAppraisalContent: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Label("Labor appraisal by segment", systemImage: "wrench.and.screwdriver")
+                    .accessibilityIdentifier("vehicle-labor-appraisal")
                 Spacer()
-                Text(LaborWords.coverage(appraisal)).foregroundStyle(.secondary)
+                if appraisal.state?.computed != false {
+                    Text(LaborWords.coverage(appraisal)).foregroundStyle(.secondary)
+                }
             }.font(.caption)
             content()
         }
@@ -370,10 +416,6 @@ struct LaborAppraisalContent: View {
     }
 
     private func row(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label).font(.caption)
-            Spacer()
-            Text(value).font(.caption.monospacedDigit()).multilineTextAlignment(.trailing)
-        }
+        RootedValueView(label: label, value: value, status: .projected, decay: calculationClock)
     }
 }

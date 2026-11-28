@@ -264,6 +264,10 @@ enum FixtureBackend {
             return ok(GarageCardFixtures.profileRead(args["p_vehicle_id"] as? String ?? ""))
         case "vehicle_statements" where scenario == "garage-cards": return ok(GarageCardFixtures.statements)
         case "vehicle_statements": return ok("null")
+        case "vehicle_labor_appraisal" where scenario == "navigation-garage" && ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_STATE"] == "pending":
+            return ok(#"{"status":"not_yet_computed","segments":[],"state":{"fresh":false,"computed":false,"error":null}}"#)
+        case "vehicle_labor_appraisal" where scenario == "navigation-garage" && ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_STATE"] == "stale":
+            return ok(#"{"applicable":true,"as_of":"2026-11-25T12:00:00Z","segments":[{"segment":"engine","hours_min":8,"hours_typical":12,"hours_max":16}],"state":{"fresh":false,"computed":true,"computed_at":"2026-11-25T12:00:00Z","error":null}}"#)
         case "vehicle_labor_appraisal": return ok("null")
         case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""

@@ -263,6 +263,33 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue((search.value as? String)?.contains("1973 Coupe") == true, "returning must retain the Garage search")
     }
 
+    func testLaborFoldStatesAreVisibleOnTheVehicleProfile() {
+        for mode in ["pending", "stale"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+            app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_LABOR_STATE": mode]
+            app.launch()
+            let garage = app.tabBars.buttons["Garage"].firstMatch
+            XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+            let vehicle = app.staticTexts["1973 Fixture Coupe"].firstMatch
+            XCTAssertTrue(vehicle.waitForExistence(timeout: 10)); vehicle.tap()
+            let status = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", mode == "pending" ? "has not been calculated yet" : "An update is needed")).firstMatch
+            XCTAssertTrue(reveal(status, in: app, swipes: 20), app.debugDescription)
+            if mode == "stale" {
+                XCTAssertTrue(status.label.contains("Last calculated"))
+                let engine = app.buttons.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "engine", "8 h to 16 h")).firstMatch
+                XCTAssertTrue(reveal(engine, in: app), app.debugDescription)
+                engine.tap()
+                XCTAssertTrue(app.staticTexts["labor-source-unavailable-engine"].waitForExistence(timeout: 5))
+                let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "labor-stale-source-unavailable"; shot.lifetime = .keepAlways; add(shot)
+            } else {
+                XCTAssertFalse(app.staticTexts["0 of 0 segments with hours"].exists)
+            }
+            XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+            app.terminate()
+        }
+    }
+
     /// The garage cards (garage-cards fixture): newest activity first under year headings, the undated car last,
     /// the price only from the profile's masthead Claim, the log book read from the card's menu, and no writes.
     func testGarageCardsOrderByActivityAndOpenTheLogBook() {
