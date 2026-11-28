@@ -746,6 +746,8 @@ struct VehicleDetailView: View {
                         photoStrip.id("photos")
                         assetWindow.id("asset")
                         VehicleWorkSection(vehicleId: vehicleId, ownerContext: isOwner).id("work")
+                        // The labor appraisal, segment by segment: the web profile's reader and words (one reader, two renderers).
+                        VehicleLaborAppraisalSection(vehicleId: vehicleId).id("labor")
                         specTable.id("specs")
                         webCTA
                     }
