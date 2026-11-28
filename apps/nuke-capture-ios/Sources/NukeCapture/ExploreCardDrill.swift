@@ -31,10 +31,10 @@ struct ExploreCardDrill: Identifiable, Equatable {
     }
 
     /// Time left to the second, the precision the card's minute pill leaves out:
-    /// "2d 03h 04m 05s", "3h 04m 05s", "4m 05s", "closed" once it has passed.
+    /// "2d 03h 04m 05s", "3h 04m 05s", "4m 05s"; the recorded deadline alone does not prove closure.
     static func preciseRemaining(_ ends: Date, now: Date) -> String {
         let s = Int(ends.timeIntervalSince(now).rounded(.down))
-        if s <= 0 { return "closed" }
+        if s <= 0 { return ExploreClock.text(ends: ends, now: now) }
         let d = s / 86_400, h = (s % 86_400) / 3600, m = (s % 3600) / 60, sec = s % 60
         func two(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
         if d > 0 { return "\(d)d \(two(h))h \(two(m))m \(two(sec))s" }
