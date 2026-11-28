@@ -77,6 +77,12 @@ export default function CommentMeasurements({ vehicleId, lotId, closeAt }: { veh
   const evidenceRef=useRef<HTMLDivElement>(null);
   const focusEvidence=useRef(false);
   const inputId=useId();
+  const activeCutoff=params.get('csCutoff')??'';
+  useEffect(()=>{
+    // The unsubmitted draft can differ, but browser history restores the applied clock.
+    setDraft(activeCutoff);
+    setFormError('');
+  },[activeCutoff]);
   useEffect(()=>{
     if (receipt&&focusEvidence.current) {
       evidenceRef.current?.focus({preventScroll:true});

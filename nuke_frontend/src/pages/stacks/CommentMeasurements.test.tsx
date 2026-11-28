@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture=vi.hoisted(()=>({rpc:vi.fn(),revision:0,refuse:false}));
 vi.mock('../../lib/supabase',()=>({supabase:{rpc:fixture.rpc}}));
@@ -12,7 +12,7 @@ import { commentFixture, CLOSE, LOT, SOURCE, VEHICLE } from './__fixtures__/comm
 import { commentSurfaceKey, type CommentSurfaceRequest } from './commentSurfaceReader';
 
 let root:Root,container:HTMLDivElement,client:QueryClient;
-function Address(){return <output data-address>{useLocation().search}</output>;}
+function Address(){const go=useNavigate();return <><output data-address>{useLocation().search}</output><button type="button" onClick={()=>go(-1)}>Back comment controls</button></>;}
 async function settle(){await act(async()=>{await new Promise(resolve=>setTimeout(resolve,15));});}
 async function render(search='?layer=dimension'){
   await act(async()=>root.render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[search]}>
@@ -84,6 +84,13 @@ it('does not read or reuse numbers for an incomplete shared evidence state',asyn
   await render('?layer=dimension&csOffset=20');expect(fixture.rpc).not.toHaveBeenCalled();
   expect(container.textContent).toContain('incomplete or invalid');expect(container.querySelector('.comment-measure__bar')).toBeNull();
   await click('Refresh comment measurements');expect(fixture.rpc).toHaveBeenCalledTimes(1);
+});
+it('restores the applied cutoff input with browser history',async()=>{
+  await render('?layer=dimension&csCutoff=2026-11-25T20%3A50%3A00Z');
+  expect(container.querySelector('input')?.value).toBe('2026-11-25T20:50:00Z');
+  await click('Current recorded state');expect(container.querySelector('input')?.value).toBe('');
+  await click('Back comment controls');expect(container.querySelector('input')?.value).toBe('2026-11-25T20:50:00Z');
+  expect(container.textContent).toContain('Retrospective recorded-input reconstruction');
 });
 it('withholds every measurement after a response fails the contract',async()=>{
   fixture.rpc.mockResolvedValue({data:{...commentFixture(),auction_event_id:VEHICLE},error:null});
