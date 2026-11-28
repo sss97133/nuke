@@ -138,4 +138,16 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertTrue(closing.waitForExistence(timeout: 25), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
+
+    func testOpenClockReflectsAnExtendedAuction() {
+        let app = open("browse-clock-extended")
+        let clock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Time left")).firstMatch
+        XCTAssertTrue(clock.waitForExistence(timeout: 20), app.debugDescription); clock.tap()
+        XCTAssertTrue(app.navigationBars["Auction clock"].waitForExistence(timeout: 10), app.debugDescription)
+        let closing = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "remaining", "closing")).firstMatch
+        XCTAssertTrue(closing.waitForExistence(timeout: 25), app.debugDescription)
+        let resumed = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS %@", "remaining", "1m")).firstMatch
+        XCTAssertTrue(resumed.waitForExistence(timeout: 35), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
 }

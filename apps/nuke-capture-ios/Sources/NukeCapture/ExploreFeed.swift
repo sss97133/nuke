@@ -362,6 +362,9 @@ struct ExploreFeedView: View {
             liveAll = ExploreFeedPaging.reconcileLive(liveAll, current: current, now: now)
             live = ExploreFeedPaging.reconcileLive(live, current: current, now: now)
             feed = ExploreFeedPaging.reconcileLive(feed, current: current, now: now)
+            if let open = drill, let fresh = current[open.item.id] {
+                drill = ExploreCardDrill(kind: open.kind, item: fresh)
+            }
             lots = lots.reduce(into: [:]) { result, entry in
                 if let fresh = byId[entry.key] { result[entry.key] = fresh }
                 else if entry.value.endsAtDate.map({ $0 > now }) ?? true { result[entry.key] = entry.value }
