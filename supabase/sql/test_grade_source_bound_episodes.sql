@@ -1,10 +1,10 @@
 -- Disposable PG17 dm_refinement_* database only. Reuse the production-shaped grader fixture and its legacy contracts.
 \set ON_ERROR_STOP on
 \ir test_grade_hammer_predictions_by_lot.sql
-\ir ../migrations/20261128121500_grade_source_bound_episodes.sql
+\ir ../migrations/20261128131001_grade_source_bound_episodes.sql
 -- The repair is repeatable without changing the function or its access grants.
 CREATE TEMP TABLE grader_after_guard AS SELECT pg_get_functiondef('public.grade_hammer_predictions_by_lot(integer,bigint)'::regprocedure) AS body;
-\ir ../migrations/20261128121500_grade_source_bound_episodes.sql
+\ir ../migrations/20261128131001_grade_source_bound_episodes.sql
 SELECT pg_temp.ok('source guard is idempotent and remains service-only',
   (SELECT body = pg_get_functiondef('public.grade_hammer_predictions_by_lot(integer,bigint)'::regprocedure) FROM grader_after_guard)
   AND has_function_privilege('service_role','public.grade_hammer_predictions_by_lot(integer,bigint)','EXECUTE')
