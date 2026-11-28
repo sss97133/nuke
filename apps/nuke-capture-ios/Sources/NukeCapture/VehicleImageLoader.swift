@@ -111,6 +111,22 @@ enum VehicleImageLoader {
         return try await rows(key("image", idString)) { gated().eq("id", value: idString).limit(1) }
     }
 
+    /// A source photo must still belong to this vehicle and pass the current viewer's gallery gate.
+    /// Do not use the short-lived gallery cache here: a withdrawn or moved source needs a fresh read.
+    static func currentSourceImage(id: UUID, vehicleId: String) async throws -> VehicleGalleryImage? {
+        let viewer = SupabaseService.currentUserId
+        let sourceName = source(signedIn: viewer != nil)
+        let selectedColumns = columns(signedIn: viewer != nil)
+        let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(
+            SupabaseService.client.from(sourceName).select(selectedColumns)
+        )
+        .eq("vehicle_id", value: vehicleId)
+        .eq("id", value: id.uuidString.lowercased())
+        .limit(1).execute().value
+        guard !Task.isCancelled, SupabaseService.currentUserId == viewer else { throw CancellationError() }
+        return rows.first
+    }
+
     /// One capture day's frames, oldest first (up to 200). `from`/`to` are yyyy-MM-dd.
     static func day(vehicleId: String, from: String, to: String) async throws -> [VehicleGalleryImage] {
         try await rows(key(vehicleId, "day", from)) {

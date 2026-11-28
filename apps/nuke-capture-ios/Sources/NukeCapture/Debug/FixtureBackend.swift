@@ -22,6 +22,17 @@ enum FixtureBackend {
     static let clientId = "00000000-0000-4000-8000-0000000000d1"
     static let providerId = "00000000-0000-4000-8000-0000000000d2"
     static let navigationVehicleId = "00000000-0000-4000-8000-00000000c001"
+    static let laborPhotoId = "00000000-0000-4000-8000-00000000e101"
+    private static let laborJudgmentLock = NSLock()
+    private static var laborJudgmentSuperseded = false
+    static func supersedeLaborJudgment() {
+        laborJudgmentLock.lock(); defer { laborJudgmentLock.unlock() }
+        laborJudgmentSuperseded = true
+    }
+    private static var currentLaborJudgmentId: String {
+        laborJudgmentLock.lock(); defer { laborJudgmentLock.unlock() }
+        return laborJudgmentSuperseded ? "00000000-0000-4000-8000-00000000e103" : "00000000-0000-4000-8000-00000000e102"
+    }
     static let analysisMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_ANALYSIS_MODE"] ?? ""
     private static let analysisReadLock = NSLock()
     private static var analysisReadAttempts = 0
@@ -243,6 +254,23 @@ enum FixtureBackend {
             let owned = items.contains { $0.name == "vehicle_id" && $0.value == "eq.\(GarageCardFixtures.owned)" }
             return ok(owned ? GarageCardFixtures.reel() : "[]")
         }
+        if scenario == "navigation-garage", ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_STATE"] == "photos",
+           path == "/rest/v1/vehicle_images" || path == "/rest/v1/vehicle_images_public" {
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            if items.contains(where: { $0.name == "id" && $0.value == "eq.\(laborPhotoId)" }) {
+                guard items.contains(where: { $0.name == "vehicle_id" && $0.value == "eq.\(navigationVehicleId)" }),
+                      items.contains(where: { $0.name == "vehicle_image_gallery_eligible" && $0.value == "eq.true" }) else {
+                    return (400, Data(#"{"message":"source photo needs vehicle and gallery gates"}"#.utf8))
+                }
+                if ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_PHOTO"] == "withdrawn" { return ok("[]") }
+                return ok("""
+                [{"id":"\(laborPhotoId)","image_url":"https://fixture.nuke.invalid/photo.png",
+                  "thumbnail_url":null,"is_primary":false,"taken_at":"2026-11-25T12:00:00Z",
+                  "labels":[],"ai_processing_status":"completed","image_category":"interior",
+                  "created_at":null,"vision_gate_agent_reasoning":null}]
+                """)
+            }
+        }
         if scenario == "navigation-actors", path == "/functions/v1/universal-search" {
             return ok("""
             {"success":true,"results":[{"id":"\(clientId)","type":"user","title":"Fixture Person"}],
@@ -377,6 +405,14 @@ enum FixtureBackend {
             return ok(#"{"status":"not_yet_computed","segments":[],"state":{"fresh":false,"computed":false,"error":null}}"#)
         case "vehicle_labor_appraisal" where scenario == "navigation-garage" && ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_STATE"] == "stale":
             return ok(#"{"applicable":true,"as_of":"2026-11-25T12:00:00Z","segments":[{"segment":"engine","hours_min":8,"hours_typical":12,"hours_max":16}],"state":{"fresh":false,"computed":true,"computed_at":"2026-11-25T12:00:00Z","error":null}}"#)
+        case "vehicle_labor_appraisal" where scenario == "navigation-garage" && ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_STATE"] == "photos":
+            return ok("""
+            {"vehicle_id":"\(navigationVehicleId)","applicable":true,"as_of":"2026-11-25T12:00:00Z",
+             "state":{"fresh":true,"computed":true},"totals":{"priced_segments":1},
+             "segments":[{"segment":"reassembly","hours_min":2,"hours_typical":2,"hours_max":2,
+               "reassembly":{"matched":[{"judgment_id":"\(currentLaborJudgmentId)","image_id":"\(laborPhotoId)","part":{"name":"Fixture carpet"},"hours":2}],
+                             "unmatched":[{"part":{"name":"No photo returned"}}]}}]}
+            """)
         case "vehicle_labor_appraisal": return ok("null")
         case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
