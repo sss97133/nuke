@@ -63,6 +63,70 @@ enum FixtureBackend {
     }
     private static let workPageLock = NSLock()
     private static var workPageAttempts = 0
+    private static let browseReadLock = NSLock()
+    private static var browseLiveAttempts = 0
+    private static var browseAskAttempts = 0
+    private static var browsePageFailureAttempts = 0
+    private static var browseAnalogAttempts = 0
+
+    /// A terminal first-read failure followed by a normal response lets the UI test
+    /// distinguish a partial feed from an empty one and exercise its retry action.
+    private static func browseRead(_ name: String) -> (Int, Data) {
+        browseReadLock.lock()
+        if name == "market_pulse_live" { browseLiveAttempts += 1 } else { browseAskAttempts += 1 }
+        let attempt = name == "market_pulse_live" ? browseLiveAttempts : browseAskAttempts
+        browseReadLock.unlock()
+        let failLive = ["browse-partial-live", "browse-both-fail"].contains(scenario) || scenario.hasPrefix("browse-partial-empty")
+        let failAsk = ["browse-partial-ask", "browse-both-fail"].contains(scenario)
+        if (attempt == 1 || scenario == "browse-partial-empty-persistent")
+            && ((name == "market_pulse_live" && failLive) || (name == "classified_ask_board" && failAsk)) {
+            if scenario == "browse-partial-ask" { return (-1, Data()) }
+            return (400, Data(#"{"code":"fixture_read_error","message":"fixture browse read failed","details":null,"hint":null}"#.utf8))
+        }
+        if name == "market_pulse_live" {
+            return ok("""
+            {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
+              "2026-11-27T10:00:00Z",null,"http://[",false,
+              "https://bringatrailer.com/listing/fixture/","Fixture auction",null,null,null,null,null]]}
+            """)
+        }
+        if scenario.hasPrefix("browse-partial-empty") { return ok(#"{"population":{},"asks":[]}"#) }
+        return ok("""
+        {"population":{},"asks":[{"event_id":"fixture-ask","source":"classified",
+         "title":"Fixture classified","ask":10000,"image":"http://["}]}
+        """)
+    }
+
+    static func browsePagingRead(_ name: String, _ args: [String: Any]) -> (Int, Data) {
+        if name == "market_pulse_live" {
+            guard scenario == "browse-paging-auction-failure" else { return ok(#"{"auctions":[]}"#) }
+            let rows: String = (0..<41).map { index -> String in
+                let id = String(format: "00000000-0000-4000-8000-%012d", index + 1)
+                let image = index == 0 || index == 40 ? #""http://[""# : "null"
+                let end = index == 40 ? "2099-11-28T12:00:00Z" : "2099-11-27T12:00:00Z"
+                return #"["\#(id)",1973,"Fixture","Coupe",5000,"\#(end)",null,null,\#(image),false,null,"Fixture auction \#(index)",null,null,null,null,null]"#
+            }.joined(separator: ",")
+            return ok("{\"auctions\":[\(rows)]}")
+        }
+        let offset = args["p_offset"] as? Int ?? 0
+        if scenario == "browse-paging-auction-failure" && offset == 40 { return (-1, Data()) }
+        if scenario == "browse-paging-fail-more" && offset == 40 {
+            browseReadLock.lock(); browsePageFailureAttempts += 1; let attempt = browsePageFailureAttempts; browseReadLock.unlock()
+            if attempt == 1 {
+                return (400, Data(#"{"code":"fixture_read_error","message":"fixture page read failed","details":null,"hint":null}"#.utf8))
+            }
+        }
+        let finalOffset = scenario.hasPrefix("browse-paging-deep") ? 240 : 80
+        let count = offset < finalOffset ? 40 : (offset == finalOffset ? 1 : 0)
+        let rows: String = (0..<count).map { index -> String in
+            let number = offset + index
+            let noFirstCard = ["browse-paging-empty", "browse-paging-deep", "browse-paging-fail-more", "browse-paging-auction-failure"].contains(scenario)
+            let visible = number == finalOffset || (number == 0 && !noFirstCard)
+            let image = visible ? #""http://[""# : "null"
+            return #"{"event_id":"fixture-page-\#(number)","source":"classified","title":"Fixture page \#(number)","ask":10000,"image":\#(image)}"#
+        }.joined(separator: ",")
+        return ok("{\"population\":{},\"asks\":[\(rows)]}")
+    }
     private static let garageSourceLock = NSLock()
     private static var garageSourceAttempts = 0
     private static let fixtureFollowLock = NSLock()
@@ -526,6 +590,12 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
+            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure"].contains(scenario):
+            return browsePagingRead(name, args)
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
+            && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):
+            return browseRead(name)
         case "market_pulse_live" where scenario == "social-browse":
             // This deliberately malformed image URL renders the static fallback; the fixture
             // must not leave an infinite loading animation or make an external image request.
@@ -534,6 +604,12 @@ enum FixtureBackend {
               "2026-11-27T10:00:00Z",null,"http://[",false,
               "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
             """)
+        case "live_finish_estimates" where scenario == "social-browse" && args["p_vehicle_ids"] != nil:
+            browseReadLock.lock(); browseAnalogAttempts += 1; let attempt = browseAnalogAttempts; browseReadLock.unlock()
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_ANALOGS"] == "failure" && attempt == 1 {
+                return (-1, Data())
+            }
+            return ok(#"{"analogs":{}}"#)
         case "record_interaction" where scenario == "social-browse" && args["p_kind"] as? String == "comment":
             switch ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_POST"] {
             case "refused": return ok(#"{"ok":false,"error":"not_authorized"}"#)

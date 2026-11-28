@@ -259,8 +259,8 @@ struct ExploreWhySheet: View {
     let why: ExploreWhy
     /// Opens the existing cohort page; the feed closes this sheet first.
     let onCohort: (CohortTarget) -> Void
-    @State private var analogs: [FinishAnalog] = []
-    @State private var analogsRead = false
+    private enum AnalogState { case loading, failed(String), loaded([FinishAnalog]) }
+    @State private var analogs: AnalogState = .loading
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -277,11 +277,20 @@ struct ExploreWhySheet: View {
                 }
                 if why.item.kind == .live {
                     Section("Comparable lots") {
-                        if analogs.isEmpty {
-                            if analogsRead { Text("No comparable lots are recorded for this one.").font(.footnote).foregroundStyle(.secondary) }
-                            else { ProgressView() }
+                        switch analogs {
+                        case .loading:
+                            ProgressView()
+                        case .failed(let reason):
+                            Text("Couldn't load comparable lots.").font(.footnote).foregroundStyle(.secondary)
+                            Text(reason).font(.footnote).foregroundStyle(.secondary)
+                                .accessibilityIdentifier("comparable-read-failure")
+                            Button("Retry comparable lots") { Task { await loadAnalogs() } }
+                        case .loaded(let rows):
+                            if rows.isEmpty {
+                                Text("No comparable lots were returned for this one.").font(.footnote).foregroundStyle(.secondary)
+                            }
+                            ForEach(rows) { a in analogView(a) }
                         }
-                        ForEach(analogs) { a in analogView(a) }
                     }
                 }
             }
@@ -327,8 +336,15 @@ struct ExploreWhySheet: View {
 
     /// The same read the Market board's bid sheet makes; lots only, one vehicle.
     private func loadAnalogs() async {
-        defer { analogsRead = true }
         guard why.item.kind == .live, let id = why.item.lotId else { return }
-        analogs = await FinishBoard.fetchAnalogs(vehicleId: id)
+        analogs = .loading
+        do {
+            let rows = try await FinishBoard.readAnalogs(vehicleId: id)
+            guard !Task.isCancelled else { return }
+            analogs = .loaded(rows)
+        } catch {
+            guard !Task.isCancelled else { return }
+            analogs = .failed(ReadFailure.text(error))
+        }
     }
 }
