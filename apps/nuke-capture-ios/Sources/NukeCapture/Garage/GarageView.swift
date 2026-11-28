@@ -252,7 +252,7 @@ struct GarageUnresolvedSourceView: View {
                         }
                         Section("Vehicle identity") {
                             Text("No identified vehicle is linked to this statement.")
-                            Text("Review groups dated photos uploaded by this app. They may not relate to this statement; other photos aren't included.")
+                            Text("Photo sessions group dated photos uploaded by this app. They may not relate to this statement; other photos aren't included.")
                                 .font(.footnote).foregroundStyle(.secondary)
                             NavigationLink("Review photo sessions") { SessionConfirmView() }
                         }
