@@ -77,4 +77,16 @@ final class BrowseDiscussionUITests: XCTestCase {
         XCTAssertEqual(field.value as? String, "Check this fixture thought")
         XCTAssertFalse(app.staticTexts["Posted to Nuke."].exists)
     }
+
+    func testClosingAndReopeningKeepsTheUnsentDraft() {
+        let app = open(persona: "client", native: "empty")
+        let field = app.textFields["discussion-composer"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("An unfinished fixture thought")
+        app.buttons["Done"].tap()
+        let comments = app.buttons["Comments"].firstMatch
+        XCTAssertTrue(comments.waitForExistence(timeout: 5)); comments.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, "An unfinished fixture thought")
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
 }

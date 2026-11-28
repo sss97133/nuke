@@ -97,6 +97,19 @@ struct DiscussionPostReply: Decodable {
     var confirmed: Bool { ok == true && kind == "comment" && comment_id != nil }
 }
 
+/// Unsent text survives closing the sheet in this app session. It is never
+/// uploaded or written to disk, and is keyed to both the vehicle and viewer.
+@MainActor enum DiscussionDrafts {
+    private static var values: [String: String] = [:]
+    private static func key(_ vehicle: String, _ viewer: String) -> String { "\(vehicle.lowercased())|\(viewer)" }
+    static func read(vehicle: String, viewer: String) -> String { values[key(vehicle, viewer)] ?? "" }
+    static func save(_ text: String, vehicle: String, viewer: String) {
+        let key = key(vehicle, viewer)
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { values.removeValue(forKey: key) }
+        else { values[key] = text }
+    }
+}
+
 private enum DiscussionLoad<Value> {
     case loading, failed, loaded(Value)
 }
@@ -114,6 +127,7 @@ struct VehicleDiscussionSheet: View {
     @State private var source: DiscussionLoad<[ListingDiscussionEntry]> = .loading
     @State private var loadedForViewer: String?
     @State private var draft = ""
+    @State private var draftViewer: String?
     @State private var posting = false
     @State private var postMessage: String?
     @State private var showListing = true
@@ -161,7 +175,10 @@ struct VehicleDiscussionSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(posting)
-        .onChange(of: viewer) { _, _ in draft = ""; postMessage = nil }
+        .onChange(of: viewer) { _, reader in selectDraft(for: reader) }
+        .onDisappear {
+            if let draftViewer { DiscussionDrafts.save(draft, vehicle: vehicleId, viewer: draftViewer) }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active && posting {
                 postMessage = "We couldn't confirm the comment was posted. Check the discussion before retrying; your draft is still here."
@@ -170,6 +187,7 @@ struct VehicleDiscussionSheet: View {
         .task(id: "\(viewer)|\(scenePhase)") {
             guard scenePhase == .active else { loadedForViewer = nil; return }
             let reader = viewer
+            selectDraft(for: reader)
             loadedForViewer = reader
             native = .loading
             source = .loading
@@ -177,6 +195,14 @@ struct VehicleDiscussionSheet: View {
             async let b: Void = loadSource(reader)
             _ = await (a, b)
         }
+    }
+
+    private func selectDraft(for reader: String) {
+        guard draftViewer != reader else { return }
+        if let draftViewer { DiscussionDrafts.save(draft, vehicle: vehicleId, viewer: draftViewer) }
+        draftViewer = reader
+        draft = DiscussionDrafts.read(vehicle: vehicleId, viewer: reader)
+        postMessage = nil
     }
 
     @ViewBuilder private func sourceSection(_ scope: ListingDiscussionScope) -> some View {
