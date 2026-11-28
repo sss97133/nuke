@@ -48,6 +48,13 @@ globalThis.fetch = (async (input, init) => {
       page_id:'20000000-0000-4000-8000-000000000001',word_count:1,duplicate:false,extractor_version:args.p_extractor_version,
       geometry_status:'client_attested_not_server_reextracted'});
   }
+  if (url.pathname === '/rest/v1/rpc/record_catalog_document_page_word_geometry') {
+    const args=JSON.parse(String(init?.body)), geometry=JSON.parse(args.p_geometry);
+    assert(args.p_document===docId && args.p_page===2 && args.p_actor==='agent:test' && geometry.words.length===1);
+    return Response.json({success:true,extraction_id:'40000000-0000-4000-8000-000000000001',
+      page_id:'20000000-0000-4000-8000-000000000001',word_count:1,duplicate:false,extractor_version:args.p_extractor_version,
+      geometry_status:'client_attested_not_server_reextracted'});
+  }
   if (url.pathname === '/functions/v1/ingest-observation') {
     intake = JSON.parse(String(init?.body)); return Response.json({ success: true, observation_id: obsId });
   }
@@ -108,6 +115,26 @@ Deno.test('actual word geometry handler rejects anonymous or invented claims',as
   calls.length=0;const denied=await handler(wordGeometryRequest('sb_publishable_fixture'));
   assert(denied.status===401 && calls.length===0);await denied.body?.cancel();
   const invalid=await handler(wordGeometryRequest(secret,input=>input.fitment='invented'));
+  assert(invalid.status===400 && calls.length===0);await invalid.body?.cancel();
+});
+function documentWordGeometryRequest(token=secret,change?:(input:any)=>void) {
+  const input:any={mode:'catalog_document_page_word_geometry',catalog_id:'30000000-0000-4000-8000-000000000001',
+    document_id:docId,catalog_page_number:2,pdf_sha256:'f'.repeat(64),extractor_version:'pdftotext version fixture',
+    geometry:JSON.stringify({width:'100',height:'200',words:[['1','2','3','4','word']]}),
+    reader:{actor:'agent:test',run_id:'fixed-run',verified_at:'2026-01-01T00:00:00Z'}};
+  change?.(input);
+  return new Request(`${project}/functions/v1/index-reference-document`,{
+    method:'POST',headers:{apikey:token,'Content-Type':'application/json'},body:JSON.stringify(input)});
+}
+Deno.test('actual whole catalog geometry handler records only attributed page geometry',async()=>{
+  calls.length=0;const response=await handler(documentWordGeometryRequest()),result=await response.json();
+  assert(response.status===200 && result.source_geometry_only===true && result.model_calls===0);
+  assert(calls.length===1 && calls[0]==='POST /rest/v1/rpc/record_catalog_document_page_word_geometry');
+});
+Deno.test('actual whole catalog geometry handler rejects anonymous or invented claims',async()=>{
+  calls.length=0;const denied=await handler(documentWordGeometryRequest('sb_publishable_fixture'));
+  assert(denied.status===401 && calls.length===0);await denied.body?.cancel();
+  const invalid=await handler(documentWordGeometryRequest(secret,input=>input.fitment='invented'));
   assert(invalid.status===400 && calls.length===0);await invalid.body?.cancel();
 });
 Deno.test('actual reference handler rejects anonymous credentials before effects', async () => {
