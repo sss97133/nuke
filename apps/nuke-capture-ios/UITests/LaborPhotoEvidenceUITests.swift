@@ -10,11 +10,12 @@ final class LaborPhotoEvidenceUITests: XCTestCase {
     }
 
     func testReassemblyPhotoUsesVehicleGateAndHandlesWithdrawal() {
-        for mode in ["available", "withdrawn"] {
+        for mode in ["available", "withdrawn", "account_changed"] {
             let app = XCUIApplication()
             app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
             app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_LABOR_STATE": "photos",
                                      "NUKE_FIXTURE_LABOR_PHOTO": mode,
+                                     "NUKE_FIXTURE_SWITCH_ACCOUNT": mode == "account_changed" ? "1" : "0",
                                      "NUKE_DEBUG_VEHICLE_ID": "00000000-0000-4000-8000-00000000c001"]
             app.launch()
             let segment = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "reassembly")).firstMatch
@@ -28,14 +29,21 @@ final class LaborPhotoEvidenceUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "does not confirm installation")).firstMatch.waitForExistence(timeout: 15))
             let carpet = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Fixture carpet")).firstMatch
             XCTAssertTrue(carpet.waitForExistence(timeout: 10)); carpet.tap()
-            if mode == "available" {
+            if mode == "account_changed" {
+                XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15), app.debugDescription)
+                let switchAccount = app.buttons["fixture.switch-account"]
+                XCTAssertTrue(switchAccount.waitForExistence(timeout: 5)); switchAccount.tap()
+                let refused = app.staticTexts["Your account changed. Return to the vehicle and reopen the photo links."]
+                XCTAssertTrue(refused.waitForExistence(timeout: 5), app.debugDescription)
+                XCTAssertFalse(app.buttons["Close"].exists, "A prior account's photo must not remain visible")
+            } else if mode == "available" {
                 XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15), app.debugDescription)
                 app.buttons["Close"].tap()
             } else {
                 XCTAssertTrue(app.staticTexts["Photo unavailable"].waitForExistence(timeout: 15), app.debugDescription)
                 app.navigationBars["Photo source"].buttons.firstMatch.tap()
             }
-            XCTAssertTrue(app.navigationBars["Photo links"].waitForExistence(timeout: 5))
+            if mode != "account_changed" { XCTAssertTrue(app.navigationBars["Photo links"].waitForExistence(timeout: 5)) }
             XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
             app.terminate()
         }
