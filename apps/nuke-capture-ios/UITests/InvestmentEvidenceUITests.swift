@@ -67,7 +67,16 @@ final class InvestmentEvidenceUITests: XCTestCase {
         for (index, suffix) in ["f004","f005","f006","f007"].enumerated() {
             let id = "00000000-0000-4000-8000-00000000" + suffix
             let confirm = app.buttons["session-confirm-" + id]
-            reveal(confirm,app:app);confirm.tap()
+            reveal(confirm,app:app)
+            // XCTest can report a row below the sheet's visible bottom as hittable.
+            // Bring it into the middle before tapping, so the request is actually sent.
+            if confirm.frame.midY > app.frame.maxY - 60 {
+                app.coordinate(withNormalizedOffset: CGVector(dx:0.5,dy:0.65))
+                    .press(forDuration:0.05,thenDragTo:app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.35)))
+                reveal(confirm,app:app)
+            }
+            XCTAssertLessThan(confirm.frame.midY, app.frame.maxY - 60)
+            confirm.tap()
             let retry = app.buttons.matching(identifier:"session-confirm-" + id)
                 .matching(NSPredicate(format:"label == %@","Retry confirmation")).firstMatch
             XCTAssertTrue(retry.waitForExistence(timeout:5),"No acknowledgement for " + suffix)
