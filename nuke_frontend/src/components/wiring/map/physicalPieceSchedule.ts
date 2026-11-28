@@ -1,7 +1,7 @@
 // A view scope over returned PostgreSQL IDs. No circuit creates a wire piece.
 import type { PhysicalHarnessModel, PhysicalTermination } from './physicalHarnessModel';
 import { engineeringText, type ScheduleColumn, type ScheduleRow, type SourceRecordKind, type SourceRecordTarget, type WiringSchedule } from './wiringSchedule';
-import { publicName } from './useWorkspaceSelection';
+import { cavOf, kindOf, publicName, valOf, type Rel } from './useWorkspaceSelection';
 
 const col = (key: string, label: string, width = 24, numeric = false): ScheduleColumn => ({ key, label, width, numeric });
 const numeric = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
@@ -11,6 +11,39 @@ const recordColumn: ScheduleColumn = { key: 'record', label: 'Open record', widt
 export interface PieceScheduleFilter {
   query: string; linkedCircuitIds?: ReadonlySet<string>; linkedEndpointIds?: ReadonlySet<string>;
   linkedPieceIds?: ReadonlySet<string>; linkedEndIds?: ReadonlySet<string>;
+}
+
+export function sourcePinEnds(model: PhysicalHarnessModel | null, selection: string | null): PhysicalTermination[] {
+  if (!model || kindOf(selection) !== 'p') return [];
+  const [code, ...address] = valOf(selection).split('|'), cavity = address.join('|');
+  const endpoints = new Set(model.endpoints.filter(e => e.code === code).map(e => e.id));
+  return model.terminations.filter(t => endpoints.has(t.endpoint_id) && cavOf(t.cavity) === cavity);
+}
+
+/** Navigation scope follows actual source keys. A pin never expands to all
+ * circuits on its connector or on the other endpoints of its related wires. */
+export function linkedPhysicalPieceFilter(model: PhysicalHarnessModel | null, selection: string | null, rel: Rel,
+  target: SourceRecordTarget | null): PieceScheduleFilter {
+  if (target?.kind === 'ends') {
+    const circuit = model?.terminations.find(t => t.id === target.id)?.circuit_id
+      ?? model?.unsegmented_end_records?.find(t => t.id === target.id)?.circuit_id;
+    return { query: '', ...(circuit ? { linkedCircuitIds: new Set([circuit]) } : { linkedEndIds: new Set([target.id]) }) };
+  }
+  if (target) return { query: '', ...(target.kind === 'segments' ? { linkedPieceIds: new Set([target.id]) }
+    : target.kind === 'endpoints' ? { linkedEndpointIds: new Set([target.id]) } : { linkedCircuitIds: new Set([target.id]) }) };
+  if (!selection || !model) return { query: '' };
+  const kind = kindOf(selection), value = valOf(selection);
+  if (kind === 'w') return { query: '', linkedCircuitIds: new Set(model.circuits.filter(c => c.code === value).map(c => c.id)) };
+  if (kind === 'n') return { query: '', linkedEndpointIds: new Set(model.endpoints.filter(e => e.code === value).map(e => e.id)) };
+  if (kind === 'p') {
+    const circuits = new Set(sourcePinEnds(model, selection).map(t => t.circuit_id));
+    // Some unsegmented ends do not include their cavity in this source read.
+    // The existing selection's related wires remain a narrower fallback than
+    // expanding to all other circuits attached to the connector.
+    if (!circuits.size) for (const c of model.circuits) if (rel.wires.has(c.code)) circuits.add(c.id);
+    return { query: '', linkedCircuitIds: circuits };
+  }
+  return { query: '', linkedCircuitIds: new Set(model.circuits.filter(c => kind === 'y' ? c.section === value : rel.wires.has(c.code)).map(c => c.id)) };
 }
 
 export function physicalRecordUrl(vehicleId: string, target: SourceRecordTarget, selection: string) {

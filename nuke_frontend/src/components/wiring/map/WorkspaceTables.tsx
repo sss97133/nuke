@@ -7,7 +7,7 @@ import { frame, rule } from '../connector-inspector/colorways';
 import type { WiringMapData } from './useWiringMap';
 import { kindOf, mask, valOf, type Rel, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 import { scheduleCellValue, wiringWorkbookBytes, type ScheduleRow, type SourceRecordTarget } from './wiringSchedule';
-import { buildPhysicalPieceSchedule, type PieceScheduleFilter } from './physicalPieceSchedule';
+import { buildPhysicalPieceSchedule, linkedPhysicalPieceFilter } from './physicalPieceSchedule';
 import { readPhysicalSourceWorkspace } from './physicalHarnessModel';
 import type { PhysicalHarnessRead } from './usePhysicalHarnessModel';
 import { supabase } from '../../../lib/supabase';
@@ -26,17 +26,7 @@ export function WorkspaceTables({ cw, map, sel, rel, isOwner, onSelect, vehicleI
   const wrap = useRef<HTMLDivElement | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const linkedFilter = useMemo<PieceScheduleFilter>(() => {
-    const model = physicalRead.model;
-    if (selectedRecord) return { query: '',
-      ...(selectedRecord.kind === 'segments' ? { linkedPieceIds: new Set([selectedRecord.id]) }
-        : selectedRecord.kind === 'ends' ? { linkedEndIds: new Set([selectedRecord.id]) }
-        : selectedRecord.kind === 'endpoints' ? { linkedEndpointIds: new Set([selectedRecord.id]) }
-        : { linkedCircuitIds: new Set([selectedRecord.id]) }) };
-    if (!sel || !model) return { query: '' };
-    if (kindOf(sel) === 'w') return { query: '', linkedCircuitIds: new Set(model.circuits.filter(c => c.code === valOf(sel)).map(c => c.id)) };
-    return { query: '', linkedEndpointIds: new Set(model.endpoints.filter(e => rel.nodes.has(e.code)).map(e => e.id)) };
-  }, [physicalRead.model, selectedRecord, sel, rel]);
+  const linkedFilter = useMemo(() => linkedPhysicalPieceFilter(physicalRead.model, sel, rel, selectedRecord), [physicalRead.model, selectedRecord, sel, rel]);
   const schedule = useMemo(() => physicalRead.model ? buildPhysicalPieceSchedule(physicalRead.model,
     { ...(onlyLinked && (sel || selectedRecord) ? linkedFilter : {}), query: tab === 'open' ? '' : q }, isOwner) : null,
     [physicalRead.model, onlyLinked, sel, selectedRecord, linkedFilter, q, isOwner, tab]);

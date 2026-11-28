@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { useContext, type CSSProperties, type ReactNode } from 'react';
 import type { PhysicalHarnessModel, PhysicalSegment } from './physicalHarnessModel';
 import { engineeringText, type SourceRecordTarget } from './wiringSchedule';
 import { publicName, wireGaugeDisplay } from './useWorkspaceSelection';
+import { ColorwayContext } from '../connector-inspector/colorways';
 
 export function readSourceRecordTarget(value: string | null): SourceRecordTarget | null {
   if (!value) return null;
@@ -10,11 +11,23 @@ export function readSourceRecordTarget(value: string | null): SourceRecordTarget
     ? { kind: kind as SourceRecordTarget['kind'], id: rest.join(':') } : null;
 }
 
-interface Props { model: PhysicalHarnessModel; target: SourceRecordTarget; onRecord: (target: SourceRecordTarget) => void }
+export function sourceCircuitForRecord(model: PhysicalHarnessModel | null, target: SourceRecordTarget | null) {
+  if (!model || !target) return null;
+  const id = target.kind === 'circuits' ? target.id : target.kind === 'segments' ? model.segments.find(s => s.id === target.id)?.circuit_id
+    : target.kind === 'ends' ? model.terminations.find(t => t.id === target.id)?.circuit_id
+      ?? model.unsegmented_end_records?.find(t => t.id === target.id)?.circuit_id : null;
+  return model.circuits.find(c => c.id === id) ?? null;
+}
+
+interface Props {
+  model: PhysicalHarnessModel; target: SourceRecordTarget; onRecord: (target: SourceRecordTarget) => void;
+  isOwner?: boolean; ownerExtra?: ReactNode;
+}
 const display = (v: unknown) => v == null || v === '' ? 'Not recorded' : typeof v === 'string' ? engineeringText(v) : String(v);
 
 /** Exact returned records and their typed keys; no positional end inference. */
-export function PhysicalRecordDetail({ model, target, onRecord }: Props) {
+export function PhysicalRecordDetail({ model, target, onRecord, isOwner = false, ownerExtra }: Props) {
+  const cw = useContext(ColorwayContext);
   const pieces = new Set(model.design_selection?.segment_ids ?? []);
   const circuits = new Map(model.circuits.map(c => [c.id, c]));
   const ends = new Map(model.terminations.map(t => [t.id, t]));
@@ -88,8 +101,10 @@ export function PhysicalRecordDetail({ model, target, onRecord }: Props) {
     }
   }
   if (!title) return <div role="alert">This exact {target.kind} record is not returned by the current source reader: {target.id}. No replacement record has been selected.</div>;
-  return <section className="physical-record-detail" aria-label="Physical source record" tabIndex={-1}><h2>{title}</h2>
+  return <section className="physical-record-detail" aria-label="Physical source record" tabIndex={-1}
+    style={{ '--record-muted': cw.inkMuted, '--record-border': cw.border, '--record-accent': cw.accent } as CSSProperties}><h2>{title}</h2>
     <p className="physical-record-qualification">Recorded plans and states are not construction release, stock allocation or proof of completion.</p>{body}
     <details className="physical-record-qualification"><summary>Source reference</summary><p>Content {model.snapshot_hash} · Read {model.read_at ?? 'time not included'}</p></details>
+    {isOwner && ownerExtra && <details className="physical-owner-evidence"><summary>Owner evidence and recorded history</summary>{ownerExtra}</details>}
     </section>;
 }

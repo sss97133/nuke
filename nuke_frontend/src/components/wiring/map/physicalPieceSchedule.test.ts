@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
-import { buildPhysicalPieceSchedule } from './physicalPieceSchedule';
+import { buildPhysicalPieceSchedule, linkedPhysicalPieceFilter } from './physicalPieceSchedule';
+import type { Rel } from './useWorkspaceSelection';
 import { wiringWorkbookBytes } from './wiringSchedule';
 import type { PhysicalHarnessModel, PhysicalSegment } from './physicalHarnessModel';
 
@@ -76,6 +77,18 @@ it('can scope one exact piece or an unsegmented end without making a new piece',
   expect(end.tables[0].rows).toEqual([]);
   expect(end.tables[1].rows.map(r => r.id)).toEqual(['unsegmented-end']);
   expect(buildPhysicalPieceSchedule(fixture(), { query: 'unsegmented-end' }, false).tables[3].rows.map(r => r.id)).toEqual(['empty']);
+});
+
+it('keeps a pin selection on its related circuit instead of including other connector cavities', () => {
+  const model = fixture();
+  const rel: Rel = { nodes: new Set(['ECU', 'CAB', 'BAY', 'SENSOR']), wires: new Set(['110']), pins: new Set(), segs: new Set(), devs: new Set(), sections: new Set() };
+  const filter = linkedPhysicalPieceFilter(model, 'p:ECU|B04', rel, null);
+  const schedule = buildPhysicalPieceSchedule(model, filter, false);
+  expect(schedule.tables[0].rows.map(r => r.id)).toEqual(['cabin-piece', 'engine-piece']);
+  expect(schedule.tables[0].rows.some(r => r.id === 'conflict-piece')).toBe(false);
+  expect([...filter.linkedCircuitIds!]).toEqual(['c110']);
+  const node = linkedPhysicalPieceFilter(model, 'n:SENSOR', rel, null);
+  expect([...node.linkedEndpointIds!]).toEqual(['SENSOR']);
 });
 
 it('retains unresolved typed references in the scope instead of silently repairing them', () => {

@@ -37,8 +37,9 @@ import { WorkspaceTree } from './WorkspaceTree';
 import { ConnectorFace, PlanView } from './WorkspaceViews';
 import { PhysicalSchematicBlock } from './SchematicBlock';
 import { usePhysicalHarnessModel } from './usePhysicalHarnessModel';
-import { PhysicalRecordDetail, readSourceRecordTarget } from './PhysicalRecordDetail';
+import { PhysicalRecordDetail, readSourceRecordTarget, sourceCircuitForRecord } from './PhysicalRecordDetail';
 import type { SourceRecordTarget } from './wiringSchedule';
+import { sourcePinEnds } from './physicalPieceSchedule';
 import './physical-record.css';
 import { WorkspaceTables } from './WorkspaceTables';
 import { WorkspaceProps } from './WorkspaceProps';
@@ -159,8 +160,10 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const cov = useMemo(() => coverage(site), [site]);
 
   const k = kindOf(sel), v = valOf(sel);
+  const pinRecords = useMemo(() => sourcePinEnds(physicalRead.model, sel), [physicalRead.model, sel]);
+  const pinRecord: SourceRecordTarget | null = !sourceRecord && k === 'p' && pinRecords.length === 1 ? { kind: 'ends', id: pinRecords[0].id } : null;
   const recordPane = useRef<HTMLDivElement>(null);
-  const sourceAddress = params.get('record') ?? (k === 'w' ? sel : null);
+  const sourceAddress = params.get('record') ?? (k === 'w' || k === 'p' ? sel : null);
   const sourceReady = physicalRead.model !== null;
   useEffect(() => {
     if (!narrow || !sourceAddress || !sourceReady || !map.loaded) return;
@@ -196,10 +199,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const pick = (id: string) => { setSel(id); setTreeOpen(false); };
   const pickRecord = (target: SourceRecordTarget) => {
     const model = physicalRead.model;
-    const circuitId = target.kind === 'segments' ? model?.segments.find(s => s.id === target.id)?.circuit_id
-      : target.kind === 'ends' ? model?.terminations.find(t => t.id === target.id)?.circuit_id
-        ?? model?.unsegmented_end_records?.find(t => t.id === target.id)?.circuit_id : target.kind === 'circuits' ? target.id : null;
-    const c = circuitId ? model?.circuits.find(c => c.id === circuitId) : undefined;
+    const c = sourceCircuitForRecord(model, target);
     const e = target.kind === 'endpoints' ? model?.endpoints.find(e => e.id === target.id) : undefined;
     set({ record: `${target.kind}:${target.id}`, sel: c ? `w:${c.code}` : e ? `n:${e.code}` : null, node: null, call: null });
     setTreeOpen(false);
@@ -207,8 +207,10 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const clearSel = React.useCallback(() => setSel(null), [setSel]);
 
   // the owner's records for the selection: proof, notes, sources, rule checks, the calls it hangs on
-  const rawNode = k === 'n' ? raw.nodes.find(n => n.code === v) : undefined;
-  const rawWire = k === 'w' ? raw.wires.find(w => w.code === v) : undefined;
+  const activeSourceCircuit = sourceCircuitForRecord(physicalRead.model, sourceRecord ?? pinRecord);
+  const rawNode = sourceRecord ? sourceRecord.kind === 'endpoints' && physicalRead.model?.endpoints.some(e => e.id === sourceRecord.id)
+    ? raw.nodes.find(n => n.id === sourceRecord.id) : undefined : k === 'n' ? raw.nodes.find(n => n.code === v) : undefined;
+  const rawWire = sourceRecord || pinRecord ? raw.wires.find(w => w.id === activeSourceCircuit?.id) : k === 'w' ? raw.wires.find(w => w.code === v) : undefined;
   const rawCall = k === 'k' ? raw.calls.find(c => c.slug === v) : undefined;
   const records = !isOwner ? undefined
     : rawNode ? <NodeCard cw={cw} n={rawNode} map={raw} byId={byId} facts={facts} recordsOnly onNode={c => pick('n:' + c)} onCall={s => pick('k:' + s)} />
@@ -261,12 +263,21 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
         ? !sourceRecord ? <p role="alert">This source-record address is not supported.</p>
           : physicalRead.error ? <p role="alert">{physicalRead.error}</p>
             : !physicalRead.model ? <p>Reading the exact source record…</p>
-              : <PhysicalRecordDetail model={physicalRead.model} target={sourceRecord} onRecord={pickRecord} />
+              : <PhysicalRecordDetail model={physicalRead.model} target={sourceRecord} onRecord={pickRecord} isOwner={isOwner} ownerExtra={records} />
+        : k === 'p'
+          ? physicalRead.error ? <p role="alert">{physicalRead.error}</p>
+            : !physicalRead.model ? <p>Reading physical termination records…</p>
+              : pinRecord ? <PhysicalRecordDetail model={physicalRead.model} target={pinRecord} onRecord={pickRecord} isOwner={isOwner} ownerExtra={records} />
+                : pinRecords.length ? <div><p>Several source ends use this pin address. Choose the exact termination.</p><ul>{pinRecords.map(t => <li key={t.id}>
+                  <button type="button" onClick={() => pickRecord({ kind: 'ends', id: t.id })}
+                    style={{ minHeight: 44, padding: '6px 0', border: 0, background: 'transparent', color: cw.accent, font: 'inherit', textAlign: 'left', overflowWrap: 'anywhere' }}>
+                    {physicalRead.model!.circuits.find(c => c.id === t.circuit_id)?.code ?? 'Circuit not returned'} · {t.id}</button>
+                </li>)}</ul></div> : <p role="alert">This pin address is not returned by the current physical source reader. Open a termination from the schedule to inspect its exact record.</p>
         : k === 'w'
           ? physicalRead.error ? <p role="alert">{physicalRead.error}</p>
             : !physicalRead.model ? <p>Reading physical wire records…</p>
               : physicalRead.model.circuits.some(c => c.code === v)
-                ? <PhysicalRecordDetail model={physicalRead.model} target={{ kind: 'circuits', id: physicalRead.model.circuits.find(c => c.code === v)!.id }} onRecord={pickRecord} />
+                ? <PhysicalRecordDetail model={physicalRead.model} target={{ kind: 'circuits', id: physicalRead.model.circuits.find(c => c.code === v)!.id }} onRecord={pickRecord} isOwner={isOwner} ownerExtra={records} />
                 : <p role="alert">This circuit is not returned by the current physical source reader.</p>
         : sel
         ? <WorkspaceProps cw={cw} map={map} ix={ix} site={site} sel={sel} isOwner={isOwner} onSelect={pick} ownerExtra={records}
