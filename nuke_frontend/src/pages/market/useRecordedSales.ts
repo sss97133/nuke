@@ -52,6 +52,21 @@ export interface SalesContributor {
   outcome_reason?: string; numerator_contribution?: number; denominator_contribution?: number;
   vehicle_identity?: { year: number | null; make: string | null; model: string | null };
 }
+export interface SalesScopeExclusion {
+  auction_event_id:string;source_event_ids:string[];vehicle_id:string;source_url:string;event_at:string;
+  vehicle_identity:{year:number|null;make:string|null;model:string|null};vehicle_identity_basis:'current_representative_parent_record';
+  source_observed_at:string|null;source_read_basis:'direct_fetch'|'cached_snapshot'|'unknown';
+  source_outcome:string|null;recorded_outcome_class:'sold'|'no_sale'|'withdrawn'|'unresolved';
+  membership_reason:string;conflicting_listing_aliases:boolean;recorded_canonical_make_id:string|null;resolved_make_id:string|null;
+  requested_canonical_model_id:string;exact_registered_model_count:number;matching_model_keys_limit:20;
+  matching_model_keys_fingerprint:string|null;matching_model_keys_truncated:boolean;matching_model_ids:string[];
+}
+export interface SalesScopeExclusions {
+  contract_version:1;state:'partial'|'unavailable';reason:string;membership_method:string;snapshot_hash:string;
+  record_limit:20;complete_external_capture:false;current_parent_identity_only:true;
+  total:number|null;records_truncated:boolean|null;omitted_records:number|null;
+  reason_counts:{reason:string;episodes:number}[]|null;records:SalesScopeExclusion[];
+}
 export interface RecordedSalesReceipt extends SalesWindow {
   contract_version: number; metric_id: string; state: 'partial'; reason: string;
   unit?: string; method_id?: string; method_version?: number;
@@ -67,6 +82,7 @@ export interface RecordedSalesReceipt extends SalesWindow {
   series: SalesPoint[];
   summary?: { series: SalesSeries; numerator: number | null; denominator: number | null;
     ratio: number | null; withdrawn: number | null; unresolved: number | null }[];
+  scope_exclusions?:SalesScopeExclusions;
   evidence: { has_more: boolean; per_bucket_series_limit: number; pagination_supported: boolean;
     snapshot_hash?: string; offset?: number; next_offset?: number | null; outcome_filter?: SalesOutcome;
     contributors: SalesContributor[] };
@@ -245,6 +261,53 @@ function assertCapturedOutcomes(data: RecordedSalesReceipt, request: SalesReques
       || c.numerator_contribution !== (c.outcome_class === 'sold' ? 1 : 0)
       || c.denominator_contribution !== (c.outcome_class === 'sold' || c.outcome_class === 'no_sale' ? 1 : 0)) fail();
   }
+  if(data.scope_exclusions!==undefined)assertScopeExclusions(data);
+}
+
+/** Optional during the SQL rollout; once present, explanations must describe this exact population and snapshot. */
+function assertScopeExclusions(data:RecordedSalesReceipt){
+  const x=data.scope_exclusions!;
+  const fail=():never=>{throw new Error('Unsupported scope-exclusion receipt');};
+  const count=(n:unknown):n is number=>typeof n==='number'&&Number.isSafeInteger(n)&&n>=0;
+  const uuid=(v:unknown)=>typeof v==='string'&&SCOPE_UUID.test(v);
+  const nullableUuid=(v:unknown)=>v===null||uuid(v);
+  const nullableText=(v:unknown)=>v===null||typeof v==='string';
+  if(!x||data.scope.kind!=='descriptive_subject'||x.contract_version!==1||x.membership_method!==data.scope.membership_method
+    ||x.snapshot_hash!==data.evidence.snapshot_hash||x.record_limit!==20||x.complete_external_capture!==false
+    ||x.current_parent_identity_only!==true||!Array.isArray(x.records))return fail();
+  if(data.truncated){
+    if(x.state!=='unavailable'||x.reason!=='candidate_cap_exceeded'||x.total!==null||x.reason_counts!==null
+      ||x.records.length||x.records_truncated!==null||x.omitted_records!==null)return fail();
+    return;
+  }
+  if(x.state!=='partial'||!count(x.total)||x.total!==data.coverage.unresolved_scope||!Array.isArray(x.reason_counts)
+    ||x.records.length!==Math.min(x.total,20)||x.records_truncated!==(x.total>20)||x.omitted_records!==Math.max(0,x.total-20))return fail();
+  const reasons=new Map<string,number>();
+  for(const r of x.reason_counts){if(!r||typeof r.reason!=='string'||!r.reason||!count(r.episodes)||!r.episodes||reasons.has(r.reason))return fail();reasons.set(r.reason,r.episodes);}
+  if([...reasons.values()].reduce((a,b)=>a+b,0)!==x.total)return fail();
+  const ids=new Set<string>(),urls=new Set<string>(),seenReasons=new Map<string,number>();
+  for(const r of x.records){
+    if(!r||!uuid(r.auction_event_id)||!uuid(r.vehicle_id)||ids.has(r.auction_event_id)
+      ||typeof r.source_url!=='string'||!/^https:\/\/bringatrailer[.]com\/listing\/[^/?#]+\/$/.test(r.source_url)||urls.has(r.source_url)
+      ||!Array.isArray(r.source_event_ids)||!r.source_event_ids.length||r.source_event_ids.some(v=>!uuid(v))
+      ||new Set(r.source_event_ids).size!==r.source_event_ids.length||!r.source_event_ids.includes(r.auction_event_id)
+      ||!reasons.has(r.membership_reason)||r.requested_canonical_model_id!==data.scope.canonical_model_id
+      ||!nullableUuid(r.recorded_canonical_make_id)||!nullableUuid(r.resolved_make_id)||typeof r.conflicting_listing_aliases!=='boolean'
+      ||!r.vehicle_identity||r.vehicle_identity_basis!=='current_representative_parent_record'
+      ||!nullableText(r.vehicle_identity.make)||!nullableText(r.vehicle_identity.model)
+      ||!(r.vehicle_identity.year===null||Number.isSafeInteger(r.vehicle_identity.year))
+      ||!nullableText(r.source_outcome)||!['sold','no_sale','withdrawn','unresolved'].includes(r.recorded_outcome_class)
+      ||!count(r.exact_registered_model_count)||r.matching_model_keys_limit!==20||!Array.isArray(r.matching_model_ids)
+      ||r.matching_model_ids.length!==Math.min(r.exact_registered_model_count,20)||r.matching_model_ids.some(v=>!uuid(v))
+      ||new Set(r.matching_model_ids).size!==r.matching_model_ids.length||r.matching_model_keys_truncated!==(r.exact_registered_model_count>20)
+      ||(r.exact_registered_model_count===0?r.matching_model_keys_fingerprint!==null:!(/^[a-f0-9]{32}$/).test(r.matching_model_keys_fingerprint??''))
+      ||!Number.isFinite(Date.parse(r.event_at))||Date.parse(r.event_at)<Date.parse(data.event_from)||Date.parse(r.event_at)>=Date.parse(data.event_to)
+      ||!['direct_fetch','cached_snapshot','unknown'].includes(r.source_read_basis)
+      ||(r.source_read_basis==='unknown'?r.source_observed_at!==null:!r.source_observed_at||!Number.isFinite(Date.parse(r.source_observed_at))
+        ||Date.parse(r.source_observed_at)>Date.parse(data.knowledge_cutoff)))return fail();
+    ids.add(r.auction_event_id);urls.add(r.source_url);seenReasons.set(r.membership_reason,1+(seenReasons.get(r.membership_reason)??0));
+  }
+  if([...seenReasons].some(([reason,n])=>n>reasons.get(reason)!))return fail();
 }
 
 export function useSalesScopes() {

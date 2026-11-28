@@ -143,4 +143,39 @@ describe('descriptive outcome scope binding', () => {
     data.scope_admission.subject_id='70000000-0000-4000-8000-000000000002';
     await expect(fetchRecordedSales(request())).rejects.toThrow('Unsupported descriptive-scope refusal');
   });
+  function explained(){return {...capturedFixture(),scope:scope(),knowledge_cutoff:'2026-11-27T12:00:00Z',
+    coverage:{complete_external_capture:false,unresolved_scope:1},scope_exclusions:{contract_version:1,state:'partial',
+      reason:'unresolved_membership_not_assigned_to_either_series',membership_method:scope().membership_method,snapshot_hash:'a'.repeat(32),
+      record_limit:20,complete_external_capture:false,current_parent_identity_only:true,total:1,records_truncated:false,omitted_records:0,
+      reason_counts:[{reason:'ambiguous_exact_registered_model_keys',episodes:1}],records:[{
+        auction_event_id:'82000000-0000-4000-8000-000000000001',vehicle_id:'81000000-0000-4000-8000-000000000001',
+        source_event_ids:['82000000-0000-4000-8000-000000000001'],source_url:'https://bringatrailer.com/listing/scope-excluded/',
+        event_at:'2026-11-20T10:00:00Z',vehicle_identity:{year:1977,make:'Fixture',model:'MODEL trim'},
+        vehicle_identity_basis:'current_representative_parent_record',source_read_basis:'unknown',source_observed_at:null as string|null,
+        source_outcome:'reserve_not_met',recorded_outcome_class:'no_sale',membership_reason:'ambiguous_exact_registered_model_keys',
+        conflicting_listing_aliases:false,recorded_canonical_make_id:null,resolved_make_id:null,
+        requested_canonical_model_id:scope().canonical_model_id,exact_registered_model_count:2,matching_model_keys_limit:20,
+        matching_model_keys_fingerprint:'c'.repeat(32),matching_model_keys_truncated:false,
+        matching_model_ids:[scope().canonical_model_id,'20000000-0000-4000-8000-000000000002']}]
+    }};}
+  it('keeps separately keyed membership explanations on the outcome snapshot',async()=>{
+    const data=explained();fixture.rpc.mockResolvedValue({data});expect((await fetchRecordedSales(request()) as any).scope_exclusions).toEqual(data.scope_exclusions);
+  });
+  it.each(['other snapshot','other model','wrong total','hidden omissions','duplicate keys','wrong event window','invented clock','wrong source'])(
+    'withholds an inconsistent membership explanation: %s',async kind=>{
+      const data=explained(),x=data.scope_exclusions,r=x.records[0];
+      if(kind==='other snapshot')x.snapshot_hash='b'.repeat(32);
+      if(kind==='other model')r.requested_canonical_model_id='20000000-0000-4000-8000-000000000099';
+      if(kind==='wrong total')data.coverage.unresolved_scope=2;
+      if(kind==='hidden omissions'){x.total=2;data.coverage.unresolved_scope=2;x.reason_counts[0].episodes=2;}
+      if(kind==='duplicate keys')r.matching_model_ids=[scope().canonical_model_id,scope().canonical_model_id];
+      if(kind==='wrong event window')r.event_at='2026-11-27T00:00:00Z';
+      if(kind==='invented clock')r.source_observed_at='2026-11-20T10:01:00Z';
+      if(kind==='wrong source')r.source_url='https://example.com/listing/scope-excluded/';
+      fixture.rpc.mockResolvedValue({data});await expect(fetchRecordedSales(request())).rejects.toThrow('Unsupported scope-exclusion receipt');
+    });
+  it('accepts a known empty explanation without inventing rejected records',async()=>{
+    const data=explained();Object.assign(data.scope_exclusions,{total:0,records:[],reason_counts:[]});data.coverage.unresolved_scope=0;
+    fixture.rpc.mockResolvedValue({data});expect((await fetchRecordedSales(request()) as any).scope_exclusions.records).toEqual([]);
+  });
 });

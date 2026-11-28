@@ -74,3 +74,12 @@ select.market-control { padding-right: 24px; }
 .market-descriptive-scope__records th,.market-descriptive-scope__records td { padding: 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); white-space: normal; }
 .market-descriptive-scope__records code { overflow-wrap: anywhere; }
 .market-descriptive-scope :is(select,button,summary,[tabindex]):focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+.market-scope-exclusions { max-width: 100%; margin: 12px 0; font: 14px var(--font-family); overflow-wrap: anywhere; }
+.market-scope-exclusions > summary { min-height: 44px; align-content: center; cursor: pointer; }
+.market-scope-exclusions__reasons { margin: 8px 0; }
+.market-scope-exclusions__reasons > div { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.market-scope-exclusions__reasons dd { margin: 0; font-variant-numeric: tabular-nums; }
+.market-scope-exclusions > ol { padding-left: 24px; }
+.market-scope-exclusions > ol > li { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.market-scope-exclusions code { font-size: 12px; overflow-wrap: anywhere; }

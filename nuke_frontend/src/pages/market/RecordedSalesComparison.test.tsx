@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import type { RecordedSalesReceipt, SalesScopeOption, SalesRequest } from './useRecordedSales';
+import type { RecordedSalesReceipt, SalesScopeOption, SalesRequest, SalesScopeExclusion } from './useRecordedSales';
 
 const fixture = vi.hoisted(() => ({ catalog: {} as any, descriptive: {} as any, query: {} as any, request: null as SalesRequest | null, retry: vi.fn(), client: null as import('@tanstack/react-query').QueryClient | null }));
 vi.mock('@tanstack/react-query', async original => ({ ...await original<typeof import('@tanstack/react-query')>(), useQueryClient: () => fixture.client }));
@@ -348,6 +348,43 @@ it('does not replace a missing descriptive scope with the make population',async
 it('withholds a selected descriptive group when its SQL catalog cannot be read',async()=>{
  withDescriptive();fixture.descriptive.isError=true;await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={{scopeKey:desc.key,days:7,metric:'captured_sell_through',drill:null,benchmark:false}}/>));
  expect(fixture.request).toBeNull();expect(container.textContent).toContain('No make population is substituted');expect(container.querySelector('.sales-count-point')).toBeNull();
+});
+
+function scopeExclusionReceipt(){
+ const r=descriptiveReceipt();r.scope.canonical_model_id='20000000-0000-4000-8000-000000000001';r.coverage.unresolved_scope=21;
+ const record=(i:number):SalesScopeExclusion=>{
+  const auction=`82000000-0000-4000-8000-${String(i).padStart(12,'0')}`,vehicle=`81000000-0000-4000-8000-${String(i).padStart(12,'0')}`;
+  return {auction_event_id:auction,vehicle_id:vehicle,source_event_ids:[auction],source_url:`https://bringatrailer.com/listing/excluded-${i}/`,event_at:bucket,
+   vehicle_identity:{year:1977,make:'Fixture',model:'MODEL special'},vehicle_identity_basis:'current_representative_parent_record',
+   source_read_basis:'unknown',source_observed_at:null,source_outcome:'reserve_not_met',recorded_outcome_class:'no_sale',
+   membership_reason:'no_exact_registered_model_label',conflicting_listing_aliases:false,recorded_canonical_make_id:null,resolved_make_id:null,
+   requested_canonical_model_id:r.scope.canonical_model_id!,exact_registered_model_count:0,matching_model_keys_limit:20,
+   matching_model_keys_fingerprint:null,matching_model_keys_truncated:false,matching_model_ids:[]};
+ };
+ r.scope_exclusions={contract_version:1,state:'partial',reason:'unresolved_membership_not_assigned_to_either_series',membership_method:'fixture',
+  snapshot_hash:'a'.repeat(32),record_limit:20,complete_external_capture:false,current_parent_identity_only:true,total:21,
+  records_truncated:true,omitted_records:1,reason_counts:[{reason:'no_exact_registered_model_label',episodes:21}],records:Array.from({length:20},(_,i)=>record(i+1))};
+ return r;
+}
+it('opens SQL membership reasons and exact source records while declaring omitted episodes',async()=>{
+ withDescriptive();fixture.query.data=scopeExclusionReceipt();
+ await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={{scopeKey:desc.key,days:7,metric:'captured_sell_through',drill:null,benchmark:false}}/>));
+ await act(async()=>container.querySelector<HTMLDetailsElement>('.market-scope-exclusions')!.querySelector('summary')!.click());
+ expect(container.querySelector('.market-scope-exclusions')?.textContent).toContain('Showing 20 of 21 excluded episodes');
+ expect(container.querySelector('.market-scope-exclusions')?.textContent).toContain('1 episode is omitted');
+ expect(container.querySelectorAll('[data-scope-exclusion-id]')).toHaveLength(20);
+ const item=container.querySelector('[data-scope-exclusion-id="82000000-0000-4000-8000-000000000001"]')!;
+ expect(item.querySelector('a')?.getAttribute('href')).toBe('/stacks/order-book/81000000-0000-4000-8000-000000000001?lot=82000000-0000-4000-8000-000000000001');
+ expect(item.textContent).toContain('no exact registered model label · recorded source result: reserve not met');
+ expect(item.textContent).toContain('Requested model 20000000-0000-4000-8000-000000000001');
+ expect(item.textContent).toContain('Source read time unknown');
+});
+it('withholds the previous membership records when the snapshot is refused',async()=>{
+ withDescriptive();const lens={scopeKey:desc.key,days:7 as const,metric:'captured_sell_through' as const,drill:null,benchmark:false};
+ fixture.query.data=scopeExclusionReceipt();await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={lens}/>));
+ expect(container.querySelectorAll('[data-scope-exclusion-id]')).toHaveLength(20);
+ fixture.query.data={state:'unavailable',reason:'evidence_snapshot_changed'};await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={lens}/>));
+ expect(container.querySelector('[data-scope-exclusion-id]')).toBeNull();expect(container.textContent).toContain('evidence snapshot changed');
 });
 it('clears local evidence selection when changing between year and make scopes',async()=>{
  withDescriptive();fixture.query.data=descriptiveReceipt();await render();await select('Market outcome measure','captured_sell_through');

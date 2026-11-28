@@ -4,7 +4,7 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import { VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Text } from '../../kit';
 import { matchSalesMake, recordedSalesRequest, recordedSalesWindow, useRecordedSales, useSalesScopes, useDescriptiveSalesScopes,
-  type SalesDrill, type SalesMetric, type SalesOutcome, type SalesPoint, type SalesSeries, type SalesScopeOption } from './useRecordedSales';
+  type SalesDrill, type SalesMetric, type SalesOutcome, type SalesPoint, type SalesSeries, type SalesScopeOption, type RecordedSalesReceipt } from './useRecordedSales';
 import './RecordedSalesComparison.css';
 
 const label: React.CSSProperties = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 };
@@ -38,6 +38,39 @@ function CountBucket({ point, name, max, refused, active, onClick, captured = fa
       <span style={{ ...mono, fontSize: 10 }}>{day(point.bucket_start).slice(5)}</span>
     </button>
   </div>;
+}
+
+function ScopeExclusionEvidence({receipt}:{receipt:RecordedSalesReceipt}){
+  const evidence=receipt.scope_exclusions;
+  if(!evidence||evidence.state!=='partial'||!evidence.total)return null;
+  return <details className="market-scope-exclusions">
+    <summary>Why {number(evidence.total)} listing episode{evidence.total===1?'':'s'} could not join this group</summary>
+    <p>These episodes are excluded from both comparison series because their group membership is unresolved. Their recorded outcomes are separate from that membership decision.</p>
+    <dl className="market-scope-exclusions__reasons">{evidence.reason_counts?.map(row=><div key={row.reason}>
+      <dt>{row.reason.replace(/_/g,' ')}</dt><dd>{number(row.episodes)}</dd>
+    </div>)}</dl>
+    <p>Showing {number(evidence.records.length)} of {number(evidence.total)} excluded episodes in this window.
+      {Boolean(evidence.omitted_records)&&<> {number(evidence.omitted_records)} episode{evidence.omitted_records===1?' is':'s are'} omitted from this bounded read.</>}
+      {' '}Vehicle labels describe the current representative parent record.</p>
+    <ol>{evidence.records.map(row=><li key={row.auction_event_id} data-scope-exclusion-id={row.auction_event_id}>
+      <PrefetchLink to={`/stacks/order-book/${row.vehicle_id}?lot=${row.auction_event_id}`}>
+        {row.vehicle_identity.year??'Year unknown'} {row.vehicle_identity.make??'Make unknown'} {row.vehicle_identity.model??'Model unknown'}
+      </PrefetchLink>{' · '}<a href={row.source_url} target="_blank" rel="noopener noreferrer">BaT listing ↗</a>
+      <div>{row.membership_reason.replace(/_/g,' ')} · recorded source result: {row.source_outcome?.replace(/_/g,' ')??'unknown'}.</div>
+      {row.conflicting_listing_aliases&&<p>Conflicting listing aliases do not establish which vehicle this episode depicts.</p>}
+      <div>Recorded listing end <time dateTime={row.event_at}>{utc(row.event_at)}</time>.{' '}
+        {row.source_read_basis==='unknown'?'Source read time unknown.':<>Source {row.source_read_basis==='direct_fetch'?'direct read':'cached snapshot'} <time dateTime={row.source_observed_at!}>{utc(row.source_observed_at!)}</time>.</>}</div>
+      <details><summary>Membership keys and matches</summary>
+        <code>Episode {row.auction_event_id}<br/>Source aliases {row.source_event_ids.join(', ')}<br/>
+          Requested model {row.requested_canonical_model_id}<br/>
+          Recorded make key {row.recorded_canonical_make_id??'unknown'}<br/>Resolved make key {row.resolved_make_id??'unresolved'}</code>
+        <div>{number(row.exact_registered_model_count)} exact registered model match{row.exact_registered_model_count===1?'':'es'}; showing {number(row.matching_model_ids.length)} keys.
+          {row.matching_model_keys_truncated&&' Additional matching keys are omitted.'}</div>
+        {row.matching_model_ids.length>0&&<ul>{row.matching_model_ids.map(id=><li key={id}><code>{id}</code></li>)}</ul>}
+      </details>
+    </li>)}</ol>
+    <p>Current PostgreSQL membership read · snapshot <code>{evidence.snapshot_hash}</code>. Refresh recorded evidence to read current inputs.</p>
+  </details>;
 }
 
 /** Displays SQL-admitted catalog representatives; the rule table preserves all candidate keys and reasons. */
@@ -262,6 +295,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
       {captured&&receipt.scope.kind==='descriptive_subject'&&!receipt.truncated&&(receipt.coverage.unresolved_scope??0)>0&&<p className="market-descriptive-scope__note">
         {number(receipt.coverage.unresolved_scope)} captured episodes have unresolved group membership and are excluded from both series. An unknown fraction can reflect missing or ambiguous model records.
       </p>}
+      {captured&&!receipt.truncated&&<ScopeExclusionEvidence receipt={receipt}/>}
       {receipt.truncated ? <div role="status" style={{ fontSize: 12, padding: '8px 0' }}>
         Candidate limit exceeded ({number(receipt.captured_candidates)} captured; limit {number(receipt.candidate_limit)}). Counts, denominators, ratios and changes are refused. Choose a shorter window.
       </div> : null}
