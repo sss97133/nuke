@@ -135,6 +135,13 @@ enum FixtureBackend {
         guard name == "market_pulse_live" else { return ok(#"{"population":{},"asks":[]}"#) }
         browseReadLock.lock(); browseLiveAttempts += 1; let attempt = browseLiveAttempts; browseReadLock.unlock()
         let iso = ISO8601DateFormatter()
+        if ["browse-clock-freshness", "browse-clock-boundary"].contains(scenario) {
+            let end = iso.string(from: Date().addingTimeInterval(scenario == "browse-clock-boundary" ? 3612 : 2700))
+            let updated = iso.string(from: Date().addingTimeInterval(-40))
+            return ok("""
+            {"auctions":[["00000000-0000-4000-8000-000000000002",1973,"Fixture","Coupe",5000,"\(end)","\(updated)",null,"http://[",false,null,"Fixture freshness",null,null,null,null,null]]}
+            """)
+        }
         let closing = iso.string(from: Date().addingTimeInterval(attempt == 1 ? 10 : 120))
         let clockOnly = ["browse-clock-extended", "browse-clock-missing-then-extended"].contains(scenario)
         let extended = iso.string(from: Date().addingTimeInterval(attempt == 1 ? (clockOnly ? 10 : 20) : 120))
@@ -619,7 +626,7 @@ enum FixtureBackend {
             && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more"].contains(scenario):
             return browsePagingRead(name, args)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
-            && ["browse-closing-refresh", "browse-clock-extended", "browse-clock-missing-then-extended"].contains(scenario):
+            && ["browse-closing-refresh", "browse-clock-extended", "browse-clock-missing-then-extended", "browse-clock-freshness", "browse-clock-boundary"].contains(scenario):
             return closingBrowseRead(name)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
             && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):

@@ -626,19 +626,18 @@ struct ExploreCardOverlay: View {
     var onWhy: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .bottom) {
-            if let amt = item.amount {
-                priceButton(amt)
-            }
-            Spacer(minLength: NukeSpace.sm)
-            if let ends = item.endsAt {
-                // Ticks against the server's clock (ServerClock): every second in the last hour, where it reads m:ss,
-                // and every 30 s before that, where it shows hours and minutes.
-                TimelineView(.periodic(from: .now, by: ExploreClock.tick(ends: ends, now: ServerClock.now()))) { ctx in
-                    let now = ServerClock.now(ctx.date)
+        TimelineView(ExploreClockSchedule(ends: item.endsAt)) { ctx in
+            let now = ServerClock.now(ctx.date)
+            HStack(alignment: .bottom) {
+                if let amt = item.amount {
+                    priceButton(amt, now: now)
+                }
+                Spacer(minLength: NukeSpace.sm)
+                if let ends = item.endsAt {
                     let text = item.liveStatusUnavailable ? "Status unavailable" : ExploreClock.text(ends: ends, now: now)
                     if let onDrill, !item.liveStatusUnavailable {
                         ExploreDoor(kind: .clock, item: item, alignment: .bottomTrailing, open: onDrill) { clock(text) }
+                            .accessibilityValue(Text(text))
                     } else {
                         clock(text)
                     }
@@ -649,7 +648,7 @@ struct ExploreCardOverlay: View {
 
     /// The price is a button: a tap opens the evidence behind it ("Why this range"; a live lot without that
     /// stack opens its bid reading). It looks like one: a chip with a chevron, not a number painted on a photo.
-    @ViewBuilder private func priceButton(_ amt: Double) -> some View {
+    @ViewBuilder private func priceButton(_ amt: Double, now: Date) -> some View {
         let action: (() -> Void)? = onWhy ?? {
             guard let onDrill, hasBidReading, item.kind == .live else { return nil }
             return { onDrill(ExploreCardDrill(kind: .bid, item: item)) }
@@ -659,19 +658,19 @@ struct ExploreCardOverlay: View {
                 Haptics.drill(depth: 1)
                 action()
             } label: {
-                priceChip(amt, tappable: true)
+                priceChip(amt, tappable: true, now: now)
             }
             .buttonStyle(ExplorePriceButtonStyle())
             .accessibilityHint(Text("Shows the evidence behind this price."))
         } else {
-            priceChip(amt, tappable: false)
+            priceChip(amt, tappable: false, now: now)
         }
     }
 
-    private func priceChip(_ amt: Double, tappable: Bool) -> some View {
+    private func priceChip(_ amt: Double, tappable: Bool, now: Date) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
-                Text(priceLabel)
+                Text(priceLabel(now: now))
                     .font(.system(.caption, design: .rounded).weight(.semibold))
                     .foregroundStyle(.white.opacity(0.85))
                 if tappable {
@@ -703,9 +702,8 @@ struct ExploreCardOverlay: View {
 
     /// In a lot's last hour the label says how old the bid on record is, since the board is rebuilt every
     /// 2 minutes and the house's bid can move faster than that.
-    private var priceLabel: String {
+    private func priceLabel(now: Date) -> String {
         guard item.kind == .live else { return item.amountLabel }
-        let now = ServerClock.now()
         if item.liveStatusUnavailable {
             return item.recordUpdatedAt.map { "Bid on record · " + ExploreAnalytics.ago($0, now: now) } ?? "Bid on record"
         }
@@ -717,6 +715,20 @@ struct ExploreCardOverlay: View {
     private func clock(_ text: String) -> some View {
         NukePill(text: text, icon: "clock", onPhoto: true, textColor: Color.red)
             .monospacedDigit()
+    }
+}
+
+/// A single schedule drives both the bid-age label and countdown. It reaches the one-hour boundary
+/// exactly, then ticks every second; distant or long-unconfirmed lots update every 30 seconds.
+struct ExploreClockSchedule: TimelineSchedule {
+    let ends: Date?
+
+    func entries(from startDate: Date, mode: Mode) -> AnySequence<Date> {
+        let offset = ServerClock.offset
+        return AnySequence(sequence(first: startDate) { date in
+            let now = date.addingTimeInterval(offset)
+            return date.addingTimeInterval(ExploreClock.nextInterval(ends: ends, now: now))
+        })
     }
 }
 
@@ -747,6 +759,14 @@ enum ExploreClock {
     static func tick(ends: Date, now: Date) -> TimeInterval {
         let left = ends.timeIntervalSince(now)
         return left > -900 && left < 3600 ? 1 : 30
+    }
+
+    /// Do not jump over the transition into the last hour when the current interval is 30 seconds.
+    static func nextInterval(ends: Date?, now: Date) -> TimeInterval {
+        guard let ends else { return 30 }
+        let left = ends.timeIntervalSince(now)
+        if left > 3600 { return max(0.001, min(30, left - 3600)) }
+        return left > -900 ? 1 : 30
     }
 
     /// A lot within 3 minutes of its recorded end, or up to 15 minutes past it, needs a fresh board read.
