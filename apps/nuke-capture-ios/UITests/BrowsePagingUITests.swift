@@ -25,6 +25,33 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 
+    func testClassifiedOffsetCeilingShowsLimitInsteadOfRepeatingPages() {
+        let app = open("browse-paging-ceiling")
+        XCTAssertTrue(app.staticTexts["Fixture page 0"].waitForExistence(timeout: 20), app.debugDescription)
+        let limit = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "browsing limit for classified listings")).firstMatch
+        for _ in 0..<3 where !limit.exists { app.swipeUp() }
+        XCTAssertTrue(limit.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.buttons["Search more"].exists)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testPartialPageAtCeilingIsARealEnd() {
+        let app = open("browse-paging-partial-ceiling")
+        XCTAssertTrue(app.staticTexts["Fixture page 0"].waitForExistence(timeout: 20), app.debugDescription)
+        let end = app.staticTexts["End of these results: open auction lots and asks from the last 72 hours. Pull down to refresh."]
+        for _ in 0..<3 where !end.exists { app.swipeUp() }
+        XCTAssertTrue(end.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "browsing limit for classified listings")).firstMatch.exists)
+    }
+
+    func testEmptyPartialFeedKeepsFailureAndLimitVisible() {
+        let app = open("browse-paging-live-failed-ceiling")
+        XCTAssertTrue(app.staticTexts["Some cars couldn't load"].waitForExistence(timeout: 20), app.debugDescription)
+        let limit = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "browsing limit for classified listings")).firstMatch
+        XCTAssertTrue(limit.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.buttons["Search more"].exists)
+    }
+
     func testAuctionPriceOpensItsEvidenceAndReturns() {
         let app = open("social-browse")
         let price = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Current bid")).firstMatch
