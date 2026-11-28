@@ -65,7 +65,7 @@ function ContributionTable({ receipt, evidenceRef }: { receipt:CommentSurfaceRec
 }
 
 /** Mounted only in the existing Dimension layer. All measured features and evidence come from the episode RPC. */
-export default function CommentMeasurements({ vehicleId, lotId, closeAt }: { vehicleId:string; lotId:string; closeAt:string|null }) {
+export default function CommentMeasurements({ vehicleId, lotId, closeAt, embedded=false }: { vehicleId:string; lotId:string; closeAt:string|null; embedded?:boolean }) {
   const [params,setParams]=useSearchParams();
   const client=useQueryClient();
   const request=commentRequestFromParams(params);
@@ -115,7 +115,7 @@ export default function CommentMeasurements({ vehicleId, lotId, closeAt }: { veh
   return <section className="comment-measure" aria-label="Comment measurements" aria-busy={query.isFetching||refreshing}>
     <h3>Comment measurements</h3>
     <p className="stack-note">Retained discussion on this exact auction. Bids are separate. No literacy, expertise, buyer-intent or profit score is established.</p>
-    <div className="comment-measure__controls" role="group" aria-label="Comment measurement time">
+    {!embedded&&<><div className="comment-measure__controls" role="group" aria-label="Comment measurement time">
       <button type="button" className="stack-chip" aria-pressed={Boolean(request&&!request.cutoff)} onClick={()=>apply(filter)}>Current recorded state</button>
       <button type="button" className="stack-chip" disabled={query.isFetching||refreshing} onClick={()=>void refresh()}>Refresh comment measurements</button>
     </div>
@@ -135,7 +135,7 @@ export default function CommentMeasurements({ vehicleId, lotId, closeAt }: { veh
       <button type="submit" className="stack-chip">Reconstruct cutoff</button>
     </form>
     {formError&&<p id={`${inputId}-error`} role="alert">{formError}</p>}
-    </details>
+    </details></>}
     {!request&&<p role="status">The shared comment controls are incomplete or invalid. Refresh to reset them; no measurement was read.</p>}
     {request&&query.isFetching&&<p role="status">Reading comment measurements and source records…</p>}
     {query.isError&&<p role="status">Comment measurements could not be read completely. Refresh to retry. No previous measurement is displayed.</p>}

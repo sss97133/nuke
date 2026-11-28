@@ -70,7 +70,7 @@ export function biddersFor(lot: LotRow, view: OrderBookView): { bidders: number 
 }
 
 /** Whether to ask, and with what: the lot's stored state, or the reason this lot has no forecast to ask for. */
-export function forecastGate(lot: LotRow, view: OrderBookView): ForecastGate {
+export function forecastGate(lot: LotRow, view: OrderBookView, measuredBidders?: { bidders: number | null; why: string | null }): ForecastGate {
   const { closeAt, open } = view.window;
   if (closeAt == null) return { kind: 'no_close' };
   if (!open) return { kind: 'closed', closeAt };
@@ -78,7 +78,7 @@ export function forecastGate(lot: LotRow, view: OrderBookView): ForecastGate {
   if (bid == null || bid <= 0) return { kind: 'no_bid' };
   const at = time(lot.updated_at);
   if (at == null) return { kind: 'no_state' };
-  const { bidders, why } = biddersFor(lot, view);
+  const { bidders, why } = measuredBidders ?? biddersFor(lot, view);
   return {
     kind: 'ask',
     request: {
