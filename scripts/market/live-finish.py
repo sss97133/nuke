@@ -40,7 +40,7 @@ Output: --out rows.json = the list of hammer_predictions model 32 rows; rows.ski
 Run: python3 live_finish.py --lots pulse.json --archive <duckdb> --cache <dir> --now <iso> --out rows.json
 Method and backtest: REPORT.md in this folder (archive car lots closed 2026-04..09 and prod lots closed 09-28..10-14).
 """
-import argparse, json, math, os, pickle, re, subprocess, sys, time
+import argparse, json, math, os, pickle, re, subprocess, sys, time, uuid
 from collections import Counter, defaultdict
 import numpy as np
 import pandas as pd
@@ -475,12 +475,15 @@ def map_titles(lots, archive, work):
 
 # --------------------------------------------------------------------------------------------------------- the inputs
 def load_lots(path):
-    d = json.load(open(path))
+    with open(path) as stream:
+        d = json.load(stream)
     if isinstance(d, dict) and 'auctions' in d:
         cols = d.get('columns') or ['id', 'year', 'make', 'model', 'current_bid', 'ends_at', 'updated_at', 'listed_at',
                                     'image_url', 'no_reserve', 'listing_url', 'title', 'band_p10', 'band_p50', 'band_p90',
                                     'band_tier', 'band_comps', 'heat']
         rows = [dict(zip(cols, r)) for r in d['auctions']]
+    elif isinstance(d, dict) and isinstance(d.get('lots'), list):
+        rows = d['lots']
     else:
         rows = d
     L = pd.DataFrame(rows)
@@ -489,6 +492,66 @@ def load_lots(path):
         if c not in L.columns:
             L[c] = None
     return L
+
+
+def verified_source_bindings(lots, identity_links, native_state=None):
+    """Carry only a board's applied, exact current-episode binding.
+
+    The scoring pipeline is currently keyed by vehicle ID. If that ID occurs twice in the
+    input, even for the same URL, it cannot safely identify which presentation was scored.
+    These notes are separate from hammer_predictions.auction_event_id, which the grader fills.
+    """
+    if not isinstance(identity_links, dict):
+        return {}
+    if not isinstance(native_state, dict):
+        native_state = {}
+
+    def valid_uuid(value):
+        try:
+            parsed = uuid.UUID(str(value))
+            return str(parsed) if parsed.int else None
+        except (ValueError, TypeError, AttributeError):
+            return None
+
+    rows = lots.to_dict('records')
+    counts = Counter(valid_uuid(row.get('vehicle_id')) for row in rows)
+    result = {}
+    for row in rows:
+        vehicle_id = valid_uuid(row.get('vehicle_id'))
+        url = row.get('listing_url')
+        if not vehicle_id or counts[vehicle_id] != 1 or row.get('house') != 'bringatrailer' or not isinstance(url, str):
+            continue
+        url = url.rstrip('/')
+        if not re.fullmatch(r'https://bringatrailer\.com/listing/[^/?#]+', url):
+            continue
+        link = identity_links.get(url)
+        if link is not None:
+            if (not isinstance(link, dict) or link.get('applied') is not True
+                    or link.get('basis') != 'retained_native_current_episode'
+                    or valid_uuid(link.get('canonical_vehicle_id')) != vehicle_id):
+                continue
+            evidence, basis = link, 'retained_native_current_episode'
+        else:
+            evidence = native_state.get(vehicle_id)
+            if not isinstance(evidence, dict) or evidence.get('basis') != 'canonical_native_fold':
+                continue
+            claims = evidence.get('source_listing_claims')
+            if claims is not None and (not isinstance(claims, dict)
+                                       or str(claims.get('source_url', '')).rstrip('/') != url):
+                continue
+            basis = 'canonical_native_fold'
+        event_id = valid_uuid(evidence.get('auction_event_id'))
+        if not event_id:
+            continue
+        result[vehicle_id] = {'source_event_id': event_id, 'source_listing_url': url,
+                              'source_identity_basis': basis}
+    return result
+
+
+def load_source_identity(path):
+    with open(path) as stream:
+        data = json.load(stream)
+    return (data.get('identity_links', {}), data.get('native_state', {})) if isinstance(data, dict) else ({}, {})
 
 
 def load_engagement(path):
@@ -633,6 +696,8 @@ def run(args):
     cache = load_cache(args.archive, args.cache, args.rebuild)
     t_cache = time.time() - t0
     lots = load_lots(args.lots)
+    links, native_state = load_source_identity(args.lots)
+    source_bindings = verified_source_bindings(lots, links, native_state)
     eng = load_engagement(args.engagement)
     kinds = json.load(open(args.kinds)) if args.kinds else {}      # vehicles.canonical_vehicle_type per lot, when given
     now = epoch(args.now) if args.now else time.time()
@@ -775,6 +840,7 @@ def run(args):
                               'coverage_prod_n': 0, 'coverage_house': round(float(cover), 3), 'coverage_house_n': int(cover_n),
                               'window': {'house': hc['window'], 'archive': notes['window']['archive']},
                               'method': notes['method'] + f', BaT analogs moved by the {r.house} calibration ({hc["fitted"]})'})
+            notes.update(source_bindings.get(str(r.vehicle_id).lower(), {}))
             rows_out[r.vehicle_id] = {
                 'vehicle_id': r.vehicle_id, 'current_bid': int(round(r.bid)), 'hours_remaining': round(r.hours_left, 1),
                 'time_window': 'live', 'price_tier': tier(est), 'model_version': 32,

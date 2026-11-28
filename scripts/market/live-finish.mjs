@@ -30,13 +30,31 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const HORIZONS = [120, 72, 48, 24, 12, 6, 3, 1, 1 / 6];
+const crossed = (before, after) => HORIZONS.some((h) => before > h && after <= h);
+
+const episodeKey = (raw) => {
+  let notes = raw;
+  try { if (typeof notes === 'string') notes = JSON.parse(notes); } catch { return null; }
+  return notes && ['retained_native_current_episode', 'canonical_native_fold'].includes(notes.source_identity_basis)
+    && typeof notes.source_event_id === 'string' && typeof notes.source_listing_url === 'string'
+    ? JSON.stringify([notes.source_event_id, notes.source_listing_url]) : null;
+};
+
+// A newly verified presentation is a material change even when its bid and horizon are unchanged.
+export function shouldWriteEstimate(row, prior) {
+  return !prior || Number(prior.current_bid) !== Number(row.current_bid)
+    || (prior.hours_remaining != null && row.hours_remaining != null && crossed(Number(prior.hours_remaining), Number(row.hours_remaining)))
+    || (episodeKey(row.notes) !== null && episodeKey(row.notes) !== episodeKey(prior.notes));
+}
+
+async function main() {
 const URL = process.env.VITE_SUPABASE_URL;
 const ANON = process.env.VITE_SUPABASE_ANON_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DRY = process.argv.includes('--dry-run');
 if (!URL || !ANON || (!SERVICE && !DRY)) throw new Error('VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are required (dotenvx run --)');
 const MODEL_VERSION = 32;
-const HORIZONS = [120, 72, 48, 24, 12, 6, 3, 1, 1 / 6];
 const PY = join(dirname(fileURLToPath(import.meta.url)), 'live-finish.py');
 // The latest production measurement of the ranges per match mode and grade; it caps the confidence wording.
 const COVERAGE = join(dirname(fileURLToPath(import.meta.url)), 'live-finish-coverage.json');
@@ -85,7 +103,10 @@ if (shown.length && batCols) {
     perHouse[lot.house] = (perHouse[lot.house] ?? 0) + 1;
   }
 }
-writeFileSync(pulseJson, JSON.stringify(batCols ? lotsIn : pulse));
+// Keep the board's verified current-episode links beside the lots. The Python scorer only
+// carries a link when it matches the exact single presentation being scored.
+writeFileSync(pulseJson, JSON.stringify(batCols ? { lots: lotsIn, identity_links: pulse?.identity_links ?? {},
+  native_state: pulse?.native_state ?? {} } : pulse));
 const live = lotsIn.length;
 // The lots prod lists as motorcycles (vehicles.canonical_vehicle_type, anon-readable) are never priced as cars.
 const kindsJson = join(dir, 'kinds.json');
@@ -122,16 +143,11 @@ const key = DRY ? ANON : SERVICE;
 if (!DRY) {
   for (let i = 0; i < rows.length; i += 200) {
     const ids = rows.slice(i, i + 200).map((r) => r.vehicle_id).join(',');
-    const prior = await rest(`hammer_predictions?select=vehicle_id,current_bid,hours_remaining,predicted_at&model_version=eq.${MODEL_VERSION}&vehicle_id=in.(${ids})&order=predicted_at.desc`, { key });
+    const prior = await rest(`hammer_predictions?select=vehicle_id,current_bid,hours_remaining,predicted_at,notes&model_version=eq.${MODEL_VERSION}&vehicle_id=in.(${ids})&order=predicted_at.desc`, { key });
     for (const p of prior ?? []) if (!latest.has(p.vehicle_id)) latest.set(p.vehicle_id, p);
   }
 }
-const crossed = (before, after) => HORIZONS.some((h) => before > h && after <= h);
-const due = rows.filter((r) => {
-  const p = latest.get(r.vehicle_id);
-  return !p || Number(p.current_bid) !== Number(r.current_bid)
-    || (p.hours_remaining != null && r.hours_remaining != null && crossed(Number(p.hours_remaining), Number(r.hours_remaining)));
-});
+const due = rows.filter((r) => shouldWriteEstimate(r, latest.get(r.vehicle_id)));
 if (due.length === 0 && rows.length > 0) due.push([...rows].sort((a, b) => Number(a.hours_remaining) - Number(b.hours_remaining))[0]);
 const out = due.map((r) => ({ ...r, model_version: MODEL_VERSION, time_window: 'live',
   notes: typeof r.notes === 'string' ? r.notes : JSON.stringify(r.notes ?? {}) }));
@@ -150,3 +166,6 @@ if (DRY) {
   }
   console.log(JSON.stringify({ live, houses: byHouse, estimated: rows.length, skipped: skipped.length, already_current: rows.length - due.length, written: out.length }));
 }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
