@@ -24,6 +24,7 @@ final class BrowseDiscussionUITests: XCTestCase {
         let row = app.buttons["listing-discussion-00000000-0000-4000-8000-00000000b101"]
         XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.staticTexts["Must never be shown."].exists)
+        XCTAssertFalse(app.staticTexts["Duplicate event must never be shown."].exists)
         row.tap()
         XCTAssertTrue(app.staticTexts["The original wheels are included."].waitForExistence(timeout: 5))
         XCTAssertTrue(app.links["Open the Bring a Trailer listing"].exists)

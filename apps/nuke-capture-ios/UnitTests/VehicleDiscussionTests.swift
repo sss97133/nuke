@@ -4,10 +4,14 @@ import XCTest
 final class VehicleDiscussionTests: XCTestCase {
     private let vehicle = "00000000-0000-4000-8000-00000000c001"
 
-    private func entry(vehicle: String, source: String, parent: String? = nil, status: String = "active") throws -> ListingDiscussionEntry {
+    private func entry(vehicle: String, source: String, parent: String? = nil, status: String = "active",
+                       event: String? = nil, canonical: String? = nil) throws -> ListingDiscussionEntry {
+        let eventJSON = event.map { "\"\($0)\"" } ?? "null"
+        let canonicalJSON = canonical.map { "{\"id\":\"\($0)\"}" } ?? "null"
         let data = """
         {"id":"00000000-0000-4000-8000-00000000b101","vehicle_id":"\(vehicle)","source_url":"\(source)",
          "posted_at":null,"author_username":null,"comment_text":"text","comment_type":"question","bid_amount":null,
+         "auction_event_id":\(eventJSON),"canonical":\(canonicalJSON),
          "vehicles":{"id":"\(parent ?? vehicle)","status":"\(status)","deleted_at":null}}
         """.data(using: .utf8)!
         return try JSONDecoder().decode(ListingDiscussionEntry.self, from: data)
@@ -26,6 +30,12 @@ final class VehicleDiscussionTests: XCTestCase {
                                                  source: "https://bringatrailer.com/listing/fixture/")))
         XCTAssertFalse(scope.contains(try entry(vehicle: vehicle, source: "https://bringatrailer.com/listing/fixture/",
                                                  parent: "00000000-0000-4000-8000-00000000c002")))
+        let event = "00000000-0000-4000-8000-00000000a001"
+        XCTAssertTrue(scope.contains(try entry(vehicle: vehicle, source: "https://bringatrailer.com/listing/fixture/",
+                                                event: event, canonical: event)))
+        XCTAssertFalse(scope.contains(try entry(vehicle: vehicle, source: "https://bringatrailer.com/listing/fixture/", event: event)))
+        XCTAssertFalse(scope.contains(try entry(vehicle: vehicle, source: "https://bringatrailer.com/listing/fixture/",
+                                                 event: event, canonical: "00000000-0000-4000-8000-00000000a002")))
         XCTAssertNil(ListingDiscussionScope(vehicleId: vehicle, listingURL: URL(string: "https://user@bringatrailer.com/listing/fixture/")))
         XCTAssertNil(ListingDiscussionScope(vehicleId: vehicle, listingURL: URL(string: "javascript:alert(1)")))
     }
