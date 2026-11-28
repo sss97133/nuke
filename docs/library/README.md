@@ -97,7 +97,7 @@ The code is an implementation of the library. The library is the source of truth
 ## CURRENT STATE
 
 <!-- library-stats:start -->
-Measured 2026-11-27 06:37 UTC from the files in this directory by [`scripts/data/readme-stats.mjs`](../../scripts/data/readme-stats.mjs), run daily by `update-stats.yml`. Markdown files and their line counts, per shelf. Nothing here is typed by hand.
+Measured 2026-11-28 06:34 UTC from the files in this directory by [`scripts/data/readme-stats.mjs`](../../scripts/data/readme-stats.mjs), run daily by `update-stats.yml`. Markdown files and their line counts, per shelf. Nothing here is typed by hand.
 
 | Shelf | Files | Lines |
 |---|---:|---:|
