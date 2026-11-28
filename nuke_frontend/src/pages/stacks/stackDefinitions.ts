@@ -69,8 +69,8 @@ export const ORDER_BOOK_STACK: StackDefinition = {
     },
     {
       id: 'dimension', name: 'Dimension', state: 'partial',
-      holds: 'Comment stance: bid, reservation price, refusal, question.',
-      reader: 'comment kind as the comment builder writes it (amount: bid; seller author: seller response; "?": question)',
+      holds: 'Captured discussion volume, text and media coverage, literal text patterns and keyed participants.',
+      reader: 'popup_vehicle_intel(vehicle, auction, request): bounded SQL measurements and source evidence; stance remains unmeasured',
       missing: 'Stance from the text fold: a stated price ("I would pay X") as a reservation price, "too rich" as a refusal. No reader classifies comments that way.',
     },
     {
