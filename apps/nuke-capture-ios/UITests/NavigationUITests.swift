@@ -306,7 +306,7 @@ final class NavigationUITests: XCTestCase {
             shortcut.tap()
             XCTAssertTrue(app.navigationBars["Work & labor"].waitForExistence(timeout: 10))
             XCTAssertTrue(app.staticTexts["1973 FIXTURE COUPE"].waitForExistence(timeout: 10))
-            XCTAssertTrue(app.staticTexts["No jobs on this vehicle yet."].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.staticTexts["No work orders shown for this vehicle."].waitForExistence(timeout: 10))
             if mode == "stale" {
                 XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "An update is needed")).firstMatch.waitForExistence(timeout: 10))
                 let engine = app.buttons.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "engine", "8 h to 16 h")).firstMatch

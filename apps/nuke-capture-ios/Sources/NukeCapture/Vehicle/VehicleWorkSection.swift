@@ -62,7 +62,7 @@ struct VehicleWorkCard: View {
             card {
                 if planEntry || postEntry != .none { entries.padding(.bottom, 6) }
                 if page.rows.isEmpty {
-                    Text("No jobs on this vehicle yet.").font(.footnote).foregroundStyle(.secondary)
+                    Text("No work orders shown for this vehicle.").font(.footnote).foregroundStyle(.secondary)
                         .padding(.vertical, 5)
                 }
                 ForEach(page.rows) { row in
