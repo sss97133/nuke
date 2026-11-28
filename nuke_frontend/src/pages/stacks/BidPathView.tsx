@@ -43,6 +43,7 @@ export function BidKnowledge({receipt,pinned=false}:{receipt:BidPathReceipt;pinn
     </dl>
     <p className="stack-note">Trailing windows end at the posted-input cutoff above. Counts describe captured eligible inputs, not complete platform activity.</p>
     <details><summary>Bid coverage and method</summary>
+      <p>Recorded currency claim basis: {receipt.amount_context.currency_source??'not recorded'}. This is current metadata, not established historical currency or fee qualification.</p>
       <p>{count(c.eligible_bid_states)} eligible bids from {count(c.source_bid_marked_rows)} bid-marked rows among {count(c.keyed_source_rows)} exact-lot source rows.</p>
       <p>{count(c.posted_bids_recorded_after_cutoff)} posted-window bids recorded later · {count(c.bid_marked_unknown_event_time)} unknown posted clocks · {count(c.bid_marked_unknown_recording_time)} unknown recording clocks · {count(c.bid_marked_unknown_amounts)} unknown amounts. Coverage gaps can overlap.</p>
       <p>{count(c.bids_outside_event_cutoff)} outside the posted window · {count(c.amount_without_bid_label)} amount-bearing rows without the bid label. Unkeyed source rows are not assessed; complete platform capture is unestablished.</p>

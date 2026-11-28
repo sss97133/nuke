@@ -12,7 +12,7 @@ import { CoverageTable, LayerPath } from './stackParts';
 import { ForecastPanel } from './ForecastPanel';
 import VehicleCohort from './VehicleCohort';
 import CommentMeasurements from './CommentMeasurements';
-import { bidDecimal, bidRequestFromParams, selectBidParams, useBidPath, type BidPathReceipt } from './bidPathReader';
+import { bidRequestFromParams, selectBidParams, useBidPath, type BidPathReceipt } from './bidPathReader';
 import EpisodeInputControls, { resetEpisodeInputs } from './EpisodeInputControls';
 import { BidEntryTable, BidKnowledge, BidPathFold, BidPathLog } from './BidPathView';
 import { stackBackParams } from './bidExpression';
@@ -232,12 +232,7 @@ export default function OrderBookStack() {
   const inputContextReason = !path ? 'The SQL bid measurement is unavailable.'
     : path.knowledge_mode !== 'current_recorded_state' || request?.snapshot_hash
       ? 'This comparison reads current live state; it does not reconstruct a historical or pinned input book.'
-      : path.amount_context.currency_state !== 'recorded_claim' || path.amount_context.currency_code !== 'USD'
-        || path.amount_context.price_basis !== 'hammer' || path.amount_context.price_basis_conflict !== false
-        ? 'The current comparison requires established USD hammer amounts without a fee-basis conflict.'
-        : !read?.lot?.high_bid || !Number.isSafeInteger(read.lot.high_bid) || path.summary.running_high_bid === null
-          || bidDecimal(String(read.lot.high_bid)) !== bidDecimal(path.summary.running_high_bid)
-          ? 'The captured running high bid does not match the current lot state.' : null;
+      : 'This bid reader carries current currency and fee-basis claims, not a source-qualified USD hammer tuple. The live price comparison is withheld.';
   const measuredBidders = path ? {
     bidders: path.summary.bid_count === read?.lot?.total_bids && path.summary.unresolved_bid_entries === 0
       ? path.summary.keyed_participant_count : null,

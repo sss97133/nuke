@@ -140,7 +140,7 @@ it('names missing layers with no number in them', async () => {
 
 it('shows the one-point baseline only for a live current lot, and names the missing curve either way', async () => {
   await render(`/stacks/order-book/${VEHICLE}?layer=baseline`);
-  expect(container.textContent).toContain('requires established USD hammer amounts');
+  expect(container.textContent).toContain('not a source-qualified USD hammer tuple');
   expect(container.textContent).toContain('Missing layer: baseline curve');
   expect(container.textContent).not.toContain('percentile');
 });
@@ -234,4 +234,12 @@ it.each(['lot=bad','lot=','lot='+LOT+'&lot='+LOT])('does not replace a malformed
 it('keeps an absent historical auction distinct from a vehicle with no auctions',async()=>{
   fixture.query.data=read({lot:null});await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}`);
   expect(container.textContent).toContain('No other auction was selected');expect(container.textContent).not.toContain('has no Bring a Trailer lot');
+});
+
+it('does not treat a platform-default currency claim as a qualified live hammer forecast',async()=>{
+  const data=read({readAt:new Date(CLOSE-60_000).toISOString()});data.lot!.high_bid=350;data.vehicle.sale_status='auction_live';fixture.query.data=data;
+  fixture.bid=request=>{const d=bidFixture(request);d.amount_context={...d.amount_context,currency_state:'recorded_claim',currency_code:'USD',currency_source:'platform default assumption',price_basis:'hammer',price_basis_conflict:false};return d;};
+  await render();expect(container.querySelector('.stack-forecast')?.getAttribute('data-forecast')).toBe('input-unavailable');
+  expect(container.textContent).toContain('not a source-qualified USD hammer tuple');
+  expect(container.textContent).toContain('Recorded currency claim basis: platform default assumption');
 });

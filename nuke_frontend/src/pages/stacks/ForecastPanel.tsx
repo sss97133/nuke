@@ -241,7 +241,8 @@ export function ForecastPanel({ read, view, unavailable, measuredBidders }: {
   const { session } = useAuth();
   const token: string | null = typeof session?.access_token === 'string' && session.access_token ? session.access_token : null;
   const lot = read.lot!;
-  const gate = useMemo(() => forecastGate(lot, view, measuredBidders), [lot, view, measuredBidders]);
+  const gate = useMemo(() => unavailable && view.window.open ? null : forecastGate(lot, view, measuredBidders), [lot, view, measuredBidders, unavailable]);
+  if (!gate) return <Frame state="input-unavailable"><Note>{unavailable} No forecast is shown.</Note></Frame>;
 
   switch (gate.kind) {
     case 'no_close':

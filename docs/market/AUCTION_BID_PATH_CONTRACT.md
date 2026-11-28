@@ -46,7 +46,7 @@ The existing order-book route consumes the two-argument reader for its posted-ti
 
 The `csCutoff` URL control applies the same reconstruction cutoff to bid and comment readers. Selecting a bid pins `bpHash` and both initial current-mode clocks, or retains the reconstruction cutoff; selection does not change which inputs were known. A pending selection may retain the matching measured path for keyboard navigation while withholding the previous point’s book. Invalid controls, contract failures, caps and source changes withhold measurements instead of silently falling back. Refresh invalidates both models’ cached first pages before clearing continuation keys, and cannot restore a prior auction after navigation.
 
-Current lot metadata, source-frame context and comparable-sale data are labeled separately. Current live comparisons require established USD hammer qualifications without a recorded basis conflict and agreement with the captured high bid; reconstructed and pinned inputs do not request a current-state forecast. SQL participant counts replace client regrouping when an eligible current comparison is made. Unknown qualifications are not dollars.
+Current lot metadata, source-frame context and comparable-sale data are labeled separately. The method supplies current currency and fee claims, not a source-qualified USD hammer tuple, so these claims cannot enable a currency-qualified live price comparison. Reconstructed and pinned inputs likewise do not request a current-state forecast. The forecast adapter can accept SQL participant measurements without regrouping source rows when a future qualified comparison is available. Unknown qualifications and platform-default currency claims are not dollars.
 
 ## Verification and remaining work
 
