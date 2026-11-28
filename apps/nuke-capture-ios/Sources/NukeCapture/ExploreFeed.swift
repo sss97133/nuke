@@ -367,6 +367,10 @@ struct ExploreFeedView: View {
             if let open = drill, let refreshed = ExploreFeedPaging.reconcileLive([open.item], current: current).first {
                 drill = ExploreCardDrill(kind: open.kind, item: refreshed)
             }
+            if let open = why, open.item.kind == .live,
+               let refreshed = ExploreFeedPaging.reconcileLive([open.item], current: current).first {
+                why = ExploreWhy(item: refreshed, estimate: open.estimate, fresh: open.fresh)
+            }
             for (key, lot) in byId where lots[key] != nil { lots[key] = lot }
         }
     }

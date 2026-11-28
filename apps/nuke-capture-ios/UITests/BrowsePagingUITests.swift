@@ -169,4 +169,14 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertTrue(resumed.waitForExistence(timeout: 35), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
+
+    func testOpenPriceDetailsReflectMissingBoardThenRecovery() {
+        let app = open("browse-clock-missing-then-extended")
+        let price = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Current bid")).firstMatch
+        XCTAssertTrue(price.waitForExistence(timeout: 20), app.debugDescription); price.tap()
+        XCTAssertTrue(app.navigationBars["Price details"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Auction status unavailable"].waitForExistence(timeout: 40), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["No fresh projection for this lot"].waitForExistence(timeout: 35), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
 }
