@@ -4,7 +4,7 @@
 //   • classified_ask_board   → classified listings seen in the last 72 h (asking price)
 // Every card is facts the record carries: photo, identity, the recorded amount and what
 // kind of amount it is, the clock, the source. A read that fails or comes back empty
-// hides its cards; the feed only shows an error when both reads fail.
+// hides its cards; a failed source is named and can be retried.
 // The feed pages (ExploreFeedPaging): every open lot is read at once and revealed 40 at a time, asks are read
 // 40 at a time by offset, and the next page starts six cards before the end. It ends with a plain line only
 // when both are exhausted. The projection board fills in the rails after the cards are up.
@@ -140,8 +140,8 @@ enum ExploreFeedPaging {
     }
 
     static func endLine(tuned: Bool) -> String {
-        tuned ? "That's every car with a photo that matches your tuning: open auction lots and asks from the last 72 hours. Pull down to refresh."
-              : "That's every car with a photo: every open auction lot and every ask from the last 72 hours. Pull down to refresh."
+        tuned ? "End of these results matching your tuning: open auction lots and asks from the last 72 hours. Pull down to refresh."
+              : "End of these results: open auction lots and asks from the last 72 hours. Pull down to refresh."
     }
 }
 
@@ -218,14 +218,18 @@ struct ExploreFeedView: View {
                 // Shimmering cards in the shape of the real ones: the page looks alive while it loads.
                 NukeFeedSkeleton(message: "Finding cars for you…")
             } else if feed.isEmpty {
-                if tuning.isActive && !(liveFailed && askFailed) {
-                    NukeEmptyState(icon: "slider.horizontal.3", title: "Nothing matches your tuning",
-                                   message: "Widen the place, era or price, or clear them.",
-                                   actionTitle: "Clear tuning") { applyTuning(ExploreTuning()) }
-                } else if liveFailed && askFailed {
+                if liveFailed && askFailed {
                     NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load cars",
                                    message: "Check your connection, then try again.",
                                    actionTitle: "Try again") { Task { await load() } }
+                } else if let missingSource {
+                    NukeEmptyState(icon: "wifi.exclamationmark", title: "Some cars couldn't load",
+                                   message: missingSource,
+                                   actionTitle: "Try again") { Task { await load() } }
+                } else if tuning.isActive {
+                    NukeEmptyState(icon: "slider.horizontal.3", title: "Nothing matches your tuning",
+                                   message: "Widen the place, era or price, or clear them.",
+                                   actionTitle: "Clear tuning") { applyTuning(ExploreTuning()) }
                 } else {
                     NukeEmptyState(icon: "photo.on.rectangle.angled", title: "No cars to show yet",
                                    message: "New cars with photos appear here as they're listed. Check back soon.",
@@ -234,6 +238,18 @@ struct ExploreFeedView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: NukeSpace.xl) {
+                        if let missingSource {
+                            HStack(spacing: NukeSpace.sm) {
+                                Image(systemName: "wifi.exclamationmark")
+                                Text(missingSource).font(.subheadline)
+                                Spacer(minLength: 0)
+                                Button("Retry") { Task { await load() } }
+                                    .accessibilityLabel("Retry Browse")
+                            }
+                            .padding(NukeSpace.md)
+                            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: NukeRadius.card))
+                            .padding(.horizontal, NukeSpace.lg)
+                        }
                         ForEach(Array(feed.enumerated()), id: \.element.id) { idx, item in
                             ExplorePagerCard(item: item, position: idx, hasBidReading: lots[item.id] != nil,
                                              finish: item.lotId.flatMap { finish?.byId[$0] },
@@ -289,6 +305,11 @@ struct ExploreFeedView: View {
     }
 
     private var hasMore: Bool { liveShown < liveAll.count || !askExhausted }
+    private var missingSource: String? {
+        if liveFailed && !askFailed { return "Auction listings couldn't load." }
+        if askFailed && !liveFailed { return "Classified listings couldn't load." }
+        return nil
+    }
 
     /// The end of the cards: loading the next page, a retry when it failed, or a plain end.
     @ViewBuilder private var pagingFooter: some View {
@@ -305,7 +326,7 @@ struct ExploreFeedView: View {
             }
             .buttonStyle(.bordered)
             .padding(.horizontal, NukeSpace.lg)
-        } else if !hasMore {
+        } else if !hasMore && !liveFailed && !askFailed {
             Text(ExploreFeedPaging.endLine(tuned: tuning.isActive))
                 .font(.footnote).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

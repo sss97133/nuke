@@ -52,6 +52,36 @@ enum FixtureBackend {
     }
     private static let workPageLock = NSLock()
     private static var workPageAttempts = 0
+    private static let browseReadLock = NSLock()
+    private static var browseLiveAttempts = 0
+    private static var browseAskAttempts = 0
+
+    /// A terminal first-read failure followed by a normal response lets the UI test
+    /// distinguish a partial feed from an empty one and exercise its retry action.
+    private static func browseRead(_ name: String) -> (Int, Data) {
+        browseReadLock.lock()
+        if name == "market_pulse_live" { browseLiveAttempts += 1 } else { browseAskAttempts += 1 }
+        let attempt = name == "market_pulse_live" ? browseLiveAttempts : browseAskAttempts
+        browseReadLock.unlock()
+        let failLive = ["browse-partial-live", "browse-both-fail"].contains(scenario) || scenario.hasPrefix("browse-partial-empty")
+        let failAsk = ["browse-partial-ask", "browse-both-fail"].contains(scenario)
+        if (attempt == 1 || scenario == "browse-partial-empty-persistent")
+            && ((name == "market_pulse_live" && failLive) || (name == "classified_ask_board" && failAsk)) {
+            return (400, Data(#"{"code":"fixture_read_error","message":"fixture browse read failed","details":null,"hint":null}"#.utf8))
+        }
+        if name == "market_pulse_live" {
+            return ok("""
+            {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
+              "2026-11-27T10:00:00Z",null,"http://[",false,
+              "https://bringatrailer.com/listing/fixture/","Fixture auction",null,null,null,null,null]]}
+            """)
+        }
+        if scenario.hasPrefix("browse-partial-empty") { return ok(#"{"population":{},"asks":[]}"#) }
+        return ok("""
+        {"population":{},"asks":[{"event_id":"fixture-ask","source":"classified",
+         "title":"Fixture classified","ask":10000,"image":"http://["}]}
+        """)
+    }
     private static let garageSourceLock = NSLock()
     private static var garageSourceAttempts = 0
 
@@ -420,6 +450,9 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
+            && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):
+            return browseRead(name)
         case "confirm_work_session" where scenario == "financial-qualification":
             let id = (args["p_session_id"] as? String ?? "").lowercased()
             if id.hasSuffix("f004") { return ok(#"{"ok":false,"error":"not_authorized"}"#) }
