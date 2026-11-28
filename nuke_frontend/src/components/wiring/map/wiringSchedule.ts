@@ -5,11 +5,17 @@ import { SECTIONS } from './useWiringMap';
 import { mask, publicName, wireGaugeDisplay, type SiteFiles } from './useWorkspaceSelection';
 
 export type ScheduleCell = string | number | null;
-export type ScheduleId = 'wires' | 'pins' | 'conns';
+export type ScheduleId = 'wires' | 'pins' | 'conns' | 'circuits';
 export interface ScheduleColumn { key: string; label: string; width?: number; numeric?: boolean; link?: boolean }
-export interface ScheduleRow { id: string; selection: string; cells: Record<string, ScheduleCell> }
+export type SourceRecordKind = 'segments' | 'ends' | 'endpoints' | 'circuits';
+export interface SourceRecordTarget { kind: SourceRecordKind; id: string }
+export interface ScheduleRow { id: string; selection: string; cells: Record<string, ScheduleCell>; record?: SourceRecordTarget }
 export interface ScheduleTable { id: ScheduleId; title: string; columns: ScheduleColumn[]; rows: ScheduleRow[] }
-export interface WiringSchedule { tables: ScheduleTable[]; vehicleId: string; readAt: string | null; isOwner: boolean }
+export interface WiringSchedule {
+  tables: ScheduleTable[]; vehicleId: string; readAt: string | null; isOwner: boolean;
+  snapshotKey?: string; scopeLabel?: string;
+  manifest?: { kind: SourceRecordKind; id: string; state: 'included' | 'not returned by source reader' }[];
+}
 
 const finite = (n: number | null | undefined): number | null => typeof n === 'number' && Number.isFinite(n) ? n : null;
 const section = (id: string | null) => SECTIONS.find(s => s.id === id)?.label ?? id ?? null;
@@ -110,7 +116,7 @@ export async function wiringWorkbookBytes(schedule: WiringSchedule): Promise<Uin
     sheet.columns = table.columns.map(c => ({ key: c.key, width: c.width ?? 22 }));
     sheet.getCell('A1').value = table.title;
     sheet.getCell('A1').font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FF213548' } };
-    sheet.getCell('A2').value = `Vehicle ${schedule.vehicleId} · Read ${schedule.readAt ?? 'time not recorded'} · All loaded records`;
+    sheet.getCell('A2').value = `Vehicle ${schedule.vehicleId} · Read ${schedule.readAt ?? 'time not recorded'} · ${schedule.scopeLabel ?? 'All loaded records'}${schedule.snapshotKey ? ` · Source ${schedule.snapshotKey}` : ''}`;
     sheet.getCell('A3').value = 'Design state is not construction approval. Planned/modelled lengths require physical verification; blank means not recorded.';
     sheet.mergeCells(2, 1, 2, table.columns.length);
     sheet.mergeCells(3, 1, 3, table.columns.length);
@@ -143,6 +149,21 @@ export async function wiringWorkbookBytes(schedule: WiringSchedule): Promise<Uin
         }
       });
     });
+  }
+  if (schedule.manifest) {
+    const scope = workbook.addWorksheet('Export scope', { views: [{ state: 'frozen', ySplit: 5 }] });
+    scope.columns = [{ width: 18 }, { width: 40 }, { width: 36 }];
+    scope.getCell('A1').value = schedule.scopeLabel ?? 'Export scope';
+    scope.getCell('A2').value = `Vehicle ${schedule.vehicleId}`;
+    scope.getCell('A3').value = `Source content ${schedule.snapshotKey ?? 'not included'}`;
+    scope.getCell('A4').value = 'Read content identity; no construction release or stock allocation is included.';
+    scope.mergeCells('A4:C4');
+    scope.addTable({ name: 'Wiring_scope', ref: 'A5', headerRow: true,
+      style: { theme: 'TableStyleMedium2', showRowStripes: true },
+      columns: [{ name: 'Record type', filterButton: true }, { name: 'Record ID', filterButton: true }, { name: 'Scope state', filterButton: true }],
+      rows: schedule.manifest.map(r => [r.kind, r.id, r.state]),
+    });
+    scope.getRow(4).alignment = { wrapText: true }; scope.getRow(4).height = 32;
   }
   return new Uint8Array(await workbook.xlsx.writeBuffer());
 }

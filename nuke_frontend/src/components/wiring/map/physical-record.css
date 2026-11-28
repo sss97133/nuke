@@ -1,0 +1,12 @@
+.physical-record-detail { padding: 2px 0; font-size: 14px; line-height: 1.5; scroll-margin-top: var(--vp-sticky-top, 90px); }
+.physical-record-detail h2 { font-size: 17px; line-height: 1.35; margin: 4px 0 16px; }
+.physical-record-detail h3 { font-size: 14px; margin: 20px 0 8px; }
+.physical-record-detail summary { min-height: 44px; padding: 10px 0; box-sizing: border-box; cursor: pointer; }
+.physical-record-fields { margin: 0; }
+.physical-record-fields > div { display: grid; grid-template-columns: minmax(110px, 42%) minmax(0, 1fr); gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border, #d8d8d8); }
+.physical-record-fields dt { color: var(--text-secondary, #626262); }
+.physical-record-fields dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.physical-record-links { padding-left: 20px; overflow-wrap: anywhere; }
+.physical-record-links li { margin: 7px 0; }
+.physical-record-detail button { min-height: 44px; border: 0; padding: 6px 0; background: transparent; text-align: left; color: var(--accent, #1764a0); font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.physical-record-qualification { margin-top: 20px; color: var(--text-secondary, #626262); font-size: 12px; overflow-wrap: anywhere; }

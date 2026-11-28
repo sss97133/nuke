@@ -166,7 +166,7 @@ export function useSelection(): [string | null, (id: string | null) => void] {
   const sel = params.get('sel') ?? (params.get('node') ? 'n:' + params.get('node') : params.get('call') ? 'k:' + params.get('call') : null);
   const set = (id: string | null) => setParams(prev => {
     const p = new URLSearchParams(prev);
-    p.delete('node'); p.delete('call');
+    p.delete('node'); p.delete('call'); p.delete('record');
     if (id) p.set('sel', id); else p.delete('sel');
     return p;
   }, { replace: true });

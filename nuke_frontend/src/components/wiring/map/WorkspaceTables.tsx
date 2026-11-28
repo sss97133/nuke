@@ -6,14 +6,19 @@ import type { Colorway } from '../connector-inspector/colorways';
 import { frame, rule } from '../connector-inspector/colorways';
 import type { WiringMapData } from './useWiringMap';
 import { kindOf, mask, valOf, type Rel, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
-import { buildWiringSchedule, scheduleCellValue, wiringWorkbookBytes, type ScheduleRow } from './wiringSchedule';
+import { scheduleCellValue, wiringWorkbookBytes, type ScheduleRow, type SourceRecordTarget } from './wiringSchedule';
+import { buildPhysicalPieceSchedule, type PieceScheduleFilter } from './physicalPieceSchedule';
+import { readPhysicalSourceWorkspace } from './physicalHarnessModel';
+import type { PhysicalHarnessRead } from './usePhysicalHarnessModel';
+import { supabase } from '../../../lib/supabase';
 
-type Tab = 'wires' | 'pins' | 'conns' | 'open';
+type Tab = 'wires' | 'pins' | 'conns' | 'circuits' | 'open';
 interface Col<T> { h: string; v: (r: T) => string | number; td?: (r: T) => React.ReactNode; mono?: boolean; num?: boolean; w?: number; searchable?: boolean }
 interface DisplayTable { rows: ScheduleRow[]; id: (r: ScheduleRow) => string; linked: (r: ScheduleRow) => boolean; cols: Col<ScheduleRow>[] }
 
-export function WorkspaceTables({ cw, map, site, sel, rel, isOwner, onSelect, vehicleId }: {
+export function WorkspaceTables({ cw, map, sel, rel, isOwner, onSelect, vehicleId, physicalRead, selectedRecord, onRecord }: {
   cw: Colorway; map: WiringMapData; ix: WsIndex; site: SiteFiles; sel: string | null; rel: Rel; isOwner: boolean; onSelect: (id: string) => void; vehicleId?: string;
+  physicalRead: PhysicalHarnessRead; selectedRecord: SourceRecordTarget | null; onRecord: (target: SourceRecordTarget) => void;
 }) {
   const [tab, setTab] = useState<Tab>('wires');
   const [q, setQ] = useState('');
@@ -21,12 +26,32 @@ export function WorkspaceTables({ cw, map, site, sel, rel, isOwner, onSelect, ve
   const wrap = useRef<HTMLDivElement | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const schedule = useMemo(() => buildWiringSchedule(map, site, vehicleId ?? '', isOwner), [map, site, vehicleId, isOwner]);
-  const T = useMemo<Record<Tab, DisplayTable>>(() => {
-    const tables = Object.fromEntries(schedule.tables.map(table => [table.id, {
+  const linkedFilter = useMemo<PieceScheduleFilter>(() => {
+    const model = physicalRead.model;
+    if (selectedRecord) return { query: '',
+      ...(selectedRecord.kind === 'segments' ? { linkedPieceIds: new Set([selectedRecord.id]) }
+        : selectedRecord.kind === 'ends' ? { linkedEndIds: new Set([selectedRecord.id]) }
+        : selectedRecord.kind === 'endpoints' ? { linkedEndpointIds: new Set([selectedRecord.id]) }
+        : { linkedCircuitIds: new Set([selectedRecord.id]) }) };
+    if (!sel || !model) return { query: '' };
+    if (kindOf(sel) === 'w') return { query: '', linkedCircuitIds: new Set(model.circuits.filter(c => c.code === valOf(sel)).map(c => c.id)) };
+    return { query: '', linkedEndpointIds: new Set(model.endpoints.filter(e => rel.nodes.has(e.code)).map(e => e.id)) };
+  }, [physicalRead.model, selectedRecord, sel, rel]);
+  const schedule = useMemo(() => physicalRead.model ? buildPhysicalPieceSchedule(physicalRead.model,
+    { ...(onlyLinked && (sel || selectedRecord) ? linkedFilter : {}), query: tab === 'open' ? '' : q }, isOwner) : null,
+    [physicalRead.model, onlyLinked, sel, selectedRecord, linkedFilter, q, isOwner, tab]);
+  const linkedRows = useMemo(() => physicalRead.model && (sel || selectedRecord)
+    ? new Map(buildPhysicalPieceSchedule(physicalRead.model, linkedFilter, isOwner).tables.map(t => [t.id, new Set(t.rows.map(r => r.id))])) : null,
+    [physicalRead.model, linkedFilter, isOwner, sel, selectedRecord]);
+  const currentView = useRef('');
+  currentView.current = JSON.stringify([vehicleId, physicalRead.viewerId, isOwner, schedule?.snapshotKey, q, onlyLinked, tab, sel, selectedRecord]);
+  const alive = useRef(true), exportRequest = useRef<AbortController | null>(null);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; exportRequest.current?.abort(); }; }, []);
+  const T = useMemo<Partial<Record<Tab, DisplayTable>>>(() => {
+    const tables = Object.fromEntries((schedule?.tables ?? []).map(table => [table.id, {
       rows: table.rows,
       id: (r: ScheduleRow) => r.selection,
-      linked: (r: ScheduleRow) => r.selection.startsWith('w:') ? rel.wires.has(r.selection.slice(2)) : rel.nodes.has(r.selection.slice(2)),
+      linked: (r: ScheduleRow) => linkedRows?.get(table.id)?.has(r.id) ?? false,
       cols: table.columns.map(c => ({
         h: c.label, v: (r: ScheduleRow) => scheduleCellValue(c, r.cells[c.key] ?? null) ?? '', num: c.numeric, w: (c.width ?? 24) * 9,
         searchable: !c.link && !/id$/i.test(c.key),
@@ -51,27 +76,39 @@ export function WorkspaceTables({ cw, map, site, sel, rel, isOwner, onSelect, ve
       ],
     };
     return { ...tables, open };
-  }, [schedule, map.calls, rel, cw]);
+  }, [schedule, map.calls, rel, cw, linkedRows]);
 
   const download = async () => {
+    if (!schedule || !vehicleId || tab === 'open') return;
+    const view = currentView.current;
+    const address = window.location.href;
+    const controller = new AbortController(); exportRequest.current = controller;
+    const deadline = window.setTimeout(() => controller.abort(), 20000);
     setExporting(true); setExportError(null);
     try {
       const bytes = await wiringWorkbookBytes(schedule);
+      const { data, error } = await supabase.rpc('harness_source_workspace', { p_vehicle_id: vehicleId }).abortSignal(controller.signal);
+      if (error) throw error;
+      const verified = readPhysicalSourceWorkspace(data, vehicleId);
+      if (!alive.current) return;
+      if (currentView.current !== view || window.location.href !== address) { setExportError('The selection or filter changed. Download the shown scope again.'); return; }
+      if (verified.snapshot_hash !== schedule.snapshotKey) throw new Error('The database source changed. Refresh the workspace before exporting.');
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       const a = document.createElement('a'); a.href = url;
-      a.download = `Wiring-schedule-${vehicleId ?? 'vehicle'}-${(map.readAt ?? new Date().toISOString()).slice(0, 10)}.xlsx`;
+      a.download = `Physical-wire-pieces-${vehicleId}-${schedule.snapshotKey}.xlsx`;
       a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) { setExportError(error instanceof Error ? error.message : 'Workbook could not be created.'); }
-    finally { setExporting(false); }
+    } catch (error) { if (alive.current && currentView.current === view) setExportError(error instanceof Error ? error.message : 'Workbook could not be created.'); }
+    finally { window.clearTimeout(deadline); if (exportRequest.current === controller) exportRequest.current = null; if (alive.current) setExporting(false); }
   };
 
-  const t = T[tab === 'open' && !isOwner ? 'wires' : tab];
+  const t = T[tab === 'open' && !isOwner ? 'wires' : tab] ?? { rows: [], id: (r: ScheduleRow) => r.selection, linked: () => false, cols: [] };
   const ql = q.trim().toLowerCase();
   let rows = t.rows;
-  if (ql) rows = rows.filter(r => t.cols.filter(c => c.searchable !== false).map(c => String(c.v(r))).join(' ').toLowerCase().includes(ql));
-  if (onlyLinked && sel) rows = rows.filter(r => t.linked(r) || t.id(r) === sel);
+  if (tab === 'open' && ql) rows = rows.filter(r => t.cols.filter(c => c.searchable !== false).map(c => String(c.v(r))).join(' ').toLowerCase().includes(ql));
+  if (tab === 'open' && onlyLinked && sel) rows = rows.filter(r => t.linked(r) || t.id(r) === sel);
   const shown = rows;
-  const priOf = (r: ScheduleRow) => t.id(r) === sel || (kindOf(sel) === 'n' && tab === 'pins' && valOf(sel) === r.cells.node);
+  const priOf = (r: ScheduleRow) => selectedRecord ? r.record?.kind === selectedRecord.kind && r.id === selectedRecord.id
+    : t.id(r) === sel || (kindOf(sel) === 'n' && tab === 'pins' && valOf(sel) === r.cells.node);
 
   useEffect(() => {   // bring the selection's row into view when it comes from another pane (this table only: on a phone
     // the whole page scrolls, and scrollIntoView would move the page too)
@@ -83,7 +120,9 @@ export function WorkspaceTables({ cw, map, site, sel, rel, isOwner, onSelect, ve
     else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
   }, [sel, tab]);
 
-  const TABS: [Tab, string, number][] = [['wires', 'Wire schedule', map.wires.length], ['pins', 'Terminations', map.ends.length], ['conns', 'Connection points', map.nodes.length]];
+  if (physicalRead.error) return <div><p role="alert">{physicalRead.error}</p><button type="button" onClick={physicalRead.refresh} disabled={physicalRead.refreshing}>Retry source read</button></div>;
+  if (!schedule) return <p>Reading physical wire pieces…</p>;
+  const TABS: [Tab, string, number][] = schedule.tables.map(t => [t.id, t.title, t.rows.length]);
   if (isOwner) TABS.push(['open', 'Calls and decisions', map.calls.length]);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -96,20 +135,22 @@ export function WorkspaceTables({ cw, map, site, sel, rel, isOwner, onSelect, ve
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '5px 8px', borderBottom: rule(cw), flexShrink: 0, flexWrap: 'wrap' }}>
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter this schedule" aria-label="Filter this table"
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Find circuit, piece or connection" aria-label="Filter physical pieces"
           style={{ width: 220, border: `2px solid ${cw.border}`, background: cw.surface, color: cw.ink, fontFamily: cw.fontBody, fontSize: 14, minHeight: 44, padding: '5px 8px' }} />
         <button onClick={() => setOnlyLinked(v => !v)} aria-pressed={onlyLinked} style={{
           border: frame(cw), background: onlyLinked ? cw.ink : cw.surface, color: onlyLinked ? cw.surface : cw.ink, fontFamily: cw.fontBody, fontSize: 13, fontWeight: 600, minHeight: 44, padding: '5px 10px', cursor: 'pointer',
         }}>Linked to selection</button>
-        <button onClick={download} disabled={exporting || !map.loaded || !!map.error || !vehicleId} title="Download every loaded wire, termination and connection point; table filters do not limit the workbook."
+        <button type="button" onClick={() => { setExportError(null); physicalRead.refresh(); }} disabled={physicalRead.refreshing}
+          style={{ border: frame(cw), background: cw.surface, color: cw.ink, font: 'inherit', minHeight: 44, padding: '5px 10px' }}>Refresh source</button>
+        <button onClick={download} disabled={exporting || !vehicleId || tab === 'open'} title="Download the shown physical pieces and their related source records. The database source is verified before the file is saved."
           style={{ border: frame(cw), background: cw.accent, color: cw.onAccent, fontFamily: cw.fontBody, fontSize: 13, fontWeight: 600, minHeight: 44, padding: '5px 12px', cursor: 'pointer' }}>
-          {exporting ? 'Preparing Excel…' : 'Download Excel · all records'}
+          {exporting ? 'Verifying and preparing Excel…' : `Download Excel · ${schedule.tables[0].rows.length} shown pieces`}
         </button>
         <span style={{ marginLeft: 'auto', fontFamily: cw.fontMono, fontSize: 11, color: cw.inkMuted }}>{shown.length}{rows.length > shown.length ? ` of ${rows.length}` : ''} ROWS{sel ? ` · ${t.rows.filter(r => t.linked(r)).length} LINKED` : ''}</span>
       </div>
       {exportError && <div role="alert" style={{ padding: '8px 12px', color: cw.warn }}>{exportError}</div>}
       <div style={{ padding: '6px 10px', fontSize: 12, color: cw.inkMuted, borderBottom: rule(cw) }}>
-        Design state and build state are separate. Blank values are not recorded. Planned lengths require physical verification.
+        {schedule.scopeLabel}. Blank means not recorded in this reader; planned lengths need physical verification. {physicalRead.refreshing && 'Checking current source…'}
       </div>
       <div ref={wrap} style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 14, fontFamily: cw.fontBody }}>
@@ -120,8 +161,8 @@ export function WorkspaceTables({ cw, map, site, sel, rel, isOwner, onSelect, ve
             const id = t.id(r), pri = priOf(r), lk = !pri && !!sel && t.linked(r);
             return (
               <tr key={r.id} data-pri={pri ? '1' : undefined} data-rel={lk ? '1' : undefined}
-                tabIndex={id ? 0 : undefined} aria-selected={pri} onClick={() => { if (id) onSelect(id); }}
-                onKeyDown={e => { if (id && e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onSelect(id); } }}
+                tabIndex={id || r.record ? 0 : undefined} aria-selected={pri} onClick={() => { if (r.record) onRecord(r.record); else if (id) onSelect(id); }}
+                onKeyDown={e => { if ((id || r.record) && e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); if (r.record) onRecord(r.record); else onSelect(id); } }}
                 style={{ cursor: id ? 'pointer' : 'default', background: pri ? `${cw.accent}33` : lk ? `${cw.accent}14` : 'transparent' }}>
                 {t.cols.map(c => (
                   <td key={c.h} title={String(c.v(r))} style={{

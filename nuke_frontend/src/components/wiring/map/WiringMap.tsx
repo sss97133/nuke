@@ -15,7 +15,7 @@
 // routes, the part-model index). Chrome from the connector inspector's colorways (PAPER default).
 // URL-addressable: ?tab=map&view=&sel= (older ?node= and ?call= still open).
 
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useVehiclePermissions } from '../../../hooks/useVehiclePermissions';
@@ -35,7 +35,11 @@ import {
 } from './useWorkspaceSelection';
 import { WorkspaceTree } from './WorkspaceTree';
 import { ConnectorFace, PlanView } from './WorkspaceViews';
-import { SchematicBlock } from './SchematicBlock';
+import { PhysicalSchematicBlock } from './SchematicBlock';
+import { usePhysicalHarnessModel } from './usePhysicalHarnessModel';
+import { PhysicalRecordDetail, readSourceRecordTarget } from './PhysicalRecordDetail';
+import type { SourceRecordTarget } from './wiringSchedule';
+import './physical-record.css';
 import { WorkspaceTables } from './WorkspaceTables';
 import { WorkspaceProps } from './WorkspaceProps';
 import { PartLibrary } from './PartLibrary';
@@ -136,6 +140,8 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const isOwner = (!!session?.user && isRowOwner) || (import.meta.env.DEV && params.get('asOwner') === '1');
 
   const raw = useWiringMap(vehicleId);
+  const physicalRead = usePhysicalHarnessModel(vehicleId);
+  const sourceRecord = readSourceRecordTarget(params.get('record'));
   const facts = useWiringFacts(isOwner ? vehicleId : undefined);
   const site = useSiteFiles(vehicleId);
   // the workspace draws results: names without the buying story (the owner's records card keeps the full text)
@@ -153,6 +159,14 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const cov = useMemo(() => coverage(site), [site]);
 
   const k = kindOf(sel), v = valOf(sel);
+  const recordPane = useRef<HTMLDivElement>(null);
+  const sourceAddress = params.get('record') ?? (k === 'w' ? sel : null);
+  const sourceReady = physicalRead.model !== null;
+  useEffect(() => {
+    if (!narrow || !sourceAddress || !sourceReady || !map.loaded) return;
+    const record = recordPane.current?.querySelector<HTMLElement>('.physical-record-detail');
+    if (record) { record.scrollIntoView({ block: 'start' }); record.focus({ preventScroll: true }); }
+  }, [sourceAddress, narrow, sourceReady, map.loaded]);
   // the open door; an older link with a view or a selection (?view=, ?sel=, ?node=, ?call=) opens the door that holds it
   const rawDoor = params.get('door'), rawView = params.get('view');
   const door: Door | null = isDoor(rawDoor) ? rawDoor
@@ -167,7 +181,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const scene3d = sceneURL.init;
   // one URL write per click (two in the same tick would each start from the same URL and the second would win)
   const go = (d: Door | null, id?: string | null) => {
-    set({ door: d, view: null, ...(id !== undefined ? { sel: id, node: null, call: null } : {}) });
+    set({ door: d, view: null, ...(id !== undefined ? { sel: id, node: null, call: null, record: null } : {}) });
     setTreeOpen(false); setTablesOpen(false);
   };
   const withWires = SECTIONS.filter(s => map.wires.some(w => w.section === s.id));
@@ -180,6 +194,16 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   const faceCode = k === 'n' ? v : k === 'p' ? v.split('|')[0] : k === 'w' ? (ix.chain.get(v) ?? [])[0]?.code ?? null
     : k === 'd' ? map.nodes.find(n => ix.devOf(n.code) === v)?.code ?? null : null;
   const pick = (id: string) => { setSel(id); setTreeOpen(false); };
+  const pickRecord = (target: SourceRecordTarget) => {
+    const model = physicalRead.model;
+    const circuitId = target.kind === 'segments' ? model?.segments.find(s => s.id === target.id)?.circuit_id
+      : target.kind === 'ends' ? model?.terminations.find(t => t.id === target.id)?.circuit_id
+        ?? model?.unsegmented_end_records?.find(t => t.id === target.id)?.circuit_id : target.kind === 'circuits' ? target.id : null;
+    const c = circuitId ? model?.circuits.find(c => c.id === circuitId) : undefined;
+    const e = target.kind === 'endpoints' ? model?.endpoints.find(e => e.id === target.id) : undefined;
+    set({ record: `${target.kind}:${target.id}`, sel: c ? `w:${c.code}` : e ? `n:${e.code}` : null, node: null, call: null });
+    setTreeOpen(false);
+  };
   const clearSel = React.useCallback(() => setSel(null), [setSel]);
 
   // the owner's records for the selection: proof, notes, sources, rule checks, the calls it hangs on
@@ -221,18 +245,30 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
           </Suspense>
         )}
         {view === 'face' && <ConnectorFace cw={cw} ix={ix} site={site} code={faceCode} sel={sel} rel={rel} onSelect={pick} />}
-        {view === 'sch' && <SchematicBlock cw={cw} vehicleId={vehicleId} section={sys} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} />}
+        {view === 'sch' && <PhysicalSchematicBlock cw={cw} vehicleId={vehicleId} section={sys} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} read={physicalRead}
+          onSourceSelect={pickRecord} />}
         {view === 'lib' && <PartLibrary cw={cw} ix={ix} site={site} sel={sel} rel={rel} onSelect={pick} />}
       </div>
     </div>
   );
   const props = (
-    <div style={{ padding: '10px 12px' }}>
-      {sel && (
+    <div ref={recordPane} style={{ padding: '10px 12px' }}>
+      {(sel || params.has('record')) && (
         <button onClick={() => setSel(null)} style={{ float: 'right', border: frame(cw), background: cw.surface, color: cw.ink,
-          fontFamily: cw.fontBody, fontSize: 10, fontWeight: 700, padding: '2px 6px', cursor: 'pointer' }}>CLEAR</button>
+          fontFamily: cw.fontBody, fontSize: 13, fontWeight: 600, minHeight: 44, padding: '5px 10px', cursor: 'pointer' }}>Clear</button>
       )}
-      {sel
+      {params.has('record')
+        ? !sourceRecord ? <p role="alert">This source-record address is not supported.</p>
+          : physicalRead.error ? <p role="alert">{physicalRead.error}</p>
+            : !physicalRead.model ? <p>Reading the exact source record…</p>
+              : <PhysicalRecordDetail model={physicalRead.model} target={sourceRecord} onRecord={pickRecord} />
+        : k === 'w'
+          ? physicalRead.error ? <p role="alert">{physicalRead.error}</p>
+            : !physicalRead.model ? <p>Reading physical wire records…</p>
+              : physicalRead.model.circuits.some(c => c.code === v)
+                ? <PhysicalRecordDetail model={physicalRead.model} target={{ kind: 'circuits', id: physicalRead.model.circuits.find(c => c.code === v)!.id }} onRecord={pickRecord} />
+                : <p role="alert">This circuit is not returned by the current physical source reader.</p>
+        : sel
         ? <WorkspaceProps cw={cw} map={map} ix={ix} site={site} sel={sel} isOwner={isOwner} onSelect={pick} ownerExtra={records}
             onShowOnTruck={door === 'wire' && k === 'w' ? () => go('truck') : undefined} />
         : door === 'wire'
@@ -240,7 +276,8 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
           : <AtRest cw={cw} map={map} ix={ix} site={site} vehicleId={vehicleId} isOwner={isOwner} rollupFacts={facts} calls={raw.calls} />}
     </div>
   );
-  const tables = <WorkspaceTables cw={cw} map={map} ix={ix} site={site} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} vehicleId={vehicleId} />;
+  const tables = <WorkspaceTables cw={cw} map={map} ix={ix} site={site} sel={sel} rel={rel} isOwner={isOwner} onSelect={pick} vehicleId={vehicleId}
+    physicalRead={physicalRead} selectedRecord={sourceRecord} onRecord={pickRecord} />;
 
   // the landing: four doors, each a sentence; "What's still missing" says how much, counted the way its list counts
   const missingCount = useMemo(() => (map.loaded && site.loaded ? missingOf(map, ix, site).length : null), [map, ix, site]);
@@ -262,8 +299,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
     border: frame(cw), background: on ? cw.ink : cw.surface, color: on ? textOn(cw.ink) : cw.ink,
     fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, letterSpacing: 0.6, padding: '3px 8px', cursor: 'pointer', whiteSpace: 'nowrap',
   });
-  // inside a door: the way back, the door's name, and the tools it can open (the tree and the tables); the colourway
-  // switch waits here too, off the first screen
+  // Current task and its shared tools. The workspace has one Paper appearance.
   const doorBar = door && (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px 8px', flexWrap: 'wrap', padding: '5px 12px', borderBottom: frame(cw), background: cw.bg, flexShrink: 0 }}>
       <nav aria-label="Wiring views" style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
@@ -318,11 +354,11 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
           <>
             {doorBar}
             {door === 'schedule' ? (
-              <div style={{ flex: 1, minHeight: narrow ? 540 : 0, display: 'grid',
-                gridTemplateColumns: sel && !narrow ? 'minmax(0, 1fr) 360px' : 'minmax(0, 1fr)',
-                gridTemplateRows: sel && narrow ? 'minmax(420px, 65vh) auto' : 'minmax(0, 1fr)' }}>
+              <div style={{ flex: narrow ? '0 0 auto' : 1, minHeight: narrow ? 540 : 0, display: 'grid',
+                gridTemplateColumns: (sel || params.has('record')) && !narrow ? 'minmax(0, 1fr) 360px' : 'minmax(0, 1fr)',
+                gridTemplateRows: (sel || params.has('record')) && narrow ? 'minmax(420px, 65vh) auto' : 'minmax(0, 1fr)' }}>
                 <div style={{ minWidth: 0, minHeight: 0, background: cw.surface }}>{tables}</div>
-                {sel && <aside aria-label="Selected record" style={{ overflowY: 'auto', minWidth: 0, borderLeft: rule(cw), background: cw.bg }}>{props}</aside>}
+                {(sel || params.has('record')) && <aside aria-label="Selected record" style={{ overflowY: narrow ? 'visible' : 'auto', minWidth: 0, borderLeft: rule(cw), background: cw.bg }}>{props}</aside>}
               </div>
             ) : door === 'missing' ? (
               <div style={{ flex: narrow ? undefined : 1, minHeight: 0, overflowY: narrow ? undefined : 'auto' }}>{missing}</div>
