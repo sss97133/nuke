@@ -75,7 +75,7 @@ final class ExploreFeedTests: XCTestCase {
         XCTAssertTrue(ExploreFeedPaging.endLine(tuned: true).contains("tuning"))
     }
 
-    func testLiveRefreshKeepsExtensionsAndRemovesOnlyExpiredMissingLots() {
+    func testLiveRefreshMarksMissingLotsUnavailableAndRecoversThem() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         func lot(_ id: String, _ end: TimeInterval?) -> ExploreFeedItem {
             ExploreFeedItem(id: id, kind: .live, title: id, image: "https://x/y.jpg", amount: 1000,
@@ -86,9 +86,18 @@ final class ExploreFeedTests: XCTestCase {
         let oldExtended = lot("extended", -1), extended = lot("extended", 600)
         let classified = item("classified", .classified)
         let result = ExploreFeedPaging.reconcileLive([expired, future, oldExtended, classified, unknown],
-                                                     current: [extended.id: extended], now: now)
-        XCTAssertEqual(result.map(\.id), ["future", "extended", "classified", "unknown"])
-        XCTAssertEqual(result[1].endsAt, extended.endsAt)
+                                                     current: [extended.id: extended])
+        XCTAssertEqual(result.map(\.id), ["expired", "future", "extended", "classified", "unknown"])
+        XCTAssertTrue(result[0].liveStatusUnavailable)
+        XCTAssertTrue(result[1].liveStatusUnavailable)
+        XCTAssertEqual(result[2].endsAt, extended.endsAt)
+        XCTAssertFalse(result[2].liveStatusUnavailable)
+        XCTAssertFalse(result[3].liveStatusUnavailable)
+        XCTAssertTrue(result[4].liveStatusUnavailable)
+        let recovered = lot("expired", 600)
+        let again = ExploreFeedPaging.reconcileLive(result, current: [recovered.id: recovered, extended.id: extended])
+        XCTAssertFalse(again[0].liveStatusUnavailable)
+        XCTAssertEqual(again[0].endsAt, recovered.endsAt)
     }
 
     // MARK: Clock
