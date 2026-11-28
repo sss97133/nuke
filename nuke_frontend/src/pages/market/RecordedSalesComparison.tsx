@@ -203,6 +203,9 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
       </label>}
       <div ref={countsRef} aria-label={captured ? 'Daily captured sell-through fractions' : 'Daily recorded sales counts'} style={{ display: 'grid', gap: 8 }}>
         {!receipt.truncated && <span style={{ fontSize: 11 }}>{captured ? 'Daily fractions · shared 0–100% scale · n = known outcomes. Select a day for both sales and no-sales.' : <>Daily sales · shared count scale 0–{number(max)}. Select a day’s count for its sources.</>}</span>}
+        <div tabIndex={0} role="region" aria-label="Daily outcome chart; scroll horizontally for later days"
+          style={{ minWidth: 0, overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gap: 8, minWidth: Math.max(280, buckets.length * 70) }}>
         {(showBenchmark ? ['selected', 'benchmark'] as const : ['selected'] as const).map(series => <div key={series}>
           <div style={{ ...label, marginBottom: 4 }}>{seriesName(series, selectedName, captured)}</div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, minmax(0, 1fr))`, gap: 2 }}>
@@ -214,6 +217,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
             })}
           </div>
         </div>)}
+        </div></div>
       </div>
       <div style={{ fontSize: 11, margin: '8px 0', color: 'var(--text-secondary)' }}>
         Read <time dateTime={receipt.knowledge_cutoff}>{utc(receipt.knowledge_cutoff)}</time>.{' '}
