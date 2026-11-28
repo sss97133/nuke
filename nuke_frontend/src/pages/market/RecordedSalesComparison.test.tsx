@@ -37,6 +37,18 @@ async function render(makeName: string | null = 'FIXTURE MAKE') {
   await act(async () => root.render(<RecordedSalesComparison make={makeName} />));
 }
 function countButton(prefix: string) { return [...container.querySelectorAll('button')].find(b => b.getAttribute('aria-label')?.includes(prefix))!; }
+function capturedReceipt(): RecordedSalesReceipt {
+  const r=receipt();r.metric_id='captured_sell_through';r.unit='fraction_of_known_retained_bidding_outcomes';
+  r.summary=[{series:'selected',numerator:0,denominator:4,ratio:0,withdrawn:1,unresolved:2},
+    {series:'benchmark',numerator:10,denominator:40,ratio:.25,withdrawn:0,unresolved:0}];
+  r.series=r.series.map(p=>({...p,value:p.series==='selected'?0:.25,ratio:p.series==='selected'?0:.25,
+    numerator:p.series==='selected'?0:10,coverage:{...p.coverage,withdrawn:1,unresolved:2}}));
+  r.evidence={...r.evidence,pagination_supported:true,offset:0,snapshot_hash:'a'.repeat(32),
+    has_more:true,next_offset:20,contributors:r.evidence.contributors.map(c=>({...c,
+      outcome_class:'no_sale',source_outcome:'reserve_not_met',numerator_contribution:0,denominator_contribution:1,
+      vehicle_identity:{year:2000,make:'Fixture',model:'Model'}}))};
+  return r;
+}
 async function select(label: string, value: string) {
   const element = container.querySelector(`select[aria-label="${label}"]`) as HTMLSelectElement;
   await act(async () => { element.value = value; element.dispatchEvent(new Event('change', { bubbles: true })); });
@@ -104,7 +116,7 @@ describe('recorded sales evidence comparison', () => {
     expect(container.textContent).toContain('Source clocks: 0 recorded · 4 unknown. Ended pending: 1');
     expect(container.textContent).toContain('Ratios and period changes: unknown');
     expect(container.textContent).toContain('partial capture');
-    expect(container.textContent).not.toMatch(/50%|25%|USD|sell-through|market strength/);
+    expect(container.textContent).not.toMatch(/50%|25%|USD|market strength/);
     expect(container.querySelector('time')?.dateTime).toBe('2026-10-04T09:00:00Z');
     expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
   });
@@ -232,5 +244,42 @@ describe('recorded sales evidence comparison', () => {
     await act(async () => root.render(<RecordedSalesComparison make={null} onMakeChange={onMakeChange} />));
     expect(fixture.request).toBeNull();
     expect(container.querySelector('[aria-label="Daily recorded sales counts"]')).toBeNull();
+  });
+});
+
+describe('captured sell-through through the existing comparison', () => {
+  async function captured() { fixture.query.data=capturedReceipt();await render();await select('Market outcome measure','captured_sell_through'); }
+  it('keeps a real zero clickable and opens no-sale records in their exact auction episode', async () => {
+    await captured();
+    expect(fixture.request).toMatchObject({metric:'captured_sell_through',reserve_policy:'all_recorded_policies'});
+    const point=countButton('FIXTURE MAKE: 0% captured');expect(point.disabled).toBe(false);
+    await act(async()=>point.click());
+    const evidence=container.querySelector('[aria-label="Recorded sales contributors"]')!;
+    expect(evidence.textContent).toContain('reserve not met');
+    expect(evidence.textContent).toContain('contributes 0 sold / 1 known outcome');
+    expect(evidence.querySelector('a[href="/stacks/order-book/fixture-vehicle?lot=fixture-auction"]')).toBeTruthy();
+    expect(container.textContent).toContain('0/4 known bidding outcomes');
+  });
+  it('carries the snapshot on continuation and discards old records when it changes', async () => {
+    await captured();await act(async()=>countButton('FIXTURE MAKE: 0% captured').click());
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Next source records')!.click());
+    expect(fixture.request).toMatchObject({evidence_offset:20,evidence_snapshot_hash:'a'.repeat(32)});
+    fixture.query.data={state:'unavailable',reason:'evidence_snapshot_changed'};await render();
+    expect(container.textContent).toContain('evidence snapshot changed');
+    expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Refresh recorded evidence')!.click());
+    expect(fixture.request).not.toHaveProperty('evidence_snapshot_hash');
+    expect(fixture.request).not.toHaveProperty('evidence_offset');
+  });
+  it('changes outcome filters without reusing another filter’s continuation', async () => {
+    await captured();await act(async()=>countButton('FIXTURE MAKE: 0% captured').click());
+    await select('Contributing outcome type','unresolved');
+    expect(fixture.request).toMatchObject({evidence_outcome:'unresolved'});
+    expect(fixture.request).not.toHaveProperty('evidence_snapshot_hash');
+    expect(fixture.request).not.toHaveProperty('evidence_offset');
+  });
+  it('requests an earlier seven-day window in UTC without client-computing its rate', async () => {
+    await captured();await select('Recorded sales event window','7:1');
+    expect(fixture.request).toMatchObject({event_from:'2026-09-20T00:00:00.000Z',event_to:'2026-09-27T00:00:00.000Z'});
   });
 });

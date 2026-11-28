@@ -1,28 +1,34 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PrefetchLink } from '../../components/PrefetchLink';
+import { VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Text } from '../../kit';
 import { matchSalesMake, recordedSalesRequest, recordedSalesWindow, useRecordedSales, useSalesScopes,
-  type SalesDrill, type SalesPoint, type SalesSeries } from './useRecordedSales';
+  type SalesDrill, type SalesMetric, type SalesOutcome, type SalesPoint, type SalesSeries } from './useRecordedSales';
 import './RecordedSalesComparison.css';
 
 const label: React.CSSProperties = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 };
 const mono: React.CSSProperties = { fontFamily: "'Courier New', monospace" };
 const number = (n: number | null | undefined) => n == null ? 'unknown' : n.toLocaleString('en-US');
+const percent = (n: number | null | undefined) => n == null ? 'unknown' : `${(n * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
 const day = (date: string) => date.slice(0, 10);
 const utc = (date: string) => new Date(date).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
 const seriesName = (series: SalesSeries, selected: string) => series === 'selected' ? selected : 'Rest of BaT';
-export interface MarketSalesLens { scopeKey: string | null; days: 2 | 7; drill: SalesDrill | null; benchmark: boolean }
+export interface MarketSalesLens { scopeKey: string | null; days: 2 | 7; drill: SalesDrill | null; benchmark: boolean;
+  metric?: SalesMetric; weeksBack?: number }
 
-function CountBucket({ point, name, max, refused, active, onClick }: {
-  point: SalesPoint; name: string; max: number; refused: boolean; active: boolean; onClick: () => void;
+function CountBucket({ point, name, max, refused, active, onClick, captured = false }: {
+  point: SalesPoint; name: string; max: number; refused: boolean; active: boolean; onClick: () => void; captured?: boolean;
 }) {
   const unavailable = refused || point.value == null || point.denominator == null;
   return <div style={{ minWidth: 0 }}>
-    <button onClick={onClick} disabled={unavailable || point.value === 0} aria-pressed={active}
-      aria-label={`${day(point.bucket_start)} UTC · ${name}: ${unavailable ? 'counts refused' : `${point.value} recorded sales, ${point.denominator} eligible ended episodes`}. Show contributors`}
+    <button onClick={onClick} disabled={unavailable || (!captured && point.value === 0)} aria-pressed={active}
+      aria-label={`${day(point.bucket_start)} UTC · ${name}: ${unavailable ? 'counts refused' : captured
+        ? `${percent(point.value)} captured sell-through, ${point.numerator} sold of ${point.denominator} known outcomes`
+        : `${point.value} recorded sales, ${point.denominator} eligible ended episodes`}. Show contributors`}
       className="sales-count-point" data-value={unavailable ? undefined : point.value}
       style={{ borderColor: active ? 'var(--text)' : 'transparent' }}>
-      <span style={{ ...mono, fontSize: 13 }}>{unavailable ? '—' : number(point.value)}</span>
+      <span style={{ ...mono, fontSize: 13 }}>{unavailable ? '—' : captured ? percent(point.value) : number(point.value)}</span>
+      {captured && <span style={{ ...mono, fontSize: 11 }}>n={number(point.denominator)}</span>}
       {!unavailable && <span aria-hidden="true" className="sales-count-track">
         <span className="sales-count-bar" style={{ height: `${(point.value ?? 0) / max * 100}%`,
           background: point.series === 'selected' ? 'var(--text)' : 'var(--text-secondary)' }} />
@@ -79,14 +85,19 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   const catalog = useSalesScopes();
   const [localChosen, setChosen] = useState<string | null>(null);
   const [localDays, setDays] = useState<2 | 7>(7);
+  const [localMetric, setMetric] = useState<SalesMetric>('recorded_sale_events');
+  const [localWeeksBack, setWeeksBack] = useState(0);
   const [windowClock, setWindowClock] = useState(() => Date.now());
   const [localDrill, setDrill] = useState<SalesDrill | null>(null);
   const [localBenchmark, setShowBenchmark] = useState(false);
   const chosen = lens ? lens.scopeKey : localChosen;
   const days = lens?.days ?? localDays;
+  const metric = lens?.metric ?? localMetric;
+  const captured = metric === 'captured_sell_through';
+  const weeksBack = captured ? lens?.weeksBack ?? localWeeksBack : 0;
   const drill = lens ? lens.drill : localDrill;
   const showBenchmark = lens?.benchmark ?? localBenchmark;
-  const window = useMemo(() => recordedSalesWindow(days, windowClock), [days, windowClock]);
+  const window = useMemo(() => recordedSalesWindow(days, windowClock, weeksBack), [days, windowClock, weeksBack]);
   const evidenceRef = useRef<HTMLDivElement>(null);
   const countsRef = useRef<HTMLDivElement>(null);
   const eventWindowRef = useRef<HTMLSelectElement>(null);
@@ -100,12 +111,13 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     : matchSalesMake(options, requestedMake);
   // A stored inventory label may have no unique registry entry; preserve that scope in the control.
   const unmatchedMake = requestedMake && !option ? requestedMake : null;
-  const request = useMemo(() => option && view === 'sales' ? recordedSalesRequest(option.scope, window, drill) : null, [option, window, drill, view]);
+  const request = useMemo(() => option && view === 'sales' ? recordedSalesRequest(option.scope, window, drill, metric) : null, [option, window, drill, view, metric]);
   const query = useRecordedSales(request);
   const response = option && view === 'sales' ? query.data : undefined;
-  const receipt = response?.state === 'partial' ? response : undefined;
+  const receipt = response?.state === 'partial' && response.metric_id === metric ? response : undefined;
   const buckets = [...new Set(receipt?.series.map(p => p.bucket_start) ?? [])].sort();
-  const max = Math.max(1, ...receipt?.series.filter(p => showBenchmark || p.series === 'selected').map(p => p.value ?? 0) ?? []);
+  const max = captured ? 1 : Math.max(1, ...receipt?.series.filter(p => showBenchmark || p.series === 'selected').map(p => p.value ?? 0) ?? []);
+  const summary = receipt?.summary?.find(s => s.series === 'selected');
   const selectedName = option?.label ?? receipt?.scope.label ?? 'Selected scope';
   const contributors = (receipt?.evidence.contributors ?? []).filter(c => drill
     && c.series === drill.series && day(c.bucket_start) === day(drill.bucket));
@@ -117,14 +129,18 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     }
   }, [drill, receipt, query.isFetching, query.isError]);
   const refresh = () => {
-    const next = recordedSalesWindow(days);
+    if (captured && drill?.snapshotHash) {
+      const next = { bucket: drill.bucket, series: drill.series, outcome: drill.outcome };
+      setDrill(next); onLensChange?.({ drill: next }); return;
+    }
+    const next = recordedSalesWindow(days, Date.now(), weeksBack);
     if (next.event_to !== window.event_to) { setWindowClock(Date.now()); setDrill(null); onLensChange?.({ drill: null }); }
     else void query.refetch();
   };
 
-  return <section className="market-sales-comparison" aria-label="Recorded sales comparison" style={{ border: '2px solid var(--border)', padding: 8, marginBottom: 12, minWidth: 0 }}>
+  return <section className="market-sales-comparison" aria-label={captured ? 'Captured sell-through comparison' : 'Recorded sales comparison'} style={{ border: '2px solid var(--border)', padding: 8, marginBottom: 12, minWidth: 0 }}>
     {controls && <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px 16px', flexWrap: 'wrap', marginBottom: 8 }}>
-      <h2 style={{ ...label, margin: 0 }}>{view === 'sales' ? 'Recorded sales over time' : 'Market explorer'}</h2>
+      <h2 style={{ ...label, margin: 0 }}>{view === 'sales' ? captured ? 'Captured sell-through over time' : 'Recorded sales over time' : 'Market explorer'}</h2>
       <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Bring a Trailer · {view === 'sales' ? 'partial capture · daily UTC listing episodes' : 'captured open vehicle lots'}</span>
     </div>}
     <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap', marginBottom: 8 }}>
@@ -137,9 +153,16 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
           {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
         </select>
       </label>}
-      {view === 'sales' && <label style={label}>Event window<br /><select ref={eventWindowRef} aria-label="Recorded sales event window" value={days} className="market-control k-body"
-        onChange={e => { const n = Number(e.target.value) as 2 | 7; setDays(n); setWindowClock(Date.now()); setDrill(null); onLensChange?.({ days: n, drill: null }); }}>
+      {view === 'sales' && <label style={label}>Measure<br /><select aria-label="Market outcome measure" className="market-control k-body" value={metric}
+        onChange={e => { const next = e.target.value as SalesMetric; setMetric(next); setDrill(null); setWeeksBack(0);
+          onLensChange?.({ metric: next, weeksBack: 0, drill: null }); }}>
+        <option value="recorded_sale_events">Recorded sales</option><option value="captured_sell_through">Captured sell-through</option>
+      </select></label>}
+      {view === 'sales' && <label style={label}>Event window<br /><select ref={eventWindowRef} aria-label="Recorded sales event window" value={weeksBack ? `${days}:${weeksBack}` : String(days)} className="market-control k-body"
+        onChange={e => { const [d, back] = e.target.value.split(':').map(Number); const n = d as 2 | 7; setDays(n); setWeeksBack(back || 0); setWindowClock(Date.now()); setDrill(null); onLensChange?.({ days: n, weeksBack: back || 0, drill: null }); }}>
         <option value={2}>Last 2 full UTC days</option><option value={7}>Last 7 full UTC days</option>
+        {captured && <><option value="7:1">Previous 7-day window</option><option value="7:2">Two windows earlier</option><option value="7:3">Three windows earlier</option></>}
+        {captured && days === 2 && weeksBack > 0 && <option value={`2:${weeksBack}`}>2 days · {weeksBack} weeks earlier</option>}
       </select></label>}
       {view === 'sales' && <button className="market-control k-body" disabled={!option || query.isFetching} onClick={refresh}>Refresh recorded evidence</button>}
       {controls && onViewChange && <div role="group" aria-label="Market view" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -166,22 +189,26 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
       <p style={{ fontSize: 12, margin: '8px 0', overflowWrap: 'anywhere' }}>
         {day(receipt.event_from)} ≤ event time &lt; {day(receipt.event_to)} UTC.
       </p>
+      {captured && summary && !receipt.truncated && <p style={{ fontSize: 14, margin: '8px 0' }}>
+        {selectedName}: {percent(summary.ratio)} recorded sold · {number(summary.numerator)}/{number(summary.denominator)} known bidding outcomes.
+        {' '}{number(summary.withdrawn)} withdrawn · {number(summary.unresolved)} unresolved.
+      </p>}
       {receipt.truncated ? <div role="status" style={{ fontSize: 12, padding: '8px 0' }}>
         Candidate limit exceeded ({number(receipt.captured_candidates)} captured; limit {number(receipt.candidate_limit)}). Counts, denominators, ratios and changes are refused. Choose a shorter window.
       </div> : null}
       {!receipt.truncated && <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, margin: '8px 0' }}>
-        <input type="checkbox" checked={showBenchmark} aria-label="Show rest of BaT absolute counts" onChange={e => { setShowBenchmark(e.target.checked); setDrill(null); onLensChange?.({ benchmark: e.target.checked, drill: null }); }} />
-        Add rest of BaT · absolute counts from a larger population
+        <input type="checkbox" checked={showBenchmark} aria-label={captured ? 'Show rest of captured BaT fractions' : 'Show rest of BaT absolute counts'} onChange={e => { setShowBenchmark(e.target.checked); setDrill(null); onLensChange?.({ benchmark: e.target.checked, drill: null }); }} />
+        {captured ? 'Compare with rest of captured BaT · selected group excluded' : 'Add rest of BaT · absolute counts from a larger population'}
       </label>}
-      <div ref={countsRef} aria-label="Daily recorded sales counts" style={{ display: 'grid', gap: 8 }}>
-        {!receipt.truncated && <span style={{ fontSize: 11 }}>Daily sales · shared count scale 0–{number(max)}. Select a day’s count for its sources.</span>}
+      <div ref={countsRef} aria-label={captured ? 'Daily captured sell-through fractions' : 'Daily recorded sales counts'} style={{ display: 'grid', gap: 8 }}>
+        {!receipt.truncated && <span style={{ fontSize: 11 }}>{captured ? 'Daily fractions · shared 0–100% scale · n = known outcomes. Select a day for both sales and no-sales.' : <>Daily sales · shared count scale 0–{number(max)}. Select a day’s count for its sources.</>}</span>}
         {(showBenchmark ? ['selected', 'benchmark'] as const : ['selected'] as const).map(series => <div key={series}>
           <div style={{ ...label, marginBottom: 4 }}>{seriesName(series, selectedName)}</div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, minmax(0, 1fr))`, gap: 2 }}>
             {buckets.map(bucket => {
               const point = receipt.series.find(p => p.bucket_start === bucket && p.series === series);
               return point ? <CountBucket key={bucket} point={point} name={seriesName(series, selectedName)} max={max}
-                refused={receipt.truncated} active={drill != null && day(drill.bucket) === day(bucket) && drill.series === series}
+                refused={receipt.truncated} captured={captured} active={drill != null && day(drill.bucket) === day(bucket) && drill.series === series}
                 onClick={() => { focusEvidence.current = true; setDrill({ bucket, series }); onLensChange?.({ drill: { bucket, series } }); }} /> : <div key={bucket} style={{ fontSize: 10 }}>Unknown<br />{day(bucket).slice(5)}</div>;
             })}
           </div>
@@ -189,38 +216,68 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
       </div>
       <div style={{ fontSize: 11, margin: '8px 0', color: 'var(--text-secondary)' }}>
         Read <time dateTime={receipt.knowledge_cutoff}>{utc(receipt.knowledge_cutoff)}</time>.{' '}
-        Ratios and period changes: unknown. Capture and result completeness are unverified, so these counts do not establish relative market performance.
+        {captured ? 'Retained known outcomes only; platform capture, settlement and reserve-policy comparability remain unverified. Earlier-window readings are available in Event window.' : 'Ratios and period changes: unknown. Capture and result completeness are unverified, so these counts do not establish relative market performance.'}
       </div>
       {!receipt.truncated && <details style={{ fontSize: 11, margin: '8px 0' }}>
         <summary>Daily counts and outcome coverage</summary>
         {receipt.series.map(point => <div key={`${point.bucket_start}:${point.series}`} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-          {day(point.bucket_start)} UTC · {seriesName(point.series, selectedName)}: {number(point.value)} recorded sales · {number(point.denominator)} captured ended listings.
+          {day(point.bucket_start)} UTC · {seriesName(point.series, selectedName)}: {captured
+            ? `${percent(point.value)} · ${number(point.numerator)}/${number(point.denominator)} known outcomes`
+            : `${number(point.value)} recorded sales · ${number(point.denominator)} captured ended listings`}.
           <div>{point.denominator === 0 ? 'No matched captured episodes; this does not establish zero demand.' :
-            `Source clocks: ${number(point.coverage.source_clock_known)} recorded · ${number(point.coverage.source_clock_unknown)} unknown. Ended pending: ${number(point.coverage.ended_pending)}.`}
+            `Source clocks: ${number(point.coverage.source_clock_known)} recorded · ${number(point.coverage.source_clock_unknown)} unknown.${captured ? '' : ` Ended pending: ${number(point.coverage.ended_pending)}.`}`}
             {point.coverage.incomplete_bucket && ' Partial UTC bucket.'}</div>
-          <div>Explicit no-sale: {number(point.coverage.explicit_no_sale)} · bid-to: {number(point.coverage.bid_to)} · sold without supported amount: {number(point.coverage.sold_without_supported_amount)}.</div>
+          <div>Explicit no-sale: {number(point.coverage.explicit_no_sale)} · {captured
+            ? `${number(point.coverage.withdrawn)} withdrawn · ${number(point.coverage.unresolved)} unresolved`
+            : `bid-to: ${number(point.coverage.bid_to)} · sold without supported amount: ${number(point.coverage.sold_without_supported_amount)}`}.</div>
+          {captured && (point.coverage.unresolved ?? 0) > 0 && <button className="market-control k-body" onClick={() => {
+            const next: SalesDrill = { bucket: point.bucket_start, series: point.series, outcome: 'unresolved' };
+            setDrill(next); onLensChange?.({ drill: next });
+          }}>Inspect unresolved outcomes</button>}
         </div>)}
       </details>}
       {drill && !receipt.truncated && !query.isFetching && !query.isError && <div ref={evidenceRef} tabIndex={-1} aria-label="Recorded sales contributors" style={{ borderTop: '2px solid var(--border)', paddingTop: 8 }}>
         <h3 style={{ ...label, margin: '0 0 6px' }}>{day(drill.bucket)} UTC · {seriesName(drill.series, selectedName)} · contributors</h3>
-        <div style={{ fontSize: 11 }}>Showing {contributors.length}; limit {receipt.evidence.per_bucket_series_limit} per bucket and series. {receipt.evidence.has_more ? 'More contributors omitted; no pagination cursor.' : 'No contributors omitted by this read limit.'} This drill has the current read cutoff shown above.</div>
-        {contributors.length === 0 && <div role="status" style={{ fontSize: 12, padding: '6px 0' }}>No supported recorded-sale contributors in this bucket at this read.</div>}
+        {captured && <label style={label}>Outcome records<br /><select aria-label="Contributing outcome type" className="market-control k-body" value={drill.outcome ?? 'known_bidding_outcome'}
+          onChange={e => { const next: SalesDrill = { bucket: drill.bucket, series: drill.series, outcome: e.target.value as SalesOutcome }; setDrill(next); onLensChange?.({ drill: next }); }}>
+          <option value="known_bidding_outcome">Sales and no-sales</option><option value="sold">Recorded sales</option><option value="no_sale">Explicit no-sales</option><option value="withdrawn">Withdrawn</option><option value="unresolved">Unresolved</option>
+        </select></label>}
+        <div style={{ fontSize: 11 }}>Showing {captured ? `${(receipt.evidence.offset ?? 0) + (contributors.length ? 1 : 0)}–${(receipt.evidence.offset ?? 0) + contributors.length}` : contributors.length}; limit {receipt.evidence.per_bucket_series_limit} per bucket and series. {receipt.evidence.has_more ? captured ? 'More source records available.' : 'More contributors omitted; no pagination cursor.' : 'No contributors omitted by this read limit.'} This drill has the current read cutoff shown above.</div>
+        {contributors.length === 0 && <div role="status" style={{ fontSize: 12, padding: '6px 0' }}>{captured ? 'No matching outcome records in this bucket at this read.' : 'No supported recorded-sale contributors in this bucket at this read.'}</div>}
         <ol style={{ paddingLeft: 20, margin: '8px 0' }}>{contributors.map(c => <li key={c.auction_event_id} style={{ marginBottom: 8, overflowWrap: 'anywhere', fontSize: 12 }}>
-          <PrefetchLink to={`/vehicle/${c.vehicle_id}`}>Vehicle record</PrefetchLink>{' · '}
+          <PrefetchLink to={captured ? `/stacks/order-book/${c.vehicle_id}?lot=${c.auction_event_id}` : `/vehicle/${c.vehicle_id}`}>
+            {captured ? c.vehicle_identity?.make && c.vehicle_identity?.model
+              ? <VehicleIdentity year={c.vehicle_identity.year} make={c.vehicle_identity.make} model={c.vehicle_identity.model} compact scale="text" vehicleId={c.vehicle_id} />
+              : 'Auction episode' : 'Vehicle record'}
+          </PrefetchLink>{' · '}
           <a href={c.source_url} target="_blank" rel="noopener noreferrer">BaT listing ↗</a>
           <div style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)' }}>{c.source_url}</div>
+          {captured && <div style={{ fontSize: 12 }}>{c.source_outcome?.replace(/_/g, ' ') ?? 'unresolved'} · contributes {c.numerator_contribution} sold / {c.denominator_contribution} known outcome.
+            {c.outcome_class === 'unresolved' && <> {c.outcome_reason?.replace(/_/g, ' ')}.</>}</div>}
           <div style={{ fontSize: 11 }}>Recorded listing end <time dateTime={c.event_at}>{utc(c.event_at)}</time>.
             {' '}{c.source_read_basis === 'direct_fetch' || c.source_read_basis === 'cached_snapshot'
               ? c.source_observed_at ? <>Source {c.source_read_basis === 'direct_fetch' ? 'direct read' : 'cached snapshot'} <time dateTime={c.source_observed_at}>{utc(c.source_observed_at)}</time>.</> : 'Source read time unknown.'
               : 'Source read time unknown.'}
           </div>
         </li>)}</ol>
+        {captured && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {(receipt.evidence.offset ?? 0) > 0 && <button className="market-control k-body" onClick={() => {
+            const next = { ...drill, offset: Math.max(0, (receipt.evidence.offset ?? 0) - receipt.evidence.per_bucket_series_limit), snapshotHash: receipt.evidence.snapshot_hash };
+            setDrill(next); onLensChange?.({ drill: next });
+          }}>Previous source records</button>}
+          {receipt.evidence.has_more && receipt.evidence.next_offset != null && <button className="market-control k-body" onClick={() => {
+            const next = { ...drill, offset: receipt.evidence.next_offset!, snapshotHash: receipt.evidence.snapshot_hash };
+            setDrill(next); onLensChange?.({ drill: next });
+          }}>Next source records</button>}
+        </div>}
       </div>}
       <details style={{ fontSize: 11, marginTop: 8 }}>
         <summary>Method, eligibility and clocks</summary>
         <p>Recorded knowledge as of <time dateTime={receipt.knowledge_cutoff}>{utc(receipt.knowledge_cutoff)}</time>. Later arrivals can change these counts; this is a current read, not a frozen historical snapshot.</p>
         <p>{number(receipt.coverage.eligible_recorded_episodes)} captured eligible episodes · {number(receipt.coverage.unresolved_scope)} unresolved memberships excluded from both series · {number(receipt.coverage.conflicting_alias_episodes)} conflicting listing aliases.</p>
-        <p>Public, undeleted vehicle parents only. One slash-normalized BaT listing episode per count, using its recorded end time and an explicit sold outcome with supported positive amount. The denominator also contains captured non-sale, bid-to, pending and unresolved-outcome episodes assigned to this series. It is not all market inventory or an ownership-transfer count.</p>
+        <p>Public, undeleted vehicle parents only. One slash-normalized BaT listing episode per count, using its recorded end time and an explicit sold outcome with supported positive amount. {captured
+          ? 'The denominator contains supported sales and explicit reserve-not-met/no-sale outcomes. Withdrawals and unresolved outcomes are separate. Reserve policies are unstratified; this is not settlement or profit. Contributor identity describes the current parent record.'
+          : 'The denominator also contains captured non-sale, bid-to, pending and unresolved-outcome episodes assigned to this series.'} It is not all market inventory or an ownership-transfer count.</p>
         <p>{receipt.scope.comparison_basis}. {receipt.scope.comparison_scope_basis}</p>
         <p>Source reads are qualified as direct, cached or unknown. Query time and row writes are not source freshness. A future recorded result may change an ended-pending count. Full UTC days are full time buckets, not complete source capture. Condition and factory generation are unverified.</p>
       </details>
