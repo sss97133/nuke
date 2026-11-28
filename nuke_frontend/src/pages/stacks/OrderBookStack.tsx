@@ -6,13 +6,15 @@ import { useLiveLotTemperature } from '../market/useLiveLotTemperature';
 import { ORDER_BOOK_STACK, type LayerId, type StackLayer } from './stackDefinitions';
 import {
   LOT_WINDOW_DAYS, UUID_RE, depthAt, shapeOrderBook, useOrderBook,
-  type BidEvent, type CommentRow, type FoldState, type OrderBookRead, type OrderBookView,
+  type BidEvent, type FoldState, type OrderBookRead, type OrderBookView,
 } from './orderBookReader';
 import { CoverageTable, LayerPath } from './stackParts';
 import { ForecastPanel } from './ForecastPanel';
 import VehicleCohort from './VehicleCohort';
+import CommentMeasurements from './CommentMeasurements';
+import { commentParams } from './commentSurfaceReader';
 import { stackBackParams } from './bidExpression';
-import { STATE_WORD, clock, count, layerReadings, outcomeWord, span, usd } from './stackFormat';
+import { STATE_WORD, clock, count, layerReadings, outcomeWord, span, sourceAmount } from './stackFormat';
 import './stacks.css';
 
 // Stack A on one lot: /stacks/order-book/:vehicleId[?lot=<auction_event_id>&layer=<layer>&at=<bid row id>].
@@ -65,7 +67,7 @@ function LotClock({ view }: { view: OrderBookView }) {
       <div className="stack-label">The lot's life, one tick per bid</div>
       <div className="stack-clock" role="img" aria-label={`${view.bids.length} bids between the first comment held and the scheduled close`}>
         <span className="stack-clock-line" />
-        {view.bids.map((b) => <span key={b.id} className="stack-clock-tick" style={{ left: x(b.at) }} title={`${usd(b.amount)} · ${clock(b.at, true)}`} />)}
+        {view.bids.map((b) => <span key={b.id} className="stack-clock-tick" style={{ left: x(b.at) }} title={`${sourceAmount(b.amount)} · ${clock(b.at, true)}`} />)}
         {open && liveUntil != null && (<>
           <span className="stack-clock-now" style={{ left: x(liveUntil) }} title={`Read ${clock(liveUntil)}`} />
           <span className="stack-clock-now-label" style={{ left: x(liveUntil) }}>now</span>
@@ -142,7 +144,7 @@ function LogLayer({ read, view, onPickBid }: { read: OrderBookRead; view: OrderB
                   <td className="num"><button type="button" className="stack-link" onClick={() => onPickBid(s.bid.id)} aria-label={`Open the book as of bid ${s.index + 1}`}>{s.index + 1}</button></td>
                   <td className="mono">{clock(s.bid.at, true)}</td>
                   <td className="num">{s.msToClose == null ? 'unknown' : span(s.msToClose)}</td>
-                  <td className="num">{usd(s.bid.amount)}</td>
+                  <td className="num">{sourceAmount(s.bid.amount)}</td>
                   <td><IdentityName id={s.bid.identityId} handle={s.bid.handle} keyed={s.bid.keyed} /></td>
                   <td className="mono hide-narrow">{s.bid.landedAt == null ? 'unknown' : clock(s.bid.landedAt)}</td>
                   <td><a href={sourceAnchor(lotUrl, s.bid.batCommentId)} target="_blank" rel="noopener noreferrer">BaT ↗</a></td>
@@ -168,7 +170,7 @@ function LogLayer({ read, view, onPickBid }: { read: OrderBookRead; view: OrderB
                   <tr key={c.id}>
                     <td className="mono">{c.posted_at ? clock(Date.parse(c.posted_at)) : 'unknown'}</td>
                     <td>{c.comment_type ?? 'unknown'}</td>
-                    <td className="num">{c.comment_type === 'bid' && c.bid_amount != null ? usd(Number(c.bid_amount)) : ''}</td>
+                    <td className="num">{c.comment_type === 'bid' && c.bid_amount != null ? sourceAmount(Number(c.bid_amount)) : ''}</td>
                     <td className="stack-mono">{c.author_username ?? 'unknown'}</td>
                     <td><a href={sourceAnchor(c.source_url ?? lotUrl, c.bat_comment_id)} target="_blank" rel="noopener noreferrer">BaT ↗</a></td>
                   </tr>
@@ -240,7 +242,7 @@ function KeyLayer({ read, view }: { read: OrderBookRead; view: OrderBookView }) 
               <tr key={l.key}>
                 <td><IdentityName id={l.identityId} handle={l.handle} keyed={l.keyed} /></td>
                 <td className="num">{count(l.bids)}</td>
-                <td className="num">{usd(l.max)}</td>
+                <td className="num">{sourceAmount(l.max)}</td>
                 <td className="num">{close == null ? 'unknown' : span(close - l.first.at)}</td>
                 <td className="num">{close == null ? 'unknown' : span(close - l.last.at)}</td>
               </tr>
@@ -256,53 +258,6 @@ function KeyLayer({ read, view }: { read: OrderBookRead; view: OrderBookView }) 
           <LotKey label="Winner" text={lot.winning_bidder} id={lot.winning_bidder_external_identity_id} read={read} />
         </tbody>
       </table>
-    </>
-  );
-}
-
-// --- Dimension -----------------------------------------------------------------------------------------------------
-
-function DimensionLayer({ read, view }: { read: OrderBookRead; view: OrderBookView }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const total = view.partition.inWindow.length;
-  const rowsOf = (kind: string): CommentRow[] => view.partition.inWindow
-    .filter((c) => (c.comment_type || 'unknown') === kind)
-    .sort((a, b) => Date.parse(a.posted_at ?? '') - Date.parse(b.posted_at ?? ''));
-  return (
-    <>
-      <p className="stack-note">
-        {count(total)} rows keyed to this lot inside its window, by the kind the comment builder wrote. That rule is mechanical
-        (an amount makes a bid, the seller's name a seller response, a question mark a question); it does not read stance.
-      </p>
-      <table className="stack-table">
-        <thead><tr><th scope="col">Kind as written</th><th scope="col" className="num">Rows</th><th scope="col" className="num">Of rows in window</th></tr></thead>
-        <tbody>
-          {view.kinds.map((k) => (
-            <tr key={k.kind} aria-selected={open === k.kind}>
-              <td><button type="button" className="stack-link" aria-expanded={open === k.kind} onClick={() => setOpen(open === k.kind ? null : k.kind)}>{k.kind.replace(/_/g, ' ')}</button></td>
-              <td className="num">{count(k.count)}</td>
-              <td className="num">{count(k.count)} / {count(total)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {open && (
-        <div className="stack-scroll" style={{ marginTop: 8 }}>
-          <table className="stack-table">
-            <thead><tr><th scope="col">Posted</th><th scope="col">Author</th><th scope="col">Text</th><th scope="col">Source</th></tr></thead>
-            <tbody>
-              {rowsOf(open).map((c) => (
-                <tr key={c.id}>
-                  <td className="mono">{c.posted_at ? clock(Date.parse(c.posted_at), true) : 'unknown'}</td>
-                  <td>{c.external_identity_id ? <Link to={`/profile/external/${c.external_identity_id}`} className="stack-mono">{read.identities[c.external_identity_id]?.handle ?? c.author_username}</Link> : <span className="stack-mono">{c.author_username ?? 'unknown'}</span>}</td>
-                  <td>{c.comment_type === 'bid' && c.bid_amount != null ? usd(Number(c.bid_amount)) : (c.comment_text ?? '').slice(0, 280) || <span className="stack-basis">no text</span>}</td>
-                  <td><a href={sourceAnchor(c.source_url ?? read.lot!.source_url, c.bat_comment_id)} target="_blank" rel="noopener noreferrer">BaT ↗</a></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </>
   );
 }
@@ -340,16 +295,16 @@ function BidPathChart({ states, selected, onSelect }: { states: FoldState[]; sel
       <svg className="stack-chart" viewBox={`0 0 ${W} ${H}`} role="group" aria-label="Bids in posted order; choose one to see the book as of that bid">
         <line className="grid" x1={PAD.l} x2={W - PAD.r} y1={y(hi)} y2={y(hi)} />
         <line className="grid" x1={PAD.l} x2={W - PAD.r} y1={y(lo)} y2={y(lo)} />
-        <text x={PAD.l - 6} y={y(hi) + 4} textAnchor="end">{usd(hi)}</text>
-        {hi !== lo && <text x={PAD.l - 6} y={y(lo) + 4} textAnchor="end">{usd(lo)}</text>}
+        <text x={PAD.l - 6} y={y(hi) + 4} textAnchor="end">{sourceAmount(hi)}</text>
+        {hi !== lo && <text x={PAD.l - 6} y={y(lo) + 4} textAnchor="end">{sourceAmount(lo)}</text>}
         <path className="path" d={path} />
         {states.map((s, i) => (
           <g key={s.bid.id} role="button" tabIndex={i === selected ? 0 : -1} aria-pressed={i === selected}
-            aria-label={`Bid ${i + 1}: ${usd(s.bid.amount)} by ${s.bid.handle}, ${clock(s.bid.at, true)}`}
+            aria-label={`Bid ${i + 1}: ${sourceAmount(s.bid.amount)} by ${s.bid.handle}, ${clock(s.bid.at, true)}`}
             onClick={() => onSelect(i)} onKeyDown={(e) => key(e, i)}>
             <circle cx={x(i)} cy={y(s.bid.amount)} r={10} fill="transparent" />
             <circle cx={x(i)} cy={y(s.bid.amount)} r={i === selected ? 5 : 3} className={i === selected ? 'pt-on' : i < selected ? 'pt' : 'pt-future'} />
-            <title>{`Bid ${i + 1} · ${usd(s.bid.amount)} · ${s.bid.handle} · ${clock(s.bid.at, true)}`}</title>
+            <title>{`Bid ${i + 1} · ${sourceAmount(s.bid.amount)} · ${s.bid.handle} · ${clock(s.bid.at, true)}`}</title>
           </g>
         ))}
         <text x={x(0)} y={H - 10} textAnchor="start">bid 1{states[0].msToClose != null ? ` · ${span(states[0].msToClose)} before close` : ''}</text>
@@ -374,16 +329,16 @@ function DemandCurve({ state, states }: { state: FoldState; states: FoldState[] 
     <figure style={{ margin: 0 }}>
       <figcaption className="stack-label">Revealed demand · identities with a bid at or above each price</figcaption>
       <svg className="stack-chart" viewBox={`0 0 ${W} ${H}`} role="img"
-        aria-label={`Demand curve as of bid ${state.index + 1}: ${m} entries from ${usd(book[m - 1].max)} to ${usd(book[0].max)}`}>
+        aria-label={`Demand curve as of bid ${state.index + 1}: ${m} entries from ${sourceAmount(book[m - 1].max)} to ${sourceAmount(book[0].max)}`}>
         <line className="grid" x1={PAD.l} x2={W - PAD.r} y1={H - PAD.b} y2={H - PAD.b} />
-        <text x={PAD.l - 6} y={y(hi) + 4} textAnchor="end">{usd(hi)}</text>
-        {hi !== lo && <text x={PAD.l - 6} y={y(lo) + 4} textAnchor="end">{usd(lo)}</text>}
+        <text x={PAD.l - 6} y={y(hi) + 4} textAnchor="end">{sourceAmount(hi)}</text>
+        {hi !== lo && <text x={PAD.l - 6} y={y(lo) + 4} textAnchor="end">{sourceAmount(lo)}</text>}
         <path className="curve" d={d} />
         {labelled && book.map((e, j) => (
           <text key={e.key} x={(x(j) + x(j + 1)) / 2} y={y(e.max) - 6} textAnchor="middle">{e.handle.slice(0, 14)}</text>
         ))}
         <text x={x(0)} y={H - 10} textAnchor="start">0</text>
-        <text x={x(m)} y={H - 10} textAnchor="end">{m} at or above {usd(book[m - 1].max)}</text>
+        <text x={x(m)} y={H - 10} textAnchor="end">{m} at or above {sourceAmount(book[m - 1].max)}</text>
       </svg>
     </figure>
   );
@@ -407,7 +362,7 @@ export function FoldLayer({ view, selected, onSelect, compact = false, sourceUrl
         <span><span className="stack-label">As of bid</span> <span className="stack-mono">{s.index + 1} of {states.length}</span></span>
         <span className="stack-mono">{clock(s.bid.at, true)}</span>
         <span><span className="stack-label">Before close</span> <span className="stack-mono">{s.msToClose == null ? 'unknown' : span(s.msToClose)}</span></span>
-        <span><span className="stack-label">Price</span> <span className="stack-mono">{usd(s.price)}</span></span>
+        <span><span className="stack-label">Price</span> <span className="stack-mono">{sourceAmount(s.price)}</span></span>
         <span><span className="stack-label">Identities revealed</span> <span className="stack-mono">{count(s.identities)}</span>
           {s.unresolved > 0 && <span className="stack-basis"> + {count(s.unresolved)} unkeyed bids</span>}</span>
         {selected !== states.length - 1 && <button type="button" onClick={() => onSelect(states.length - 1)} style={{ minWidth: 60 }}>Latest</button>}
@@ -415,14 +370,14 @@ export function FoldLayer({ view, selected, onSelect, compact = false, sourceUrl
       <label className="stack-scrubber">
         <span className="stack-label">Replay received bids</span>
         <input type="range" min={0} max={states.length - 1} value={selected} disabled={states.length === 1}
-          aria-label="Replay received bids" aria-valuetext={`Bid ${selected + 1} of ${states.length}: ${usd(s.price)}`}
+          aria-label="Replay received bids" aria-valuetext={`Bid ${selected + 1} of ${states.length}: ${sourceAmount(s.price)}`}
           onChange={(e) => onSelect(Number(e.target.value))} />
         <span className="stack-mono">{selected + 1} / {states.length}</span>
       </label>
       <div className="stack-event-flow" aria-label="Selected bid and its effect on the book">
         <div>
           <span className="stack-label">Source bid</span>
-          <strong className="stack-event-value">{usd(s.bid.amount)}</strong>
+          <strong className="stack-event-value">{sourceAmount(s.bid.amount)}</strong>
           {sourceUrl && <a href={sourceAnchor(sourceUrl, s.bid.batCommentId)} target="_blank" rel="noopener noreferrer">Bid at source ↗</a>}
         </div>
         <div>
@@ -432,8 +387,8 @@ export function FoldLayer({ view, selected, onSelect, compact = false, sourceUrl
         </div>
         <div>
           <span className="stack-label">Book after this bid</span>
-          <strong className="stack-event-value">{usd(s.price)}</strong>
-          <span className="stack-basis">{previous ? `${usd(s.price - previous.price)} change in the high bid` : 'First received bid'} · {count(s.identities)} keyed of {count(s.book.length)} book entries</span>
+          <strong className="stack-event-value">{sourceAmount(s.price)}</strong>
+          <span className="stack-basis">{previous ? `${sourceAmount(s.price - previous.price)} change in the high bid` : 'First received bid'} · {count(s.identities)} keyed of {count(s.book.length)} book entries</span>
         </div>
       </div>
       <div className="stack-fold-grid">
@@ -455,10 +410,10 @@ export function FoldLayer({ view, selected, onSelect, compact = false, sourceUrl
             <tr key={e.key} aria-selected={e.bidId === s.bid.id}>
               <td className="num">{depthAt(s.book, e.max)}</td>
               <td><IdentityName id={e.identityId} handle={e.handle} keyed={Boolean(e.identityId)} /></td>
-              <td className="num">{usd(e.max)}</td>
+              <td className="num">{sourceAmount(e.max)}</td>
               <td className="num hide-narrow">{view.window.closeAt == null ? 'unknown' : span(view.window.closeAt - e.at)}</td>
               <td className="num">{count(e.bids)}</td>
-              <td className="hide-narrow"><span className="stack-ladder-bar" style={{ width: `${top > 0 ? (100 * e.max) / top : 0}%` }} title={`${usd(e.max)} of ${usd(top)}`} /></td>
+              <td className="hide-narrow"><span className="stack-ladder-bar" style={{ width: `${top > 0 ? (100 * e.max) / top : 0}%` }} title={`${sourceAmount(e.max)} of ${sourceAmount(top)}`} /></td>
             </tr>
           ))}
         </tbody>
@@ -519,8 +474,8 @@ function OutcomeLayer({ read, view }: { read: OrderBookRead; view: OrderBookView
     <table className="stack-table">
       <tbody>
         <tr><td>Result</td><td>{outcomeWord(lot, false)}</td></tr>
-        <tr><td>Hammer</td><td className="stack-mono">{lot.winning_bid != null ? `${usd(Number(lot.winning_bid))} (buyer fee excluded)` : 'none recorded'}</td></tr>
-        <tr><td>High bid as recorded</td><td className="stack-mono">{lot.high_bid != null ? usd(Number(lot.high_bid)) : 'not recorded'}</td></tr>
+        <tr><td>Recorded winning bid</td><td className="stack-mono">{lot.winning_bid != null ? `${sourceAmount(Number(lot.winning_bid))} (fee basis unestablished)` : 'none recorded'}</td></tr>
+        <tr><td>High bid as recorded</td><td className="stack-mono">{lot.high_bid != null ? sourceAmount(Number(lot.high_bid)) : 'not recorded'}</td></tr>
         <tr><td>Winner</td><td>{winner && lot.winning_bidder_external_identity_id
           ? <Link to={`/profile/external/${lot.winning_bidder_external_identity_id}`} className="stack-mono">{winner.handle}</Link>
           : <span className="stack-mono">{lot.winning_bidder ?? 'not recorded'}{lot.winning_bidder ? ' (not keyed)' : ''}</span>}</td></tr>
@@ -617,12 +572,15 @@ export default function OrderBookStack() {
           <span className="stack-label">Lots on this vehicle</span>
           {read.lots.map((l) => (
             <button key={l.id} type="button" className="stack-chip" aria-pressed={l.id === lot.id}
-              onClick={() => { const next = new URLSearchParams(params); next.set('lot', l.id); next.delete('at'); setParams(next); }}>
+              onClick={() => { const next = new URLSearchParams(params); next.set('lot', l.id); next.delete('at');
+                setParams(commentParams(next,{evidence_filter:'all_discussion'})); }}>
               {l.auction_end_date ? new Date(l.auction_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) : 'no close'} · {l.outcome ?? 'unknown'}
             </button>
           ))}
         </div>
       )}
+
+      <p className="stack-note" data-source-amount-basis>This lot’s bid and result amounts are numeric source values. Currency and fee basis are not established by this reader.</p>
 
       <VehicleCohort key={lot.id} read={read} />
 
@@ -636,7 +594,7 @@ export default function OrderBookStack() {
         <LayerHead layer={current} index={layerIndex}>
           {layer === 'log' && <LogLayer read={read} view={view} onPickBid={pickBidFromLog} />}
           {layer === 'key' && <KeyLayer read={read} view={view} />}
-          {layer === 'dimension' && (<><DimensionLayer read={read} view={view} /><MissingNote layer={current} name="Stance" tail="No comment is labelled with a stance." /></>)}
+          {layer === 'dimension' && (<><CommentMeasurements key={lot.id} vehicleId={read.vehicle.id} lotId={lot.id} closeAt={lot.auction_end_date} /><MissingNote layer={current} name="Stance" tail="No comment is labelled with a stance." /></>)}
           {layer === 'fold' && <FoldLayer view={view} selected={selected} onSelect={selectBid} sourceUrl={lot.source_url} />}
           {layer === 'baseline' && <BaselineLayer applies={baselineApplies} temperature={temperature} layer={current} />}
           {(layer === 'residual' || layer === 'feature' || layer === 'prediction') && <MissingNote layer={current} />}

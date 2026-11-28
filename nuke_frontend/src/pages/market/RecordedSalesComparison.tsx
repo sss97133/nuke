@@ -214,7 +214,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
           style={{ minWidth: 0, overflowX: 'auto' }}>
         <div style={{ display: 'grid', gap: 8, minWidth: Math.max(280, buckets.length * 70) }}>
         {(showBenchmark ? ['selected', 'benchmark'] as const : ['selected'] as const).map(series => <div key={series}>
-          <div style={{ ...label, marginBottom: 4 }}>{seriesName(series, selectedName, captured)}</div>
+          <div className="sales-count-series-label" style={{ ...label, marginBottom: 4 }}>{seriesName(series, selectedName, captured)}</div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, minmax(0, 1fr))`, gap: 2 }}>
             {buckets.map(bucket => {
               const point = receipt.series.find(p => p.bucket_start === bucket && p.series === series);
