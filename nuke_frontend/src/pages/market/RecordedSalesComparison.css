@@ -62,3 +62,15 @@ select.market-control { padding-right: 24px; }
 @media (max-width: 760px) {
   .market-scope__views[aria-label="Market view"] > button { min-height: 44px; }
 }
+
+.market-descriptive-scope { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 100%; flex: 1 1 240px; font: 14px var(--font-family); }
+.market-descriptive-scope > label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.market-descriptive-scope select { min-height: 44px; max-width: 100%; width: 100%; white-space: normal; }
+.market-descriptive-scope__note { font-size: 12px; white-space: normal; }
+.market-descriptive-scope summary { cursor: pointer; white-space: normal; }
+.market-descriptive-scope__records { max-height: 360px; max-width: 100%; overflow: auto; }
+.market-descriptive-scope__records table { min-width: 640px; width: 100%; border-collapse: collapse; font-size: 12px; }
+.market-descriptive-scope__records caption { padding: 8px 0; text-align: left; }
+.market-descriptive-scope__records th,.market-descriptive-scope__records td { padding: 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); white-space: normal; }
+.market-descriptive-scope__records code { overflow-wrap: anywhere; }
+.market-descriptive-scope :is(select,button,summary,[tabindex]):focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }

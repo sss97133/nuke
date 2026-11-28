@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Text } from '../../kit';
-import { matchSalesMake, recordedSalesRequest, recordedSalesWindow, useRecordedSales, useSalesScopes,
-  type SalesDrill, type SalesMetric, type SalesOutcome, type SalesPoint, type SalesSeries } from './useRecordedSales';
+import { matchSalesMake, recordedSalesRequest, recordedSalesWindow, useRecordedSales, useSalesScopes, useDescriptiveSalesScopes,
+  type SalesDrill, type SalesMetric, type SalesOutcome, type SalesPoint, type SalesSeries, type SalesScopeOption } from './useRecordedSales';
 import './RecordedSalesComparison.css';
 
 const label: React.CSSProperties = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 };
@@ -40,6 +40,46 @@ function CountBucket({ point, name, max, refused, active, onClick, captured = fa
   </div>;
 }
 
+/** Displays SQL-admitted catalog representatives; the rule table preserves all candidate keys and reasons. */
+function DescriptiveGroupControl({catalog,makeOption,selectedKey,onSelect}:{
+  catalog:ReturnType<typeof useDescriptiveSalesScopes>;makeOption:SalesScopeOption|undefined;
+  selectedKey:string|null;onSelect:(key:string)=>void;
+}){
+  if(!makeOption)return null;
+  const options=!catalog.isError?catalog.data?.options??[]:[];
+  const selected=selectedKey?.startsWith('descriptive:')?selectedKey:'';
+  const missing=Boolean(selected&&!options.some(option=>option.key===selected));
+  return <div className="market-descriptive-scope">
+    <label><Text role="label">Recorded model / year</Text>
+      <select aria-label="Recorded model and year group" className="market-control k-body" value={selected}
+        disabled={catalog.isPending||catalog.isFetching||catalog.isError}
+        onChange={event=>onSelect(event.target.value||makeOption.key)}>
+        <option value="">{selectedKey?.startsWith('subject:')?'Choose a recorded model/year group':`All ${makeOption.make} records`}</option>
+        {missing&&<option value={selected} disabled>Requested group · {catalog.isPending?'reading catalog':'unavailable'}</option>}
+        {options.map(option=><option key={option.key} value={option.key}>{option.label}</option>)}
+      </select>
+    </label>
+    {catalog.isPending&&<span role="status">Reading registered model/year groups…</span>}
+    {catalog.isError&&<span role="status">Model/year groups could not be read. <button type="button" className="market-control" onClick={()=>void catalog.refetch()}>Retry model/year groups</button></span>}
+    {!catalog.isPending&&!catalog.isError&&options.length===0&&<span className="market-descriptive-scope__note">No registered model/year group is admitted in this catalog. This does not measure auction activity.</span>}
+    {catalog.data&&!catalog.isError&&catalog.data.rules.length>0&&<details>
+      <summary>Group definitions and admission</summary>
+      <button type="button" className="market-control" disabled={catalog.isFetching} onClick={()=>void catalog.refetch()}>Refresh group definitions</button>
+      <div className="market-descriptive-scope__records" tabIndex={0} role="region" aria-label="Registered group definitions; scroll horizontally">
+        <table><caption>Current registry candidates and PostgreSQL admission decisions</caption>
+          <thead><tr><th scope="col">Registered label</th><th scope="col">Year scope</th><th scope="col">SQL decision</th><th scope="col">Record keys</th></tr></thead>
+          <tbody>{catalog.data.rules.map(row=><tr key={row.subject_id} data-scope-rule-id={row.subject_id}>
+            <td>{row.registered_model_label??'Label unknown'}{row.registered_model_label!==row.canonical_model&&row.canonical_model&&<> → {row.canonical_model}</>}</td>
+            <td>{row.grain==='year'?row.year??'unknown':row.grain==='model'?`${row.year_start??'unknown'} to ${row.year_end??'unknown'}`:row.grain??'unknown'}</td>
+            <td>{row.state} · {row.reason.replace(/_/g,' ')}{row.state==='admitted'&&<><br/>{row.equivalent_catalog_subjects} equivalent registry subject{row.equivalent_catalog_subjects===1?'':'s'} in this catalog</>}</td>
+            <td><details><summary>Registry keys</summary><code>Subject {row.subject_id}<br/>Model {row.canonical_model_id??'unresolved'}<br/>Catalog representative {row.catalog_subject_id??'unavailable'}</code></details></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </details>}
+  </div>;
+}
+
 /** The cohort select and the view pair for the market strip. Driven by the URL through its props; no state of its own. */
 export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onViewChange, children, makeSelect = true }: {
   make: string | null; scopeKey: string | null; view: 'inventory' | 'sales';
@@ -49,13 +89,17 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
   makeSelect?: boolean;
 }) {
   const catalog = useSalesScopes();
-  const options = catalog.data ?? [];
+  const baseOptions = catalog.data ?? [];
+  const makeOption = matchSalesMake(baseOptions,make);
+  const descriptive = useDescriptiveSalesScopes(makeOption?.make??null,view==='sales'&&makeSelect);
+  const options = [...baseOptions,...(!descriptive.isError?descriptive.data?.options??[]:[])];
   const chosenOption = options.find(o => o.key === scopeKey);
   const option = view === 'sales' && scopeKey != null
     ? chosenOption?.make.toUpperCase() === make?.toUpperCase() ? chosenOption : undefined
     : matchSalesMake(options, make);
   // A stored inventory label may have no unique registry entry; preserve that scope in the control.
-  const unmatchedMake = make && !option ? make : null;
+  const unmatchedMake = make && !makeOption ? make : null;
+  const makeSelectKey = option?.scope.kind==='descriptive_subject'?makeOption?.key:option?.key;
   return <>
     <div role="group" aria-label="Market view" className="market-scope__views">
       {(['inventory', 'sales'] as const).map(mode => <button key={mode} type="button" className="market-control"
@@ -65,7 +109,7 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
       {children}
     </div>
     {makeSelect && <label className="market-scope__cohort"><Text role="label">Make</Text>
-      <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
+      <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={makeSelectKey ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
         onChange={e => onMakeChange(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null)}>
         <option value="">{view === 'inventory' ? 'All makes' : 'Choose a make or grouping'}</option>
         {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}
@@ -73,6 +117,8 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
         {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
       </select>
     </label>}
+    {makeSelect&&view==='sales'&&<DescriptiveGroupControl catalog={descriptive} makeOption={makeOption} selectedKey={scopeKey}
+      onSelect={key=>onMakeChange(options.find(option=>option.key===key)?.make??makeOption?.make??null,key)}/>}
   </>;
 }
 
@@ -105,23 +151,31 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   const countsRef = useRef<HTMLDivElement>(null);
   const eventWindowRef = useRef<HTMLSelectElement>(null);
   const focusEvidence = useRef(false);
-  const options = catalog.data ?? [];
+  const baseOptions = catalog.data ?? [];
   // Porsche is the owner's initial comparison case; its ID still comes from the public registry.
   const requestedMake = onMakeChange ? make : make ?? 'PORSCHE';
+  const makeOption = matchSalesMake(baseOptions,requestedMake);
+  const descriptive = useDescriptiveSalesScopes(makeOption?.make??null,view==='sales');
+  const options = [...baseOptions,...(!descriptive.isError?descriptive.data?.options??[]:[])];
   const chosenOption = options.find(o => o.key === chosen);
   const option = view === 'sales' && chosen != null
     ? chosenOption?.make.toUpperCase() === requestedMake?.toUpperCase() ? chosenOption : undefined
     : matchSalesMake(options, requestedMake);
   // A stored inventory label may have no unique registry entry; preserve that scope in the control.
-  const unmatchedMake = requestedMake && !option ? requestedMake : null;
-  const request = useMemo(() => option && view === 'sales' ? recordedSalesRequest(option.scope, window, drill, metric) : null, [option, window, drill, view, metric]);
+  const unmatchedMake = requestedMake && !makeOption ? requestedMake : null;
+  const makeSelectKey = option?.scope.kind==='descriptive_subject'?makeOption?.key:option?.key;
+  const descriptiveNeedsMetric = option?.scope.kind==='descriptive_subject'&&!captured;
+  const selectedDescriptive = chosen?.startsWith('descriptive:')??false;
+  const request = useMemo(() => option && view === 'sales' && !descriptiveNeedsMetric ? recordedSalesRequest(option.scope, window, drill, metric) : null, [option, window, drill, view, metric, descriptiveNeedsMetric]);
   const query = useRecordedSales(request);
-  const response = option && view === 'sales' ? query.data : undefined;
+  const response = request ? query.data : undefined;
   const receipt = response?.state === 'partial' && response.metric_id === metric ? response : undefined;
   const buckets = [...new Set(receipt?.series.map(p => p.bucket_start) ?? [])].sort();
   const max = captured ? 1 : Math.max(1, ...receipt?.series.filter(p => showBenchmark || p.series === 'selected').map(p => p.value ?? 0) ?? []);
   const summary = receipt?.summary?.find(s => s.series === 'selected');
-  const selectedName = option?.label ?? receipt?.scope.label ?? 'Selected scope';
+  const receiptName = receipt?.scope.kind==='descriptive_subject'
+    ? `${receipt.scope.label??'Recorded model'} · ${receipt.scope.grain==='year'?`${receipt.scope.year} model year`:'registered model group'}` : receipt?.scope.label;
+  const selectedName = (receipt?.scope.kind==='descriptive_subject'?receiptName:option?.label??receiptName) ?? 'Selected scope';
   const contributors = (receipt?.evidence.contributors ?? []).filter(c => drill
     && c.series === drill.series && day(c.bucket_start) === day(drill.bucket));
   useEffect(() => {
@@ -153,7 +207,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     </div>}
     <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap', marginBottom: 8 }}>
       {controls && <label style={{ ...label, minWidth: 0, maxWidth: '100%' }}>{onMakeChange ? 'Market cohort' : 'Recorded sales scope'}<br />
-        <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
+        <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={makeSelectKey ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
           onChange={e => { setChosen(e.target.value || null); setDrill(null); onMakeChange?.(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null); }}>
           <option value="">{onMakeChange ? 'All makes · live inventory' : 'Choose a registered make or supported grouping'}</option>
           {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}
@@ -161,6 +215,8 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
           {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
         </select>
       </label>}
+      {controls&&view==='sales'&&<DescriptiveGroupControl catalog={descriptive} makeOption={makeOption} selectedKey={chosen}
+        onSelect={key=>{setChosen(key);setDrill(null);onMakeChange?.(options.find(option=>option.key===key)?.make??makeOption?.make??null,key);}}/>}
       {view === 'sales' && <label style={label}>Measure<br /><select aria-label="Market outcome measure" className="market-control k-body" value={metric}
         onChange={e => { const next = e.target.value as SalesMetric; setMetric(next); setDrill(null); setWeeksBack(0);
           onLensChange?.({ metric: next, weeksBack: 0, drill: null }); }}>
@@ -185,10 +241,12 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     </div>}
     {catalog.isError ? <div role="status">The scope registry could not be read. <button className="market-control k-body" onClick={() => void catalog.refetch()}>Retry scope registry</button></div>
       : catalog.isLoading ? <div role="status">Reading the public scope registry…</div>
+      : selectedDescriptive&&!option&&view==='sales' ? <div role="status">{descriptive.isPending?'Reading the requested model/year group…':descriptive.isError?'The requested group catalog could not be read. No make population is substituted.':'The requested group is not admitted in the current catalog. Choose a group or inspect its registry decision.'}</div>
       : !option && view === 'sales' ? <div role="status">{make ? `No unique registered make matches ${make}. ` : ''}Choose a registered make or grouping to compare its recorded sales with the rest of BaT.</div> : null}
-    {option && view === 'sales' && query.isFetching && <div role="status">Reading recorded outcomes{drill ? ' and bucket contributors' : ''}…</div>}
-    {option && view === 'sales' && query.isError && <div role="status">Recorded outcomes could not be refreshed.{receipt ? ' The previous read remains below.' : ''} <button className="market-control k-body" onClick={() => void query.refetch()}>Retry recorded outcomes</button></div>}
-    {response?.state === 'unavailable' && <div role="status">This comparison is unavailable: {response.reason.replace(/_/g, ' ')}. Missing coverage is not zero demand.</div>}
+    {descriptiveNeedsMetric&&view==='sales'&&<div role="status">Recorded model/year groups currently measure captured sell-through. <button type="button" className="market-control" onClick={()=>{setMetric('captured_sell_through');setDrill(null);setWeeksBack(0);onLensChange?.({metric:'captured_sell_through',weeksBack:0,drill:null});}}>Show captured sell-through</button></div>}
+    {request && view === 'sales' && query.isFetching && <div role="status">Reading recorded outcomes{drill ? ' and bucket contributors' : ''}…</div>}
+    {request && view === 'sales' && query.isError && <div role="status">Recorded outcomes could not be refreshed.{receipt ? ' The previous read remains below.' : ''} <button className="market-control k-body" onClick={() => void query.refetch()}>Retry recorded outcomes</button></div>}
+    {response?.state === 'unavailable' && <div role="status">This comparison is unavailable: {response.reason.replace(/_/g, ' ')}{response.scope_admission?.reason?` (${response.scope_admission.reason.replace(/_/g,' ')})`:''}. Missing coverage is not zero demand.</div>}
     {drill && <button className="market-control k-body" onClick={() => {
       (countsRef.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]:not(:disabled)') ?? eventWindowRef.current)?.focus();
       setDrill(null); onLensChange?.({ drill: null });
@@ -200,6 +258,9 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
       {captured && summary && !receipt.truncated && <p style={{ fontSize: 14, margin: '8px 0' }}>
         {selectedName}: {percent(summary.ratio)} recorded sold · {number(summary.numerator)}/{number(summary.denominator)} known bidding outcomes.
         {' '}{number(summary.withdrawn)} withdrawn · {number(summary.unresolved)} unresolved.
+      </p>}
+      {captured&&receipt.scope.kind==='descriptive_subject'&&!receipt.truncated&&(receipt.coverage.unresolved_scope??0)>0&&<p className="market-descriptive-scope__note">
+        {number(receipt.coverage.unresolved_scope)} captured episodes have unresolved group membership and are excluded from both series. An unknown fraction can reflect missing or ambiguous model records.
       </p>}
       {receipt.truncated ? <div role="status" style={{ fontSize: 12, padding: '8px 0' }}>
         Candidate limit exceeded ({number(receipt.captured_candidates)} captured; limit {number(receipt.candidate_limit)}). Counts, denominators, ratios and changes are refused. Choose a shorter window.

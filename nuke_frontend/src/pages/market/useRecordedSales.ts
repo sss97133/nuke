@@ -5,8 +5,22 @@ export type SalesSeries = 'selected' | 'benchmark';
 export type SalesMetric = 'recorded_sale_events' | 'captured_sell_through';
 export type SalesOutcome = 'known_bidding_outcome' | 'sold' | 'no_sale' | 'withdrawn' | 'unresolved';
 export type SalesScope = { kind: 'canonical_make'; canonical_make_id: string }
-  | { kind: 'supported_subject'; subject_id: string };
-export interface SalesScopeOption { key: string; label: string; make: string; scope: SalesScope }
+  | { kind: 'supported_subject'; subject_id: string }
+  | { kind: 'descriptive_subject'; subject_id: string };
+export interface SalesScopeOption { key: string; label: string; make: string; scope: SalesScope;
+  descriptive?: { model: string; grain: 'year' | 'model'; year: number | null; yearStart: number | null; yearEnd: number | null } }
+export interface DescriptiveScopeRule {
+  subject_id: string; canonical_make: string | null; canonical_model: string | null; grain: string | null;
+  year: number | null; year_start: number | null; year_end: number | null; canonical_model_id: string | null;
+  comparison_scope_status: string | null; admission_purpose: 'captured_sell_through_descriptive';
+  membership_method: string | null; state: 'admitted' | 'unavailable'; reason: string;
+  registered_model_label: string | null; catalog_subject_id: string | null; equivalent_catalog_subjects: number;
+}
+export interface DescriptiveScopeCatalog { candidateCount: number; options: SalesScopeOption[]; rules: DescriptiveScopeRule[] }
+const SCOPE_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SCOPE_PURPOSE='captured_sell_through_descriptive';
+const SCOPE_METHOD='unique_exact_registered_model_alias_with_declared_year_scope_v1';
+
 export interface SalesWindow { event_from: string; event_to: string }
 export interface SalesDrill { bucket: string; series: SalesSeries; offset?: number; snapshotHash?: string; outcome?: SalesOutcome }
 export interface SalesRequest extends SalesWindow {
@@ -42,7 +56,8 @@ export interface RecordedSalesReceipt extends SalesWindow {
   contract_version: number; metric_id: string; state: 'partial'; reason: string;
   unit?: string; method_id?: string; method_version?: number;
   scope: { kind?: SalesScope['kind']; canonical_make_id?: string; subject_id?: string;
-    label?: string; comparison_basis?: string; comparison_scope_basis?: string };
+    label?: string; comparison_basis?: string; comparison_scope_basis?: string; grain?: string; year?: number|null;
+    year_start?: number|null; year_end?: number|null; canonical_model_id?: string; membership_method?: string; admission_purpose?: string };
   knowledge_cutoff: string; knowledge_mode: string; generated_at: string;
   candidate_limit: number; captured_candidates: number; truncated: boolean;
   coverage: {
@@ -56,7 +71,8 @@ export interface RecordedSalesReceipt extends SalesWindow {
     snapshot_hash?: string; offset?: number; next_offset?: number | null; outcome_filter?: SalesOutcome;
     contributors: SalesContributor[] };
 }
-export type SalesResponse = RecordedSalesReceipt | { state: 'unavailable'; reason: string };
+export type SalesResponse = RecordedSalesReceipt | { state: 'unavailable'; reason: string;
+  scope_admission?: { subject_id: string; state: string; reason: string; admission_purpose: string } };
 
 /** Full UTC days: today is excluded, so even seven days stays within the RPC's limit. */
 export function recordedSalesWindow(days: 2 | 7, now = Date.now(), weeksBack = 0): SalesWindow {
@@ -107,10 +123,76 @@ export async function fetchSalesScopes(): Promise<SalesScopeOption[]> {
   return options;
 }
 
+/** Candidate collection is bounded to one selected make; PostgreSQL supplies admission and alias folding. */
+export async function fetchDescriptiveSalesScopes(make: string, signal?: AbortSignal): Promise<DescriptiveScopeCatalog> {
+  const fail=(): never=>{throw new Error('Incomplete or unsupported descriptive scope catalog');};
+  if (!make.trim()) return fail();
+  const literalMake=make.replace(/[\\%_]/g,'\\$&');
+  let candidates=supabase.from('make_model_profiles').select('subject_id',{count:'exact'})
+    .ilike('canonical_make',literalMake).in('grain',['year','model']).order('subject_id').limit(1001);
+  if(signal)candidates=candidates.abortSignal(signal);
+  const source=await candidates;
+  if(source.error)throw source.error;
+  if(!Array.isArray(source.data)||source.count===null||source.count!==source.data.length||source.count>1000)return fail();
+  const ids:string[]=source.data.map(row=>row.subject_id);
+  if(ids.some(id=>typeof id!=='string'||!SCOPE_UUID.test(id))||new Set(ids).size!==ids.length)return fail();
+  if(ids.length===0)return {candidateCount:0,options:[],rules:[]};
+  let call=supabase.rpc('cohort_scope_rule',{p_subject_ids:ids,p_purpose:SCOPE_PURPOSE});
+  if(signal)call=call.abortSignal(signal);
+  const {data,error}=await call;if(error)throw error;
+  if(!Array.isArray(data)||data.length!==ids.length)return fail();
+  const rows=data as DescriptiveScopeRule[],requested=new Set(ids),seen=new Set<string>();
+  const nullableText=(value:unknown)=>value===null||typeof value==='string';
+  const nullableYear=(value:unknown)=>value===null||typeof value==='number'&&Number.isSafeInteger(value);
+  for(const row of rows){
+    if(!row||typeof row!=='object'||!requested.has(row.subject_id)||seen.has(row.subject_id)||row.admission_purpose!==SCOPE_PURPOSE
+      ||!['admitted','unavailable'].includes(row.state)||typeof row.reason!=='string'||!row.reason
+      ||![row.canonical_make,row.canonical_model,row.grain,row.canonical_model_id,row.comparison_scope_status,row.registered_model_label].every(nullableText)
+      ||![row.year,row.year_start,row.year_end].every(nullableYear))return fail();
+    seen.add(row.subject_id);
+    if(row.state==='admitted'){
+      if(!row.canonical_make||row.canonical_make.toUpperCase()!==make.toUpperCase()||!row.canonical_model
+        ||!row.registered_model_label||!row.canonical_model_id||!SCOPE_UUID.test(row.canonical_model_id)||!['year','model'].includes(row.grain??'')
+        ||row.membership_method!==SCOPE_METHOD||!row.catalog_subject_id||!requested.has(row.catalog_subject_id)
+        ||!Number.isSafeInteger(row.equivalent_catalog_subjects)||row.equivalent_catalog_subjects<1||row.equivalent_catalog_subjects>ids.length
+        ||row.grain==='year'&&(row.year===null||row.year_start!==null||row.year_end!==null)
+        ||row.grain==='model'&&row.year!==null)return fail();
+    }else if(row.catalog_subject_id!==null||row.equivalent_catalog_subjects!==0||row.membership_method!==null)return fail();
+  }
+  const byId=new Map(rows.map(row=>[row.subject_id,row]));
+  const counts=new Map<string,number>();
+  for(const row of rows.filter(row=>row.state==='admitted'))counts.set(row.catalog_subject_id!,1+(counts.get(row.catalog_subject_id!)??0));
+  for(const row of rows.filter(row=>row.state==='admitted')){
+    const representative=byId.get(row.catalog_subject_id!)!;
+    if(representative.state!=='admitted'||representative.catalog_subject_id!==representative.subject_id
+      ||representative.canonical_model_id!==row.canonical_model_id||representative.grain!==row.grain
+      ||representative.year!==row.year||representative.year_start!==row.year_start||representative.year_end!==row.year_end
+      ||representative.equivalent_catalog_subjects!==row.equivalent_catalog_subjects
+      ||counts.get(row.catalog_subject_id!)!==row.equivalent_catalog_subjects)return fail();
+  }
+  const options=rows.filter(row=>row.state==='admitted'&&row.subject_id===row.catalog_subject_id).map(row=>({
+    key:`descriptive:${row.subject_id}`,label:`${row.canonical_make} ${row.canonical_model} · ${row.grain==='year'?`${row.year} model year`:'registered model group'}`,
+    make:row.canonical_make!,scope:{kind:'descriptive_subject' as const,subject_id:row.subject_id},
+    descriptive:{model:row.canonical_model!,grain:row.grain as 'year'|'model',year:row.year,yearStart:row.year_start,yearEnd:row.year_end},
+  })).sort((a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true}));
+  return {candidateCount:ids.length,options,rules:rows};
+}
+export function useDescriptiveSalesScopes(make:string|null,enabled=true){
+  return useQuery({queryKey:['market-descriptive-scopes',make?.toUpperCase()??null],
+    queryFn:({signal})=>fetchDescriptiveSalesScopes(make!,signal),enabled:enabled&&Boolean(make),
+    staleTime:60_000,retry:false,refetchOnWindowFocus:false});
+}
+
 export async function fetchRecordedSales(request: SalesRequest): Promise<SalesResponse> {
   const { data, error } = await supabase.rpc('get_market_trends', { p_request: request });
   if (error) throw error;
-  if (data?.state === 'unavailable' && typeof data.reason === 'string') return data as SalesResponse;
+  if (data?.state === 'unavailable' && typeof data.reason === 'string') {
+    if(data.scope_admission!==undefined&&(request.scope.kind!=='descriptive_subject'
+      ||data.scope_admission?.subject_id!==request.scope.subject_id||data.scope_admission.state!=='unavailable'
+      ||data.scope_admission.admission_purpose!==SCOPE_PURPOSE||typeof data.scope_admission.reason!=='string'))
+      throw new Error('Unsupported descriptive-scope refusal');
+    return data as SalesResponse;
+  }
   if (!data || data.state !== 'partial' || data.contract_version !== 1 || data.metric_id !== request.metric
     || !Array.isArray(data.series) || !data.evidence || !Array.isArray(data.evidence.contributors)) {
     throw new Error('Unsupported recorded-sales receipt');
@@ -142,6 +224,15 @@ function assertCapturedOutcomes(data: RecordedSalesReceipt, request: SalesReques
     || data.evidence.pagination_supported !== true || !count(data.evidence.offset) || data.evidence.offset > 2000
     || (data.evidence.has_more && (!count(data.evidence.next_offset)
       || data.evidence.next_offset <= data.evidence.offset || data.evidence.next_offset > 2000))) fail();
+  if(request.scope.kind==='descriptive_subject'){
+    const scope=data.scope;
+    const year=(v:unknown)=>v===null||typeof v==='number'&&Number.isSafeInteger(v);
+    if(scope.admission_purpose!==SCOPE_PURPOSE||scope.membership_method!==SCOPE_METHOD
+      ||!scope.canonical_model_id||!SCOPE_UUID.test(scope.canonical_model_id)||!scope.label
+      ||!['year','model'].includes(scope.grain??'')||![scope.year,scope.year_start,scope.year_end].every(year)
+      ||scope.grain==='year'&&(scope.year===null||scope.year_start!==null||scope.year_end!==null)
+      ||scope.grain==='model'&&scope.year!==null)fail();
+  }
   const keys = new Set<string>();
   for (const p of data.series) {
     const key = `${p.bucket_start}:${p.series}`;
