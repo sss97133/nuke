@@ -120,12 +120,19 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 
-    func testClosingRefreshRemovesMissingLotAndKeepsAnExtension() {
+    func testClosingRefreshKeepsMissingLotRecoverableAndRestoresIt() {
         let app = open("browse-closing-refresh")
         let closing = app.staticTexts["Fixture closing"]
         XCTAssertTrue(closing.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(closing.waitForNonExistence(timeout: 45), app.debugDescription)
+        let unavailable = app.staticTexts["Status unavailable"]
+        XCTAssertTrue(unavailable.waitForExistence(timeout: 45), app.debugDescription)
+        XCTAssertTrue(closing.exists, app.debugDescription)
+        let recorded = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Bid on record")).firstMatch
+        XCTAssertTrue(recorded.exists, app.debugDescription)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Bid on record")).firstMatch.exists)
         XCTAssertTrue(app.staticTexts["Fixture extended"].exists, app.debugDescription)
+        XCTAssertTrue(unavailable.waitForNonExistence(timeout: 35), app.debugDescription)
+        XCTAssertTrue(closing.exists, app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 
@@ -146,6 +153,18 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Auction clock"].waitForExistence(timeout: 10), app.debugDescription)
         let closing = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "remaining", "closing")).firstMatch
         XCTAssertTrue(closing.waitForExistence(timeout: 25), app.debugDescription)
+        let resumed = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS %@", "remaining", "1m")).firstMatch
+        XCTAssertTrue(resumed.waitForExistence(timeout: 35), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testOpenClockRecoversAfterMissingBoardThenExtension() {
+        let app = open("browse-clock-missing-then-extended")
+        let clock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Time left")).firstMatch
+        XCTAssertTrue(clock.waitForExistence(timeout: 20), app.debugDescription); clock.tap()
+        XCTAssertTrue(app.navigationBars["Auction clock"].waitForExistence(timeout: 10), app.debugDescription)
+        let unavailable = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "status unavailable")).firstMatch
+        XCTAssertTrue(unavailable.waitForExistence(timeout: 40), app.debugDescription)
         let resumed = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS %@", "remaining", "1m")).firstMatch
         XCTAssertTrue(resumed.waitForExistence(timeout: 35), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")

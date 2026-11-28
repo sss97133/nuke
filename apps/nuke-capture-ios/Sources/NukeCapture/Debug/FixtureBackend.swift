@@ -135,16 +135,20 @@ enum FixtureBackend {
         guard name == "market_pulse_live" else { return ok(#"{"population":{},"asks":[]}"#) }
         browseReadLock.lock(); browseLiveAttempts += 1; let attempt = browseLiveAttempts; browseReadLock.unlock()
         let iso = ISO8601DateFormatter()
-        let closing = iso.string(from: Date().addingTimeInterval(10))
-        let extended = iso.string(from: Date().addingTimeInterval(attempt == 1 ? (scenario == "browse-clock-extended" ? 10 : 20) : 120))
+        let closing = iso.string(from: Date().addingTimeInterval(attempt == 1 ? 10 : 120))
+        let clockOnly = ["browse-clock-extended", "browse-clock-missing-then-extended"].contains(scenario)
+        let extended = iso.string(from: Date().addingTimeInterval(attempt == 1 ? (clockOnly ? 10 : 20) : 120))
         let open = iso.string(from: Date().addingTimeInterval(3600))
         func row(_ suffix: String, _ title: String, _ end: String) -> String {
             #"["00000000-0000-4000-8000-0000000000\#(suffix)",1973,"Fixture","Coupe",5000,"\#(end)",null,null,"http://[",false,null,"\#(title)",null,null,null,null,null]"#
         }
-        if scenario == "browse-clock-extended" {
+        if scenario == "browse-clock-missing-then-extended", attempt == 2 {
+            return ok(#"{"auctions":[]}"#)
+        }
+        if clockOnly {
             return ok("{\"auctions\":[\(row("02", "Fixture extended", extended))]}")
         }
-        let rows = (attempt == 1 ? [row("01", "Fixture closing", closing)] : [])
+        let rows = (attempt == 2 ? [] : [row("01", "Fixture closing", closing)])
             + [row("02", "Fixture extended", extended), row("03", "Fixture still open", open)]
         return ok("{\"auctions\":[\(rows.joined(separator: ","))]}")
     }
@@ -615,7 +619,7 @@ enum FixtureBackend {
             && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more"].contains(scenario):
             return browsePagingRead(name, args)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
-            && ["browse-closing-refresh", "browse-clock-extended"].contains(scenario):
+            && ["browse-closing-refresh", "browse-clock-extended", "browse-clock-missing-then-extended"].contains(scenario):
             return closingBrowseRead(name)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
             && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):

@@ -195,7 +195,7 @@ struct ExplorePagerCard: View {
             .overlay(alignment: .bottomLeading) {
                 if selected.kind == .photos {
                     ExploreCardOverlay(item: item, hasBidReading: hasBidReading, onDrill: onDrill,
-                                       rail: ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh),
+                                       rail: item.liveStatusUnavailable ? nil : ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh),
                                        onWhy: whyAction)
                         .padding(NukeSpace.lg)
                         .transition(.opacity)
@@ -396,7 +396,7 @@ struct ExplorePagerCard: View {
 
     @ViewBuilder private var menu: some View {
         let hasTaste = ExplorePreferences.key(item) != nil
-        if item.amount != nil {
+        if item.amount != nil && !item.liveStatusUnavailable {
             Button { showWhy() } label: {
                 Label(ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh).detailsTitle,
                       systemImage: "chart.bar.doc.horizontal")
@@ -423,7 +423,7 @@ struct ExplorePagerCard: View {
 
     /// A long press on the price opens the stack, when the card has a price.
     private var whyAction: (() -> Void)? {
-        guard item.amount != nil else { return nil }
+        guard item.amount != nil, !item.liveStatusUnavailable else { return nil }
         return { showWhy() }
     }
 

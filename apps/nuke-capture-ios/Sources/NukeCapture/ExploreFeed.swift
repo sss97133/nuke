@@ -46,6 +46,8 @@ struct ExploreFeedItem: Identifiable, Equatable {
     var asOf: Date? = nil
     /// A live lot's last record write (the board's updated_at): the bid on the card is no newer than this.
     var recordUpdatedAt: Date? = nil
+    /// A successful refresh omitted this lot. Its last bid is retained, but its current status is unknown.
+    var liveStatusUnavailable = false
 
     /// The vehicle id a live lot's finish estimate is keyed by (the card id without its "live:" prefix).
     var lotId: String? {
@@ -139,14 +141,15 @@ enum ExploreFeedPaging {
             .filter { !existing.contains($0.id) }
     }
 
-    /// A successful board refresh can update an extension or omit an expired lot. A missing unexpired
-    /// lot is retained: absence alone does not establish its outcome or close time.
-    static func reconcileLive(_ items: [ExploreFeedItem], current: [String: ExploreFeedItem], now: Date) -> [ExploreFeedItem] {
-        items.compactMap { item in
+    /// An omitted lot may have an extension that has not reached the board. Keep it available for a
+    /// later refresh, but mark its current status unknown until that source returns it again.
+    static func reconcileLive(_ items: [ExploreFeedItem], current: [String: ExploreFeedItem]) -> [ExploreFeedItem] {
+        items.map { item in
             guard item.kind == .live else { return item }
             if let fresh = current[item.id] { return fresh }
-            if let end = item.endsAt, end <= now { return nil }
-            return item
+            var unavailable = item
+            unavailable.liveStatusUnavailable = true
+            return unavailable
         }
     }
 
@@ -309,7 +312,8 @@ struct ExploreFeedView: View {
                             .padding(.horizontal, NukeSpace.lg)
                         }
                         ForEach(Array(feed.enumerated()), id: \.element.id) { idx, item in
-                            ExplorePagerCard(item: item, position: idx, hasBidReading: lots[item.id] != nil,
+                            ExplorePagerCard(item: item, position: idx,
+                                             hasBidReading: !item.liveStatusUnavailable && lots[item.id] != nil,
                                              finish: item.lotId.flatMap { finish?.byId[$0] },
                                              finishFresh: finish?.fresh == true,
                                              onDrill: openDrill, onOpenProfile: openProfile,
@@ -357,19 +361,13 @@ struct ExploreFeedView: View {
                   !reloading, !loadingMore else { continue }
             let byId = Dictionary(board.auctions.map { ("live:" + $0.id, $0) }, uniquingKeysWith: { first, _ in first })
             let current = byId.mapValues(ExploreFeedItem.from)
-            let now = ServerClock.now()
-            liveShown = ExploreFeedPaging.reconcileLive(Array(liveAll.prefix(liveShown)), current: current, now: now).count
-            liveAll = ExploreFeedPaging.reconcileLive(liveAll, current: current, now: now)
-            live = ExploreFeedPaging.reconcileLive(live, current: current, now: now)
-            feed = ExploreFeedPaging.reconcileLive(feed, current: current, now: now)
-            if let open = drill, let fresh = current[open.item.id] {
-                drill = ExploreCardDrill(kind: open.kind, item: fresh)
+            liveAll = ExploreFeedPaging.reconcileLive(liveAll, current: current)
+            live = ExploreFeedPaging.reconcileLive(live, current: current)
+            feed = ExploreFeedPaging.reconcileLive(feed, current: current)
+            if let open = drill, let refreshed = ExploreFeedPaging.reconcileLive([open.item], current: current).first {
+                drill = ExploreCardDrill(kind: open.kind, item: refreshed)
             }
-            lots = lots.reduce(into: [:]) { result, entry in
-                if let fresh = byId[entry.key] { result[entry.key] = fresh }
-                else if entry.value.endsAtDate.map({ $0 > now }) ?? true { result[entry.key] = entry.value }
-            }
-            if feed.isEmpty && hasMore { await loadMore() }
+            for (key, lot) in byId where lots[key] != nil { lots[key] = lot }
         }
     }
 
@@ -422,7 +420,7 @@ struct ExploreFeedView: View {
 
     private var footer: String {
         var parts: [String] = []
-        if !live.isEmpty { parts.append("Current bids are Bring a Trailer's, in US dollars — not sold prices.") }
+        if !live.isEmpty { parts.append("Bids are Bring a Trailer's recorded bids, in US dollars — not sold prices.") }
         if !classified.isEmpty { parts.append("An asking price is what the seller listed when we saw it, not a sale.") }
         return parts.joined(separator: " ")
     }
@@ -634,8 +632,8 @@ struct ExploreCardOverlay: View {
                 // and every 30 s before that, where it shows hours and minutes.
                 TimelineView(.periodic(from: .now, by: ExploreClock.tick(ends: ends, now: ServerClock.now()))) { ctx in
                     let now = ServerClock.now(ctx.date)
-                    let text = ExploreClock.text(ends: ends, now: now)
-                    if let onDrill {
+                    let text = item.liveStatusUnavailable ? "Status unavailable" : ExploreClock.text(ends: ends, now: now)
+                    if let onDrill, !item.liveStatusUnavailable {
                         ExploreDoor(kind: .clock, item: item, alignment: .bottomTrailing, open: onDrill) { clock(text) }
                     } else {
                         clock(text)
@@ -702,8 +700,12 @@ struct ExploreCardOverlay: View {
     /// In a lot's last hour the label says how old the bid on record is, since the board is rebuilt every
     /// 2 minutes and the house's bid can move faster than that.
     private var priceLabel: String {
-        guard item.kind == .live, let ends = item.endsAt else { return item.amountLabel }
+        guard item.kind == .live else { return item.amountLabel }
         let now = ServerClock.now()
+        if item.liveStatusUnavailable {
+            return item.recordUpdatedAt.map { "Bid on record · " + ExploreAnalytics.ago($0, now: now) } ?? "Bid on record"
+        }
+        guard let ends = item.endsAt else { return item.amountLabel }
         guard ends.timeIntervalSince(now) < 3600, let at = item.recordUpdatedAt else { return item.amountLabel }
         return "Bid on record · " + ExploreAnalytics.ago(at, now: now)
     }

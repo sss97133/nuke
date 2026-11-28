@@ -177,10 +177,14 @@ struct ExploreClockSheet: View {
             List {
                 if let ends = item.endsAt {
                     Section {
-                        drillLine("Closes", ExploreCardDrill.absolute(ends))
-                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                            drillLine("Remaining", ExploreCardDrill.preciseRemaining(ends, now: ServerClock.now(ctx.date)))
-                                .foregroundStyle(Color.red)
+                        drillLine(item.liveStatusUnavailable ? "Last recorded close" : "Closes", ExploreCardDrill.absolute(ends))
+                        if item.liveStatusUnavailable {
+                            Text("Status unavailable").foregroundStyle(.secondary)
+                        } else {
+                            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                                drillLine("Remaining", ExploreCardDrill.preciseRemaining(ends, now: ServerClock.now(ctx.date)))
+                                    .foregroundStyle(Color.red)
+                            }
                         }
                     } footer: {
                         Text("Shown in your time zone. The house may extend the close when bids arrive in the final minutes.")
