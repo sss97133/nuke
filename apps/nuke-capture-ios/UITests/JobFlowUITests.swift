@@ -373,6 +373,9 @@ final class JobFlowUITests: XCTestCase {
 
         reveal(text(app, contains: "Do you take K5 wiring jobs?"), in: app).tap()
         type(app, into: "Write a message", "Yes, after the 25th works.")
+        let message = app.textFields["Write a message"].firstMatch
+        let typed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "Yes, after the 25th works."), object: message)
+        XCTAssertEqual(XCTWaiter.wait(for: [typed], timeout: 10), .completed, "Wait for the full draft before sending")
         app.buttons["thread.send"].firstMatch.tap()
         waitForWrite(app, "post_contact_message")
         let posted = call(app, "post_contact_message")

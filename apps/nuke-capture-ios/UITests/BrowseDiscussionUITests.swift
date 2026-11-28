@@ -28,7 +28,9 @@ final class BrowseDiscussionUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Duplicate event must never be shown."].exists)
         row.tap()
         XCTAssertTrue(app.staticTexts["The original wheels are included."].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.links["Open the Bring a Trailer listing"].exists)
+        let sourceLink = app.descendants(matching: .any)["listing-discussion-source-link"].firstMatch
+        XCTAssertTrue(sourceLink.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(sourceLink.isHittable)
         app.navigationBars.buttons["Discussion"].tap()
         app.segmentedControls.buttons["Nuke"].tap()
         XCTAssertTrue(app.staticTexts["A real Nuke fixture comment."].waitForExistence(timeout: 5))

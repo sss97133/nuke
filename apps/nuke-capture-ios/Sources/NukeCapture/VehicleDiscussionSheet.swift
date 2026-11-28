@@ -404,6 +404,7 @@ private struct ListingDiscussionRecord: View {
                 Text(entry.comment_text?.isEmpty == false ? entry.comment_text! : "No text recorded.")
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 Link("Open the \(source) listing", destination: listingURL)
+                    .accessibilityIdentifier("listing-discussion-source-link")
             }.padding(16)
         }
         .navigationTitle("Listing entry").navigationBarTitleDisplayMode(.inline)
