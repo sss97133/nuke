@@ -188,6 +188,14 @@ struct NukeCaptureApp: App {
                 rootView
                 #endif
             }
+            #if DEBUG
+            .overlay(alignment: .bottomTrailing) {
+                if FixtureBackend.isActive && ProcessInfo.processInfo.environment["NUKE_FIXTURE_SUPERSEDE_LABOR"] == "1" {
+                    Button("Supersede fixture judgment") { FixtureBackend.supersedeLaborJudgment() }
+                        .accessibilityIdentifier("fixture.supersede-labor")
+                }
+            }
+            #endif
             .environmentObject(session)
             .onOpenURL(perform: handleOpenURL)
             #if DEBUG
@@ -203,12 +211,6 @@ struct NukeCaptureApp: App {
                     .accessibilityValue(session.viewerId ?? "visitor")
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 48).padding(.trailing, 8)
-                }
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if FixtureBackend.isActive && ProcessInfo.processInfo.environment["NUKE_FIXTURE_SUPERSEDE_LABOR"] == "1" {
-                    Button("Supersede fixture judgment") { FixtureBackend.supersedeLaborJudgment() }
-                        .accessibilityIdentifier("fixture.supersede-labor")
                 }
             }
             #endif
