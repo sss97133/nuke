@@ -442,9 +442,10 @@ enum FixtureBackend {
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
         case "market_pulse_live" where scenario == "social-follow":
+            // Use the static fallback instead of an endlessly loading fixture image.
             return ok("""
             {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
-              "2026-11-27T10:00:00Z",null,"https://fixture.nuke.invalid/car.jpg",false,
+              "2026-11-27T10:00:00Z",null,"http://[",false,
               "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
             """)
         case "record_interaction" where scenario == "social-follow" && args["p_kind"] as? String == "follow":
