@@ -71,7 +71,10 @@ final class BrowseFollowUITests: XCTestCase {
         app.buttons["Follow"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Following"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertEqual(log(app), "no writes")
-        app.buttons["fixture.switch-account"].tap()
+        let switchAccount = app.buttons["fixture.switch-account"]
+        switchAccount.tap()
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "00000000-0000-4000-8000-0000000000d3"), object: switchAccount)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 10), .completed)
         let follow = app.buttons["Follow"].firstMatch
         XCTAssertTrue(follow.waitForExistence(timeout: 10))
         follow.tap()

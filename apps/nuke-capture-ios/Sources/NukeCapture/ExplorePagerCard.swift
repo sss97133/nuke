@@ -351,11 +351,8 @@ struct ExplorePagerCard: View {
 
     // MARK: Actions under the card
 
-    private var viewer: String? {
-        _ = session.isSignedIn
-        return SupabaseService.currentUserId
-    }
-    private var canFollow: Bool { item.vehicleId != nil && viewer != nil }
+    private var viewer: String? { session.viewerId }
+    private var canFollow: Bool { item.vehicleId != nil && viewer != nil && viewer == SupabaseService.currentUserId }
     private var shownFollowing: Bool { followViewer == viewer && following == true }
 
     private var actions: some View {
@@ -455,7 +452,10 @@ struct ExplorePagerCard: View {
         let checkOnly = followNeedsCheck
         let desired = !shownFollowing
         var writing = false
-        func current() -> Bool { !Task.isCancelled && viewer == user && scenePhase == .active && followEpoch == epoch }
+        func current() -> Bool {
+            !Task.isCancelled && viewer == user && SupabaseService.currentUserId == user
+                && scenePhase == .active && followEpoch == epoch
+        }
         do {
             let engagement: VehicleEngagement = try await SupabaseService.client
                 .rpc("get_vehicle_engagement", params: ["p_vehicle_id": vid])
