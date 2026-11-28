@@ -2,9 +2,11 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient } from '@tanstack/react-query';
 import type { RecordedSalesReceipt, SalesScopeOption, SalesRequest } from './useRecordedSales';
 
-const fixture = vi.hoisted(() => ({ catalog: {} as any, query: {} as any, request: null as SalesRequest | null, retry: vi.fn() }));
+const fixture = vi.hoisted(() => ({ catalog: {} as any, query: {} as any, request: null as SalesRequest | null, retry: vi.fn(), client: null as import('@tanstack/react-query').QueryClient | null }));
+vi.mock('@tanstack/react-query', async original => ({ ...await original<typeof import('@tanstack/react-query')>(), useQueryClient: () => fixture.client }));
 vi.mock('./useRecordedSales', async original => ({ ...await original<typeof import('./useRecordedSales')>(),
   useSalesScopes: () => fixture.catalog, useRecordedSales: (request: SalesRequest | null) => { fixture.request = request; return fixture.query; } }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
@@ -57,11 +59,12 @@ beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-04T09:30:00Z'));
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.retry.mockReset(); fixture.request = null;
+  fixture.client = new QueryClient();
   fixture.catalog = { data: [make, subject], isLoading: false, isError: false, refetch: fixture.retry };
   fixture.query = { data: receipt(), isFetching: false, isError: false, refetch: fixture.retry };
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
+afterEach(async () => { await act(async () => root.unmount()); fixture.client?.clear(); container.remove(); vi.useRealTimers(); });
 
 describe('recorded sales evidence comparison', () => {
   it('keeps the shared context in inventory mode without requesting ended outcomes', async () => {
@@ -262,6 +265,11 @@ describe('captured sell-through through the existing comparison', () => {
   });
   it('carries the snapshot on continuation and discards old records when it changes', async () => {
     await captured();await act(async()=>countButton('FIXTURE MAKE: 0% captured').click());
+    const firstRequest=fixture.request!;
+    fixture.client!.setQueryData(['market-recorded-sales',firstRequest],capturedReceipt());
+    const fetchFresh=vi.fn().mockResolvedValue({...capturedReceipt(),evidence:{...capturedReceipt().evidence,snapshot_hash:'b'.repeat(32)}});
+    await fixture.client!.fetchQuery({queryKey:['market-recorded-sales',firstRequest],queryFn:fetchFresh,staleTime:60_000});
+    expect(fetchFresh).not.toHaveBeenCalled(); // The first page is still fresh before recovery.
     await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Next source records')!.click());
     expect(fixture.request).toMatchObject({evidence_offset:20,evidence_snapshot_hash:'a'.repeat(32)});
     fixture.query.data={state:'unavailable',reason:'evidence_snapshot_changed'};await render();
@@ -270,6 +278,9 @@ describe('captured sell-through through the existing comparison', () => {
     await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Refresh recorded evidence')!.click());
     expect(fixture.request).not.toHaveProperty('evidence_snapshot_hash');
     expect(fixture.request).not.toHaveProperty('evidence_offset');
+    const refreshed=await fixture.client!.fetchQuery({queryKey:['market-recorded-sales',fixture.request],queryFn:fetchFresh,staleTime:60_000});
+    expect(fetchFresh).toHaveBeenCalledOnce();
+    expect(refreshed.evidence.snapshot_hash).toBe('b'.repeat(32));
   });
   it('changes outcome filters without reusing another filter’s continuation', async () => {
     await captured();await act(async()=>countButton('FIXTURE MAKE: 0% captured').click());
@@ -292,5 +303,14 @@ describe('captured sell-through through the existing comparison', () => {
     expect(container.textContent).not.toContain('No matched captured episodes');
     await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Inspect unresolved outcomes')!.click());
     expect(fixture.request).toMatchObject({evidence_outcome:'unresolved',evidence_series:'selected'});
+  });
+  it('opens withdrawn evidence when a bucket has no known or unresolved outcomes', async () => {
+    const r=capturedReceipt();r.series=[{...r.series[0],value:null,ratio:null,numerator:0,denominator:0,
+      coverage:{...r.series[0].coverage,unresolved:0,withdrawn:1}}];
+    r.evidence.contributors=[];fixture.query.data=r;await render();await select('Market outcome measure','captured_sell_through');
+    expect(countButton('no known bidding outcomes; fraction unknown').disabled).toBe(true);
+    expect(container.textContent).not.toContain('Inspect unresolved outcomes');
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Inspect withdrawn outcomes')!.click());
+    expect(fixture.request).toMatchObject({evidence_outcome:'withdrawn',evidence_series:'selected',evidence_bucket:bucket});
   });
 });

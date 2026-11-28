@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Text } from '../../kit';
@@ -84,6 +85,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   controls?: boolean;
 }) {
   const catalog = useSalesScopes();
+  const queryClient = useQueryClient();
   const [localChosen, setChosen] = useState<string | null>(null);
   const [localDays, setDays] = useState<2 | 7>(7);
   const [localMetric, setMetric] = useState<SalesMetric>('recorded_sale_events');
@@ -132,6 +134,11 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   const refresh = () => {
     if (captured && drill?.snapshotHash) {
       const next = { bucket: drill.bucket, series: drill.series, outcome: drill.outcome };
+      // The earlier page can still be fresh in the cache. Recovery must read a new snapshot.
+      if (option) void queryClient.invalidateQueries({
+        queryKey: ['market-recorded-sales', recordedSalesRequest(option.scope, window, next, metric)],
+        exact: true, refetchType: 'none',
+      });
       setDrill(next); onLensChange?.({ drill: next }); return;
     }
     const next = recordedSalesWindow(days, Date.now(), weeksBack);
@@ -242,6 +249,11 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
             const next: SalesDrill = { bucket: point.bucket_start, series: point.series, outcome: 'unresolved' };
             setDrill(next); onLensChange?.({ drill: next });
           }}>Inspect unresolved outcomes</button>}
+          {captured && (point.coverage.withdrawn ?? 0) > 0 && <button className="market-control k-body" onClick={() => {
+            focusEvidence.current = true;
+            const next: SalesDrill = { bucket: point.bucket_start, series: point.series, outcome: 'withdrawn' };
+            setDrill(next); onLensChange?.({ drill: next });
+          }}>Inspect withdrawn outcomes</button>}
         </div>)}
       </details>}
       {drill && !receipt.truncated && !query.isFetching && !query.isError && <div ref={evidenceRef} tabIndex={-1} aria-label="Recorded sales contributors" style={{ borderTop: '2px solid var(--border)', paddingTop: 8 }}>
