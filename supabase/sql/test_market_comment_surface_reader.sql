@@ -9,13 +9,15 @@ DO $$ DECLARE r text; BEGIN
  END LOOP;
 END $$;
 CREATE TABLE vehicles(id uuid PRIMARY KEY,is_public boolean,deleted_at timestamptz,
- merged_into_vehicle_id uuid,status text,listing_kind text);
-CREATE TABLE auction_events(id uuid PRIMARY KEY,vehicle_id uuid,source text,source_url text,
+ merged_into_vehicle_id uuid REFERENCES vehicles(id),status text,listing_kind text);
+CREATE TABLE auction_events(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES vehicles(id),source text,source_url text,
  auction_end_date timestamptz,canonical boolean DEFAULT true);
 CREATE VIEW auction_events_canonical WITH(security_invoker=true) AS SELECT * FROM auction_events WHERE canonical;
 CREATE TABLE external_identities(id uuid PRIMARY KEY,platform text);
-CREATE TABLE auction_comments(id uuid PRIMARY KEY,vehicle_id uuid,auction_event_id uuid,comment_type text,
- bid_amount numeric,posted_at timestamptz,created_at timestamptz,is_seller boolean,external_identity_id uuid,
+CREATE TABLE auction_comments(id uuid PRIMARY KEY,vehicle_id uuid REFERENCES vehicles(id),
+ auction_event_id uuid REFERENCES auction_events(id),comment_type text,
+ bid_amount numeric,posted_at timestamptz,created_at timestamptz,is_seller boolean,
+ external_identity_id uuid REFERENCES external_identities(id),
  comment_text text,media_urls text[],bat_comment_id bigint,source_url text);
 CREATE INDEX ON auction_comments(auction_event_id);
 CREATE INDEX ON auction_events(source,source_url);
