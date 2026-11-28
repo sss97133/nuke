@@ -30,7 +30,9 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: macos-26
-    timeout-minutes: 45
+    # 60, not 45: the unit + UI suite runs 40-45 min; on 2026-11-25 three runs passed every test and were then
+    # cancelled at the 45-min cap while writing results (45552624333, 45575270131), and main's last green took 43 min.
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: apps/nuke-capture-ios
