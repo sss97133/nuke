@@ -112,6 +112,9 @@ enum FixtureBackend {
             return ok("{\"auctions\":[\(rows)]}")
         }
         let offset = args["p_offset"] as? Int ?? 0
+        if scenario.hasSuffix("-ceiling") && offset > 5000 {
+            return (400, Data(#"{"message":"fixture offset exceeded reader limit"}"#.utf8))
+        }
         if scenario == "browse-paging-auction-failure" && offset == 40 { return (-1, Data()) }
         if ["browse-paging-fail-more", "browse-paging-live-failed-more"].contains(scenario) && offset == 40 {
             browseReadLock.lock(); browsePageFailureAttempts += 1; let attempt = browsePageFailureAttempts; browseReadLock.unlock()
@@ -120,11 +123,15 @@ enum FixtureBackend {
             }
         }
         let finalOffset = (scenario.hasPrefix("browse-paging-deep") || scenario == "browse-paging-live-failed-deep") ? 240 : 80
-        let count = offset < finalOffset ? 40 : (offset == finalOffset ? 1 : 0)
+        let count = scenario.hasSuffix("-ceiling")
+            ? (scenario == "browse-paging-partial-ceiling" && offset == 5000 ? 10 : 40)
+            : (offset < finalOffset ? 40 : (offset == finalOffset ? 1 : 0))
         let rows: String = (0..<count).map { index -> String in
             let number = offset + index
             let noFirstCard = ["browse-paging-empty", "browse-paging-deep", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more"].contains(scenario)
-            let visible = number == finalOffset || (number == 0 && !noFirstCard)
+            let visible = scenario.hasSuffix("-ceiling")
+                ? (number == 0 && scenario != "browse-paging-live-failed-ceiling")
+                : (number == finalOffset || (number == 0 && !noFirstCard))
             let image = visible ? #""http://[""# : "null"
             return #"{"event_id":"fixture-page-\#(number)","source":"classified","title":"Fixture page \#(number)","ask":10000,"image":\#(image)}"#
         }.joined(separator: ",")
@@ -623,7 +630,7 @@ enum FixtureBackend {
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
-            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more"].contains(scenario):
+            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more", "browse-paging-ceiling", "browse-paging-partial-ceiling", "browse-paging-live-failed-ceiling"].contains(scenario):
             return browsePagingRead(name, args)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
             && ["browse-closing-refresh", "browse-clock-extended", "browse-clock-missing-then-extended", "browse-clock-freshness", "browse-clock-boundary"].contains(scenario):

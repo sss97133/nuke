@@ -54,7 +54,7 @@ struct AllocationRecord: Decodable, Equatable, Identifiable {
     }
 }
 
-enum AllocationSource: String, CaseIterable, Identifiable {
+enum AllocationSource: String, CaseIterable, Identifiable, Hashable {
     case book, bank
     var id: String { rawValue }
     var title: String { self == .book ? "Current book source" : "Current bank source" }
@@ -199,6 +199,7 @@ enum AllocationReaders {
 struct VehicleAllocationRecordsView: View {
     let vehicleId: UUID
     @State private var page = AllocationPage()
+    @State private var selectedKey: AllocationRecord.Key?
     @State private var loading = true
     @State private var refusal: JobRefusal?
     @State private var readAt: Date?
@@ -214,15 +215,20 @@ struct VehicleAllocationRecordsView: View {
                 }
             }
             ForEach(page.rows) { row in
-                NavigationLink {
-                    AllocationRecordView(vehicleId: vehicleId, key: row.id) { Task { await load(reset: true) } }
-                } label: {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(row.description ?? "Allocation record")
-                        Text("\(row.phaseText) · \(row.currency ?? "Unit unknown")").font(.caption)
-                        Text(row.qualificationText).font(.caption).foregroundStyle(.secondary)
+                Button { selectedKey = row.id } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(row.description ?? "Allocation record")
+                            Text("\(row.phaseText) · \(row.currency ?? "Unit unknown")").font(.caption)
+                            Text(row.qualificationText).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
-                }.accessibilityIdentifier("allocation-record-\(row.use_id.uuidString.lowercased())-\(row.allocation_index)")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("allocation-record-\(row.use_id.uuidString.lowercased())-\(row.allocation_index)")
             }
             if loading { ProgressView("Reading allocation records…") }
             if let refusal { JobRefusalRow(refusal: refusal); Button("Retry") { Task { await load(reset: true) } } }
@@ -232,6 +238,10 @@ struct VehicleAllocationRecordsView: View {
                 Text("Pages are separate reads. Refresh after changes; exhausting these pages does not establish lifetime coverage.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+        }
+        // Keep the destination alive while a changed or withheld record refreshes this list.
+        .navigationDestination(item: $selectedKey) { key in
+            AllocationRecordView(vehicleId: vehicleId, key: key) { Task { await load(reset: true) } }
         }
         .navigationTitle("Book allocations").navigationBarTitleDisplayMode(.inline)
         .refreshable { await load(reset: true) }
@@ -274,6 +284,8 @@ struct AllocationRecordView: View {
     @State private var state: JobLoad<AllocationRecord> = .loading
     @State private var readAt: Date?
     @State private var generation = UUID()
+    @State private var selectedSource: AllocationSource?
+    @State private var sourceRow: AllocationRecord?
     var body: some View {
         List {
             switch state {
@@ -292,12 +304,18 @@ struct AllocationRecordView: View {
                 Section("Source records") {
                     ForEach(AllocationSource.allCases) { kind in
                         if kind.reference(row) != nil {
-                            NavigationLink(kind.title) {
-                                AllocationSourceView(vehicleId: vehicleId, row: row, kind: kind) {
-                                    state = .refused(AllocationReaders.unavailable("Source access or currentness changed. Refresh this allocation."))
-                                    onInvalidated()
+                            Button {
+                                sourceRow = row
+                                selectedSource = kind
+                            } label: {
+                                HStack {
+                                    Text(kind.title)
+                                    Spacer()
+                                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                                        .accessibilityHidden(true)
                                 }
                             }
+                            .buttonStyle(.plain)
                         } else { Text("\(kind.title): exact reference not returned").foregroundStyle(.secondary) }
                     }
                 }
@@ -332,6 +350,21 @@ struct AllocationRecordView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+            }
+        }
+        // The refusal view must not disappear when it invalidates the record behind it.
+        .navigationDestination(item: $selectedSource) { kind in
+            if let sourceRow {
+                AllocationSourceView(vehicleId: vehicleId, row: sourceRow, kind: kind) {
+                    state = .refused(AllocationReaders.unavailable("Source access or currentness changed. Refresh this allocation."))
+                    onInvalidated()
+                }
+            }
+        }
+        .onChange(of: selectedSource) { old, new in
+            if old != nil && new == nil {
+                sourceRow = nil
+                Task { await reload() }
             }
         }
         .navigationTitle("Allocation record").navigationBarTitleDisplayMode(.inline)

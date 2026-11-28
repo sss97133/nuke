@@ -3,7 +3,7 @@ import Supabase
 
 /// Only the reassembly reader's explicitly named image_id is a photo reference. The generic
 /// evidence_ids array also contains other kinds of IDs and must not be treated as photos.
-struct LaborPhotoReference: Equatable {
+struct LaborPhotoReference: Hashable {
     let judgmentId: UUID
     let imageId: UUID
     let part: String
@@ -42,6 +42,7 @@ struct LaborPhotoEvidenceList: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var state: LoadState = .loading
     @State private var retry = 0
+    @State private var selectedPhoto: LaborPhotoReference?
 
     private enum LoadState {
         case loading, unavailable, failed
@@ -86,18 +87,26 @@ struct LaborPhotoEvidenceList: View {
                         }
                         Section("Photo links") {
                             ForEach(Array(links.enumerated()), id: \.offset) { _, link in
-                                NavigationLink {
-                                    LaborPhotoEvidenceDetail(vehicleId: vehicleId, segment: segment, reference: link,
-                                                             accountAtOpen: accountAtOpen)
-                                } label: {
-                                    Label(link.part, systemImage: "photo")
+                                Button { selectedPhoto = link } label: {
+                                    HStack {
+                                        Label(link.part, systemImage: "photo")
+                                        Spacer()
+                                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                                            .foregroundStyle(.tertiary).accessibilityHidden(true)
+                                    }
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
                     .accessibilityIdentifier("labor-photo-links")
                 }
             }
+        }
+        // The current detail stays mounted while the parent rechecks links on return or account change.
+        .navigationDestination(item: $selectedPhoto) { link in
+            LaborPhotoEvidenceDetail(vehicleId: vehicleId, segment: segment, reference: link,
+                                     accountAtOpen: accountAtOpen)
         }
         .navigationTitle("Photo links")
         .navigationBarTitleDisplayMode(.inline)

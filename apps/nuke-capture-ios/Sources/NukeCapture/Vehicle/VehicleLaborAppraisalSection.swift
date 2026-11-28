@@ -304,6 +304,7 @@ enum LaborWords {
 struct VehicleLaborAppraisalSection: View {
     let vehicleId: String
     var showEmptyState = false
+    var openPhotoLinks: ((String) -> Void)? = nil
     @State private var appraisal: LaborAppraisal?
     @State private var failed = false
     @State private var loading = true
@@ -311,7 +312,10 @@ struct VehicleLaborAppraisalSection: View {
     var body: some View {
         // A VStack, not a Group: an empty Group holds no view, so its .task would never run.
         VStack(alignment: .leading, spacing: 0) {
-            if let appraisal { LaborAppraisalContent(appraisal: appraisal, vehicleId: vehicleId, showEmptyState: showEmptyState) }
+            if let appraisal {
+                LaborAppraisalContent(appraisal: appraisal, vehicleId: vehicleId, showEmptyState: showEmptyState,
+                                      openPhotoLinks: openPhotoLinks)
+            }
             else if loading { Text("Reading the labor appraisal…").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16) }
             else if failed {
                 HStack {
@@ -353,6 +357,7 @@ struct LaborAppraisalContent: View {
     let appraisal: LaborAppraisal
     var vehicleId: String? = nil
     var showEmptyState = false
+    var openPhotoLinks: ((String) -> Void)? = nil
 
     private var priced: [LaborSegment] { appraisal.segments.filter { $0.hours_typical != nil } }
     private var calculationClock: String {
@@ -392,11 +397,19 @@ struct LaborAppraisalContent: View {
                             ForEach(Array(LaborWords.lines(segment, appraisal.names).enumerated()), id: \.offset) { _, line in caption(line) }
                             if let vehicleId, !LaborPhotoReference.from(segment, names: appraisal.names).isEmpty {
                                 let count = LaborPhotoReference.from(segment, names: appraisal.names).count
-                                NavigationLink {
-                                    LaborPhotoEvidenceList(vehicleId: vehicleId, segment: segment.segment,
-                                                           accountAtOpen: SupabaseService.currentUserId)
-                                } label: {
-                                    Label("View \(count) photo link\(count == 1 ? "" : "s")", systemImage: "photo")
+                                Group {
+                                    if let openPhotoLinks {
+                                        Button { openPhotoLinks(segment.segment) } label: {
+                                            Label("View \(count) photo link\(count == 1 ? "" : "s")", systemImage: "photo")
+                                        }
+                                    } else {
+                                        NavigationLink {
+                                            LaborPhotoEvidenceList(vehicleId: vehicleId, segment: segment.segment,
+                                                                   accountAtOpen: SupabaseService.currentUserId)
+                                        } label: {
+                                            Label("View \(count) photo link\(count == 1 ? "" : "s")", systemImage: "photo")
+                                        }
+                                    }
                                 }
                                 .font(.caption.weight(.medium))
                                 .accessibilityIdentifier("labor-photos-\(segment.segment)")

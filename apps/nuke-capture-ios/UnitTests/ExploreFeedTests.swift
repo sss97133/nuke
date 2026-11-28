@@ -61,6 +61,17 @@ final class ExploreFeedTests: XCTestCase {
         XCTAssertTrue(ExploreFeedPaging.exhausted(read: 0, asked: 40))
     }
 
+    func testAskPagingStopsAtTheReaderOffsetLimitWithoutClaimingCompleteness() {
+        let before = ExploreFeedPaging.askProgress(offset: 4960, read: 40, asked: 40)
+        XCTAssertEqual(before.nextOffset, 5000); XCTAssertFalse(before.exhausted); XCTAssertFalse(before.limited)
+        let final = ExploreFeedPaging.askProgress(offset: 5000, read: 40, asked: 40)
+        XCTAssertTrue(final.exhausted); XCTAssertTrue(final.limited)
+        let partial = ExploreFeedPaging.askProgress(offset: 5000, read: 12, asked: 40)
+        XCTAssertTrue(partial.exhausted); XCTAssertFalse(partial.limited)
+        let overlap = ExploreFeedPaging.askProgress(offset: 4985, read: 40, asked: 40)
+        XCTAssertEqual(overlap.nextOffset, 5000); XCTAssertFalse(overlap.exhausted)
+    }
+
     func testNextPageNeverRepeatsACardAndKeepsHiddenOnesOut() {
         var prefs = ExplorePreferences()
         prefs.hide("c2")

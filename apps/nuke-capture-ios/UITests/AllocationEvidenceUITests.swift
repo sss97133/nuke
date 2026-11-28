@@ -41,7 +41,11 @@ final class AllocationEvidenceUITests: XCTestCase {
     }
     func testWithheldExactSourceNeverSubstitutesAllocationOrLegacyEvidence() {
         let app = open(withheld: true)
-        XCTAssertTrue(app.staticTexts["Allocation detail unavailable"].firstMatch.waitForExistence(timeout: 10))
+        let unavailable = app.staticTexts["Allocation detail unavailable"].firstMatch
+        XCTAssertTrue(unavailable.waitForExistence(timeout: 10))
+        let disappeared = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: unavailable)
+        disappeared.isInverted = true
+        wait(for: [disappeared], timeout: 3)
         XCTAssertFalse(app.staticTexts["42.123456 EUR"].exists)
         XCTAssertFalse(app.staticTexts["9007199254740993.000001 USD"].exists)
         app.navigationBars.buttons["Allocation record"].firstMatch.tap()
