@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mock=vi.hoisted(()=>({rpc:vi.fn()}));
 vi.mock('../../lib/supabase',()=>({supabase:mock}));
-import { assertCommentSurface, commentPageRequest, commentParams, commentRequestFromParams, fetchCommentSurface, initialCommentRequest,
+import { assertCommentSurface, commentHourRequest, commentPageRequest, commentParams, commentRequestFromParams, fetchCommentSurface, initialCommentRequest,
   type CommentSurfaceReceipt, type CommentSurfaceRequest } from './commentSurfaceReader';
 import { commentFixture, LOT, VEHICLE } from './__fixtures__/commentSurface';
 const request:CommentSurfaceRequest={evidence_filter:'all_discussion'};
@@ -54,7 +54,7 @@ describe('episode comment measurement contract',()=>{
     d.recorded_cutoff='2026-11-25T20:55:00Z';expect(()=>assertCommentSurface(d,VEHICLE,LOT,r)).toThrow();
   });
   it('round trips shared pinned state without changing the auction drill',()=>{
-    const r=commentPageRequest(commentFixture(),20);
+    const r=commentPageRequest(commentFixture({...request,include_trajectory:true}),20);
     const params=commentParams(new URLSearchParams(`lot=${LOT}&layer=dimension&at=bid`),r);
     expect(commentRequestFromParams(params)).toEqual(r);expect(params.get('lot')).toBe(LOT);expect(params.get('at')).toBe('bid');
     const reset=commentParams(params,initialCommentRequest(r));expect(reset.has('csHash')).toBe(false);expect(reset.has('csRecorded')).toBe(false);
@@ -70,5 +70,56 @@ describe('episode comment measurement contract',()=>{
     const r={evidence_filter:filter},d=commentFixture(r);
     d.evidence.contributors[0].excerpt_truncated=true;
     expect(()=>assertCommentSurface(d,VEHICLE,LOT,r)).not.toThrow();
+  });
+});
+
+describe('hourly discussion projection',()=>{
+  const projection:CommentSurfaceRequest={evidence_filter:'all_discussion',include_trajectory:true};
+  it('accepts the complete projected population and same-snapshot exact-hour pages',()=>{
+    const d=commentFixture(projection),hour='2026-11-25T19:00:00.000Z';
+    expect(()=>assertCommentSurface(d,VEHICLE,LOT,projection)).not.toThrow();
+    const selected=commentHourRequest(d,hour),page=commentFixture(selected);
+    expect(()=>assertCommentSurface(page,VEHICLE,LOT,selected)).not.toThrow();
+    expect(commentPageRequest(page,20)).toMatchObject({include_trajectory:true,evidence_bucket:hour,offset:20,snapshot_hash:d.evidence.snapshot_hash});
+    const params=commentParams(new URLSearchParams(`lot=${LOT}&layer=dimension`),selected);
+    expect(commentRequestFromParams(params)).toEqual(selected);
+    expect(initialCommentRequest(selected)).toEqual(projection);
+    expect(commentHourRequest(page,null).evidence_bucket).toBeUndefined();
+  });
+  it('accepts an empty retained hour without changing full-window totals',()=>{
+    const request=commentHourRequest(commentFixture(projection),'2026-11-25T18:00:00.000Z'),d=commentFixture(request);
+    expect(()=>assertCommentSurface(d,VEHICLE,LOT,request)).not.toThrow();
+    expect(d.evidence.matching_entries).toBe(0);expect(d.features.discussion_entries).toBe(24);
+  });
+  it('accepts a zero-duration final instant with a count and a null rate',()=>{
+    const request={...projection,knowledge_mode:'recorded_input_reconstruction' as const,cutoff:'2026-11-25T19:00:00Z'};
+    const d=commentFixture(request);d.recorded_cutoff='2026-11-25T19:30:00Z';request.cutoff=d.recorded_cutoff;
+    // Keep this case a current pinned receipt: source arrivals can precede the read while event time is pinned to the boundary.
+    d.knowledge_mode='current_recorded_state';
+    const pinned:CommentSurfaceRequest={...projection,event_cutoff:d.event_cutoff,recorded_cutoff:d.recorded_cutoff,snapshot_hash:d.evidence.snapshot_hash};
+    expect(d.trajectory?.buckets.at(-1)).toMatchObject({window_seconds:0,discussion_entries:24,entries_per_window_hour:null});
+    expect(()=>assertCommentSurface(d,VEHICLE,LOT,pinned)).not.toThrow();
+  });
+  it.each([
+    ['missing projection',(d:CommentSurfaceReceipt)=>{delete d.trajectory;}],
+    ['wrong method',(d:CommentSurfaceReceipt)=>{d.trajectory!.method_id='other' as never;}],
+    ['missing hour',(d:CommentSurfaceReceipt)=>{d.trajectory!.buckets.pop();}],
+    ['duplicate hour',(d:CommentSurfaceReceipt)=>{d.trajectory!.buckets[1]=d.trajectory!.buckets[0];}],
+    ['changed hourly total',(d:CommentSurfaceReceipt)=>{d.trajectory!.buckets[334].discussion_entries++;}],
+    ['invalid window denominator',(d:CommentSurfaceReceipt)=>{d.trajectory!.buckets[1].window_seconds=42;}],
+    ['wrong rate',(d:CommentSurfaceReceipt)=>{d.trajectory!.buckets[334].entries_per_window_hour=9000;}],
+    ['false cumulative count',(d:CommentSurfaceReceipt)=>{d.trajectory!.buckets[1].cumulative_discussion_entries=1;}],
+    ['unsupported capture claim',(d:CommentSurfaceReceipt)=>{d.trajectory!.rate_basis='observed_capture' as never;}],
+  ])('rejects %s before drawing a curve',(_name,change)=>{
+    const d=commentFixture(projection);change(d);expect(()=>assertCommentSurface(d,VEHICLE,LOT,projection)).toThrow('Unsupported comment measurement receipt');
+  });
+  it('rejects source records outside the selected hour even when their count matches',()=>{
+    const request=commentHourRequest(commentFixture(projection),'2026-11-25T19:00:00.000Z'),d=commentFixture(request);
+    d.evidence.contributors[0].posted_at='2026-11-25T18:59:59Z';
+    expect(()=>assertCommentSurface(d,VEHICLE,LOT,request)).toThrow();
+  });
+  it.each(['csHour=2026-11-25T19%3A00%3A00Z','csHour=bad','csHour=2026-11-25T19%3A01%3A00Z',
+    'csHour=2026-11-25T19%3A00%3A00Z&csHour=2026-11-25T20%3A00%3A00Z'])('refuses incomplete or invalid hour pins %s',search=>{
+    expect(commentRequestFromParams(new URLSearchParams(search))).toBeNull();
   });
 });

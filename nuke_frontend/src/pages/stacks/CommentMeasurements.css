@@ -24,6 +24,19 @@
 .comment-measure__evidence td { vertical-align: top; max-width: 420px; }
 .comment-measure__evidence details { overflow-wrap: anywhere; }
 .comment-measure__excerpt { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+.comment-measure__composition > summary { min-height: 44px; align-content: center; cursor: pointer; }
+.comment-timeline { min-width: 0; margin: 20px 0; }
+.comment-timeline figcaption { font-weight: bold; font-size: var(--fs-14,14px); }
+.comment-timeline__controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.comment-timeline__controls select { min-width: 0; max-width: 100%; min-height: 44px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.comment-timeline__plot { display: block; width: 100%; min-width: 0; height: 240px; color: var(--text); }
+.comment-timeline__plot text { fill: currentColor; font-family: var(--font-family); font-size: var(--fs-12,12px); }
+.comment-timeline__axis { stroke: var(--border); }
+.comment-timeline__hour { fill: currentColor; cursor: pointer; }
+.comment-timeline__hour.is-selected { fill: var(--accent); }
+.comment-timeline__hit { fill: transparent; }
+.comment-timeline__selected-hour { stroke: var(--accent); stroke-dasharray: 3 3; }
+.comment-timeline select:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .comment-measure button:focus-visible, .comment-measure input:focus-visible, .comment-measure a:focus-visible, .comment-measure summary:focus-visible, .comment-measure [tabindex]:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 @media(max-width:600px) {
   .comment-measure__facts { grid-template-columns: 1fr; }

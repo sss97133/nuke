@@ -347,7 +347,7 @@ export default function OrderBookStack() {
         <LayerHead layer={current} index={layerIndex}>
           {layer === 'log' && <LogLayer read={read} view={view} path={path} onPickBid={pickBidFromLog} />}
           {layer === 'key' && <KeyLayer read={read} path={path} bookReady={bookReady} />}
-          {layer === 'dimension' && (<><CommentMeasurements key={lot.id} vehicleId={read.vehicle.id} lotId={lot.id} closeAt={lot.auction_end_date} embedded /><MissingNote layer={current} name="Stance" tail="No comment is labelled with a stance." /></>)}
+          {layer === 'dimension' && (<><CommentMeasurements key={lot.id} vehicleId={read.vehicle.id} lotId={lot.id} closeAt={lot.auction_end_date} embedded /><MissingNote layer={current} name="Stance" tail="This reader does not establish a stance score for the selected auction." /></>)}
           {layer === 'fold' && path && <BidPathFold receipt={path} identities={read.identities} selectedId={request?.selected_bid_comment_id ?? path.states.at(-1)?.bid_comment_id ?? null} bookReady={bookReady} onSelect={selectBid} />}
           {layer === 'baseline' && <BaselineLayer applies={baselineApplies} temperature={temperature} layer={current} unavailable={inputContextReason} />}
           {(layer === 'residual' || layer === 'feature' || layer === 'prediction') && <MissingNote layer={current} />}

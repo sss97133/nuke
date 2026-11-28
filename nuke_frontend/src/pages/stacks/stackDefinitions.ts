@@ -71,7 +71,7 @@ export const ORDER_BOOK_STACK: StackDefinition = {
       id: 'dimension', name: 'Dimension', state: 'partial',
       holds: 'Captured discussion volume, text and media coverage, literal text patterns and keyed participants.',
       reader: 'popup_vehicle_intel(vehicle, auction, request): bounded SQL measurements and source evidence; stance remains unmeasured',
-      missing: 'Stance from the text fold: a stated price ("I would pay X") as a reservation price, "too rich" as a refusal. No reader classifies comments that way.',
+      missing: 'Stance from the text fold: a stated price ("I would pay X") as a reservation price, "too rich" as a refusal. This view does not provide a qualified measurement of that stance.',
     },
     {
       id: 'fold', name: 'Fold', state: 'reader',

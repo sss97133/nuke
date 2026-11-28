@@ -64,13 +64,13 @@ it('removes old evidence on source change and makes a fresh first-page RPC despi
   const before=fixture.rpc.mock.calls.length;
   await click('Refresh comment measurements');
   expect(fixture.rpc.mock.calls.length).toBe(before+1);
-  expect(fixture.rpc.mock.calls.at(-1)![1].p_request).toEqual({evidence_filter:'all_discussion'});
+  expect(fixture.rpc.mock.calls.at(-1)![1].p_request).toEqual({evidence_filter:'all_discussion',include_trajectory:true});
   expect(container.querySelector('[data-comment-id]')?.getAttribute('data-comment-id')).toContain('000000001100');
   expect(container.querySelector('[data-address]')?.textContent).not.toContain('csHash');
 });
 it('filters media as recorded activity while preserving the whole discussion denominator',async()=>{
   await render();await click('Media only');
-  expect(fixture.rpc.mock.calls.at(-1)![1].p_request).toEqual({evidence_filter:'media_only'});
+  expect(fixture.rpc.mock.calls.at(-1)![1].p_request).toEqual({evidence_filter:'media_only',include_trajectory:true});
   expect(container.querySelectorAll('[data-comment-id]')).toHaveLength(1);
   expect(container.textContent).toContain('Media-only source entry');
   expect(container.querySelector('[aria-label^="Media only: 1 of 24"]')).toBeTruthy();
@@ -110,4 +110,20 @@ it('does not attach a shortened-text label to a long whitespace-only media entry
   await render('?layer=dimension&csFilter=media_only');
   expect(container.textContent).toContain('Media-only source entry');
   expect(container.querySelector('[data-comment-id]')?.textContent).not.toContain('excerpt shortened');
+});
+
+it('opens the same SQL hour from the chart and selector, retains it on page two and restores it with Back',async()=>{
+  await render();const hour='2026-11-25T19:00:00.000Z';
+  const point=container.querySelector(`[data-discussion-hour="${hour}"]`)!;
+  expect(point.getAttribute('data-entry-count')).toBe('24');
+  expect(container.querySelector<HTMLDetailsElement>('.comment-measure__composition')?.open).toBe(false);
+  await act(async()=>point.dispatchEvent(new MouseEvent('click',{bubbles:true})));await settle();
+  expect(fixture.rpc.mock.calls.at(-1)![1].p_request).toMatchObject({include_trajectory:true,evidence_bucket:hour,snapshot_hash:'1'.repeat(32),offset:0});
+  expect(container.querySelector('caption')?.textContent).toContain('hour beginning 2026-11-25 19:00:00 UTC');
+  await click('Next comment entries');expect(fixture.rpc.mock.calls.at(-1)![1].p_request).toMatchObject({evidence_bucket:hour,offset:20});
+  const select=container.querySelector('select')!;
+  await act(async()=>{select.value='2026-11-25T18:00:00.000Z';select.dispatchEvent(new Event('change',{bubbles:true}));});await settle();
+  expect(container.querySelector('[data-comment-id]')).toBeNull();expect(container.textContent).toContain('0 entries');
+  await click('Back comment controls');expect(container.querySelector('select')?.value).toBe(hour);
+  expect(container.querySelectorAll('[data-comment-id]')).toHaveLength(4);
 });
