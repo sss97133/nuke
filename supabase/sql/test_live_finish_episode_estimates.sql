@@ -55,7 +55,7 @@ INSERT INTO public.hammer_predictions VALUES
  ('00000000-0000-4000-8000-000000000102',32,41000,35000,51000,0.8,30000,now()-interval '2 minutes',
   '{"source_event_id":"00000000-0000-4000-8000-000000000202","source_listing_url":"https://bringatrailer.com/listing/fixture-private-car","source_identity_basis":"retained_native_current_episode"}');
 
-\ir ../migrations/20261128111352_live_finish_episode_estimates.sql
+\ir ../migrations/20261128131000_live_finish_episode_estimates.sql
 
 SET ROLE anon;
 SELECT pg_temp.ok('direct prediction table is not readable', NOT has_table_privilege('anon','public.hammer_predictions','SELECT'));
