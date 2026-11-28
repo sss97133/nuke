@@ -20,6 +20,49 @@ final class ReceiptEvidenceTests: XCTestCase {
     func workRead() throws -> ReceiptWorkContextRead {
         try JSONDecoder().decode(ReceiptWorkContextRead.self, from: Data(ReceiptDepthFixtures.work.utf8))
     }
+    func testHistoricalReadingKeepsItsOwnPhotoAndIsNotPresentedAsCurrent() throws {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(ReceiptDepthFixtures.work.utf8)) as? [String: Any])
+        var lines = try XCTUnwrap(object["lines"] as? [[String: Any]])
+        lines[0].removeValue(forKey: "historical_judgment")
+        object["lines"] = lines
+        let old = try JSONDecoder().decode(ReceiptWorkContextRead.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(old.lines.first?.historical_judgment, "Older reader payloads remain compatible")
+        let frameID = "00000000-0000-4000-8000-00000000d001"
+        lines[0]["historical_judgment"] = [
+            "answer": ["visible": "yes", "installed": "cannot_tell", "confidence": 0.6, "quote": "A part is visible"],
+            "frame": ["image_id": frameID, "image_url": "https://example.invalid/photo.jpg", "taken_at": "2026-03-09"]
+        ]
+        object["lines"] = lines
+        let decoded = try JSONDecoder().decode(ReceiptWorkContextRead.self, from: JSONSerialization.data(withJSONObject: object))
+        let reading = try XCTUnwrap(decoded.lines.first?.historical_judgment)
+        XCTAssertEqual(reading.frame?.image_id, UUID(uuidString: frameID))
+        XCTAssertEqual(reading.answer?.quote, "A part is visible")
+        XCTAssertTrue(ReceiptWorkWords.historical(reading).contains("photo context has since changed"))
+        XCTAssertTrue(ReceiptWorkWords.historical(reading).contains("installed cannot tell"))
+    }
+    func testCurrentReadingDecodesItsCitedFrameIdentity() throws {
+        let line = try XCTUnwrap(workRead().lines.first)
+        let citedID = try XCTUnwrap(line.judgment?.answer?.image_id)
+        let frame = try XCTUnwrap(line.frames.first { $0.image_id == citedID })
+        XCTAssertEqual(frame.image_url, "https://fixture.nuke.invalid/current.jpg")
+        let context = try XCTUnwrap(line.judgment?.answer?.frame_context)
+        XCTAssertEqual(context.image_id, citedID)
+        XCTAssertEqual(context.photo_taken_at, "2026-03-12T15:00:00+00:00")
+        XCTAssertEqual(context.session?.id, UUID(uuidString: "00000000-0000-4000-8000-00000000e201"))
+        XCTAssertEqual(context.session?.session_date, "2026-03-12")
+    }
+    func testSessionReadingKeepsReceiptItemPhotoAndSourceDateSeparate() throws {
+        let read = try JSONDecoder().decode(ReceiptSessionReadings.self, from: Data(ReceiptDepthFixtures.sessionReadings.utf8))
+        XCTAssertTrue(read.available)
+        let line = try XCTUnwrap(read.readings.first)
+        XCTAssertEqual(line.evidence_id, UUID(uuidString: "00000000-0000-4000-8000-00000000f101"))
+        XCTAssertEqual(line.question_id, UUID(uuidString: "00000000-0000-4000-8000-00000000f301"))
+        XCTAssertEqual(line.receipt_id, receipt)
+        XCTAssertEqual(line.item_id, UUID(uuidString: "00000000-0000-4000-8000-00000000f201"))
+        XCTAssertEqual(line.photo_id, UUID(uuidString: "00000000-0000-4000-8000-00000000e001"))
+        XCTAssertEqual(line.source_date, "2026-03-09")
+        XCTAssertEqual(line.photo_taken_at, "2026-03-12T15:00:00+00:00")
+    }
     func reads(day: ReceiptEvidenceDay? = nil, work: ReceiptWorkContextRead? = nil) -> ReceiptEvidenceReaders.Reads {
         let row = link(), payload = day ?? self.day()
         return .init(links: { _ in [row] }, day: { _, _ in payload }, work: { _, _ in

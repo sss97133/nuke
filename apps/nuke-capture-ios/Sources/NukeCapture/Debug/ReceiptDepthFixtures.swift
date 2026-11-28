@@ -12,6 +12,13 @@ enum ReceiptDepthFixtures {
      "audit":{"receipts":[{"id":"\(receiptId)","source":"receipt","vendor":"Fixture Parts Shop","amount":35,"date":"2026-03-09"}]}}
     """
     static let withdrawn = #"{"date":"2026-03-09","tied":true,"documents":[]}"#
+    static let sessionReadings = """
+    {"available":true,"readings":[{"evidence_id":"00000000-0000-4000-8000-00000000f101","question_id":"00000000-0000-4000-8000-00000000f301",
+      "receipt_id":"\(receiptId)","item_id":"00000000-0000-4000-8000-00000000f201",
+      "line_number":1,"description":"Corrected gasket reading","part_number":"TEST-G1","reading_status":"current",
+      "source_date":"2026-03-09","photo_id":"00000000-0000-4000-8000-00000000e001",
+      "photo_taken_at":"2026-03-12T15:00:00+00:00","visible":"yes","installed":"cannot_tell"}]}
+    """
     static let day = """
     {"date":"2026-03-09","tied":true,"documents":[{"receipt_id":"\(receiptId)",
       "document_id":"00000000-0000-4000-8000-00000000d001","date":"2026-03-09","date_source":"transaction_date",
@@ -29,7 +36,7 @@ enum ReceiptDepthFixtures {
        "line_number":1,"description":"Corrected gasket reading","amount":35,"conclusion":"install_window_photographed","confidence":0.57,
        "status":"proposed","kind":"receipt_time_context","not_asserted":["independent_corroboration","installation_proof","payment_proof","owner_sign"],
        "anchor_date":"2026-03-09","anchor_source":"page_date:receipt_date","zone":"engine","days_to_first_photo":3,
-       "frames":[{"image_id":"00000000-0000-4000-8000-00000000e001","taken_at":"2026-03-12T15:00:00+00:00","image_url":null,"thumbnail_url":null,
+       "frames":[{"image_id":"00000000-0000-4000-8000-00000000e001","taken_at":"2026-03-12T15:00:00+00:00","image_url":"https://fixture.nuke.invalid/current.jpg","thumbnail_url":null,
                   "photographer":{"label":"photographer (from the photo record)","attribution":"Fixture photographer","documented_by_user_id":null}}],
        "frames_hidden":1,
        "lineage":{"receipt_id":"\(receiptId)","source_document_table":"vehicle_documents","source_document_id":"00000000-0000-4000-8000-00000000d001",
@@ -38,9 +45,15 @@ enum ReceiptDepthFixtures {
        "printed":{"attributed_to":"document","line_date":null,"hours":null,"performer":"FIXTURE TECH"},
        "printed_performer":{"label":"performer as printed on the document (document testimony)","value":"FIXTURE TECH"},
        "custodian":{"label":"account the document is filed under (custody only, not ownership or payment)","user_id":null,"masked":true},
+       "historical_judgment":{"question_id":"00000000-0000-4000-8000-00000000f302","status":"answered",
+           "reason":"The photo context has changed since this reading.",
+           "answer":{"visible":"yes","installed":"cannot_tell","confidence":0.6,"quote":"earlier gasket reading"},
+           "frame":{"image_id":"00000000-0000-4000-8000-00000000e002","image_url":"https://fixture.nuke.invalid/earlier.jpg","taken_at":"2026-03-10"}},
        "judgment":{"question_id":"00000000-0000-4000-8000-00000000f301","status":"answered","question":"receipt_part_visible",
                    "asked_at":"2026-03-13T00:00:00+00:00","holder":null,
-                   "answer":{"visible":"yes","installed":"cannot_tell","confidence":0.6,"image_id":null,"quote":"gasket visible"}}}],
+                   "answer":{"visible":"yes","installed":"cannot_tell","confidence":0.6,"image_id":"00000000-0000-4000-8000-00000000e001","quote":"gasket visible",
+                       "frame_context":{"image_id":"00000000-0000-4000-8000-00000000e001","photo_taken_at":"2026-03-12T15:00:00+00:00",
+                           "session":{"id":"00000000-0000-4000-8000-00000000e201","session_date":"2026-03-12","title":"Fixture photo session","session_type":"auto_detected"}}}}}],
      "withdrawn":[{"evidence_id":"00000000-0000-4000-8000-00000000f102","receipt_id":"\(receiptId)","item_id":null,"line_number":2,
                    "status":"withdrawn","reason":"line_removed","prior_evidence_id":null,"prior_conclusion":"receipt_day_photographed"}]}
     """

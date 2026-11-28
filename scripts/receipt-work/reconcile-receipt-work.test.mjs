@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { judgmentFor, staleJudgments, retireKind, discoverVehicles, main, DEPARTMENT, QUESTION } from './reconcile-receipt-work.mjs';
+import { judgmentFor, staleJudgments, retireKind, discoverVehicles, equivalentQuestionParams, main, DEPARTMENT, QUESTION } from './reconcile-receipt-work.mjs';
 import { fromReceiptWorkLine, fromReceiptWorkWithdrawal } from '../garage/derivation-evidence.mjs';
 
 const row = { vehicle_id: '20d21fb0-4651-4469-a0ba-e751309a1e54', user_id: '0b9f107a-d124-49de-9ded-94698f63c1c4', receipt_id: '11111111-1111-1111-1111-111111111111',
@@ -116,6 +116,16 @@ function fakeDb(state) {
     if (path === 'receipt_vehicle_links') return ok(state.links);
     if (path === 'rpc/receipt_work_lines') return ok(state.lines[body.p_vehicle_id] ?? []);
     if (path === 'rpc/receipt_work_withdrawals') return ok(state.withdrawals[body.p_vehicle_id] ?? []);
+    if (path === 'rpc/receipt_work_judgment_qualification') {
+      if (state.qualificationFailure) return { ok: false, status: 400, text: async () => 'qualification unavailable' };
+      return ok((state.judgments ?? []).filter((j) => j.vehicle_id === body.p_vehicle_id && j.status === 'answered').flatMap((j) => {
+        const problems = state.problems[j.id] ?? [];
+        const photoOnly = problems.length && problems.every((p) => /^context_changed:(candidate_image_ids|zone_photos_total|zone_photos_in_window|first_photo_day|conclusion)(,(candidate_image_ids|zone_photos_total|zone_photos_in_window|first_photo_day|conclusion))*$/.test(p));
+        if (problems.length && !photoOnly) return [];
+        const line = (state.lines[body.p_vehicle_id] ?? []).find((r) => r.item_id === j.subject_id);
+        return line ? [{ judgment_id: j.id, receipt_item_id: j.subject_id, link_id: line.link_id, qualification: photoOnly ? 'historical_photo_context' : 'current' }] : [];
+      }));
+    }
     if (path === 'rpc/raise_evidence_judgment') { state.raised.push(body.p_row); return ok([{ id: `new-${state.raised.length}`, action: 'inserted', status: 'pending' }]); }
     if (path === 'rpc/evidence_judgment_ineligibility') return ok(state.problems[body.p_id] ?? []);
     if (path === 'rpc/retire_evidence_judgment') { state.retired.push(body); return ok(state.judgments.find((j) => j.id === body.p_id)?.status === 'answered' ? 'withdrawn' : 'cancelled'); }
@@ -177,6 +187,105 @@ test('a corrected line raises a new question and retires the old one as content_
   assert.equal(state.retired.length, 1);
   assert.equal(state.retired[0].p_kind, 'content_changed'); assert.equal(state.retired[0].p_superseded_by, 'new-1');
   assert.deepEqual(summary.judgments_retired, { 'content_changed:withdrawn': 1 }, 'an answered question about old content is withdrawn, not inherited');
+});
+
+test('--keep-answered never carries an answer across a corrected line', async () => {
+  const corrected = { ...row, description: 'RADIATOR HOSE', relationship_status: 'proposed' };
+  const state = { links: [{ vehicle_id: V1 }], lines: { [V1]: [corrected] }, withdrawals: {}, raised: [], retired: [],
+    problems: { jo: ['line_changed', 'context_changed:description'] }, evidence: [],
+    judgments: [{ id: 'jo', vehicle_id: V1, subject_id: row.item_id, dedupe_key: 'old', status: 'answered' }] };
+  const { summary } = await runWith(state, ['--keep-answered']);
+  assert.deepEqual(summary.errors, []);
+  assert.equal(state.raised.length, 1);
+  assert.equal(state.raised[0].params.description, 'RADIATOR HOSE');
+  assert.equal(state.retired[0].p_kind, 'content_changed');
+  assert.equal(state.retired[0].p_superseded_by, 'new-1');
+  assert.equal(summary.judgments_kept_answered, 0);
+});
+
+test('--keep-answered retains only a database-qualified answer', async () => {
+  const evidence = fromReceiptWorkLine(row, { runId: RUN }, { version: 'v' });
+  const currentKey = judgmentFor(row, evidence, { runId: RUN, version: 'v' }).dedupe_key;
+  const state = { links: [{ vehicle_id: V1 }], lines: { [V1]: [row] }, withdrawals: {}, raised: [], retired: [], problems: { jo: [] },
+    evidence: [], judgments: [{ id: 'jo', vehicle_id: V1, subject_id: row.item_id, dedupe_key: currentKey, status: 'answered' }] };
+  const { summary } = await runWith(state, ['--keep-answered']);
+  assert.deepEqual(summary.errors, []);
+  assert.equal(state.raised.length, 0, 'the exact answered question is retained');
+  assert.equal(state.retired.length, 0);
+  assert.equal(summary.judgments_kept_answered, 1);
+});
+
+test('--keep-answered re-asks when the old question has no recoverable source context', async () => {
+  const state = { links: [{ vehicle_id: V1 }], lines: { [V1]: [row] }, withdrawals: {}, raised: [], retired: [],
+    problems: { jo: ['context_changed:candidate_image_ids'] }, evidence: [],
+    judgments: [{ id: 'jo', vehicle_id: V1, subject_id: row.item_id, dedupe_key: 'old', status: 'answered' }] };
+  const { summary } = await runWith(state, ['--keep-answered']);
+  assert.deepEqual(summary.errors, []);
+  assert.equal(state.raised.length, 1);
+  assert.equal(state.retired[0].p_kind, 'content_changed');
+});
+
+test('--keep-answered preserves a source-bound answer as historical when the photo search changes', async () => {
+  const newImage = '77777777-7777-7777-7777-777777777777';
+  const prior = { ...row, question_context: { ...row.question_context, zone_photos_total: 1 } };
+  const current = { ...prior, image_ids: [row.image_ids[0], newImage],
+    question_context: { ...prior.question_context, zone_photos_total: 2, candidate_image_ids: [row.image_ids[0], newImage] } };
+  const ev = fromReceiptWorkLine(prior, { runId: RUN }, { version: 'v' });
+  const old = judgmentFor(prior, ev, { runId: RUN, version: 'v' });
+  const state = { links: [{ vehicle_id: V1 }], lines: { [V1]: [current] }, withdrawals: {}, raised: [], retired: [],
+    problems: { jo: ['context_changed:candidate_image_ids,zone_photos_total'] }, evidence: [],
+    judgments: [{ id: 'jo', vehicle_id: V1, subject_id: row.item_id, dedupe_key: old.dedupe_key, params: old.params, status: 'answered' }] };
+  const { summary, calls } = await runWith(state, ['--keep-answered']);
+  assert.deepEqual(summary.errors, []);
+  assert.equal(state.raised.length, 0);
+  assert.equal(state.retired.length, 0);
+  assert.equal(summary.judgments_kept_historical, 1);
+  assert.equal(calls.filter((c) => c.path === 'rpc/receipt_work_judgment_qualification').length, 1);
+  assert.equal(calls.filter((c) => c.path === 'rpc/evidence_judgment_ineligibility').length, 0);
+});
+
+test('question comparison treats only candidate ordering as immaterial', () => {
+  const a = { candidate_image_ids: ['a', 'b'], context: { candidate_image_ids: ['a', 'b'], link_id: 'l1' }, lineage: { image_ids: ['a', 'b'] } };
+  const b = { candidate_image_ids: ['b', 'a'], context: { candidate_image_ids: ['b', 'a'], link_id: 'l1' }, lineage: { image_ids: ['b', 'a'] } };
+  assert.equal(equivalentQuestionParams(a, b), true);
+  assert.equal(equivalentQuestionParams(a, { ...b, context: { ...b.context, link_id: 'l2' } }), false);
+  assert.equal(equivalentQuestionParams(a, { ...b, candidate_image_ids: ['a'] }), false);
+});
+
+test('--keep-answered preserves the same source question when photo order changes', async () => {
+  const second = '77777777-7777-7777-7777-777777777777';
+  const changedOrder = { ...row, image_ids: [row.image_ids[0], second], question_context: { ...row.question_context, candidate_image_ids: [row.image_ids[0], second] } };
+  const prior = { ...changedOrder, image_ids: [second, row.image_ids[0]], question_context: { ...changedOrder.question_context, candidate_image_ids: [second, row.image_ids[0]] } };
+  const ev = fromReceiptWorkLine(prior, { runId: RUN }, { version: 'v' });
+  const old = judgmentFor(prior, ev, { runId: RUN, version: 'v' });
+  const state = { links: [{ vehicle_id: V1 }], lines: { [V1]: [changedOrder] }, withdrawals: {}, raised: [], retired: [], problems: { jo: [] }, evidence: [],
+    judgments: [{ id: 'jo', vehicle_id: V1, subject_id: row.item_id, dedupe_key: old.dedupe_key, params: old.params, status: 'answered' }] };
+  const { summary } = await runWith(state, ['--keep-answered']);
+  assert.deepEqual(summary.errors, []);
+  assert.equal(state.raised.length, 0);
+  assert.equal(state.retired.length, 0);
+  assert.equal(summary.judgments_kept_answered, 1);
+});
+
+test('--keep-answered does not keep an answer when the source changes during the run', async () => {
+  const evidence = fromReceiptWorkLine(row, { runId: RUN }, { version: 'v' });
+  const currentKey = judgmentFor(row, evidence, { runId: RUN, version: 'v' }).dedupe_key;
+  const state = { links: [{ vehicle_id: V1 }], lines: { [V1]: [row] }, withdrawals: {}, raised: [], retired: [],
+    problems: { jo: ['line_changed'] }, evidence: [],
+    judgments: [{ id: 'jo', vehicle_id: V1, subject_id: row.item_id, dedupe_key: currentKey, status: 'answered' }] };
+  const { summary } = await runWith(state, ['--keep-answered']);
+  assert.deepEqual(summary.errors, []);
+  assert.equal(state.retired.length, 1);
+  assert.equal(state.retired[0].p_id, 'jo');
+});
+
+test('--keep-answered stops before writes when database qualification is unavailable', async () => {
+  const state = { links: [{ vehicle_id: V1 }], lines: { [V1]: [row] }, withdrawals: {}, raised: [], retired: [], problems: {}, evidence: [], judgments: [], qualificationFailure: true };
+  const { summary, calls } = await runWith(state, ['--keep-answered']);
+  assert.equal(summary.errors.length, 1);
+  assert.equal(calls.filter((c) => ['POST', 'PATCH'].includes(c.method) && !c.path.startsWith('rpc/')).length, 0);
+  assert.equal(state.raised.length, 0);
+  assert.equal(state.retired.length, 0);
 });
 
 test('--no-db reads but writes nothing', async () => {

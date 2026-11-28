@@ -76,10 +76,40 @@ struct ReceiptWorkContextRead: Decodable {
     let withdrawn: [ReceiptWorkWithdrawal]
 }
 
+struct ReceiptSessionReadings: Decodable {
+    struct Reading: Decodable, Identifiable {
+        let evidence_id: UUID
+        let question_id: UUID
+        let receipt_id: UUID
+        let item_id: UUID
+        let line_number: Int?
+        let description: String?
+        let part_number: String?
+        let reading_status: String
+        let source_date: String?
+        let photo_id: UUID?
+        let photo_taken_at: String?
+        let visible: String?
+        let installed: String?
+
+        var id: String { "\(evidence_id.uuidString):\(question_id.uuidString)" }
+        var statusText: String {
+            switch reading_status {
+            case "current": return "Current photo reading"
+            case "historical": return "Earlier photo reading"
+            default: return "Photo reading status unavailable"
+            }
+        }
+    }
+    let available: Bool
+    let readings: [Reading]
+}
+
 struct ReceiptWorkContextLine: Decodable {
     struct Frame: Decodable {
         struct Photographer: Decodable { let attribution: String? }
         let image_id: UUID
+        let image_url: String?
         let taken_at: String?
         let photographer: Photographer?
     }
@@ -98,6 +128,17 @@ struct ReceiptWorkContextLine: Decodable {
     }
     struct Labelled: Decodable { let value: String? }
     struct Custodian: Decodable { let masked: Bool? }
+    struct FrameContext: Decodable {
+        struct Session: Decodable, Identifiable {
+            let id: UUID
+            let session_date: String?
+            let title: String?
+            let session_type: String?
+        }
+        let image_id: UUID
+        let photo_taken_at: String?
+        let session: Session?
+    }
     struct Judgment: Decodable {
         struct Holder: Decodable { let claimed_by: String? }
         struct Answer: Decodable {
@@ -105,10 +146,21 @@ struct ReceiptWorkContextLine: Decodable {
             let installed: String?
             let confidence: Double?
             let quote: String?
+            let image_id: UUID?
+            let frame_context: FrameContext?
         }
         let status: String
         let holder: Holder?
         let answer: Answer?
+    }
+    struct HistoricalJudgment: Decodable {
+        struct Frame: Decodable {
+            let image_id: UUID
+            let image_url: String?
+            let taken_at: String?
+        }
+        let answer: Judgment.Answer?
+        let frame: Frame?
     }
     let evidence_id: UUID
     let receipt_id: UUID
@@ -124,6 +176,7 @@ struct ReceiptWorkContextLine: Decodable {
     let printed_performer: Labelled?
     let custodian: Custodian?
     let judgment: Judgment?
+    let historical_judgment: HistoricalJudgment?
 }
 
 struct ReceiptWorkWithdrawal: Decodable {
@@ -169,6 +222,14 @@ enum ReceiptWorkWords {
                          a?.confidence.map { String(format: "confidence %.2f", $0) }].compactMap { $0 }
             return "Answered, a model's reading (not a sign): " + (parts.isEmpty ? "no detail" : parts.joined(separator: " · "))
         }
+    }
+    static func historical(_ j: ReceiptWorkContextLine.HistoricalJudgment) -> String {
+        let a = j.answer
+        let parts = [a?.visible.map { "visible \(JobWords.humanize($0))" },
+                     a?.installed.map { "installed \(JobWords.humanize($0))" },
+                     a?.confidence.map { String(format: "confidence %.2f", $0) }].compactMap { $0 }
+        return "Earlier model reading; the photo context has since changed: "
+            + (parts.isEmpty ? "no detail" : parts.joined(separator: " · "))
     }
 }
 
@@ -264,7 +325,7 @@ struct ReceiptEvidenceView: View {
             case .refused(let refusal):
                 JobRefusalRow(refusal: refusal)
                 Button("Retry") { Task { await reload() } }
-            case .loaded(let evidence): ReceiptEvidenceContent(evidence: evidence)
+            case .loaded(let evidence): ReceiptEvidenceContent(evidence: evidence, vehicleId: vehicleId)
             }
         }
         .accessibilityIdentifier("receipt-evidence")
@@ -293,6 +354,7 @@ struct ReceiptEvidenceView: View {
 
 struct ReceiptEvidenceContent: View {
     let evidence: ReceiptEvidence
+    let vehicleId: UUID
     private var document: ReceiptEvidenceDocument { evidence.document }
 
     var body: some View {
@@ -311,7 +373,7 @@ struct ReceiptEvidenceContent: View {
                     if let performer = line.performer { RootedValueView(label: "Performer reading", value: performer, status: .attributed) }
                     if let date = line.line_date { RootedValueView(label: "Recorded line date", value: date, status: .attributed) }
                     if let work = evidence.workLine(line.line_number) {
-                        ReceiptWorkContextDisclosure(line: work)
+                        ReceiptWorkContextDisclosure(line: work, vehicleId: vehicleId)
                     } else if let gone = evidence.withdrawnWork(line.line_number) {
                         Text("Proposed work context withdrawn: \(ReceiptWorkWords.withdrawal(gone.reason)).")
                             .font(.caption).foregroundStyle(.secondary)
@@ -360,6 +422,19 @@ struct ReceiptEvidenceContent: View {
 /// One line's proposed receipt-to-work context, behind a disclosure, in the same rooted-row style as the line.
 struct ReceiptWorkContextDisclosure: View {
     let line: ReceiptWorkContextLine
+    let vehicleId: UUID
+    private struct ReadingPhoto: Identifiable {
+        let id: UUID
+        let url: String
+        let takenAt: String?
+    }
+    private struct ReadingSession: Identifiable {
+        let context: ReceiptWorkContextLine.FrameContext
+        let session: ReceiptWorkContextLine.FrameContext.Session
+        var id: UUID { session.id }
+    }
+    @State private var selectedPhoto: ReadingPhoto?
+    @State private var selectedSession: ReadingSession?
 
     var body: some View {
         DisclosureGroup("Proposed work context") {
@@ -392,9 +467,157 @@ struct ReceiptWorkContextDisclosure: View {
             if let judgment = line.judgment {
                 RootedValueView(label: "Question", value: ReceiptWorkWords.judgment(judgment), status: judgment.status == "answered" ? .projected : .pending)
                 if let quote = judgment.answer?.quote { Text("“\(quote)”").font(.caption).textSelection(.enabled) }
+                if let answer = judgment.answer, let context = answer.frame_context, context.image_id == answer.image_id {
+                    ReceiptReadingFrameContext(context: context) { session in
+                        selectedSession = ReadingSession(context: context, session: session)
+                    }
+                }
+                if let imageID = judgment.answer?.image_id,
+                   let frame = line.frames.first(where: { $0.image_id == imageID }),
+                   let url = frame.image_url, !url.isEmpty {
+                    Button("View photo cited by reading") {
+                        selectedPhoto = ReadingPhoto(id: imageID, url: url, takenAt: frame.taken_at)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            if let historical = line.historical_judgment {
+                RootedValueView(label: "Earlier reading", value: ReceiptWorkWords.historical(historical), status: .attributed)
+                if let quote = historical.answer?.quote { Text("“\(quote)”").font(.caption).textSelection(.enabled) }
+                if let answer = historical.answer, let context = answer.frame_context, context.image_id == answer.image_id {
+                    ReceiptReadingFrameContext(context: context) { session in
+                        selectedSession = ReadingSession(context: context, session: session)
+                    }
+                }
+                if let frame = historical.frame, let url = frame.image_url, !url.isEmpty {
+                    Button("View photo from earlier reading") {
+                        selectedPhoto = ReadingPhoto(id: frame.image_id, url: url, takenAt: frame.taken_at)
+                    }
+                    .buttonStyle(.borderless)
+                    Text("This opens the current photo record; the original image bytes were not recorded with the reading.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
         .font(.callout)
-        .accessibilityIdentifier("receipt-work-context")
+        .accessibilityElement(children: .contain)
+        .sheet(item: $selectedPhoto) { photo in
+            FullScreenGalleryView(photos: [VehicleGalleryImage(id: photo.id, image_url: photo.url, thumbnail_url: nil,
+                is_primary: nil, taken_at: photo.takenAt, labels: nil, ai_processing_status: nil,
+                image_category: nil, created_at: nil, vision_gate_agent_reasoning: nil)])
+        }
+        .sheet(item: $selectedSession) { target in
+            NavigationStack {
+                ReceiptReadingSessionDetail(context: target.context, session: target.session, vehicleId: vehicleId)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Close") { selectedSession = nil }.accessibilityLabel("Close photo session")
+                        }
+                    }
+            }
+        }
+    }
+}
+
+/// This session comes from the cited photo's actual foreign key, not the receipt's date window.
+private struct ReceiptReadingFrameContext: View {
+    let context: ReceiptWorkContextLine.FrameContext
+    let open: (ReceiptWorkContextLine.FrameContext.Session) -> Void
+
+    var body: some View {
+        if let session = context.session {
+            Button {
+                open(session)
+            } label: {
+                HStack {
+                    Text("Photo's linked session" + (session.session_date.map { " · \($0)" } ?? ""))
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("receipt-reading-photo-session")
+        }
+    }
+}
+
+private struct ReceiptReadingSessionDetail: View {
+    let context: ReceiptWorkContextLine.FrameContext
+    let session: ReceiptWorkContextLine.FrameContext.Session
+    let vehicleId: UUID
+    private enum ReadState {
+        case loading, available(ReceiptSessionReadings), unavailable, failed
+    }
+    @State private var state: ReadState = .loading
+    @State private var generation = UUID()
+
+    var body: some View {
+        List {
+            switch state {
+            case .loading: ProgressView("Reading the photo session…")
+            case .unavailable: Text("This photo session is unavailable to this account.")
+            case .failed:
+                Text("Could not load the photo session.")
+                Button("Retry") { Task { await reload() } }
+            case .available(let read):
+                Section("Photo's linked session") {
+                    if let title = session.title, !title.isEmpty { Text(title) }
+                    RootedValueView(label: "Session day", value: session.session_date ?? "Not recorded", status: .recorded)
+                    if let type = session.session_type { RootedValueView(label: "Session source", value: JobWords.humanize(type), status: .attributed) }
+                    RootedValueView(label: "Photo timestamp", value: context.photo_taken_at ?? "Not recorded", status: .recorded)
+                    Text("The photo is linked to this session. The photo and session do not establish the part's installation date.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section("Related receipt lines") {
+                    if read.readings.isEmpty {
+                        Text("No accessible receipt-photo readings found for this session.").foregroundStyle(.secondary)
+                    }
+                    ForEach(read.readings) { reading in
+                        NavigationLink {
+                            ReceiptEvidenceView(receiptId: reading.receipt_id, vehicleId: vehicleId)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(reading.description ?? "Receipt line")
+                                if let part = reading.part_number { Text(part).font(.caption.monospaced()) }
+                                Text(reading.statusText)
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if let sourceDate = reading.source_date { Text("Source date · \(sourceDate)").font(.caption).foregroundStyle(.secondary) }
+                            }
+                        }
+                    }
+                    Text("These readings connect receipt lines to photos in this session; they are not confirmed work or a work value.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .navigationTitle("Photo session")
+        .accessibilityIdentifier("receipt-reading-session-detail")
+        .task(id: "\(vehicleId)|\(session.id)") {
+            let changes = SupabaseService.client.auth.authStateChanges
+            var account = SupabaseService.currentUserId
+            await reload()
+            for await _ in changes {
+                guard !Task.isCancelled else { return }
+                let next = SupabaseService.currentUserId
+                if next != account { account = next; state = .loading; await reload() }
+            }
+        }
+    }
+
+    @MainActor private func reload() async {
+        let request = UUID(); generation = request; state = .loading
+        let account = SupabaseService.currentUserId
+        do {
+            let read: ReceiptSessionReadings = try await SupabaseService.client.rpc("get_vehicle_receipt_readings_for_session", params: [
+                "p_vehicle_id": vehicleId.uuidString, "p_session_id": session.id.uuidString
+            ]).execute().value
+            guard !Task.isCancelled, generation == request else { return }
+            guard SupabaseService.currentUserId == account else { state = .unavailable; return }
+            state = read.available ? .available(read) : .unavailable
+        } catch {
+            guard !Task.isCancelled, generation == request else { return }
+            state = .failed
+        }
     }
 }
