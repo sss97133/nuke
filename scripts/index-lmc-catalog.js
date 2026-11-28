@@ -4,8 +4,10 @@
  * Extracts every part, every detail, page by page
  */
 
-import { createClient } from '@supabase/supabase-js';
-import { createRequire } from 'module';
+import guardUnqualifiedCatalogWrites from './guard-unqualified-lmc-writes.cjs';
+guardUnqualifiedCatalogWrites();
+const { createClient } = await import('@supabase/supabase-js');
+const { createRequire } = await import('node:module');
 const require = createRequire(import.meta.url);
 require('dotenv').config();
 const pdfParseModule = require('pdf-parse');

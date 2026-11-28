@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./guard-unqualified-lmc-writes.cjs')();
 /**
  * COMPLETE LMC CATALOG INDEXING
  * Extracts ALL data: parts, prices, categories, page references, sections

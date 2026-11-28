@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
-import { createClient } from '@supabase/supabase-js';
-import * as pdfjsLib from 'pdfjs-dist';
+import guardUnqualifiedCatalogWrites from './guard-unqualified-lmc-writes.cjs';
+guardUnqualifiedCatalogWrites();
+const { createClient } = await import('@supabase/supabase-js');
+const pdfjsLib = await import('pdfjs-dist');
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

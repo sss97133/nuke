@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./guard-unqualified-lmc-writes.cjs')();
 /**
  * BACKFILL CATALOG METADATA
  * Updates existing catalog parts with category, year ranges, and model compatibility

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./guard-unqualified-lmc-writes.cjs')();
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const pdfjsLib = require('pdfjs-dist');

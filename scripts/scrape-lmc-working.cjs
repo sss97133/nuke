@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./guard-unqualified-lmc-writes.cjs')();
 /**
  * WORKING LMC SCRAPER
  * Uses Firecrawl to get real LMC product data

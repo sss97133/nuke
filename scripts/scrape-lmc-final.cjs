@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./guard-unqualified-lmc-writes.cjs')();
 /**
  * FINAL LMC SCRAPER
  * Uses Firecrawl MAP API directly to discover LMC URLs, then scrapes them
