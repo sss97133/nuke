@@ -9,9 +9,9 @@
 //   • an auction lot: the live finish estimate's low..high from FinishBoard (read once per feed load),
 //     labelled "Projected hammer", only while the board is fresh and the current bid sits at or under the
 //     band's top. No action zone: the repo has no validated one.
-// A long press on the rail opens "Why this range" (ExploreWhySheet), which serves the rest of the evidence
-// once: cohort size and period, basis, venues, mileage, source, as-of; for lots the model, grade, comps
-// date, factors and the analog lots with their links.
+// Tapping the price opens its evidence sheet: cohort size and period, basis, venues, mileage, source,
+// and as-of; for lots the model, grade, comps date, factors and the analog lots with their links. The
+// sheet says "Why this range" only when the card actually displays a range.
 
 import SwiftUI
 
@@ -31,6 +31,8 @@ struct ExplorePriceRail: Equatable {
     let marker: Double
 
     var hasBand: Bool { basis != .none }
+    /// A plain price has context too, but there is no range to explain.
+    var detailsTitle: String { hasBand ? "Why this range" : "Price details" }
 
     static func plain(caption: String?) -> ExplorePriceRail {
         ExplorePriceRail(basis: .none, caption: caption, low: nil, high: nil, bandStart: 0, bandEnd: 0, marker: 0)
@@ -253,6 +255,18 @@ struct ExploreWhy: Identifiable, Equatable {
     let estimate: FinishEstimate?
     let fresh: Bool
     var id: String { item.id }
+
+    var rail: ExplorePriceRail { .make(item: item, estimate: estimate, fresh: fresh) }
+    var footer: String? {
+        switch item.kind {
+        case .live:
+            guard fresh, ExploreWhyStack.dollars(estimate?.estimate) != nil else { return nil }
+            return "A projection from comparable finished lots. It is not a guarantee."
+        case .classified:
+            guard rail.hasBand else { return nil }
+            return "A cohort's sold spread. It is not a condition-adjusted value."
+        }
+    }
 }
 
 struct ExploreWhySheet: View {
@@ -271,9 +285,7 @@ struct ExploreWhySheet: View {
                         rowView(row)
                     }
                 } footer: {
-                    Text(why.item.kind == .live
-                         ? "A projection from comparable finished lots. It is not a guarantee."
-                         : "A cohort's sold spread. It is not a condition-adjusted value.")
+                    if let footer = why.footer { Text(footer) }
                 }
                 if why.item.kind == .live {
                     Section("Comparable lots") {
@@ -294,7 +306,7 @@ struct ExploreWhySheet: View {
                     }
                 }
             }
-            .navigationTitle("Why this range")
+            .navigationTitle(why.rail.detailsTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task { await loadAnalogs() }
