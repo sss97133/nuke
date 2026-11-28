@@ -139,6 +139,10 @@ final class VehicleAccessTests: XCTestCase {
         XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: true, ownerContext: true, jobs: .loaded(unstated)), .post)  // owner fallback
         XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: true, ownerContext: false, jobs: .loaded(unstated)), .inspect)
         XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: false, ownerContext: true, jobs: .loaded(holder)), .none)
+        XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: true, ownerContext: true, jobs: .loading, requireAuthoritativeAccess: true), .none)
+        XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: true, ownerContext: true, jobs: .loaded(unstated), requireAuthoritativeAccess: true), .none)
+        XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: true, ownerContext: false, jobs: .loaded(holder), requireAuthoritativeAccess: true), .post)
+        XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: true, ownerContext: true, jobs: .loaded(stranger), requireAuthoritativeAccess: true), .inspect)
     }
 }
 

@@ -224,6 +224,46 @@ Series points require the same receipt at bucket grain, comparison value and bas
 
 Evidence responses repeat metric/cohort/bucket/cutoffs and provide stable UUIDs for contributing lots/observations/comments, contribution/weight, method and source attribution. Cursor pagination is server-side and bounded. Public/undeleted/vehicle-only eligibility applies to aggregates AND drill. Denied/private records must contribute neither payload nor public aggregate counts. No service-role browser credentials, no page-time observation-log reconstruction.
 
+### Captured outcome fractions in the existing comparison owner
+
+`get_market_trends(jsonb)` accepts the additive metric `captured_sell_through`,
+with the existing scope/source/benchmark and explicit event-window fields plus
+`reserve_policy: "all_recorded_policies"`. Its population is the retained public,
+undeleted, vehicle-only, canonical BaT listing episodes assigned by the existing
+registry membership rule. Slash aliases count once; conflicting vehicle/outcome
+aliases have no assigned series. The seven-day, 2,000-plus-sentinel candidate bound
+and invoker permissions stay in force. A truncated read withholds fractions.
+
+The numerator is the existing supported source-sold outcome: explicit `sold` with
+a positive finite winning amount. The denominator adds explicit `reserve_not_met`
+episodes. A bare `no_sale` label remains unresolved: the extractor can assign it
+when no result was extracted. `cancelled` is a separate withdrawal. Past-close `live`,
+`pending`, `relisted`, `bid_to`, unsupported sold amounts and other outcomes remain
+unresolved. Empty known-outcome populations yield a null ratio and a reason.
+Daily points and whole-window totals are computed in SQL; the latter divides
+summed outcome counts rather than averaging daily fractions. The benchmark
+excludes the selected population under the same rules.
+
+This is a captured-known-outcome fraction, not platform-wide sell-through or
+verified financial settlement. Reserve policies are unstratified. Broad make
+membership does not establish model, build or condition equivalence. Repeated
+periods, minimum support and the relevant build/reserve strata are still required
+before describing a cohort as consistently strong. Currency and cost evidence
+are separate prerequisites for price and profit questions.
+
+Evidence includes sales and no-sales with numerator/denominator contributions.
+`evidence_outcome` can instead select `sold`, `no_sale`, `withdrawn` or `unresolved`.
+Each page contains at most the requested `evidence_limit` (maximum 20) per bucket
+and series. Continuation supplies `evidence_offset`, an explicit `evidence_bucket`
+and `evidence_series`, and the returned `evidence_snapshot_hash`. A change to the
+public projected source/membership state refuses continuation with
+`evidence_snapshot_changed`; it does not serve a frozen historical snapshot.
+Hidden parents neither enter the result nor invalidate its public fingerprint.
+The legacy `recorded_sale_events` count payload is retained.
+
+Contract: `supabase/sql/test_market_captured_sell_through.sql`. Implementation,
+normal deployment and anonymous runtime verification remain distinct stages.
+
 ## Live reader inspection and exact gaps
 
 Read-only deployment inspection at 2026-10-04 UTC:

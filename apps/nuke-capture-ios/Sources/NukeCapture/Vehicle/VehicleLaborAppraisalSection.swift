@@ -300,6 +300,7 @@ enum LaborWords {
 /// except the reader's own "nothing priced" answer, which is printed as one.
 struct VehicleLaborAppraisalSection: View {
     let vehicleId: String
+    var showEmptyState = false
     @State private var appraisal: LaborAppraisal?
     @State private var failed = false
     @State private var loading = true
@@ -307,13 +308,17 @@ struct VehicleLaborAppraisalSection: View {
     var body: some View {
         // A VStack, not a Group: an empty Group holds no view, so its .task would never run.
         VStack(alignment: .leading, spacing: 0) {
-            if let appraisal { LaborAppraisalContent(appraisal: appraisal) }
+            if let appraisal { LaborAppraisalContent(appraisal: appraisal, showEmptyState: showEmptyState) }
             else if loading { Text("Reading the labor appraisal…").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16) }
             else if failed {
                 HStack {
                     Text("The labor appraisal could not load.").font(.caption).foregroundStyle(.secondary)
                     Button("Retry") { Task { await load() } }.font(.caption)
                 }.padding(.horizontal, 16)
+            } else if showEmptyState {
+                Text("No labor appraisal is available for this vehicle.")
+                    .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
+                    .accessibilityIdentifier("labor.empty")
             }
         }
         .task(id: vehicleId) { await load() }
@@ -343,6 +348,7 @@ struct VehicleLaborAppraisalSection: View {
 
 struct LaborAppraisalContent: View {
     let appraisal: LaborAppraisal
+    var showEmptyState = false
 
     private var priced: [LaborSegment] { appraisal.segments.filter { $0.hours_typical != nil } }
     private var calculationClock: String {
@@ -393,6 +399,8 @@ struct LaborAppraisalContent: View {
             }
         } else if let status = LaborWords.foldStatus(appraisal) {
             section { caption(status) }
+        } else if showEmptyState {
+            section { caption("No labor appraisal is available for this vehicle.") }
         }
     }
 

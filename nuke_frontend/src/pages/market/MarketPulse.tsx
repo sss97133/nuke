@@ -576,11 +576,20 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       ?? document.querySelector<HTMLButtonElement>('.market-lot-image'))?.focus({ preventScroll: true }));
   };
   const salesDay = params.get('day');
+  const salesMetric = params.get('salesMetric') === 'recorded_sale_events' ? 'recorded_sale_events' : 'captured_sell_through';
+  const salesOffset = Number(params.get('salesOffset') ?? 0);
+  const salesSnapshot = params.get('salesSnapshot');
+  const salesOutcome = params.get('salesOutcome');
   const salesLens: MarketSalesLens = {
     scopeKey: params.get('salesScope'), days: params.get('days') === '2' ? 2 : 7,
+    metric: salesMetric, weeksBack: ['1','2','3'].includes(params.get('weeksBack') ?? '') ? Number(params.get('weeksBack')) : 0,
     drill: salesDay && /^\d{4}-\d{2}-\d{2}$/.test(salesDay) && Number.isFinite(Date.parse(salesDay))
-      ? { bucket: `${salesDay}T00:00:00Z`, series: params.get('series') === 'benchmark' ? 'benchmark' : 'selected' } : null,
-    benchmark: params.get('benchmark') === '1' || params.get('series') === 'benchmark',
+      ? { bucket: `${salesDay}T00:00:00Z`, series: params.get('series') === 'benchmark' ? 'benchmark' : 'selected',
+        ...(Number.isInteger(salesOffset) && salesOffset > 0 && salesOffset <= 2000 ? { offset: salesOffset } : {}),
+        ...(salesSnapshot && /^[0-9a-f]{32}$/.test(salesSnapshot) ? { snapshotHash: salesSnapshot } : {}),
+        ...(['known_bidding_outcome','sold','no_sale','withdrawn','unresolved'].includes(salesOutcome ?? '')
+          ? { outcome: salesOutcome as NonNullable<MarketSalesLens['drill']>['outcome'] } : {}) } : null,
+    benchmark: (salesMetric === 'captured_sell_through' ? params.get('benchmark') !== '0' : params.get('benchmark') === '1') || params.get('series') === 'benchmark',
   };
   const houseParam = params.get('house');
   const win = (WINDOWS.some((w) => w.id === params.get('live')) ? params.get('live') : 'all') as Window;
@@ -603,14 +612,14 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
     if (key === 'view') next.delete('bidRange');
     if (key === 'view' && value === 'sales' && (!next.get('make') || next.get('make') === 'all') && largestMake) next.set('make', largestMake);
-    if (key === 'make' || key === 'view') ['day', 'series', 'salesScope'].forEach(k => next.delete(k));
+    if (key === 'make' || key === 'view') ['day', 'series', 'salesScope', 'salesOffset', 'salesSnapshot', 'salesOutcome'].forEach(k => next.delete(k));
     next.delete('lot');
     setParams(next, { replace: key === 'live' || key === 'house' || key === 'bidRange' || key === 'sort', preventScrollReset: true });
   };
   const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
     const next = new URLSearchParams(params);
     next.set('make', nextMake ?? 'all');
-    ['model', 'family', 'family_name', 'year', 'era', 'bidRange', 'day', 'series', 'salesScope', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
+    ['model', 'family', 'family_name', 'year', 'era', 'bidRange', 'day', 'series', 'salesScope', 'salesOffset', 'salesSnapshot', 'salesOutcome', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
     if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
     next.delete('lot');
     setParams(next);
@@ -663,10 +672,17 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const setSalesLens = (change: Partial<MarketSalesLens>) => {
     const next = new URLSearchParams(params);
     if (change.days != null) next.set('days', String(change.days));
-    if (change.benchmark != null) { if (change.benchmark) next.set('benchmark', '1'); else next.delete('benchmark'); }
+    if (change.metric != null) next.set('salesMetric', change.metric);
+    if (change.weeksBack != null) { if (change.weeksBack) next.set('weeksBack', String(change.weeksBack)); else next.delete('weeksBack'); }
+    if (change.benchmark != null) next.set('benchmark', change.benchmark ? '1' : '0');
     if ('drill' in change) {
-      next.delete('day'); next.delete('series');
-      if (change.drill) { next.set('day', change.drill.bucket.slice(0, 10)); next.set('series', change.drill.series); }
+      ['day','series','salesOffset','salesSnapshot','salesOutcome'].forEach(k=>next.delete(k));
+      if (change.drill) {
+        next.set('day', change.drill.bucket.slice(0, 10)); next.set('series', change.drill.series);
+        if (change.drill.offset) next.set('salesOffset', String(change.drill.offset));
+        if (change.drill.snapshotHash) next.set('salesSnapshot', change.drill.snapshotHash);
+        if (change.drill.outcome) next.set('salesOutcome', change.drill.outcome);
+      }
     }
     setParams(next);
   };
