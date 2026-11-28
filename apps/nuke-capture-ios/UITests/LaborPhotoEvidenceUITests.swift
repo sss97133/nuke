@@ -1,0 +1,43 @@
+import XCTest
+
+final class LaborPhotoEvidenceUITests: XCTestCase {
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        for _ in 0..<18 {
+            if element.exists && element.isHittable { return true }
+            app.swipeUp()
+        }
+        return element.exists && element.isHittable
+    }
+
+    func testReassemblyPhotoUsesVehicleGateAndHandlesWithdrawal() {
+        for mode in ["available", "withdrawn"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+            app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_LABOR_STATE": "photos",
+                                     "NUKE_FIXTURE_LABOR_PHOTO": mode,
+                                     "NUKE_DEBUG_VEHICLE_ID": "00000000-0000-4000-8000-00000000c001"]
+            app.launch()
+            let segment = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "reassembly")).firstMatch
+            XCTAssertTrue(segment.waitForExistence(timeout: 20))
+            guard reveal(segment, in: app) else { XCTFail("Reassembly is not reachable"); return }
+            segment.tap()
+            let photos = app.buttons["labor-photos-reassembly"].firstMatch
+            guard reveal(photos, in: app) else { XCTFail("Photo links are not reachable"); return }
+            photos.tap()
+            XCTAssertTrue(app.navigationBars["Photo links"].waitForExistence(timeout: 15))
+            XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "does not confirm installation")).firstMatch.waitForExistence(timeout: 15))
+            let carpet = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Fixture carpet")).firstMatch
+            XCTAssertTrue(carpet.waitForExistence(timeout: 10)); carpet.tap()
+            if mode == "available" {
+                XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15), app.debugDescription)
+                app.buttons["Close"].tap()
+            } else {
+                XCTAssertTrue(app.staticTexts["Photo unavailable"].waitForExistence(timeout: 15), app.debugDescription)
+                app.navigationBars["Photo source"].buttons.firstMatch.tap()
+            }
+            XCTAssertTrue(app.navigationBars["Photo links"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+            app.terminate()
+        }
+    }
+}
