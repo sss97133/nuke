@@ -20,6 +20,33 @@ export interface PhysicalHarnessModel {
   circuits: PhysicalCircuit[]; endpoints: PhysicalEndpoint[]; terminations: PhysicalTermination[];
   segments: PhysicalSegment[]; connector_matings: PhysicalMating[];
   nets: { id: string }[];
+  design_selection?: PhysicalDesignSelection;
+}
+
+export interface PhysicalDesignSelection {
+  owner: 'harness_model_inputs'; contract_version: 2; kind: 'decided_design';
+  segment_ids: string[]; circuit_ids: string[];
+}
+
+/** Source content and selected-design membership have separate database owners. */
+export function readPhysicalSourceWorkspace(value: unknown, vehicleId: string): PhysicalHarnessModel {
+  const envelope = value as Record<string, unknown> | null;
+  const selection = envelope?.selection as PhysicalDesignSelection | null;
+  if (!envelope || envelope.contract_version !== 1 || envelope.vehicle_id !== vehicleId
+    || envelope.snapshot_kind !== 'current_read_not_published_revision'
+    || typeof envelope.snapshot_hash !== 'string' || !envelope.snapshot_hash
+    || !selection || selection.owner !== 'harness_model_inputs' || selection.contract_version !== 2
+    || selection.kind !== 'decided_design') throw new Error('The physical wiring selection could not be read.');
+  const source = readPhysicalHarnessModel(envelope.source, vehicleId);
+  const validIds = (ids: unknown, rows: { id: string }[]) => Array.isArray(ids)
+    && ids.every(id => typeof id === 'string' && id.length > 0)
+    && new Set(ids).size === ids.length
+    && ids.every(id => rows.some(row => row.id === id));
+  if (!validIds(selection.segment_ids, source.segments) || !validIds(selection.circuit_ids, source.circuits)
+    || source.segments.some(s => selection.segment_ids.includes(s.id) && !selection.circuit_ids.includes(s.circuit_id))) {
+    throw new Error('The physical wiring selection contains unavailable records.');
+  }
+  return { ...source, snapshot_hash: envelope.snapshot_hash, design_selection: selection };
 }
 
 /** Reject an incompatible or misrouted response instead of falling back to an invented legacy chain. */
@@ -42,8 +69,9 @@ export interface SchematicPiece {
   from: SchematicEnd | null; to: SchematicEnd | null;
 }
 export function physicalSchematicPieces(model: PhysicalHarnessModel, section: string, includeConcepts: boolean) {
+  const selected = model.design_selection;
   const circuits = new Map(model.circuits.filter(c => c.section === section
-    && (includeConcepts || c.design_status === 'decided')).map(c => [c.id, c]));
+    && (includeConcepts || (selected ? selected.circuit_ids.includes(c.id) : c.design_status === 'decided'))).map(c => [c.id, c]));
   const ends = new Map(model.terminations.map(t => [t.id, t]));
   const endpoints = new Map(model.endpoints.map(e => [e.id, e]));
   const nets = new Set(model.nets.map(n => n.id));
@@ -62,7 +90,7 @@ export function physicalSchematicPieces(model: PhysicalHarnessModel, section: st
   const pieces: SchematicPiece[] = [];
   for (const segment of model.segments) {
     const circuit = circuits.get(segment.circuit_id);
-    if (circuit && (includeConcepts || segment.design_status === 'decided')) pieces.push({ id: segment.id, code: circuit.code, circuit, segment,
+    if (circuit && (includeConcepts || (selected ? selected.segment_ids.includes(segment.id) : segment.design_status === 'decided'))) pieces.push({ id: segment.id, code: circuit.code, circuit, segment,
       from: end(segment.from_termination_id, segment), to: end(segment.to_termination_id, segment) });
   }
   return pieces;
