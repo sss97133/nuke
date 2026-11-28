@@ -32,6 +32,7 @@ class FakeTus:
     def open(self, request):
         self.assert_origin(request.full_url)
         if request.get_method() == 'POST':
+            assert request.get_header('X-upsert') == 'false'
             self.posts += 1
             return Response({'Location': self.url})
         if request.get_method() == 'HEAD':
@@ -150,6 +151,30 @@ class RetainPublicCatalogTests(unittest.TestCase):
                  mock.patch.object(module, 'digest_public', return_value=('f' * 64, size)), \
                  mock.patch.object(module, 'open_service', side_effect=AssertionError('unexpected write')):
                 with self.assertRaisesRegex(RuntimeError, 'public source bytes differ'):
+                    module.main()
+
+    def test_existing_object_with_different_bytes_is_never_overwritten(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'test.pdf'
+            source.write_bytes(b'%PDF-source')
+            digest, size = module.digest_file(source)
+            manifest = root / 'manifest.json'
+            manifest.write_text(json.dumps({'title': 'Catalog', 'source_url': 'https://example.com/catalog.pdf',
+                'local_pdf': str(source), 'expected_pdf_sha256': digest, 'expected_pages': 2,
+                'reader_actor': 'agent:test', 'reader_run_id': 'test'}))
+            saved = {'name': f'catalog-public/{digest}.pdf', 'size': size,
+                     'id': '00000000-0000-4000-8000-000000000001', 'version': 'v1'}
+            def run(args, **kwargs):
+                return mock.Mock(stdout='Pages: 2\n' if args[0] == 'pdfinfo' else b'first\x0c\x0c')
+            with mock.patch('sys.argv', ['retain', str(manifest), '--execute']), \
+                 mock.patch.dict('os.environ', {'VITE_SUPABASE_URL': 'https://example.supabase.co',
+                                               'SUPABASE_SERVICE_ROLE_KEY': 'sb_secret_test'}), \
+                 mock.patch.object(module, 'digest_public', side_effect=[(digest, size), ('f' * 64, size)]), \
+                 mock.patch.object(module, 'public_info', return_value=saved), \
+                 mock.patch.object(module.subprocess, 'run', side_effect=run), \
+                 mock.patch.object(module, 'open_service', side_effect=AssertionError('unexpected write')):
+                with self.assertRaisesRegex(RuntimeError, 'Stored object bytes differ'):
                     module.main()
 
 
