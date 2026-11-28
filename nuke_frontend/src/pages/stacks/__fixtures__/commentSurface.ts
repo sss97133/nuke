@@ -18,9 +18,10 @@ export function commentFixture(request:CommentSurfaceRequest={evidence_filter:'a
   }));
   const filtered=all.filter(r=>request.evidence_filter==='all_discussion'||(request.evidence_filter==='text'&&r.excerpt!==null)
     ||(request.evidence_filter==='media_only'&&r.excerpt===null&&r.media_reference_count>0)
-    ||(request.evidence_filter==='no_captured_content'&&r.excerpt===null&&r.media_reference_count===0));
+    ||(request.evidence_filter==='no_captured_content'&&r.excerpt===null&&r.media_reference_count===0))
+    .filter(r=>!request.evidence_bucket||Math.floor(Date.parse(r.posted_at)/3_600_000)===Math.floor(Date.parse(request.evidence_bucket)/3_600_000));
   const offset=request.offset??0,more=filtered.length>offset+20;
-  return {state:'partial',contract_version:1,method_id:'auction_comment_surface',method_version:1,reason:'retained_keyed_inputs_only',
+  const receipt:CommentSurfaceReceipt={state:'partial',contract_version:1,method_id:'auction_comment_surface',method_version:1,reason:'retained_keyed_inputs_only',
     vehicle_id:VEHICLE,auction_event_id:LOT,source_url:SOURCE,knowledge_mode:request.knowledge_mode??'current_recorded_state',
     measured_at:'2026-11-28T06:00:00Z',event_cutoff:request.event_cutoff??(request.cutoff&&Date.parse(request.cutoff)<Date.parse(CLOSE)?request.cutoff:CLOSE),
     recorded_cutoff:request.cutoff??request.recorded_cutoff??'2026-11-28T06:00:00Z',
@@ -38,4 +39,25 @@ export function commentFixture(request:CommentSurfaceRequest={evidence_filter:'a
     evidence:{snapshot_hash:String(revision+1).repeat(32),offset,limit:20,filter:request.evidence_filter,matching_entries:filtered.length,
       has_more:more,next_offset:more?offset+20:null,contributors:filtered.slice(offset,offset+20)},
   };
+  if(request.include_trajectory){
+    const start=Date.parse(receipt.window_from),end=Date.parse(receipt.event_cutoff),first=Math.floor(start/3_600_000)*3_600_000;
+    const occupied=Date.parse(all[0].posted_at),f=receipt.features;
+    receipt.trajectory={contract_version:1,method_id:'auction_comment_hourly_v1',bucket_unit:'UTC_hour',nominal_bucket_seconds:3600,
+      event_time_basis:'posted_at',count_unit:'retained_eligible_discussion_entries',rate_basis:'eligible_window_seconds_not_observed_capture_uptime',
+      zero_basis:'zero_retained_eligible_entries_not_zero_external_activity',participant_basis:'distinct_keyed_platform_identities_per_bucket_not_additive_people',
+      buckets:Array.from({length:Math.floor((end-first)/3_600_000)+1},(_,i)=>{
+        const at=first+i*3_600_000,from=Math.max(at,start),to=Math.min(at+3_600_000,end),seconds=(to-from)/1000;
+        const here=occupied>=at&&occupied<at+3_600_000;
+        return {bucket_start:new Date(at).toISOString(),window_start:new Date(from).toISOString(),window_end:new Date(to).toISOString(),window_seconds:seconds,
+          discussion_entries:here?f.discussion_entries:0,text_entries:here?f.text_entries:0,media_only_entries:here?f.media_only_entries:0,
+          no_captured_content_entries:here?f.no_captured_text_or_media_entries:0,whitespace_tokens:here?f.whitespace_tokens:0,
+          question_mark_entries:here?f.question_mark_entries:0,url_marker_entries:here?f.url_marker_entries:0,numeric_unit_marker_entries:here?f.numeric_unit_marker_entries:0,
+          seller_flagged_entries:here?f.seller_flagged_entries:0,unknown_seller_flag_entries:here?f.unknown_seller_flag_entries:0,
+          keyed_participant_count:here?f.keyed_participant_count:0,unkeyed_participant_entries:here?f.unkeyed_participant_entries:0,
+          entries_per_window_hour:seconds===0?null:Math.round((here?f.discussion_entries:0)*3600/seconds*1e6)/1e6,
+          cumulative_discussion_entries:at+3_600_000>occupied?f.discussion_entries:0};
+      })};
+    receipt.evidence.bucket_start=request.evidence_bucket??null;
+  }
+  return receipt;
 }

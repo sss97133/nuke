@@ -2,9 +2,10 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
-import { commentPageRequest, commentParams, commentRequestFromParams, commentSurfaceKey, finiteCommentClock,
+import { commentHourRequest, commentPageRequest, commentParams, commentRequestFromParams, commentSurfaceKey, finiteCommentClock,
   initialCommentRequest, useCommentSurface, type CommentFilter, type CommentSurfaceReceipt } from './commentSurfaceReader';
 import './CommentMeasurements.css';
+import CommentDiscussionTimeline from './CommentDiscussionTimeline';
 
 const number = (value: number | null) => value === null ? 'unknown' : value.toLocaleString('en-US');
 const utc = (value: string) => new Date(value).toISOString().replace('T',' ').replace(/\.000Z$/,' UTC');
@@ -44,7 +45,7 @@ function MeasuredGraphs({ receipt, filter, choose }: { receipt: CommentSurfaceRe
 function ContributionTable({ receipt, evidenceRef }: { receipt:CommentSurfaceReceipt; evidenceRef:React.RefObject<HTMLDivElement|null> }) {
   return <div ref={evidenceRef} className="stack-scroll" tabIndex={0} role="region" aria-label="Comment source records; scroll horizontally">
     <table className="stack-table comment-measure__evidence">
-      <caption>Source records · {names[receipt.evidence.filter]} · {receipt.evidence.matching_entries === 0 ? '0 entries'
+      <caption>Source records · {names[receipt.evidence.filter]}{receipt.evidence.bucket_start?` · hour beginning ${utc(receipt.evidence.bucket_start)}`:''} · {receipt.evidence.matching_entries === 0 ? '0 entries'
         : `${receipt.evidence.offset+1}–${receipt.evidence.offset+receipt.evidence.contributors.length} of ${number(receipt.evidence.matching_entries)}`}</caption>
       <thead><tr><th scope="col">Posted / recorded by us</th><th scope="col">Source entry</th><th scope="col">Measured from full text</th><th scope="col">Source / participant key</th></tr></thead>
       <tbody>{receipt.evidence.contributors.map(row=><tr key={row.comment_id} data-comment-id={row.comment_id}>
@@ -92,11 +93,11 @@ export default function CommentMeasurements({ vehicleId, lotId, closeAt, embedde
   const apply=(filter:CommentFilter,cutoff?:string,inspect=false)=>{
     setFormError('');
     focusEvidence.current=inspect;
-    setParams(commentParams(params,{evidence_filter:filter,...(cutoff?{knowledge_mode:'recorded_input_reconstruction',cutoff}:{})}));
+    setParams(commentParams(params,{evidence_filter:filter,include_trajectory:true,...(cutoff?{knowledge_mode:'recorded_input_reconstruction',cutoff}:{})}));
   };
   const filter=request?.evidence_filter??'all_discussion';
   const refresh=async()=>{
-    const reset=request?initialCommentRequest(request):{evidence_filter:'all_discussion' as const};
+    const reset=request?initialCommentRequest(request):{evidence_filter:'all_discussion' as const,include_trajectory:true};
     setRefreshing(true);
     focusEvidence.current=true;
     try {
@@ -145,7 +146,12 @@ export default function CommentMeasurements({ vehicleId, lotId, closeAt, embedde
     {receipt&&<>
       <p className="comment-measure__mode">{receipt.knowledge_mode==='recorded_input_reconstruction'?'Retrospective recorded-input reconstruction':'Current recorded state'} · posted through <time dateTime={receipt.event_cutoff}>{utc(receipt.event_cutoff)}</time> · recorded by us through <time dateTime={receipt.recorded_cutoff}>{utc(receipt.recorded_cutoff)}</time>.</p>
       {receipt.knowledge_mode==='recorded_input_reconstruction'&&<p className="stack-note">Current source rows and the currently recorded close anchor this reconstruction. It is not evidence that a forecast or feature was served at that time.</p>}
-      <MeasuredGraphs receipt={receipt} filter={filter} choose={chosen=>apply(chosen,request?.cutoff,true)} />
+      <CommentDiscussionTimeline receipt={receipt} choose={hour=>{
+        focusEvidence.current=true;setParams(commentParams(params,commentHourRequest(receipt,hour)));
+      }}/>
+      <details className="comment-measure__composition"><summary>Text patterns and captured content</summary>
+        <MeasuredGraphs receipt={receipt} filter={filter} choose={chosen=>apply(chosen,request?.cutoff,true)} />
+      </details>
       <dl className="comment-measure__facts">
         <dt>Whitespace-separated token runs</dt><dd>{number(receipt.features.whitespace_tokens)} total · {number(receipt.features.median_whitespace_tokens)} median per text entry</dd>
         <dt>Participants</dt><dd>{number(receipt.features.keyed_participant_count)} distinct BaT identity keys · {number(receipt.features.unkeyed_participant_entries)} discussion entries with unknown participant key</dd>

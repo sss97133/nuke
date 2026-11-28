@@ -38,6 +38,17 @@ async function click(text:string){await act(async()=>button(text).click());await
 const bidCalls=()=>fixture.rpc.mock.calls.filter(c=>c[0]==='lot_order_book_read');
 const commentCalls=()=>fixture.rpc.mock.calls.filter(c=>c[0]==='popup_vehicle_intel');
 const search=()=>new URLSearchParams(container.querySelector('[data-address]')!.textContent!);
+
+it('changes the discussion hour without rereading bids, then resets the hour when the shared cutoff changes',async()=>{
+  await render();const bidsBefore=bidCalls().length,commentsBefore=commentCalls().length;
+  const select=container.querySelector('select')!;
+  await act(async()=>{select.value='2026-11-25T19:00:00.000Z';select.dispatchEvent(new Event('change',{bubbles:true}));});await settle();
+  expect(commentCalls().length).toBe(commentsBefore+1);expect(bidCalls().length).toBe(bidsBefore);
+  expect(search().get('csHour')).toBe('2026-11-25T19:00:00.000Z');
+  await click('Reconstruct 1 hour before recorded close');
+  expect(search().has('csHour')).toBe(false);expect(commentCalls().at(-1)![1].p_request.evidence_bucket).toBeUndefined();
+  expect(commentCalls().at(-1)![1].p_request.cutoff).toBe(bidCalls().at(-1)![1].p_request.cutoff);
+});
 beforeEach(()=>{
   (globalThis as {IS_REACT_ACT_ENVIRONMENT?:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
   fixture.revision=0;fixture.refuse=false;fixture.defer=null;
@@ -84,7 +95,7 @@ it('invalidates cached first pages before clearing refused pins on both models',
   expect(container.querySelector('[data-entry-key]')).toBeNull();expect(container.querySelector('[data-comment-id]')).toBeNull();
   const beforeBid=bidCalls().length,beforeComment=commentCalls().length;await click('Refresh auction measurements');
   expect(bidCalls().length).toBe(beforeBid+1);expect(commentCalls().length).toBe(beforeComment+1);
-  expect(bidCalls().at(-1)![1].p_request).toEqual({});expect(commentCalls().at(-1)![1].p_request).toEqual({evidence_filter:'all_discussion'});
+  expect(bidCalls().at(-1)![1].p_request).toEqual({});expect(commentCalls().at(-1)![1].p_request).toEqual({evidence_filter:'all_discussion',include_trajectory:true});
   expect(container.querySelector('.bid-path__knowledge')?.textContent).toContain('2'.repeat(32));
   expect([...search().keys()].filter(k=>k.startsWith('bp')||k.startsWith('cs'))).toEqual([]);
 });
