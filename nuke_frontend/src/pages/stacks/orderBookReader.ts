@@ -18,8 +18,8 @@ export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 const BAT_LOT_URL = /^https:\/\/bringatrailer\.com\/listing\/[^/?#]+\/?$/;
 
 /**
- * A comment keyed to a lot but posted more than this many days before the lot's scheduled close cannot be from that
- * lot's run: it is a key conflict, shown and never folded. Basis (scripts/data/q.sh, read-only, 2026-10-07 00:55Z):
+ * This is an assumed lower bound on a lot's captured window, not proof of a key conflict or its observed opening.
+ * Rows before it remain visible as window exclusions and are not folded. Historical basis (scripts/data/q.sh, read-only, 2026-10-07 00:55Z):
  * on 400 BaT lots closed 2026-10-04 to 10-07, the first comment came 6 to 8 days before close on 389, and 8 to 12 days
  * on 10. On the same read, the live lot with the most keyed bids held 48 of its 50 bids from a sale 14 months earlier.
  */
@@ -279,7 +279,7 @@ const amountOf = (v: number | string | null): number | null => {
 export interface LotWindow {
   /** auction_events.auction_end_date as last read (moves with soft-close extensions while live). */
   closeAt: number | null;
-  /** closeAt minus LOT_WINDOW_DAYS; rows keyed to the lot and posted before it are key conflicts. */
+  /** closeAt minus LOT_WINDOW_DAYS; rows posted before it are window exclusions, not proven key conflicts. */
   windowStart: number | null;
   /** Earliest posted time among the lot's rows in its window: an observed lower bound on the opening, which BaT
    *  lots do not record (auction_events.auction_start_date is empty for BaT). */
@@ -542,7 +542,7 @@ export interface OrderBookView {
   landedThrough: number | null;
 }
 
-export function shapeOrderBook(read: OrderBookRead): OrderBookView | null {
+export function shapeOrderBook(read: OrderBookRead, options: { fold?:boolean } = {}): OrderBookView | null {
   const lot = read.lot;
   if (!lot) return null;
   const readAt = time(read.readAt) ?? Date.now();
@@ -550,7 +550,7 @@ export function shapeOrderBook(read: OrderBookRead): OrderBookView | null {
   const partition = partitionWindow(read.comments, closeAt);
   const window = lotWindow(lot, partition.inWindow, readAt);
   const bids = bidEvents(partition.inWindow, read.identities);
-  const states = foldOrderBook(bids, closeAt);
+  const states = options.fold===false ? [] : foldOrderBook(bids, closeAt);
   const frames = frameCoverage(read.frames, window);
   const kinds = commentKinds(partition.inWindow);
   let landed: number | null = null;
@@ -588,15 +588,15 @@ export function shapeOrderBook(read: OrderBookRead): OrderBookView | null {
     // Without a close clock the window cannot judge any row (on 2026-10-07 a quarter of a 0.2% sample of lot-keyed
     // BaT comments sat on lots with no auction_end_date), so the check is reported as not run rather than as zero.
     coverage.push({
-      id: 'key_conflicts', label: 'Key conflicts', numerator: null, denominator: read.comments.length,
+      id: 'key_conflicts', label: 'Window exclusions', numerator: null, denominator: read.comments.length,
       of: 'rows keyed to this lot', asOf: readAt, asOfBasis: 'database read',
-      basis: `not checked: this lot has no close time (auction_events.auction_end_date), so the ${LOT_WINDOW_DAYS}-day window cannot judge its rows`,
+      basis: `not checked: this lot has no close time (auction_events.auction_end_date), so the ${LOT_WINDOW_DAYS}-day window cannot classify its rows`,
     });
   } else if (partition.outside.length > 0) {
     coverage.push({
-      id: 'key_conflicts', label: 'Key conflicts', numerator: partition.outside.length, denominator: read.comments.length,
+      id: 'key_conflicts', label: 'Window exclusions', numerator: partition.outside.length, denominator: read.comments.length,
       of: 'rows keyed to this lot', asOf: readAt, asOfBasis: 'database read',
-      basis: `posted more than ${LOT_WINDOW_DAYS} days before the scheduled close; shown in the log, never folded`,
+      basis: `posted more than ${LOT_WINDOW_DAYS} days before recorded close; excluded from the assumed window, not proof of a wrong key`,
     });
   }
   return {

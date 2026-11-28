@@ -63,8 +63,8 @@ export const ORDER_BOOK_STACK: StackDefinition = {
     },
     {
       id: 'key', name: 'Key', state: 'reader',
-      holds: 'Bid to identity (external_identity_id) and bid to lot (auction_event_id), both keyed 2026-10-06.',
-      reader: 'external_identities by key; the lot row keys its seller and winner where they resolve',
+      holds: 'Each selected book entry’s validated platform identity, exact auction and supporting bid records.',
+      reader: 'lot_order_book_read(auction, request): SQL entry relationships; current lot seller and winner keys are separate context',
       missing: null,
     },
     {
@@ -75,8 +75,8 @@ export const ORDER_BOOK_STACK: StackDefinition = {
     },
     {
       id: 'fold', name: 'Fold', state: 'reader',
-      holds: 'Per lot, at every bid: the implied demand curve (identities that revealed a price at or above P), the price, the time to close.',
-      reader: "computed on each read from this lot's log only (one lot, bounded); no stored fold table",
+      holds: 'Captured running high bid through posted time, and each selected entry’s highest revealed bid. Willingness to pay is unmeasured.',
+      reader: 'lot_order_book_read(auction, request): bounded SQL path and selected book, recomputed against explicit input clocks; no stored fold writes',
       missing: null,
     },
     {

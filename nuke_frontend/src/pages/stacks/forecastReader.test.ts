@@ -237,3 +237,11 @@ describe('readForecast: one call, the session\'s token, every refusal a state', 
     await expect(pending).rejects.toThrow();
   });
 });
+
+it('uses the supplied SQL participant measurement instead of regrouping source rows',()=>{
+  const r=liveRead(),view=viewOf(r);view.bids=[];
+  const known=forecastGate(r.lot!,view,{bidders:7,why:null});
+  expect(known.kind==='ask'&&known.request.bidders).toBe(7);
+  const missing=forecastGate(r.lot!,view,{bidders:null,why:'SQL inputs incomplete'});
+  expect(missing.kind==='ask'&&missing.request.biddersWhy).toBe('SQL inputs incomplete');
+});
