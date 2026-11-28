@@ -37,6 +37,13 @@ DO $$ DECLARE bad jsonb; BEGIN
   UPDATE system_state SET value=bad;
   IF pg_temp.queue()->>'state'<>'invalid' OR pg_temp.queue() ? 'queued_receipts' THEN RAISE EXCEPTION 'Malformed queue became measured zero/count'; END IF;
  END LOOP;
+END $$;
+-- The delivery migration's small receipt/privacy cases above retain their original body.
+-- The 1,000-entry ceiling must exercise the installed aggregation repair, rather than
+-- sorting the complete queue JSON once per entry in the historical implementation.
+-- Keep the same payload, assertions and caller's 3s budget.
+\ir ../migrations/20261109024500_auction_queue_reader_cost.sql
+DO $$ BEGIN
  UPDATE system_state SET value=jsonb_build_object('version',1,'entries',(
    SELECT jsonb_agg(pg_temp.entry()||jsonb_build_object('key',(100000000000+g)::text,
      'url','https://ebay.com/itm/'||(100000000000+g)::text)) FROM generate_series(1,1000) g));
