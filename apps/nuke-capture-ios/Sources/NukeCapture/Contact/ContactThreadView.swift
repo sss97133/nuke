@@ -71,6 +71,7 @@ struct ContactThreadView: View {
                     Section {
                         TextField("Write a message", text: $draft, axis: .vertical)
                             .lineLimit(1...6)
+                            .accessibilityIdentifier("thread.draft")
                         Button {
                             Task { await post() }
                         } label: {
