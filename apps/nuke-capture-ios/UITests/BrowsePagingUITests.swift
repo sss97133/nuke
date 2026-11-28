@@ -99,4 +99,33 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
+
+    func testEmptyPartialFeedCanContinueLookingForClassifieds() {
+        let app = open("browse-paging-live-failed-deep")
+        XCTAssertTrue(app.staticTexts["Some cars couldn't load"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Auction listings couldn't load.")).firstMatch.exists)
+        let more = app.buttons["Search more"]
+        XCTAssertTrue(more.exists, app.debugDescription); more.tap()
+        XCTAssertTrue(app.staticTexts["Fixture page 240"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Auction listings couldn't load."].exists)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testEmptyPartialFeedCanRetryAFailedClassifiedPage() {
+        let app = open("browse-paging-live-failed-more")
+        XCTAssertTrue(app.staticTexts["Some cars couldn't load"].waitForExistence(timeout: 20), app.debugDescription)
+        let retry = app.buttons["Retry more"]
+        XCTAssertTrue(retry.exists, app.debugDescription); retry.tap()
+        XCTAssertTrue(app.staticTexts["Fixture page 80"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testClosingRefreshRemovesMissingLotAndKeepsAnExtension() {
+        let app = open("browse-closing-refresh")
+        let closing = app.staticTexts["Fixture closing"]
+        XCTAssertTrue(closing.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(closing.waitForNonExistence(timeout: 45), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Fixture extended"].exists, app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
 }

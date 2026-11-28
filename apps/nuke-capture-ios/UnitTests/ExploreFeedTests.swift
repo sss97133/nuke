@@ -75,6 +75,22 @@ final class ExploreFeedTests: XCTestCase {
         XCTAssertTrue(ExploreFeedPaging.endLine(tuned: true).contains("tuning"))
     }
 
+    func testLiveRefreshKeepsExtensionsAndRemovesOnlyExpiredMissingLots() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        func lot(_ id: String, _ end: TimeInterval?) -> ExploreFeedItem {
+            ExploreFeedItem(id: id, kind: .live, title: id, image: "https://x/y.jpg", amount: 1000,
+                            amountLabel: "Current bid", endsAt: end.map { now.addingTimeInterval($0) }, source: "S",
+                            location: nil, facts: nil, seen: nil, vehicleId: nil, year: nil, make: nil, model: nil, link: nil)
+        }
+        let expired = lot("expired", -1), future = lot("future", 60), unknown = lot("unknown", nil)
+        let oldExtended = lot("extended", -1), extended = lot("extended", 600)
+        let classified = item("classified", .classified)
+        let result = ExploreFeedPaging.reconcileLive([expired, future, oldExtended, classified, unknown],
+                                                     current: [extended.id: extended], now: now)
+        XCTAssertEqual(result.map(\.id), ["future", "extended", "classified", "unknown"])
+        XCTAssertEqual(result[1].endsAt, extended.endsAt)
+    }
+
     // MARK: Clock
 
     func testCountdownReadsSecondsInTheLastHourAndClosingAtTheEnd() {
@@ -85,6 +101,8 @@ final class ExploreFeedTests: XCTestCase {
         XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(59), now: now), "0:59")
         XCTAssertEqual(ExploreClock.text(ends: now, now: now), "Closing")
         XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(-30), now: now), "Closing")
+        XCTAssertEqual(ExploreClock.text(ends: now.addingTimeInterval(-900), now: now), "Status unknown")
+        XCTAssertEqual(ExploreClock.tick(ends: now.addingTimeInterval(-900), now: now), 30)
         XCTAssertEqual(ExploreClock.tick(ends: now.addingTimeInterval(600), now: now), 1)
         XCTAssertEqual(ExploreClock.tick(ends: now.addingTimeInterval(7200), now: now), 30)
     }
