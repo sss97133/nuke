@@ -8,7 +8,7 @@
 //   listing  → the source's mark and "Opening <Source>…"; settling here opens the original listing and
 //              the pager returns to the page before it
 //
-// Under the card: Comments (the profile), Follow (signed in), Share and the listing. A long press gives the
+// Under the card: Comments, Follow (signed in), Share and the listing. A long press gives the
 // feed's own choices (more / less / hide) and the listing's link. Every action is also a local signal
 // (ExploreSignals.swift). The pager is the GarageCard recipe: a fixed-size box sizes the card and a
 // page-style TabView fills it, so vertical scrolling of the feed is untouched.
@@ -66,6 +66,7 @@ struct ExplorePagerCard: View {
     var finishFresh = false
     let onDrill: (ExploreCardDrill) -> Void
     let onOpenProfile: (ExploreFeedItem) -> Void
+    let onOpenDiscussion: (ExploreFeedItem) -> Void
     let onChoice: (ExploreSignalEvent.Choice, ExploreFeedItem) -> Void
     /// Opens the "why this range" stack for this card.
     let onWhy: (ExploreFeedItem) -> Void
@@ -327,7 +328,7 @@ struct ExplorePagerCard: View {
             if item.vehicleId != nil {
                 actionButton("Comments", "bubble.left") {
                     record(.commentOpen)
-                    onOpenProfile(item)
+                    onOpenDiscussion(item)
                 }
             }
             if canFollow {
