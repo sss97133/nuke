@@ -9,9 +9,9 @@
 //   • an auction lot: the live finish estimate's low..high from FinishBoard (read once per feed load),
 //     labelled "Projected hammer", only while the board is fresh and the current bid sits at or under the
 //     band's top. No action zone: the repo has no validated one.
-// A long press on the rail opens "Why this range" (ExploreWhySheet), which serves the rest of the evidence
-// once: cohort size and period, basis, venues, mileage, source, as-of; for lots the model, grade, comps
-// date, factors and the analog lots with their links.
+// Tapping the price opens its evidence sheet: cohort size and period, basis, venues, mileage, source,
+// and as-of; for lots the model, grade, comps date, factors and the analog lots with their links. The
+// sheet says "Why this range" only when the card actually displays a range.
 
 import SwiftUI
 
@@ -31,6 +31,8 @@ struct ExplorePriceRail: Equatable {
     let marker: Double
 
     var hasBand: Bool { basis != .none }
+    /// A plain price has context too, but there is no range to explain.
+    var detailsTitle: String { hasBand ? "Why this range" : "Price details" }
 
     static func plain(caption: String?) -> ExplorePriceRail {
         ExplorePriceRail(basis: .none, caption: caption, low: nil, high: nil, bandStart: 0, bandEnd: 0, marker: 0)
@@ -112,43 +114,57 @@ extension ExploreAnalytics {
 struct ExplorePriceRailView: View {
     let item: ExploreFeedItem
     let rail: ExplorePriceRail
+    /// The card's price chip draws the label (with its chevron) itself.
+    var showsLabel = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(item.amountLabel)
-                .font(.system(.caption, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white.opacity(0.85))
+            if showsLabel {
+                Text(item.amountLabel)
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
             Text(LiveBoardView.bidNumber(item.amount))
                 .font(.nukeBigNumber)
                 .foregroundStyle(.white)
             if rail.hasBand {
                 GeometryReader { geo in
                     let w = geo.size.width
+                    // One track: the dim line is the scale, the bright segment is the range named below, and the
+                    // ringed dot is this price. Nothing else is drawn on it.
                     ZStack(alignment: .leading) {
-                        Capsule().fill(.white.opacity(0.3)).frame(height: 4)
-                        Capsule().fill(.white.opacity(0.8))
-                            .frame(width: max(3, w * (rail.bandEnd - rail.bandStart)), height: 6)
+                        Capsule().fill(.white.opacity(0.25)).frame(height: 4)
+                        Capsule().fill(Color.accentColor.opacity(0.95))
+                            .frame(width: max(4, w * (rail.bandEnd - rail.bandStart)), height: 8)
                             .offset(x: w * rail.bandStart)
                         Circle().fill(.white)
-                            .overlay(Circle().stroke(.black.opacity(0.45), lineWidth: 1))
-                            .frame(width: 10, height: 10)
-                            .offset(x: min(max(0, w * rail.marker - 5), max(0, w - 10)))
+                            .overlay(Circle().stroke(.black.opacity(0.6), lineWidth: 1.5))
+                            .frame(width: 12, height: 12)
+                            .offset(x: min(max(0, w * rail.marker - 6), max(0, w - 12)))
                     }
                     .frame(maxHeight: .infinity)
                 }
-                .frame(height: 12)
-                if let range = rail.rangeText {
-                    Text(range).font(.caption2.monospacedDigit()).foregroundStyle(.white.opacity(0.9))
-                }
+                .frame(height: 14)
             }
-            if let caption = rail.caption {
-                Text(caption).font(.caption2).foregroundStyle(.white.opacity(0.75))
+            // What the bright segment is, and its ends, in one line ("Projected hammer · $14k – $22k").
+            if let line = ExplorePriceRailView.legend(rail) {
+                Text(line).font(.caption2.weight(.medium).monospacedDigit()).foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1).minimumScaleFactor(0.8)
             }
         }
         .frame(maxWidth: 200, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(accessibility))
-        .accessibilityHint(Text(rail.hasBand || item.kind == .classified ? "Long press for why this range." : ""))
+        .accessibilityHint(Text(rail.hasBand || item.kind == .classified ? "Tap for why this range." : ""))
+    }
+
+    static func legend(_ rail: ExplorePriceRail) -> String? {
+        switch (rail.caption, rail.hasBand ? rail.rangeText : nil) {
+        case let (c?, r?): return c + " · " + r
+        case let (c?, nil): return c
+        case let (nil, r?): return r
+        default: return nil
+        }
     }
 
     private var accessibility: String {
@@ -239,39 +255,67 @@ struct ExploreWhy: Identifiable, Equatable {
     let estimate: FinishEstimate?
     let fresh: Bool
     var id: String { item.id }
+
+    var rail: ExplorePriceRail { .make(item: item, estimate: estimate, fresh: fresh) }
+    var footer: String? {
+        switch item.kind {
+        case .live:
+            guard fresh, ExploreWhyStack.dollars(estimate?.estimate) != nil else { return nil }
+            return "A projection from comparable finished lots. It is not a guarantee."
+        case .classified:
+            guard rail.hasBand else { return nil }
+            return "A cohort's sold spread. It is not a condition-adjusted value."
+        }
+    }
 }
 
 struct ExploreWhySheet: View {
     let why: ExploreWhy
     /// Opens the existing cohort page; the feed closes this sheet first.
     let onCohort: (CohortTarget) -> Void
-    @State private var analogs: [FinishAnalog] = []
-    @State private var analogsRead = false
+    private enum AnalogState { case loading, failed(String), loaded([FinishAnalog]) }
+    @State private var analogs: AnalogState = .loading
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(ExploreWhyStack.rows(item: why.item, estimate: why.estimate, fresh: why.fresh)) { row in
-                        rowView(row)
+                if why.item.liveStatusUnavailable {
+                    Section {
+                        Text("Auction status unavailable")
+                        Text("The latest board did not return this listing. Its last recorded bid may have changed.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        if let url = why.item.link { Link("Open original listing", destination: url) }
                     }
-                } footer: {
-                    Text(why.item.kind == .live
-                         ? "A projection from comparable finished lots. It is not a guarantee."
-                         : "A cohort's sold spread. It is not a condition-adjusted value.")
-                }
-                if why.item.kind == .live {
-                    Section("Comparable lots") {
-                        if analogs.isEmpty {
-                            if analogsRead { Text("No comparable lots are recorded for this one.").font(.footnote).foregroundStyle(.secondary) }
-                            else { ProgressView() }
+                } else {
+                    Section {
+                        ForEach(ExploreWhyStack.rows(item: why.item, estimate: why.estimate, fresh: why.fresh)) { row in
+                            rowView(row)
                         }
-                        ForEach(analogs) { a in analogView(a) }
+                    } footer: {
+                        if let footer = why.footer { Text(footer) }
+                    }
+                    if why.item.kind == .live {
+                        Section("Comparable lots") {
+                            switch analogs {
+                            case .loading:
+                                ProgressView()
+                            case .failed(let reason):
+                                Text("Couldn't load comparable lots.").font(.footnote).foregroundStyle(.secondary)
+                                Text(reason).font(.footnote).foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("comparable-read-failure")
+                                Button("Retry comparable lots") { Task { await loadAnalogs() } }
+                            case .loaded(let rows):
+                                if rows.isEmpty {
+                                    Text("No comparable lots were returned for this one.").font(.footnote).foregroundStyle(.secondary)
+                                }
+                                ForEach(rows) { a in analogView(a) }
+                            }
+                        }
                     }
                 }
             }
-            .navigationTitle("Why this range")
+            .navigationTitle(why.item.liveStatusUnavailable ? "Price details" : why.rail.detailsTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task { await loadAnalogs() }
@@ -313,8 +357,15 @@ struct ExploreWhySheet: View {
 
     /// The same read the Market board's bid sheet makes; lots only, one vehicle.
     private func loadAnalogs() async {
-        defer { analogsRead = true }
         guard why.item.kind == .live, let id = why.item.lotId else { return }
-        analogs = await FinishBoard.fetchAnalogs(vehicleId: id)
+        analogs = .loading
+        do {
+            let rows = try await FinishBoard.readAnalogs(vehicleId: id)
+            guard !Task.isCancelled else { return }
+            analogs = .loaded(rows)
+        } catch {
+            guard !Task.isCancelled else { return }
+            analogs = .failed(ReadFailure.text(error))
+        }
     }
 }

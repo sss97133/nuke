@@ -22,6 +22,17 @@ enum FixtureBackend {
     static let clientId = "00000000-0000-4000-8000-0000000000d1"
     static let providerId = "00000000-0000-4000-8000-0000000000d2"
     static let navigationVehicleId = "00000000-0000-4000-8000-00000000c001"
+    static let laborPhotoId = "00000000-0000-4000-8000-00000000e101"
+    private static let laborJudgmentLock = NSLock()
+    private static var laborJudgmentSuperseded = false
+    static func supersedeLaborJudgment() {
+        laborJudgmentLock.lock(); defer { laborJudgmentLock.unlock() }
+        laborJudgmentSuperseded = true
+    }
+    private static var currentLaborJudgmentId: String {
+        laborJudgmentLock.lock(); defer { laborJudgmentLock.unlock() }
+        return laborJudgmentSuperseded ? "00000000-0000-4000-8000-00000000e103" : "00000000-0000-4000-8000-00000000e102"
+    }
     static let analysisMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_ANALYSIS_MODE"] ?? ""
     private static let analysisReadLock = NSLock()
     private static var analysisReadAttempts = 0
@@ -52,8 +63,123 @@ enum FixtureBackend {
     }
     private static let workPageLock = NSLock()
     private static var workPageAttempts = 0
+    private static let browseReadLock = NSLock()
+    private static var browseLiveAttempts = 0
+    private static var browseAskAttempts = 0
+    private static var browsePageFailureAttempts = 0
+    private static var browseAnalogAttempts = 0
+
+    /// A terminal first-read failure followed by a normal response lets the UI test
+    /// distinguish a partial feed from an empty one and exercise its retry action.
+    private static func browseRead(_ name: String) -> (Int, Data) {
+        browseReadLock.lock()
+        if name == "market_pulse_live" { browseLiveAttempts += 1 } else { browseAskAttempts += 1 }
+        let attempt = name == "market_pulse_live" ? browseLiveAttempts : browseAskAttempts
+        browseReadLock.unlock()
+        let failLive = ["browse-partial-live", "browse-both-fail"].contains(scenario) || scenario.hasPrefix("browse-partial-empty")
+        let failAsk = ["browse-partial-ask", "browse-both-fail"].contains(scenario)
+        if (attempt == 1 || scenario == "browse-partial-empty-persistent")
+            && ((name == "market_pulse_live" && failLive) || (name == "classified_ask_board" && failAsk)) {
+            if scenario == "browse-partial-ask" { return (-1, Data()) }
+            return (400, Data(#"{"code":"fixture_read_error","message":"fixture browse read failed","details":null,"hint":null}"#.utf8))
+        }
+        if name == "market_pulse_live" {
+            return ok("""
+            {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
+              "2026-11-27T10:00:00Z",null,"http://[",false,
+              "https://bringatrailer.com/listing/fixture/","Fixture auction",null,null,null,null,null]]}
+            """)
+        }
+        if scenario.hasPrefix("browse-partial-empty") { return ok(#"{"population":{},"asks":[]}"#) }
+        return ok("""
+        {"population":{},"asks":[{"event_id":"fixture-ask","source":"classified",
+         "title":"Fixture classified","ask":10000,"image":"http://["}]}
+        """)
+    }
+
+    static func browsePagingRead(_ name: String, _ args: [String: Any]) -> (Int, Data) {
+        if name == "market_pulse_live" {
+            if scenario.hasPrefix("browse-paging-live-failed") {
+                return (400, Data(#"{"code":"fixture_read_error","message":"fixture auction read failed","details":null,"hint":null}"#.utf8))
+            }
+            guard scenario == "browse-paging-auction-failure" else { return ok(#"{"auctions":[]}"#) }
+            let rows: String = (0..<41).map { index -> String in
+                let id = String(format: "00000000-0000-4000-8000-%012d", index + 1)
+                let image = index == 0 || index == 40 ? #""http://[""# : "null"
+                let end = index == 40 ? "2099-11-28T12:00:00Z" : "2099-11-27T12:00:00Z"
+                return #"["\#(id)",1973,"Fixture","Coupe",5000,"\#(end)",null,null,\#(image),false,null,"Fixture auction \#(index)",null,null,null,null,null]"#
+            }.joined(separator: ",")
+            return ok("{\"auctions\":[\(rows)]}")
+        }
+        let offset = args["p_offset"] as? Int ?? 0
+        if scenario.hasSuffix("-ceiling") && offset > 5000 {
+            return (400, Data(#"{"message":"fixture offset exceeded reader limit"}"#.utf8))
+        }
+        if scenario == "browse-paging-auction-failure" && offset == 40 { return (-1, Data()) }
+        if ["browse-paging-fail-more", "browse-paging-live-failed-more"].contains(scenario) && offset == 40 {
+            browseReadLock.lock(); browsePageFailureAttempts += 1; let attempt = browsePageFailureAttempts; browseReadLock.unlock()
+            if attempt == 1 {
+                return (400, Data(#"{"code":"fixture_read_error","message":"fixture page read failed","details":null,"hint":null}"#.utf8))
+            }
+        }
+        let finalOffset = (scenario.hasPrefix("browse-paging-deep") || scenario == "browse-paging-live-failed-deep") ? 240 : 80
+        let count = scenario.hasSuffix("-ceiling")
+            ? (scenario == "browse-paging-partial-ceiling" && offset == 5000 ? 10 : 40)
+            : (offset < finalOffset ? 40 : (offset == finalOffset ? 1 : 0))
+        let rows: String = (0..<count).map { index -> String in
+            let number = offset + index
+            let noFirstCard = ["browse-paging-empty", "browse-paging-deep", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more"].contains(scenario)
+            let visible = scenario.hasSuffix("-ceiling")
+                ? (number == 0 && scenario != "browse-paging-live-failed-ceiling")
+                : (number == finalOffset || (number == 0 && !noFirstCard))
+            let image = visible ? #""http://[""# : "null"
+            return #"{"event_id":"fixture-page-\#(number)","source":"classified","title":"Fixture page \#(number)","ask":10000,"image":\#(image)}"#
+        }.joined(separator: ",")
+        return ok("{\"population\":{},\"asks\":[\(rows)]}")
+    }
+
+    private static func closingBrowseRead(_ name: String) -> (Int, Data) {
+        guard name == "market_pulse_live" else { return ok(#"{"population":{},"asks":[]}"#) }
+        browseReadLock.lock(); browseLiveAttempts += 1; let attempt = browseLiveAttempts; browseReadLock.unlock()
+        let iso = ISO8601DateFormatter()
+        if ["browse-clock-freshness", "browse-clock-boundary"].contains(scenario) {
+            let end = iso.string(from: Date().addingTimeInterval(scenario == "browse-clock-boundary" ? 3612 : 2700))
+            let updated = iso.string(from: Date().addingTimeInterval(-40))
+            return ok("""
+            {"auctions":[["00000000-0000-4000-8000-000000000002",1973,"Fixture","Coupe",5000,"\(end)","\(updated)",null,"http://[",false,null,"Fixture freshness",null,null,null,null,null]]}
+            """)
+        }
+        let closing = iso.string(from: Date().addingTimeInterval(attempt == 1 ? 10 : 120))
+        let clockOnly = ["browse-clock-extended", "browse-clock-missing-then-extended"].contains(scenario)
+        let extended = iso.string(from: Date().addingTimeInterval(attempt == 1 ? (clockOnly ? 10 : 20) : 120))
+        let open = iso.string(from: Date().addingTimeInterval(3600))
+        func row(_ suffix: String, _ title: String, _ end: String) -> String {
+            #"["00000000-0000-4000-8000-0000000000\#(suffix)",1973,"Fixture","Coupe",5000,"\#(end)",null,null,"http://[",false,null,"\#(title)",null,null,null,null,null]"#
+        }
+        if scenario == "browse-clock-missing-then-extended", attempt == 2 {
+            return ok(#"{"auctions":[]}"#)
+        }
+        if clockOnly {
+            return ok("{\"auctions\":[\(row("02", "Fixture extended", extended))]}")
+        }
+        let rows = (attempt == 2 ? [] : [row("01", "Fixture closing", closing)])
+            + [row("02", "Fixture extended", extended), row("03", "Fixture still open", open)]
+        return ok("{\"auctions\":[\(rows.joined(separator: ","))]}")
+    }
     private static let garageSourceLock = NSLock()
     private static var garageSourceAttempts = 0
+    private static let fixtureFollowLock = NSLock()
+    private static var fixtureFollowingByUser: [String: Bool] = [:]
+
+    private static func fixtureFollow(toggle: Bool) -> Bool {
+        fixtureFollowLock.lock(); defer { fixtureFollowLock.unlock() }
+        let user = userId ?? "visitor"
+        var following = fixtureFollowingByUser[user]
+            ?? (user == clientId && ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_INITIAL"] == "following")
+        if toggle { following.toggle() }
+        fixtureFollowingByUser[user] = following
+        return following
+    }
 
     private static func garageCorrections(_ args: [String: Any]) -> (Int, Data) {
         // The detail read names its account explicitly. The list read still sees the original row so the
@@ -190,6 +316,23 @@ enum FixtureBackend {
             let owned = items.contains { $0.name == "vehicle_id" && $0.value == "eq.\(GarageCardFixtures.owned)" }
             return ok(owned ? GarageCardFixtures.reel() : "[]")
         }
+        if scenario == "navigation-garage", ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_STATE"] == "photos",
+           path == "/rest/v1/vehicle_images" || path == "/rest/v1/vehicle_images_public" {
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            if items.contains(where: { $0.name == "id" && $0.value == "eq.\(laborPhotoId)" }) {
+                guard items.contains(where: { $0.name == "vehicle_id" && $0.value == "eq.\(navigationVehicleId)" }),
+                      items.contains(where: { $0.name == "vehicle_image_gallery_eligible" && $0.value == "eq.true" }) else {
+                    return (400, Data(#"{"message":"source photo needs vehicle and gallery gates"}"#.utf8))
+                }
+                if ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_PHOTO"] == "withdrawn" { return ok("[]") }
+                return ok("""
+                [{"id":"\(laborPhotoId)","image_url":"https://fixture.nuke.invalid/photo.png",
+                  "thumbnail_url":null,"is_primary":false,"taken_at":"2026-11-25T12:00:00Z",
+                  "labels":[],"ai_processing_status":"completed","image_category":"interior",
+                  "created_at":null,"vision_gate_agent_reasoning":null}]
+                """)
+            }
+        }
         if scenario == "navigation-actors", path == "/functions/v1/universal-search" {
             return ok("""
             {"success":true,"results":[{"id":"\(clientId)","type":"user","title":"Fixture Person"}],
@@ -324,6 +467,14 @@ enum FixtureBackend {
             return ok(#"{"status":"not_yet_computed","segments":[],"state":{"fresh":false,"computed":false,"error":null}}"#)
         case "vehicle_labor_appraisal" where scenario == "navigation-garage" && ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_STATE"] == "stale":
             return ok(#"{"applicable":true,"as_of":"2026-11-25T12:00:00Z","segments":[{"segment":"engine","hours_min":8,"hours_typical":12,"hours_max":16}],"state":{"fresh":false,"computed":true,"computed_at":"2026-11-25T12:00:00Z","error":null}}"#)
+        case "vehicle_labor_appraisal" where scenario == "navigation-garage" && ProcessInfo.processInfo.environment["NUKE_FIXTURE_LABOR_STATE"] == "photos":
+            return ok("""
+            {"vehicle_id":"\(navigationVehicleId)","applicable":true,"as_of":"2026-11-25T12:00:00Z",
+             "state":{"fresh":true,"computed":true},"totals":{"priced_segments":1},
+             "segments":[{"segment":"reassembly","hours_min":2,"hours_typical":2,"hours_max":2,
+               "reassembly":{"matched":[{"judgment_id":"\(currentLaborJudgmentId)","image_id":"\(laborPhotoId)","part":{"name":"Fixture carpet"},"hours":2}],
+                             "unmatched":[{"part":{"name":"No photo returned"}}]}}]}
+            """)
         case "vehicle_labor_appraisal": return ok("null")
         case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
@@ -433,6 +584,17 @@ enum FixtureBackend {
             return ok(JobFixtures.statementVisitor
                 .replacingOccurrences(of: #""payments":null,"balance":null"#, with: #""payments":\#(plantedAmount),"balance":\#(plantedAmount)"#)
                 .replacingOccurrences(of: #""payments_total":null,"balance_due":null"#, with: #""payments_total":\#(plantedAmount),"balance_due":\#(plantedAmount)"#))
+        case "get_vehicle_engagement" where scenario == "social-follow":
+            guard (args["p_vehicle_id"] as? String)?.lowercased() == navigationVehicleId else {
+                return (400, Data(#"{"message":"wrong fixture vehicle"}"#.utf8))
+            }
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_READ"] == "failure" {
+                return (400, Data(#"{"message":"fixture follow read failed"}"#.utf8))
+            }
+            let follows = fixtureFollow(toggle: false)
+            return ok("""
+            {"following_count":\(follows ? 1 : 0),"is_following":\(follows),"comment_count":0,"contribution_count":0,"recent_comments":[]}
+            """)
         default: return pending
         }
     }
@@ -467,6 +629,15 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
+            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more", "browse-paging-ceiling", "browse-paging-partial-ceiling", "browse-paging-live-failed-ceiling"].contains(scenario):
+            return browsePagingRead(name, args)
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
+            && ["browse-closing-refresh", "browse-clock-extended", "browse-clock-missing-then-extended", "browse-clock-freshness", "browse-clock-boundary"].contains(scenario):
+            return closingBrowseRead(name)
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
+            && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):
+            return browseRead(name)
         case "market_pulse_live" where scenario == "social-browse":
             // This deliberately malformed image URL renders the static fallback; the fixture
             // must not leave an infinite loading animation or make an external image request.
@@ -475,6 +646,12 @@ enum FixtureBackend {
               "2026-11-27T10:00:00Z",null,"http://[",false,
               "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
             """)
+        case "live_finish_estimates" where scenario == "social-browse" && args["p_vehicle_ids"] != nil:
+            browseReadLock.lock(); browseAnalogAttempts += 1; let attempt = browseAnalogAttempts; browseReadLock.unlock()
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_ANALOGS"] == "failure" && attempt == 1 {
+                return (-1, Data())
+            }
+            return ok(#"{"analogs":{}}"#)
         case "record_interaction" where scenario == "social-browse" && args["p_kind"] as? String == "comment":
             switch ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_POST"] {
             case "refused": return ok(#"{"ok":false,"error":"not_authorized"}"#)
@@ -503,6 +680,24 @@ enum FixtureBackend {
             return ok(#"{"work_order_id":"\#(args["p_work_order_id"] as? String ?? "")","visibility":"\#(args["p_visibility"] as? String ?? "")","providers_notified":false,"payment_authorized":false}"#)
         case "claim_organization": return ok(ParityFixtures.claimed)
         case "create_supplier_invite": return ok(ParityFixtures.invite)
+        case "market_pulse_live" where scenario == "social-follow":
+            // Use the static fallback instead of an endlessly loading fixture image.
+            return ok("""
+            {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
+              "2026-11-27T10:00:00Z",null,"http://[",false,
+              "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
+            """)
+        case "record_interaction" where scenario == "social-follow" && args["p_kind"] as? String == "follow":
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_WRITE"] == "refused" {
+                return ok(#"{"ok":false,"error":"not_authorized"}"#)
+            }
+            let follows = fixtureFollow(toggle: true)
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_WRITE"] == "uncertain" {
+                return ok(#"{"ok":true,"kind":"follow"}"#)
+            }
+            return ok("""
+            {"ok":true,"kind":"follow","following":\(follows)}
+            """)
         default: return ok("{}")
         }
     }

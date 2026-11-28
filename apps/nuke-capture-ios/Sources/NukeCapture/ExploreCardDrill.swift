@@ -31,10 +31,10 @@ struct ExploreCardDrill: Identifiable, Equatable {
     }
 
     /// Time left to the second, the precision the card's minute pill leaves out:
-    /// "2d 03h 04m 05s", "3h 04m 05s", "4m 05s", "closed" once it has passed.
+    /// "2d 03h 04m 05s", "3h 04m 05s", "4m 05s"; the recorded deadline alone does not prove closure.
     static func preciseRemaining(_ ends: Date, now: Date) -> String {
         let s = Int(ends.timeIntervalSince(now).rounded(.down))
-        if s <= 0 { return "closed" }
+        if s <= 0 { return ExploreClock.text(ends: ends, now: now) }
         let d = s / 86_400, h = (s % 86_400) / 3600, m = (s % 3600) / 60, sec = s % 60
         func two(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
         if d > 0 { return "\(d)d \(two(h))h \(two(m))m \(two(sec))s" }
@@ -133,9 +133,6 @@ struct ExploreSourceSheet: View {
                     }
                     .accessibilityElement(children: .combine)
                     drillLine("Record", item.kind == .live ? "Open auction lot" : "Classified listing")
-                    if let listed = item.listedAt {
-                        drillLine("Listed", ExploreCardDrill.absolute(listed))
-                    }
                 }
                 if let link = item.link {
                     Section {
@@ -168,7 +165,7 @@ struct ExploreSourceSheet: View {
     }
 }
 
-/// Clock door: the close on the wall clock, to the second, how long the auction runs and its bid count.
+/// Clock door: the close on the wall clock, to the second, and its bid count.
 struct ExploreClockSheet: View {
     let item: ExploreFeedItem
     @State private var pulse: VehiclePulse?
@@ -180,13 +177,14 @@ struct ExploreClockSheet: View {
             List {
                 if let ends = item.endsAt {
                     Section {
-                        drillLine("Closes", ExploreCardDrill.absolute(ends))
-                        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                            drillLine("Remaining", ExploreCardDrill.preciseRemaining(ends, now: ctx.date))
-                                .foregroundStyle(Color.red)
-                        }
-                        if let run = ExploreCardDrill.runLength(listed: item.listedAt, ends: ends) {
-                            drillLine("Auction length", run)
+                        drillLine(item.liveStatusUnavailable ? "Last recorded close" : "Closes", ExploreCardDrill.absolute(ends))
+                        if item.liveStatusUnavailable {
+                            Text("Status unavailable").foregroundStyle(.secondary)
+                        } else {
+                            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                                drillLine("Remaining", ExploreCardDrill.preciseRemaining(ends, now: ServerClock.now(ctx.date)))
+                                    .foregroundStyle(Color.red)
+                            }
                         }
                     } footer: {
                         Text("Shown in your time zone. The house may extend the close when bids arrive in the final minutes.")

@@ -2300,6 +2300,7 @@ private struct VehicleWorkLaborDetail: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var readGeneration = 0
     @State private var hasAppeared = false
+    @State private var selectedLaborSegment: String?
 
     private var accountKey: String {
         "\(SupabaseService.currentUserId ?? "signed-out")|\(session.isSignedIn)|\(readGeneration)"
@@ -2320,12 +2321,18 @@ private struct VehicleWorkLaborDetail: View {
                                 .padding(.horizontal, 16)
                         }
                         VehicleWorkSection(vehicleId: vehicleId, requireAuthoritativeAccess: true)
-                        VehicleLaborAppraisalSection(vehicleId: vehicleId, showEmptyState: true)
+                        VehicleLaborAppraisalSection(vehicleId: vehicleId, showEmptyState: true) { segment in
+                            selectedLaborSegment = segment
+                        }
                     }
                     .padding(.vertical, 12)
                 }
                 .id(accountKey)
             }
+        }
+        // The source route survives the parent work screen's foreground/account revalidation.
+        .navigationDestination(item: $selectedLaborSegment) { segment in
+            LaborPhotoEvidenceList(vehicleId: vehicleId, segment: segment, accountAtOpen: accountAtOpen)
         }
         .onAppear {
             if hasAppeared { readGeneration += 1 } else { hasAppeared = true }

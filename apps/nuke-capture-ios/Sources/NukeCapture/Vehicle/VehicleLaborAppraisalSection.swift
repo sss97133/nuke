@@ -14,7 +14,10 @@ struct LaborRange: Decodable, Equatable {
 
 struct LaborPart: Decodable, Equatable {
     struct CatalogPart: Decodable, Equatable { var catalog_part_id: String?; var name: String? }
+    var judgment_id: String?
     var item_id: String?
+    /// A gallery-eligible photo linked by the reassembly reading, when the reader returns one.
+    var image_id: String?
     var hours: Double?
     var operation_code: String?
     var name: String?
@@ -301,6 +304,7 @@ enum LaborWords {
 struct VehicleLaborAppraisalSection: View {
     let vehicleId: String
     var showEmptyState = false
+    var openPhotoLinks: ((String) -> Void)? = nil
     @State private var appraisal: LaborAppraisal?
     @State private var failed = false
     @State private var loading = true
@@ -308,7 +312,10 @@ struct VehicleLaborAppraisalSection: View {
     var body: some View {
         // A VStack, not a Group: an empty Group holds no view, so its .task would never run.
         VStack(alignment: .leading, spacing: 0) {
-            if let appraisal { LaborAppraisalContent(appraisal: appraisal, showEmptyState: showEmptyState) }
+            if let appraisal {
+                LaborAppraisalContent(appraisal: appraisal, vehicleId: vehicleId, showEmptyState: showEmptyState,
+                                      openPhotoLinks: openPhotoLinks)
+            }
             else if loading { Text("Reading the labor appraisal…").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16) }
             else if failed {
                 HStack {
@@ -348,7 +355,9 @@ struct VehicleLaborAppraisalSection: View {
 
 struct LaborAppraisalContent: View {
     let appraisal: LaborAppraisal
+    var vehicleId: String? = nil
     var showEmptyState = false
+    var openPhotoLinks: ((String) -> Void)? = nil
 
     private var priced: [LaborSegment] { appraisal.segments.filter { $0.hours_typical != nil } }
     private var calculationClock: String {
@@ -368,7 +377,7 @@ struct LaborAppraisalContent: View {
             section {
                 if let status = LaborWords.foldStatus(appraisal) { caption(status) }
                 caption("Reported hours and estimates are shown where available; totals come from the appraisal.")
-                if appraisal.totals != nil { caption("This appraisal cannot open the underlying sources here yet.") }
+                if appraisal.totals != nil { caption("Some sources, including receipts, cannot be opened here yet.") }
                 if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed ?? totals.with_unwitnessed_purchases) {
                     Text("Appraisal totals").font(.caption.weight(.semibold)).padding(.top, 4)
                     row("Witnessed", LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
@@ -386,7 +395,26 @@ struct LaborAppraisalContent: View {
                     DisclosureGroup {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(Array(LaborWords.lines(segment, appraisal.names).enumerated()), id: \.offset) { _, line in caption(line) }
-                            caption("This appraisal cannot open the underlying sources here yet.")
+                            if let vehicleId, !LaborPhotoReference.from(segment, names: appraisal.names).isEmpty {
+                                let count = LaborPhotoReference.from(segment, names: appraisal.names).count
+                                Group {
+                                    if let openPhotoLinks {
+                                        Button { openPhotoLinks(segment.segment) } label: {
+                                            Label("View \(count) photo link\(count == 1 ? "" : "s")", systemImage: "photo")
+                                        }
+                                    } else {
+                                        NavigationLink {
+                                            LaborPhotoEvidenceList(vehicleId: vehicleId, segment: segment.segment,
+                                                                   accountAtOpen: SupabaseService.currentUserId)
+                                        } label: {
+                                            Label("View \(count) photo link\(count == 1 ? "" : "s")", systemImage: "photo")
+                                        }
+                                    }
+                                }
+                                .font(.caption.weight(.medium))
+                                .accessibilityIdentifier("labor-photos-\(segment.segment)")
+                            }
+                            caption("Some sources for this segment cannot be opened here yet.")
                                 .accessibilityIdentifier("labor-source-unavailable-\(segment.segment)")
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
                     } label: {

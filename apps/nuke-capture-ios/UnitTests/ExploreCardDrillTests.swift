@@ -13,7 +13,7 @@ final class ExploreCardDrillTests: XCTestCase {
                         seen: nil, vehicleId: nil, year: 1967, make: "Chevrolet", model: "C10", link: link, listedAt: listedAt)
     }
 
-    func testPreciseRemainingCountsDownToTheSecondAndSaysClosedAfter() {
+    func testPreciseRemainingCountsDownAndKeepsEndUnconfirmed() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         let day: TimeInterval = 86_400, hour: TimeInterval = 3600, minute: TimeInterval = 60
         let twoDays: TimeInterval = 2 * day + 3 * hour + 4 * minute + 5
@@ -23,8 +23,9 @@ final class ExploreCardDrillTests: XCTestCase {
         XCTAssertEqual(ExploreCardDrill.preciseRemaining(now.addingTimeInterval(threeHours), now: now), "3h 04m 05s")
         XCTAssertEqual(ExploreCardDrill.preciseRemaining(now.addingTimeInterval(fourMinutes), now: now), "4m 05s")
         XCTAssertEqual(ExploreCardDrill.preciseRemaining(now.addingTimeInterval(9), now: now), "0m 09s")
-        XCTAssertEqual(ExploreCardDrill.preciseRemaining(now, now: now), "closed")
-        XCTAssertEqual(ExploreCardDrill.preciseRemaining(now.addingTimeInterval(-60), now: now), "closed")
+        XCTAssertEqual(ExploreCardDrill.preciseRemaining(now, now: now), "Closing")
+        XCTAssertEqual(ExploreCardDrill.preciseRemaining(now.addingTimeInterval(-60), now: now), "Closing")
+        XCTAssertEqual(ExploreCardDrill.preciseRemaining(now.addingTimeInterval(-900), now: now), "Status unknown")
     }
 
     func testRunLengthNeedsBothEndsInOrder() {

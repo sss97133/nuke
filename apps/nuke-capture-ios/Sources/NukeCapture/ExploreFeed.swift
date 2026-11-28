@@ -4,7 +4,10 @@
 //   • classified_ask_board   → classified listings seen in the last 72 h (asking price)
 // Every card is facts the record carries: photo, identity, the recorded amount and what
 // kind of amount it is, the clock, the source. A read that fails or comes back empty
-// hides its cards; the feed only shows an error when both reads fail.
+// hides its cards; a failed source is named and can be retried.
+// The feed pages (ExploreFeedPaging): every open lot is read at once and revealed 40 at a time, asks are read
+// 40 at a time by offset, and the next page starts six cards before the end. It ends with a plain line only
+// when both are exhausted. The projection board fills in the rails after the cards are up.
 
 import SwiftUI
 import UIKit
@@ -41,6 +44,10 @@ struct ExploreFeedItem: Identifiable, Equatable {
     var position: AskPosition? = nil
     /// When the read that produced this classified card was made (the board's as_of), for the "why" stack.
     var asOf: Date? = nil
+    /// A live lot's last record write (the board's updated_at): the bid on the card is no newer than this.
+    var recordUpdatedAt: Date? = nil
+    /// A successful refresh omitted this lot. Its last bid is retained, but its current status is unknown.
+    var liveStatusUnavailable = false
 
     /// The vehicle id a live lot's finish estimate is keyed by (the card id without its "live:" prefix).
     var lotId: String? {
@@ -88,7 +95,10 @@ struct ExploreFeedItem: Identifiable, Equatable {
                         amount: lot.currentBid, amountLabel: "Current bid", endsAt: lot.endsAtDate,
                         source: "Bring a Trailer", location: nil, facts: lot.noReserve ? "No reserve" : nil,
                         seen: nil, vehicleId: lot.vehicleUUID, year: lot.year, make: lot.make, model: lot.model,
-                        link: lot.listingUrl.flatMap { URL(string: $0) }, listedAt: lot.listedAtDate)
+                        // No listedAt: the board's listed_at is vehicles.created_at (when Nuke first wrote the row), not
+                        // when bidding opened, so no "listed" date or auction length is derived from it.
+                        link: lot.listingUrl.flatMap { URL(string: $0) },
+                        recordUpdatedAt: ProfileClock.date(lot.updatedAt))
     }
 
     static func from(_ row: AskRow) -> ExploreFeedItem {
@@ -108,6 +118,64 @@ struct ExploreFeedItem: Identifiable, Equatable {
     }
 }
 
+/// How the feed pages. Pure, so the rules are unit-tested (ExploreFeedTests).
+enum ExploreFeedPaging {
+    static let livePage = 40
+    static let askPage = 40
+    static let tunedAskPage = 100
+    /// classified_ask_board clamps the starting offset to 5,000.
+    static let askOffsetLimit = 5_000
+    static let askLimitMessage = "You've reached the browsing limit for classified listings. More may be available; adjust filters or refresh."
+    /// The next page starts loading when a card this close to the end appears.
+    static let lookahead = 6
+    /// Pages read in a row that add no card (all tuned out, hidden or already shown) before the feed waits.
+    static let maxEmptyPages = 5
+
+    static func shouldLoadMore(appeared index: Int, count: Int) -> Bool {
+        count > 0 && index >= count - lookahead
+    }
+
+    /// The ask board returned fewer rows than asked: it has no more.
+    static func exhausted(read: Int, asked: Int) -> Bool { read < asked }
+
+    struct AskProgress {
+        let nextOffset: Int
+        let exhausted: Bool
+        let limited: Bool
+    }
+
+    static func askProgress(offset: Int, read: Int, asked: Int) -> AskProgress {
+        let start = min(max(offset, 0), askOffsetLimit)
+        if exhausted(read: read, asked: asked) { return AskProgress(nextOffset: start, exhausted: true, limited: false) }
+        if start == askOffsetLimit { return AskProgress(nextOffset: start, exhausted: true, limited: true) }
+        let advance = min(max(read, 0), askOffsetLimit - start)
+        return AskProgress(nextOffset: start + advance, exhausted: false, limited: false)
+    }
+
+    static func nextCards(live: [ExploreFeedItem], classified: [ExploreFeedItem], existing: Set<String>,
+                          prefs: ExplorePreferences) -> [ExploreFeedItem] {
+        ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
+            .filter { !existing.contains($0.id) }
+    }
+
+    /// An omitted lot may have an extension that has not reached the board. Keep it available for a
+    /// later refresh, but mark its current status unknown until that source returns it again.
+    static func reconcileLive(_ items: [ExploreFeedItem], current: [String: ExploreFeedItem]) -> [ExploreFeedItem] {
+        items.map { item in
+            guard item.kind == .live else { return item }
+            if let fresh = current[item.id] { return fresh }
+            var unavailable = item
+            unavailable.liveStatusUnavailable = true
+            return unavailable
+        }
+    }
+
+    static func endLine(tuned: Bool) -> String {
+        tuned ? "End of these results matching your tuning: open auction lots and asks from the last 72 hours. Pull down to refresh."
+              : "End of these results: open auction lots and asks from the last 72 hours. Pull down to refresh."
+    }
+}
+
 struct ExploreFeedView: View {
     @State private var live: [ExploreFeedItem] = []
     @State private var classified: [ExploreFeedItem] = []
@@ -116,8 +184,8 @@ struct ExploreFeedView: View {
     @State private var feed: [ExploreFeedItem] = []
     @State private var prefs = ExplorePreferences.load()
     @State private var loaded = false
-    @State private var liveFailed = false
-    @State private var askFailed = false
+    @State private var liveFailure: String?
+    @State private var askFailure: String?
     /// The open lots behind live cards, by card id: the bid door hands the lot to the bid reading.
     @State private var lots: [String: LiveAuction] = [:]
     @State private var drill: ExploreCardDrill?
@@ -131,6 +199,19 @@ struct ExploreFeedView: View {
     @State private var finish: FinishBoard?
     @State private var why: ExploreWhy?
     @State private var openCohort: CohortTarget?
+    /// Paging. The live board is one read of every open lot, so its cards are revealed a page at a time; asks are
+    /// read a page at a time with the board's offset. A new load (refresh, tuning) starts a new generation and
+    /// any page still in flight from the old one is dropped.
+    @State private var liveAll: [ExploreFeedItem] = []
+    @State private var liveShown = 0
+    @State private var askOffset = 0
+    @State private var askExhausted = true
+    @State private var askLimited = false
+    @State private var reloading = false
+    @State private var loadingMore = false
+    @State private var moreFailure: String?
+    @State private var morePaused = false
+    @State private var generation = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -178,14 +259,60 @@ struct ExploreFeedView: View {
                 // Shimmering cards in the shape of the real ones: the page looks alive while it loads.
                 NukeFeedSkeleton(message: "Finding cars for you…")
             } else if feed.isEmpty {
-                if tuning.isActive && !(liveFailed && askFailed) {
+                if loadingMore {
+                    ProgressView("Looking for more cars…")
+                } else if liveFailed && askFailed {
+                    NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load cars",
+                                   message: "Auctions: \(liveFailure ?? "Read failed.") Classifieds: \(askFailure ?? "Read failed.")",
+                                   actionTitle: "Try again") { Task { await load() } }
+                } else if let missingSource {
+                    VStack(spacing: NukeSpace.md) {
+                        NukeEmptyState(icon: "wifi.exclamationmark", title: "Some cars couldn't load",
+                                       message: "\(missingSource.title) \(missingSource.reason)",
+                                       actionTitle: "Try again") { Task { await load() } }
+                        if askLimited {
+                            Text(ExploreFeedPaging.askLimitMessage)
+                                .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        }
+                        if let moreFailure {
+                            Text("Couldn't load more classified listings. \(moreFailure)")
+                                .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            Button("Retry more") {
+                                self.moreFailure = nil
+                                Task { await loadMore() }
+                            }
+                            .buttonStyle(.bordered)
+                        } else if hasMore {
+                            Button("Search more") { Task { await loadMore() } }
+                                .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(.horizontal, NukeSpace.lg).padding(.bottom, NukeSpace.xl)
+                } else if let moreFailure {
+                    if morePaused && liveShown < liveAll.count {
+                        NukeEmptyState(icon: "magnifyingglass", title: "More auctions to check",
+                                       message: "Classified listings couldn't load. \(moreFailure)",
+                                       actionTitle: "Search more auctions") { Task { await loadMore() } }
+                    } else {
+                        NukeEmptyState(icon: "wifi.exclamationmark", title: "Couldn't load more cars",
+                                       message: moreFailure,
+                                       actionTitle: "Try again") {
+                            self.moreFailure = nil
+                            Task { await loadMore() }
+                        }
+                    }
+                } else if hasMore {
+                    NukeEmptyState(icon: "magnifyingglass", title: "More listings to check",
+                                   message: "No cars to show in the pages checked so far.",
+                                   actionTitle: "Search more") { Task { await loadMore() } }
+                } else if askLimited {
+                    NukeEmptyState(icon: "magnifyingglass", title: "Classified browsing limit reached",
+                                   message: ExploreFeedPaging.askLimitMessage,
+                                   actionTitle: "Adjust filters") { showTune = true }
+                } else if tuning.isActive {
                     NukeEmptyState(icon: "slider.horizontal.3", title: "Nothing matches your tuning",
                                    message: "Widen the place, era or price, or clear them.",
                                    actionTitle: "Clear tuning") { applyTuning(ExploreTuning()) }
-                } else if liveFailed && askFailed {
-                    NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load cars",
-                                   message: "Check your connection, then try again.",
-                                   actionTitle: "Try again") { Task { await load() } }
                 } else {
                     NukeEmptyState(icon: "photo.on.rectangle.angled", title: "No cars to show yet",
                                    message: "New cars with photos appear here as they're listed. Check back soon.",
@@ -194,8 +321,25 @@ struct ExploreFeedView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: NukeSpace.xl) {
+                        if let missingSource {
+                            HStack(spacing: NukeSpace.sm) {
+                                Image(systemName: "wifi.exclamationmark")
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(missingSource.title).font(.subheadline)
+                                    Text(missingSource.reason).font(.caption).foregroundStyle(.secondary)
+                                        .accessibilityIdentifier("browse-source-failure-detail")
+                                }
+                                Spacer(minLength: 0)
+                                Button("Retry") { Task { await load() } }
+                                    .accessibilityLabel("Retry Browse")
+                            }
+                            .padding(NukeSpace.md)
+                            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: NukeRadius.card))
+                            .padding(.horizontal, NukeSpace.lg)
+                        }
                         ForEach(Array(feed.enumerated()), id: \.element.id) { idx, item in
-                            ExplorePagerCard(item: item, position: idx, hasBidReading: lots[item.id] != nil,
+                            ExplorePagerCard(item: item, position: idx,
+                                             hasBidReading: !item.liveStatusUnavailable && lots[item.id] != nil,
                                              finish: item.lotId.flatMap { finish?.byId[$0] },
                                              finishFresh: finish?.fresh == true,
                                              onDrill: openDrill, onOpenProfile: openProfile,
@@ -203,6 +347,7 @@ struct ExploreFeedView: View {
                                              onWhy: openWhy)
                                 .onAppear { prefetch(after: idx) }
                         }
+                        pagingFooter
                         if !footer.isEmpty {
                             Text(footer)
                                 .font(.caption).foregroundStyle(.tertiary)
@@ -227,11 +372,91 @@ struct ExploreFeedView: View {
             }
         }
         .task { if !loaded { await load() } }
+        .task(id: generation) { await watchClosing() }
+    }
+
+    /// While a card's lot is in its last minutes or just past its recorded end, re-read the board every 20 s so a
+    /// soft-close extension (the house resets the clock when a late bid lands) or a new bid reaches the card. The
+    /// board itself is rebuilt every 2 minutes, so the card also says how old the bid on record is.
+    private func watchClosing() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            guard !Task.isCancelled, loaded else { continue }
+            guard ExploreClock.needsRefresh(feed, now: ServerClock.now()) else { continue }
+            guard let board = try? await LiveBoard.fetch(maxAge: 15), !Task.isCancelled,
+                  !reloading, !loadingMore else { continue }
+            let byId = Dictionary(board.auctions.map { ("live:" + $0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let current = byId.mapValues(ExploreFeedItem.from)
+            liveAll = ExploreFeedPaging.reconcileLive(liveAll, current: current)
+            live = ExploreFeedPaging.reconcileLive(live, current: current)
+            feed = ExploreFeedPaging.reconcileLive(feed, current: current)
+            if let open = drill, let refreshed = ExploreFeedPaging.reconcileLive([open.item], current: current).first {
+                drill = ExploreCardDrill(kind: open.kind, item: refreshed)
+            }
+            if let open = why, open.item.kind == .live,
+               let refreshed = ExploreFeedPaging.reconcileLive([open.item], current: current).first {
+                why = ExploreWhy(item: refreshed, estimate: open.estimate, fresh: open.fresh)
+            }
+            for (key, lot) in byId where lots[key] != nil { lots[key] = lot }
+        }
+    }
+
+    private var hasMore: Bool { liveShown < liveAll.count || !askExhausted }
+    private var liveFailed: Bool { liveFailure != nil }
+    private var askFailed: Bool { askFailure != nil }
+    private var moreFailed: Bool { moreFailure != nil }
+    private var missingSource: (title: String, reason: String)? {
+        if let liveFailure, !askFailed { return ("Auction listings couldn't load.", liveFailure) }
+        if let askFailure, !liveFailed { return ("Classified listings couldn't load.", askFailure) }
+        return nil
+    }
+
+    /// The end of the cards: loading the next page, a retry when it failed, or a plain end.
+    @ViewBuilder private var pagingFooter: some View {
+        if loadingMore {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, NukeSpace.lg)
+        } else if let moreFailure {
+            VStack(spacing: NukeSpace.xs) {
+                Text(moreFailure).font(.caption).foregroundStyle(.secondary)
+                Button {
+                    self.moreFailure = nil
+                    Task { await loadMore() }
+                } label: {
+                    Label("Couldn't load more classified listings. Try again", systemImage: "arrow.clockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: NukeSize.minTap)
+                }
+                .buttonStyle(.bordered)
+                if morePaused && liveShown < liveAll.count {
+                    Button("Search more auctions") { Task { await loadMore() } }
+                        .frame(maxWidth: .infinity, minHeight: NukeSize.minTap)
+                        .buttonStyle(.bordered)
+                }
+            }
+            .padding(.horizontal, NukeSpace.lg)
+        } else if morePaused && hasMore {
+            Button("Search more") { Task { await loadMore() } }
+                .frame(maxWidth: .infinity, minHeight: NukeSize.minTap)
+                .buttonStyle(.bordered)
+                .padding(.horizontal, NukeSpace.lg)
+        } else if !hasMore && askLimited {
+            Text(ExploreFeedPaging.askLimitMessage)
+                .font(.footnote).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, NukeSpace.xl).padding(.vertical, NukeSpace.lg)
+        } else if !hasMore && !liveFailed && !askFailed {
+            Text(ExploreFeedPaging.endLine(tuned: tuning.isActive))
+                .font(.footnote).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, NukeSpace.xl).padding(.vertical, NukeSpace.lg)
+        }
     }
 
     private var footer: String {
         var parts: [String] = []
-        if !live.isEmpty { parts.append("Current bids are Bring a Trailer's, in US dollars — not sold prices.") }
+        if !live.isEmpty { parts.append("Bids are Bring a Trailer's recorded bids, in US dollars — not sold prices.") }
         if !classified.isEmpty { parts.append("An asking price is what the seller listed when we saw it, not a sale.") }
         return parts.joined(separator: " ")
     }
@@ -296,6 +521,7 @@ struct ExploreFeedView: View {
 
     private func prefetch(after idx: Int) {
         let all = feed
+        if ExploreFeedPaging.shouldLoadMore(appeared: idx, count: all.count) { Task { await loadMore() } }
         guard idx + 1 < all.count else { return }
         for j in (idx + 1)..<min(idx + 4, all.count) {
             if let u = NukeImage.thumb(all[j].image, width: 1080) {
@@ -305,39 +531,129 @@ struct ExploreFeedView: View {
     }
 
     private func load() async {
+        generation += 1
+        let gen = generation
+        reloading = true
+        loadingMore = false
+        defer { if gen == generation { reloading = false } }
         let tune = tuning
         async let l = Self.readLive()
-        async let a = Self.readClassified(tune)
-        async let f = FinishBoard.fetch()
-        let (lr, ar, fb) = await (l, a, f)
-        finish = fb
-        liveFailed = lr == nil
-        askFailed = ar == nil
-        lots = Dictionary((lr ?? []).map { ($0.item.id, $0.lot) }, uniquingKeysWith: { first, _ in first })
-        live = tune.apply(lr?.map { $0.item } ?? [])
-        classified = tune.apply(ar ?? [])
+        async let a = Self.readClassified(tune, offset: 0)
+        let (lr, ar) = await (l, a)
+        guard !Task.isCancelled, gen == generation else { return }
+        let liveRows: [(item: ExploreFeedItem, lot: LiveAuction)]
+        switch lr {
+        case .success(let rows): liveRows = rows; liveFailure = nil
+        case .failure(let error): liveRows = []; liveFailure = ReadFailure.text(error)
+        }
+        let askPage: (items: [ExploreFeedItem], read: Int, asked: Int)?
+        switch ar {
+        case .success(let page): askPage = page; askFailure = nil
+        case .failure(let error): askPage = nil; askFailure = ReadFailure.text(error)
+        }
+        lots = Dictionary(liveRows.map { ($0.item.id, $0.lot) }, uniquingKeysWith: { first, _ in first })
+        liveAll = tune.apply(liveRows.map { $0.item })
+        live = Array(liveAll.prefix(ExploreFeedPaging.livePage))
+        liveShown = live.count
+        classified = tune.apply(askPage?.items ?? [])
+        let progress = askPage.map { ExploreFeedPaging.askProgress(offset: 0, read: $0.read, asked: $0.asked) }
+        askOffset = progress?.nextOffset ?? 0
+        askExhausted = progress?.exhausted ?? true
+        askLimited = progress?.limited ?? false
+        #if DEBUG
+        // Exercise the real end-of-range UI without making 125 fixture page requests.
+        if FixtureBackend.isActive && FixtureBackend.scenario.hasSuffix("-ceiling") && !askExhausted {
+            askOffset = 4_960
+        }
+        #endif
+        moreFailure = nil
+        morePaused = false
         feed = ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
         loaded = true
+        reloading = false
+        // With no visible first-page cards, no card can trigger prefetch. Continue
+        // through the same bounded empty-page search used while scrolling.
+        if feed.isEmpty && hasMore { await loadMore() }
+        guard !Task.isCancelled, gen == generation else { return }
+        // The projection board only fills in the lots' rails (about 220 KB); the cards don't wait for it.
+        let board = await FinishBoard.fetch()
+        guard gen == generation else { return }
+        finish = board
     }
 
-    private static func readLive() async -> [(item: ExploreFeedItem, lot: LiveAuction)]? {
-        guard let board = try? await LiveBoard.fetch() else { return nil }
-        return board.open(at: Date())
-            .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
-            .prefix(40).map { (ExploreFeedItem.from($0), $0) }
+    /// The next page: the next slice of open lots and the next page of asks, interleaved, with the saved choices
+    /// applied and no card already in the feed. A page the tuning or the choices empty out reads on, a few pages
+    /// at most, so the feed never stalls on a filtered-out page.
+    private func loadMore() async {
+        guard loaded, !reloading, !loadingMore, hasMore,
+              !moreFailed || liveShown < liveAll.count else { return }
+        let gen = generation
+        loadingMore = true
+        morePaused = false
+        defer { if gen == generation { loadingMore = false } }
+        let tune = tuning
+        for _ in 0..<ExploreFeedPaging.maxEmptyPages {
+            let nextLive = Array(liveAll.dropFirst(liveShown).prefix(ExploreFeedPaging.livePage))
+            var nextAsks: [ExploreFeedItem] = []
+            var read = 0, asked = 0
+            if !askExhausted && !moreFailed {
+                switch await Self.readClassified(tune, offset: askOffset) {
+                case .failure(let error):
+                    guard !Task.isCancelled, gen == generation else { return }
+                    moreFailure = ReadFailure.text(error)
+                case .success(let page):
+                    nextAsks = tune.apply(page.items)
+                    read = page.read
+                    asked = page.asked
+                }
+            }
+            guard !Task.isCancelled, gen == generation else { return }
+            liveShown += nextLive.count
+            if !askExhausted && !moreFailed {
+                let progress = ExploreFeedPaging.askProgress(offset: askOffset, read: read, asked: asked)
+                askOffset = progress.nextOffset
+                askExhausted = progress.exhausted
+                askLimited = progress.limited
+            }
+            live += nextLive
+            classified += nextAsks
+            let fresh = ExploreFeedPaging.nextCards(live: nextLive, classified: nextAsks,
+                                                    existing: Set(feed.map(\.id)), prefs: prefs)
+            feed += fresh
+            if !fresh.isEmpty || !hasMore || (moreFailed && liveShown >= liveAll.count) { return }
+        }
+        if !Task.isCancelled, gen == generation, hasMore,
+           !moreFailed || liveShown < liveAll.count { morePaused = true }
     }
 
-    private static func readClassified(_ tune: ExploreTuning) async -> [ExploreFeedItem]? {
+    /// Every open lot, soonest to end first. The feed reveals them a page at a time (ExploreFeedPaging.livePage).
+    private static func readLive() async -> Result<[(item: ExploreFeedItem, lot: LiveAuction)], Error> {
+        do {
+            let board = try await LiveBoard.fetch()
+            return .success(board.open(at: Date())
+                .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
+                .map { (ExploreFeedItem.from($0), $0) })
+        } catch { return .failure(error) }
+    }
+
+    /// One page of asks from `offset`: the cards, how many rows the board returned and how many were asked for
+    /// (fewer returned than asked means the board has no more).
+    private static func readClassified(_ tune: ExploreTuning, offset: Int) async
+        -> Result<(items: [ExploreFeedItem], read: Int, asked: Int), Error> {
         let place = tune.place
         // A filter applied here to rows already read needs more rows to land on.
-        guard let board = try? await AskBoard.fetch(hours: 72, sort: .newest, limit: tune.hasLocalFilters ? 100 : 40,
-                                                    lat: place?.lat, lng: place?.lng, radiusMiles: place?.radius) else { return nil }
-        let asOf = ProfileClock.date(board.as_of)
-        return board.rows.map { row -> ExploreFeedItem in
-            var card = ExploreFeedItem.from(row)
-            card.asOf = asOf
-            return card
-        }
+        let limit = tune.hasLocalFilters ? ExploreFeedPaging.tunedAskPage : ExploreFeedPaging.askPage
+        do {
+            let board = try await AskBoard.fetch(hours: 72, sort: .newest, limit: limit, offset: offset,
+                                                 lat: place?.lat, lng: place?.lng, radiusMiles: place?.radius)
+            let asOf = ProfileClock.date(board.as_of)
+            let items = board.rows.map { row -> ExploreFeedItem in
+                var card = ExploreFeedItem.from(row)
+                card.asOf = asOf
+                return card
+            }
+            return .success((items, board.rows.count, limit))
+        } catch { return .failure(error) }
     }
 }
 
@@ -352,55 +668,156 @@ struct ExploreCardOverlay: View {
     var onWhy: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .bottom) {
-            if let amt = item.amount {
-                if let onDrill, hasBidReading, item.kind == .live {
-                    ExploreDoor(kind: .bid, item: item, open: onDrill) { price(amt) }
-                } else {
-                    price(amt)
+        TimelineView(ExploreClockSchedule(ends: item.endsAt)) { ctx in
+            let now = ServerClock.now(ctx.date)
+            HStack(alignment: .bottom) {
+                if let amt = item.amount {
+                    priceButton(amt, now: now)
                 }
-            }
-            Spacer(minLength: NukeSpace.sm)
-            if item.endsAt != nil {
-                TimelineView(.periodic(from: .now, by: 60)) { ctx in
-                    if let left = item.timeLeft(now: ctx.date) {
-                        if let onDrill {
-                            ExploreDoor(kind: .clock, item: item, alignment: .bottomTrailing, open: onDrill) { clock(left) }
-                        } else {
-                            clock(left)
-                        }
+                Spacer(minLength: NukeSpace.sm)
+                if let ends = item.endsAt {
+                    let text = item.liveStatusUnavailable ? "Status unavailable" : ExploreClock.text(ends: ends, now: now)
+                    if let onDrill, !item.liveStatusUnavailable {
+                        ExploreDoor(kind: .clock, item: item, alignment: .bottomTrailing, open: onDrill) { clock(text) }
+                            .accessibilityValue(Text(text))
+                    } else {
+                        clock(text)
                     }
                 }
             }
         }
     }
 
-    @ViewBuilder private func price(_ amt: Double) -> some View {
-        if let rail {
-            if let onWhy {
-                ExplorePriceRailView(item: item, rail: rail)
-                    .highPriorityGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onWhy() })
-            } else {
-                ExplorePriceRailView(item: item, rail: rail)
+    /// The price is a button: a tap opens the evidence behind it ("Why this range"; a live lot without that
+    /// stack opens its bid reading). It looks like one: a chip with a chevron, not a number painted on a photo.
+    @ViewBuilder private func priceButton(_ amt: Double, now: Date) -> some View {
+        let action: (() -> Void)? = onWhy ?? {
+            guard let onDrill, hasBidReading, item.kind == .live else { return nil }
+            return { onDrill(ExploreCardDrill(kind: .bid, item: item)) }
+        }()
+        if let action {
+            Button {
+                Haptics.drill(depth: 1)
+                action()
+            } label: {
+                priceChip(amt, tappable: true, now: now)
             }
+            .buttonStyle(ExplorePriceButtonStyle())
+            .accessibilityHint(Text("Shows the evidence behind this price."))
         } else {
-            amount(amt)
+            priceChip(amt, tappable: false, now: now)
         }
     }
 
-    private func amount(_ amt: Double) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(item.amountLabel)
-                .font(.system(.caption, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white.opacity(0.85))
-            Text(LiveBoardView.bidNumber(amt))
-                .font(.nukeBigNumber)
-                .foregroundStyle(.white)
+    private func priceChip(_ amt: Double, tappable: Bool, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(priceLabel(now: now))
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                if tappable {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            if let rail {
+                ExplorePriceRailView(item: item, rail: rail, showsLabel: false)
+            } else {
+                Text(LiveBoardView.bidNumber(amt))
+                    .font(.nukeBigNumber)
+                    .foregroundStyle(.white)
+            }
         }
+        .padding(.horizontal, tappable ? 10 : 0)
+        .padding(.vertical, tappable ? 8 : 0)
+        .background {
+            if tappable {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.black.opacity(0.35))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.25), lineWidth: 0.5))
+            }
+        }
+        .frame(minHeight: NukeSize.minTap)
+        .contentShape(Rectangle())
     }
 
-    private func clock(_ left: String) -> some View {
-        NukePill(text: left, icon: "clock", onPhoto: true, textColor: Color.red)
+    /// In a lot's last hour the label says how old the bid on record is, since the board is rebuilt every
+    /// 2 minutes and the house's bid can move faster than that.
+    private func priceLabel(now: Date) -> String {
+        guard item.kind == .live else { return item.amountLabel }
+        if item.liveStatusUnavailable {
+            return item.recordUpdatedAt.map { "Bid on record · " + ExploreAnalytics.ago($0, now: now) } ?? "Bid on record"
+        }
+        guard let ends = item.endsAt else { return item.amountLabel }
+        guard ends.timeIntervalSince(now) < 3600, let at = item.recordUpdatedAt else { return item.amountLabel }
+        return "Bid on record · " + ExploreAnalytics.ago(at, now: now)
+    }
+
+    private func clock(_ text: String) -> some View {
+        NukePill(text: text, icon: "clock", onPhoto: true, textColor: Color.red)
+            .monospacedDigit()
+    }
+}
+
+/// A single schedule drives both the bid-age label and countdown. It reaches the one-hour boundary
+/// exactly, then ticks every second; distant or long-unconfirmed lots update every 30 seconds.
+struct ExploreClockSchedule: TimelineSchedule {
+    let ends: Date?
+
+    func entries(from startDate: Date, mode: Mode) -> AnySequence<Date> {
+        let offset = ServerClock.offset
+        return AnySequence(sequence(first: startDate) { date in
+            let now = date.addingTimeInterval(offset)
+            return date.addingTimeInterval(ExploreClock.nextInterval(ends: ends, now: now))
+        })
+    }
+}
+
+/// A pressed price chip sinks a little; the tap lands as a button, not as decoration.
+struct ExplorePriceButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+/// The card's countdown. Pure, so it is unit-tested (ExploreFeedTests).
+enum ExploreClock {
+    /// At the recorded end, allow time for a soft-close extension. If the board cannot confirm a status
+    /// for 15 minutes, do not keep claiming the lot is closing.
+    static func text(ends: Date, now: Date) -> String {
+        let s = Int(ends.timeIntervalSince(now).rounded(.down))
+        if s <= -900 { return "Status unknown" }
+        if s <= 0 { return "Closing" }
+        if s < 3600 { return String(format: "%d:%02d", s / 60, s % 60) }
+        if s < 86_400 { return "\(s / 3600)h \((s % 3600) / 60)m" }
+        return "\(s / 86_400)d \((s % 86_400) / 3600)h"
+    }
+
+    /// How often the card's clock redraws.
+    static func tick(ends: Date, now: Date) -> TimeInterval {
+        let left = ends.timeIntervalSince(now)
+        return left > -900 && left < 3600 ? 1 : 30
+    }
+
+    /// Do not jump over the transition into the last hour when the current interval is 30 seconds.
+    static func nextInterval(ends: Date?, now: Date) -> TimeInterval {
+        guard let ends else { return 30 }
+        let left = ends.timeIntervalSince(now)
+        if left > 3600 { return max(0.001, min(30, left - 3600)) }
+        return left > -900 ? 1 : 30
+    }
+
+    /// A lot within 3 minutes of its recorded end, or up to 15 minutes past it, needs a fresh board read.
+    static func needsRefresh(_ items: [ExploreFeedItem], now: Date) -> Bool {
+        items.contains { item in
+            guard item.kind == .live, let ends = item.endsAt else { return false }
+            let left = ends.timeIntervalSince(now)
+            return left < 180 && left > -900
+        }
     }
 }
 
