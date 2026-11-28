@@ -129,6 +129,19 @@ final class ExploreFeedTests: XCTestCase {
         XCTAssertFalse(ExploreClock.needsRefresh([lot(-3600)], now: now))
     }
 
+    func testClockScheduleReachesTheHourBoundaryThenTicksEverySecond() {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        let end = start.addingTimeInterval(3610)
+        let schedule = ExploreClockSchedule(ends: end)
+        let entries = Array(schedule.entries(from: start, mode: .normal).prefix(4))
+        XCTAssertEqual(entries.count, 4)
+        XCTAssertEqual(entries[1].timeIntervalSince(entries[0]), 10, accuracy: 0.001)
+        XCTAssertEqual(entries[2].timeIntervalSince(entries[1]), 1, accuracy: 0.001)
+        XCTAssertEqual(entries[3].timeIntervalSince(entries[2]), 1, accuracy: 0.001)
+        XCTAssertEqual(ExploreClock.nextInterval(ends: nil, now: start), 30)
+        XCTAssertEqual(ExploreClock.nextInterval(ends: start.addingTimeInterval(-900), now: start), 30)
+    }
+
     func testServerClockReadsTheDateHeaderAndIgnoresSubSecondNoise() {
         let server = ServerClock.parse("Mon, 23 Nov 2026 23:53:34 GMT")
         XCTAssertNotNil(server)

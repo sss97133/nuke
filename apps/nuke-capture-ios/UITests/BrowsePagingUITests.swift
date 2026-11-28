@@ -179,4 +179,28 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No fresh projection for this lot"].waitForExistence(timeout: 35), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
+
+    func testBidAgeAdvancesWhileTheCardStaysOnScreen() {
+        let app = open("browse-clock-freshness")
+        let bid = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Bid on record")).firstMatch
+        XCTAssertTrue(bid.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(bid.label.contains("just now"), app.debugDescription)
+        let aged = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "1m ago")).firstMatch
+        XCTAssertTrue(aged.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testCountdownChangesToSecondTicksAtTheHourBoundary() {
+        let app = open("browse-clock-boundary")
+        let clock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Time left")).firstMatch
+        XCTAssertTrue(clock.waitForExistence(timeout: 20), app.debugDescription)
+        let seconds = NSPredicate(format: "value MATCHES %@", "59:[0-9]{2}")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: seconds, object: clock)], timeout: 20), .completed,
+                       app.debugDescription)
+        let first = clock.value as? String ?? ""
+        let changed = NSPredicate(format: "value != %@ AND value MATCHES %@", first, "59:[0-9]{2}")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: changed, object: clock)], timeout: 5), .completed,
+                       app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
 }
