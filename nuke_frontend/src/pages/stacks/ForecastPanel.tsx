@@ -234,11 +234,14 @@ function AskedForecast({ request, token }: { request: ForecastRequest; token: st
 
 // --- The panel ---------------------------------------------------------------------------------------------------------
 
-export function ForecastPanel({ read, view }: { read: OrderBookRead; view: OrderBookView }) {
+export function ForecastPanel({ read, view, unavailable, measuredBidders }: {
+  read: OrderBookRead; view: OrderBookView; unavailable?: string | null;
+  measuredBidders?: { bidders: number | null; why: string | null };
+}) {
   const { session } = useAuth();
   const token: string | null = typeof session?.access_token === 'string' && session.access_token ? session.access_token : null;
   const lot = read.lot!;
-  const gate = useMemo(() => forecastGate(lot, view), [lot, view]);
+  const gate = useMemo(() => forecastGate(lot, view, measuredBidders), [lot, view, measuredBidders]);
 
   switch (gate.kind) {
     case 'no_close':
@@ -259,6 +262,7 @@ export function ForecastPanel({ read, view }: { read: OrderBookRead; view: Order
     default:
       break;
   }
+  if (unavailable) return <Frame state="input-unavailable"><Note>{unavailable} No forecast is shown.</Note></Frame>;
   if (!token) {
     return (
       <Frame state="signed-out">

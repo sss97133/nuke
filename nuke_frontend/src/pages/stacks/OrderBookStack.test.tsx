@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ query: {} as Record<string, unknown>, temperature: {} as Record<string, unknown> }));
+const fixture = vi.hoisted(() => ({ query: {} as Record<string, unknown>, temperature: {} as Record<string, unknown>, bid: null as null | ((request: import('./bidPathReader').BidPathRequest) => unknown), bidState: {} as Record<string,unknown> }));
 vi.mock('./orderBookReader', async (importActual) => ({
   ...(await importActual<typeof import('./orderBookReader')>()),
   useOrderBook: () => fixture.query,
@@ -14,15 +15,18 @@ vi.mock('../../components/PrefetchLink', () => ({
   PrefetchLink: ({ to, ...p }: { to: string } & Record<string, unknown>) => <a href={to} {...p} />,
 }));
 vi.mock('./bidPopulationReader', () => ({useBidStudy:() => ({isPending:true})}));
+vi.mock('./bidPathReader', async importActual => ({...(await importActual<typeof import('./bidPathReader')>()),useBidPath: (_v:string,_l:string,request:import('./bidPathReader').BidPathRequest|null) => ({data:request?fixture.bid?.(request):undefined,...fixture.bidState})}));
+vi.mock('./CommentMeasurements',()=>({default:({embedded}:{embedded:boolean})=><section data-comment-embedded={String(embedded)}>SQL comment measurements</section>}));
+import { bidFixture, bidId, BID_LOT, BID_A, BID_B, BID_CLOSE, BID_SOURCE } from './__fixtures__/bidPath';
 import OrderBookStack from './OrderBookStack';
 import type { CommentRow, OrderBookRead } from './orderBookReader';
 
 const VEHICLE = '00000000-0000-4000-8000-000000000001';
-const LOT = '00000000-0000-4000-8000-0000000000a1';
-const ID_A = '00000000-0000-4000-8000-00000000aaaa';
-const ID_B = '00000000-0000-4000-8000-00000000bbbb';
-const CLOSE = Date.parse('2026-10-12T20:30:00Z');
-const URL = 'https://bringatrailer.com/listing/synthetic-lot-1';
+const LOT = BID_LOT;
+const ID_A = BID_A;
+const ID_B = BID_B;
+const CLOSE = Date.parse(BID_CLOSE);
+const URL = BID_SOURCE;
 const at = (minutes: number) => new Date(CLOSE - minutes * 60_000).toISOString();
 let n = 0;
 function row(changes: Partial<CommentRow>): CommentRow {
@@ -55,15 +59,16 @@ function read(changes: Partial<OrderBookRead> = {}): OrderBookRead {
 }
 
 let root: Root;
+let client: QueryClient;
 let container: HTMLDivElement;
 function LocationProbe(){return <output data-order-address>{useLocation().search}</output>;}
 async function render(path = `/stacks/order-book/${VEHICLE}`) {
   await act(async () => root.render(
-    <MemoryRouter initialEntries={[path]}>
+    <QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/stacks/order-book/:vehicleId" element={<><OrderBookStack/><LocationProbe/></>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter></QueryClientProvider>,
   ));
 }
 const click = async (el: Element | null | undefined) => act(async () => { el!.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
@@ -74,11 +79,13 @@ beforeEach(() => {
   n = 0;
   fixture.query = { data: read(), isPending: false, isError: false };
   fixture.temperature = { data: null, isPending: false };
+  fixture.bid=request=>bidFixture(request); fixture.bidState={isError:false,isPlaceholderData:false};
+  client = new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+afterEach(async () => { await act(async () => root.unmount()); client.clear(); container.remove(); });
 
 it('puts coverage first, every number with its denominator, then the nine layers', async () => {
   await render();
@@ -104,14 +111,18 @@ it('puts the forecast panel after the coverage block and before the nine layers,
   expect(forecast.textContent).not.toMatch(/\$\d/);
 });
 
-it('opens on the fold and moves the book to the chosen bid, using only bids posted by then', async () => {
+it('uses SQL path and book despite contradictory current source rows, and pins selection clocks', async () => {
   await render();
-  expect(container.querySelector('.stack-asof')?.textContent).toContain('3 of 3');
+  expect(container.querySelector('.stack-asof')?.textContent).toContain('5 of 5');
+  expect(container.querySelector('.stack-path')?.textContent).toContain('5 SQL states');
   expect([...container.querySelectorAll('.stack-table tbody tr')].map((r) => r.textContent)).toEqual([
-    expect.stringContaining('bidder-a'), expect.stringContaining('bidder-b'),
+    expect.stringContaining('Unresolved bid entry'), expect.stringContaining('bidder-b'), expect.stringContaining('bidder-a'),
   ]);
   await click(container.querySelectorAll('svg [role="button"]')[0]);
-  expect(container.querySelector('.stack-asof')?.textContent).toContain('1 of 3');
+  expect(container.querySelector('.stack-asof')?.textContent).toContain('1 of 5');
+  const pinned=new URLSearchParams(container.querySelector('[data-order-address]')!.textContent!);
+  expect(pinned.get('at')).toBe(bidId(0)); expect(pinned.get('bpHash')).toBe('1'.repeat(32));
+  expect(pinned.get('bpRecorded')).toBe('2026-11-28T06:00:00Z');
   const rows = [...container.querySelectorAll('.stack-table tbody tr')];
   expect(rows).toHaveLength(1);
   expect(rows[0].textContent).toContain('100');
@@ -129,7 +140,7 @@ it('names missing layers with no number in them', async () => {
 
 it('shows the one-point baseline only for a live current lot, and names the missing curve either way', async () => {
   await render(`/stacks/order-book/${VEHICLE}?layer=baseline`);
-  expect(container.textContent).toContain('answers only while a lot is live');
+  expect(container.textContent).toContain('requires established USD hammer amounts');
   expect(container.textContent).toContain('Missing layer: baseline curve');
   expect(container.textContent).not.toContain('percentile');
 });
@@ -142,7 +153,7 @@ it('keeps key conflicts visible in the log and out of the fold', async () => {
   expect(container.querySelector('[data-coverage="key_conflicts"]')?.textContent).toContain('1 / 5');
   expect(container.querySelector('.stack-missing')?.textContent).toContain('99,000');
   await click(layerButton('Fold'));
-  expect(container.querySelector('.stack-asof')?.textContent).toContain('300');
+  expect(container.querySelector('.stack-asof')?.textContent).toContain('350');
 });
 
 it('reports the outcome as recorded and links the keyed winner', async () => {
@@ -168,10 +179,11 @@ it.each(['query', 'internal address'])('returns to the exact source exploration 
 });
 
 it('does not turn unitless source bids into dollars or round away their fractional input', async () => {
-  const data = read(); data.comments[0].bid_amount = 100.25; fixture.query.data = data;
+  const data = read(); data.comments[0].bid_amount = 999999; fixture.query.data = data;
+  fixture.bid=request=>{const d=bidFixture(request);d.states[0].amount='100.25';return d;};
   await render(); await click(container.querySelectorAll('svg [role="button"]')[0]);
-  expect(container.querySelector('[data-source-amount-basis]')?.textContent).toContain('Currency and fee basis are not established');
-  expect(container.querySelector('.stack-asof')?.textContent).toContain('100.25');
+  expect(container.querySelector('.bid-path__knowledge')?.textContent).toContain('Currency is unestablished');
+  expect(container.querySelector('.stack-event-flow')?.textContent).toContain('100.25');
   expect(container.querySelector('.stack-layer')?.textContent).not.toMatch(/\$/);
 });
 
@@ -179,9 +191,36 @@ it('starts another auction with its own first-page comment controls',async()=>{
   const data=read(),other='00000000-0000-4000-8000-0000000000a2';
   data.lots.push({...data.lot!,id:other,source_url:'https://bringatrailer.com/listing/other-synthetic-lot',auction_end_date:'2025-11-25T21:00:00Z'});
   fixture.query.data=data;
-  await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}&at=old-bid&csFilter=media_only&csOffset=20&csHash=${'1'.repeat(32)}&csEvent=2026-11-25T21:00:00Z&csRecorded=2026-11-28T06:00:00Z&csCutoff=2026-11-25T20:50:00Z`);
+  await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}&at=old-bid&csFilter=media_only&csOffset=20&csHash=${'1'.repeat(32)}&csEvent=2026-11-25T21:00:00Z&csRecorded=2026-11-28T06:00:00Z&csCutoff=2026-11-25T20:52:00Z&bpHash=${'2'.repeat(32)}`);
   await click(container.querySelectorAll('.stack-lots button')[1]);
   const params=new URLSearchParams(container.querySelector('[data-order-address]')!.textContent!);
   expect(params.get('lot')).toBe(other);expect(params.has('at')).toBe(false);
-  expect([...params.keys()].filter(k=>k.startsWith('cs'))).toEqual([]);
+  expect([...params.keys()].filter(k=>k.startsWith('cs')||k.startsWith('bp'))).toEqual([]);
+});
+
+it('withholds the old browser fold and zeros when the SQL read fails',async()=>{
+  fixture.bidState={isError:true};await render();
+  expect(container.textContent).toContain('Bid curves and measurements are withheld');
+  expect(container.querySelector('svg')).toBeNull();expect(container.querySelector('.stack-asof')).toBeNull();
+  expect(container.querySelector('.stack-path')?.textContent).toContain('unavailable');
+});
+it('shows the requested point while withholding another point book during a pinned read',async()=>{
+  fixture.bid=()=>bidFixture();fixture.bidState={isPlaceholderData:true};
+  await render(`/stacks/order-book/${VEHICLE}?at=${bidId(0)}`);
+  expect(container.querySelector('.stack-asof')?.textContent).toContain('1 of 5');
+  expect(container.textContent).toContain('Reading this bid’s book');
+  expect(container.querySelector('[data-entry-key]')).toBeNull();
+});
+it('refuses an unknown selected point instead of selecting the latest bid',async()=>{
+  fixture.bid=()=>({state:'unavailable',reason:'selected_bid_not_in_known_inputs'});
+  await render(`/stacks/order-book/${VEHICLE}?at=${LOT}`);
+  expect(container.textContent).toContain('selected bid not in known inputs');
+  expect(container.querySelector('.stack-asof')).toBeNull();
+});
+it('uses a single cutoff control and embeds the comment consumer',async()=>{
+  await render(`/stacks/order-book/${VEHICLE}?layer=dimension&csCutoff=2026-11-25T20:52:00Z`);
+  expect(container.querySelectorAll('.episode-input-controls')).toHaveLength(1);
+  expect(container.querySelector('[data-comment-embedded]')?.getAttribute('data-comment-embedded')).toBe('true');
+  expect(container.textContent).toContain('Recorded-input reconstruction');
+  expect(container.querySelector('.stack-path')?.textContent).toContain('2 SQL states');
 });

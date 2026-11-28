@@ -1,0 +1,35 @@
+.bid-path, .bid-path__knowledge { min-width: 0; font-family: var(--font-family); font-size: var(--fs-14,14px); }
+.bid-path .stack-note, .bid-path .stack-basis, .bid-path__knowledge .stack-note { font-size: var(--fs-12,12px); }
+.bid-path__knowledge { margin: 12px 0 16px; overflow-wrap: anywhere; }
+.bid-path__knowledge p { margin: 6px 0; }
+.bid-path__knowledge summary { cursor: pointer; }
+.bid-path__figure { margin: 0; min-width: 0; }
+.bid-path__figure figcaption { font-weight: bold; margin: 8px 0; }
+.bid-path__controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.bid-path__controls .stack-chip { min-height: 44px; white-space: normal; font: inherit; border-width: 1px; border-radius: var(--radius); }
+.bid-path__chart-scroll { max-width: 100%; overflow-x: auto; }
+.bid-path__chart { width: 100%; min-width: 600px; height: auto; }
+.bid-path .bid-path__chart text { font: 14px var(--font-family); font-variant-numeric: tabular-nums; }
+.bid-path__chart line { stroke: var(--border); stroke-width: 1; }
+.bid-path__line { stroke: var(--text); stroke-width: 2; }
+.bid-path__hit { fill: transparent; cursor: pointer; }
+.bid-path__point { fill: var(--text); cursor: pointer; }
+.bid-path__chart [aria-pressed="true"] .bid-path__point { stroke: var(--text); stroke-width: 2; fill: var(--bg); }
+.bid-path__facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin: 16px 0; }
+.bid-path__facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.bid-path__table-scroll { max-width: 100%; overflow: auto; }
+.bid-path__table-scroll table { min-width: 680px; font-size: var(--fs-12,12px); }
+.bid-path__table-scroll caption { text-align: left; font-weight: bold; padding: 10px 0; }
+.bid-path__table-scroll td { vertical-align: top; }
+.bid-path__table-scroll details { max-width: 360px; overflow-wrap: anywhere; }
+.bid-path :is(button,a,input,[tabindex]):focus-visible, .bid-path__table-scroll:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+@media(max-width:600px) { .bid-path__facts { grid-template-columns: 1fr; }.bid-path__facts dd { margin-bottom: 8px; } }
+
+.bid-path__summary { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 14px 0; }
+.bid-path__summary div { min-width: 130px; }
+.bid-path__summary dt { font-size: 12px; color: var(--text-secondary); }
+.bid-path__summary dd { margin: 4px 0 0; font-size: 16px; font-variant-numeric: tabular-nums; }
+.bid-path .bid-path__chart [role="button"]:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.bid-path .bid-path__chart [role="button"]:focus-visible .bid-path__point { stroke: var(--text); stroke-width: 4; }
+.bid-path__table-scroll .stack-table th { font-size: 12px; text-transform: none; letter-spacing: normal; }
+.bid-path__table-scroll .stack-table td { font-size: 12px; }
