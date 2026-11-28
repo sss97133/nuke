@@ -14,6 +14,7 @@ import { recordCatalogTextSource } from './catalogTextSource.ts';
 import { recordAttestedPdfText } from './attestedPdfText.ts';
 import { recordCatalogPageMembership } from './catalogPageMembership.ts';
 import { recordCatalogPageWordGeometry } from './catalogPageWordGeometry.ts';
+import { recordCatalogDocumentPageWordGeometry } from './catalogDocumentPageWordGeometry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +36,25 @@ Deno.serve(async (req) => {
     )
 
     const body = await req.json();
+    if (body.mode === 'catalog_document_page_word_geometry') {
+      try {
+        const result=await recordCatalogDocumentPageWordGeometry(body,{
+          authorize:()=>isServiceCaller(req),
+          async record(catalogId,documentId,page,pdfSha256,geometry,version,actor,runId,verifiedAt) {
+            const {data,error}=await supabase.rpc('record_catalog_document_page_word_geometry',{
+              p_catalog:catalogId,p_document:documentId,p_page:page,p_pdf_sha256:pdfSha256,p_geometry:geometry,
+              p_extractor_version:version,p_actor:actor,p_run_id:runId,p_verified_at:verifiedAt,
+            });
+            if(error)throw new ReferenceError('catalog_word_source_not_recorded',409);
+            return data;
+          },
+        });
+        return Response.json(result,{headers:corsHeaders});
+      } catch(error) {
+        return Response.json({success:false,error:error instanceof ReferenceError?error.code:'catalog_word_persistence_failed',model_calls:0},
+          {status:error instanceof ReferenceError?error.status:500,headers:corsHeaders});
+      }
+    }
     if (body.mode === 'catalog_page_word_geometry') {
       try {
         const result = await recordCatalogPageWordGeometry(body, {
