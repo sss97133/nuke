@@ -133,6 +133,14 @@ BEGIN
  EXCEPTION WHEN raise_exception THEN IF SQLERRM='Unexpected acceptance of changed second source' THEN RAISE; END IF; END;
  IF EXISTS(SELECT 1 FROM public.catalog_sources WHERE base_url='https://example.test/other.pdf')
   THEN RAISE EXCEPTION 'Failed batch did not roll back its catalog'; END IF;
+ BEGIN
+  PERFORM public.record_catalog_page_membership(cfg||jsonb_build_object('name','Different catalog','base_url','https://example.test/different.pdf'),
+   jsonb_build_array(docs->0));
+  RAISE EXCEPTION 'Unexpected acceptance of a source already linked to another catalog';
+ EXCEPTION WHEN unique_violation THEN NULL; END;
+ IF EXISTS(SELECT 1 FROM public.catalog_sources WHERE base_url='https://example.test/different.pdf')
+  OR public.catalog_page_member_evidence(catalog,11,repeat('f',64)) IS NULL
+  THEN RAISE EXCEPTION 'Cross-catalog source conflict changed the existing link'; END IF;
  INSERT INTO public.catalog_sources(name,provider,base_url) VALUES ('Foreign key test','test','https://example.test/fk.pdf') RETURNING id INTO other_catalog;
  BEGIN
   INSERT INTO public.catalog_reference_documents(catalog_id,reference_document_id,source_revision,catalog_page_number,document_page_id,page_mapping_receipt,page_mapping_receipt_sha256)

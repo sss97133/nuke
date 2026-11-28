@@ -424,7 +424,7 @@ A `reference_documents` row and its canonical supplied `document_pages` are reta
 
 ### Catalog page membership
 
-The existing `catalog_reference_documents` edge can record a catalog-relative page number and an actual `document_pages` key for an independently retained one-page source. Its composite foreign key requires that page to belong to the linked `reference_documents` row. The attributed comparison to the complete catalog PDF is client-attested: neither the complete PDF bytes nor the render or word-box comparison is re-extracted by PostgreSQL. `catalog_page_member_evidence` rechecks the retained source and receipt, and returns no membership when the source changes or competing links exist. A page membership does not establish a supplier listing, physical component, vehicle application, fitment or installation.
+The existing `catalog_reference_documents` edge can record a catalog-relative page number and an actual `document_pages` key for an independently retained one-page source. Its composite foreign key requires that page to belong to the linked `reference_documents` row. The attributed comparison to the complete catalog PDF is client-attested: neither the complete PDF bytes nor the render or word-box comparison is re-extracted by PostgreSQL. `catalog_page_member_evidence` rechecks the retained source and receipt, and returns no membership when the source changes or competing links exist. The existing edge allows a reference document to belong to only one catalog; reuse across catalogs is held until that constraint is deliberately evolved. A page membership does not establish a supplier listing, physical component, vehicle application, fitment or installation.
 
 ### Conditioned wire resistance vocabulary
 
