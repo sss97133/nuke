@@ -11,6 +11,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from '../_shared/geminiGuard.ts';
 import { recordSuppliedDocument, recordSuppliedReference, ReferenceError, sha256 } from './suppliedReference.ts';
 import { recordCatalogTextSource } from './catalogTextSource.ts';
+import { recordAttestedPdfText } from './attestedPdfText.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,6 +33,22 @@ Deno.serve(async (req) => {
     )
 
     const body = await req.json();
+    if (body.mode === 'attested_pdf_text') {
+      try {
+        const result = await recordAttestedPdfText(body, {
+          authorize: () => isServiceCaller(req),
+          async record(source, pages) {
+            const { data, error } = await supabase.rpc('record_attested_pdf_text', { p_source: source, p_pages: pages });
+            if (error) throw new ReferenceError('attested_pdf_source_not_recorded', 409);
+            return data;
+          },
+        });
+        return Response.json(result, { headers: corsHeaders });
+      } catch (error) {
+        return Response.json({ success: false, error: error instanceof ReferenceError ? error.code : 'attested_pdf_persistence_failed', model_calls: 0 },
+          { status: error instanceof ReferenceError ? error.status : 500, headers: corsHeaders });
+      }
+    }
     if (body.mode === 'retained_catalog_text') {
       try {
         const result = await recordCatalogTextSource(body, {
