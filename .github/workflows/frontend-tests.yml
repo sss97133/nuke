@@ -54,6 +54,7 @@ jobs:
           supabase/functions/index-reference-document/attestedPdfText.test.ts
           supabase/functions/index-reference-document/catalogPageMembership.test.ts
           supabase/functions/index-reference-document/catalogPageWordGeometry.test.ts
+          supabase/functions/index-reference-document/catalogDocumentPageWordGeometry.test.ts
           supabase/functions/ingest-observation/wireResistanceReference.test.ts
           supabase/functions/ingest-observation/wireResistanceReferenceHandler.test.ts
           supabase/functions/ingest-observation/wireCurrentRatingReference.test.ts
@@ -68,6 +69,8 @@ jobs:
         run: python3 scripts/test_retain_catalog_page_membership.py
       - name: Verify catalog page word geometry client
         run: python3 scripts/test_retain_catalog_page_word_geometry.py
+      - name: Verify whole catalog page word geometry client
+        run: python3 scripts/test_retain_catalog_document_page_word_geometry.py
       - name: Install native source-processing build dependencies
         timeout-minutes: 12
         run: |
