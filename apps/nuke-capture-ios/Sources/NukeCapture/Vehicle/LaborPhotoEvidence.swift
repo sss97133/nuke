@@ -49,10 +49,11 @@ struct LaborPhotoEvidenceList: View {
     }
 
     private var accountMatches: Bool {
-        LaborPhotoAccess.allows(openedAs: accountAtOpen, current: SupabaseService.currentUserId, signedIn: session.isSignedIn)
+        session.viewerId == SupabaseService.currentUserId
+            && LaborPhotoAccess.allows(openedAs: accountAtOpen, current: session.viewerId, signedIn: session.isSignedIn)
     }
     private var refreshKey: String {
-        "\(scenePhase)|\(SupabaseService.currentUserId ?? "signed-out")|\(session.isSignedIn)|\(retry)"
+        "\(scenePhase)|\(session.viewerId ?? "signed-out")|\(session.isSignedIn)|\(retry)"
     }
 
     var body: some View {
@@ -135,10 +136,11 @@ struct LaborPhotoEvidenceDetail: View {
 
     private enum LoadState { case loading, unavailable, failed, loaded(VehicleGalleryImage) }
     private var accountMatches: Bool {
-        LaborPhotoAccess.allows(openedAs: accountAtOpen, current: SupabaseService.currentUserId, signedIn: session.isSignedIn)
+        session.viewerId == SupabaseService.currentUserId
+            && LaborPhotoAccess.allows(openedAs: accountAtOpen, current: session.viewerId, signedIn: session.isSignedIn)
     }
     private var refreshKey: String {
-        "\(scenePhase)|\(SupabaseService.currentUserId ?? "signed-out")|\(session.isSignedIn)|\(retry)"
+        "\(scenePhase)|\(session.viewerId ?? "signed-out")|\(session.isSignedIn)|\(retry)"
     }
 
     var body: some View {
