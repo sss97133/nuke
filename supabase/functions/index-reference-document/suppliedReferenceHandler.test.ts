@@ -28,6 +28,12 @@ globalThis.fetch = (async (input, init) => {
     return Response.json({ success: true, document_id: docId, revision: 'c'.repeat(64),
       page_count: args.p_source.page_count, duplicate: false, pdf_hash_status: 'client_attested_not_server_rehashed' });
   }
+  if (url.pathname === '/rest/v1/rpc/record_attested_pdf_text') {
+    const args = JSON.parse(String(init?.body)); assert(args.p_pages.length === args.p_source.page_count);
+    return Response.json({ success: true, document_id: docId, revision: 'd'.repeat(64),
+      page_count: args.p_source.page_count, duplicate: false, pdf_hash_status: 'client_attested_not_server_rehashed',
+      text_provenance_status: 'client_attested_extraction_not_server_verified' });
+  }
   if (url.pathname === '/functions/v1/ingest-observation') {
     intake = JSON.parse(String(init?.body)); return Response.json({ success: true, observation_id: obsId });
   }
@@ -107,5 +113,29 @@ Deno.test('actual retained-catalog handler rejects anonymous and caller-supplied
   calls.length = 0; const denied = await handler(catalogRequest('sb_publishable_fixture'));
   assert(denied.status === 401 && calls.length === 0); await denied.body?.cancel();
   const invalid = await handler(catalogRequest(secret, input => input.source.project_origin = 'https://other.example'));
+  assert(invalid.status === 400 && calls.length === 0); await invalid.body?.cancel();
+});
+
+function attestedRequest(token = secret, change?: (input: any) => void) {
+  const input: any = { mode: 'attested_pdf_text', source: {
+    title: 'Synthetic SUV catalog', source_url: 'https://example.com/catalog.pdf',
+    object_id: '00000000-0000-4000-8000-000000000001', object_version: 'v1',
+    object_name: `catalog-public/${'a'.repeat(64)}.pdf`, pdf_sha256: 'a'.repeat(64), pdf_size: 123,
+    text_sha256: 'b'.repeat(64), page_count: 3, reader_actor: 'agent:test',
+    reader_method: 'client_sha256_pdftotext_v1', reader_run_id: 'test', reader_verified_at: new Date().toISOString(),
+  }, pages: ['a', '', 'b'] };
+  change?.(input);
+  return new Request(`${project}/functions/v1/index-reference-document`, {
+    method: 'POST', headers: { apikey: token, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+}
+Deno.test('actual attested PDF handler only invokes source-page admission', async () => {
+  calls.length = 0; const response = await handler(attestedRequest()), result = await response.json();
+  assert(response.status === 200 && result.source_pages_only === true && result.model_calls === 0);
+  assert(calls.length === 1 && calls[0] === 'POST /rest/v1/rpc/record_attested_pdf_text');
+});
+Deno.test('actual attested PDF handler rejects anonymous and injected assembly without effects', async () => {
+  calls.length = 0; const denied = await handler(attestedRequest('sb_publishable_fixture'));
+  assert(denied.status === 401 && calls.length === 0); await denied.body?.cancel();
+  const invalid = await handler(attestedRequest(secret, input => input.assembly = { name: 'invented' }));
   assert(invalid.status === 400 && calls.length === 0); await invalid.body?.cancel();
 });

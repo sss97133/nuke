@@ -51,12 +51,15 @@ jobs:
           supabase/functions/index-reference-document/suppliedReference.test.ts
           supabase/functions/index-reference-document/suppliedReferenceHandler.test.ts
           supabase/functions/index-reference-document/catalogTextSource.test.ts
+          supabase/functions/index-reference-document/attestedPdfText.test.ts
           supabase/functions/ingest-observation/wireResistanceReference.test.ts
           supabase/functions/ingest-observation/wireResistanceReferenceHandler.test.ts
           supabase/functions/ingest-observation/wireCurrentRatingReference.test.ts
           supabase/functions/ingest-observation/wireCurrentRatingReferenceHandler.test.ts
       - name: Verify stored catalog source client
         run: python3 scripts/test_retain_catalog_source.py
+      - name: Verify resumable public catalog source client
+        run: python3 scripts/test_retain_public_catalog_pdf.py
       - name: Install native source-processing build dependencies
         timeout-minutes: 12
         run: |
