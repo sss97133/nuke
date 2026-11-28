@@ -152,6 +152,13 @@ Deno.serve(async (req) => {
       if (!(await isServiceCaller(req))) return new Response(JSON.stringify({ error: 'service_role required' }), { status: 403, headers: corsHeaders });
       return new Response(JSON.stringify(await enrichReceiptProducts(supabase, body)), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+    if (body.mode === 'extract_parts') {
+      // This legacy path writes model output directly into catalog_parts,
+      // without an exact retained listing or application witness. Keep the
+      // source-custody modes above available while that admission is rebuilt.
+      return Response.json({ success: false, error: 'catalog_source_scope_unqualified', model_calls: 0 },
+        { status: 409, headers: corsHeaders });
+    }
     const { document_id, pdf_url, user_id, mode, page_start, page_end } = body
     if (!pdf_url) throw new Error('Missing pdf_url')
 

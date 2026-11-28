@@ -110,6 +110,16 @@ Deno.test('actual word geometry handler rejects anonymous or invented claims',as
   const invalid=await handler(wordGeometryRequest(secret,input=>input.fitment='invented'));
   assert(invalid.status===400 && calls.length===0);await invalid.body?.cancel();
 });
+Deno.test('legacy model part extraction refuses before source, model or database effects',async()=>{
+  calls.length=0;
+  const response=await handler(new Request(`${project}/functions/v1/index-reference-document`,{
+    method:'POST',headers:{apikey:secret,'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'extract_parts',pdf_url:'https://example.test/catalog.pdf',page_start:1,page_end:50}),
+  }));
+  const result=await response.json();
+  assert(response.status===409 && result.error==='catalog_source_scope_unqualified' && result.model_calls===0);
+  assert(calls.length===0,'unqualified extraction reached an external or database request');
+});
 Deno.test('actual reference handler rejects anonymous credentials before effects', async () => {
   calls.length = 0; const response = await handler(await request('sb_publishable_fixture')); assert(response.status === 401 && calls.length === 0); await response.body?.cancel();
 });
