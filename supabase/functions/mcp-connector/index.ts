@@ -590,7 +590,7 @@ const TOOLS: ToolDef[] = [
     name: "query_library",
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Reference Library" },
     description:
-      "Search the vehicle reference library. Types: paint_codes (76 GM colors), condition_knowledge (1,084 entries from service manuals), condition_taxonomy (descriptors), vehicle_nomenclature (naming standards). Returns factory reference data.",
+      "Search stored paint, condition, taxonomy and vehicle-nomenclature records. Filters use recorded metadata; they do not verify source pages or vehicle applicability. Condition knowledge may be unverified.",
     inputSchema: {
       type: "object",
       properties: {
@@ -600,8 +600,9 @@ const TOOLS: ToolDef[] = [
           description: "Reference data type",
         },
         query: { type: "string", description: "Search text" },
-        make: { type: "string", description: "Filter by make" },
-        year: { type: "number", description: "Filter by year" },
+        make: { type: "string", description: "Filter by recorded make; array matches are case-sensitive" },
+        model: { type: "string", description: "Filter by recorded model where supported; array matches are case-sensitive" },
+        year: { type: "number", description: "Filter by recorded year or range where supported; unknown values are excluded" },
         limit: { type: "number", description: "Max results (default 25)" },
       },
       required: ["type"],
@@ -611,7 +612,7 @@ const TOOLS: ToolDef[] = [
     name: "search_service_manuals",
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Search Service Manuals" },
     description:
-      "Search ingested GM service manuals (1,111 chunks). Find torque specs, procedures, part numbers, service intervals. Returns matching text chunks with page references.",
+      "Search stored manual chunks. A chunk may be a summary or span multiple pages; this reader does not verify verbatim text, page identity or vehicle applicability.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2307,11 +2308,43 @@ async function handleQueryMarketHistory(args: Record<string, unknown>): Promise<
 const LIBRARY_TYPES = ["paint_codes", "condition_knowledge", "condition_taxonomy", "vehicle_nomenclature"];
 const LIBRARY_MAX_LIMIT = 100;
 
+// PostgREST's array contains syntax needs a quoted/escaped element. Treat
+// ILIKE inputs as literal names, not user-provided wildcard patterns.
+function libraryArrayLiteral(value: string): string {
+  return `{"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"}`;
+}
+function libraryLiteralLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
 async function handleQueryLibrary(args: Record<string, unknown>): Promise<ToolResult> {
   const type = String(args.type);
   if (!LIBRARY_TYPES.includes(type)) {
     return toolErr(`Unknown library type. Use one of: ${LIBRARY_TYPES.join(", ")}`);
   }
+  let make: string | undefined;
+  let model: string | undefined;
+  let year: number | undefined;
+  if (args.make !== undefined) {
+    if (typeof args.make !== "string" || !args.make.trim()) return toolErr("make must be a non-empty string");
+    make = args.make.trim();
+  }
+  if (args.model !== undefined) {
+    if (typeof args.model !== "string" || !args.model.trim()) return toolErr("model must be a non-empty string");
+    model = args.model.trim();
+  }
+  if (args.year !== undefined) {
+    // The condition-knowledge filter uses [year, year + 1) as an int4 range.
+    if (typeof args.year !== "number" || !Number.isInteger(args.year) || args.year < -2147483648 || args.year >= 2147483647) {
+      return toolErr("year must be an integer in the supported range");
+    }
+    year = args.year;
+  }
+  if (type === "condition_taxonomy" && (make !== undefined || model !== undefined || year !== undefined)) {
+    return toolErr("condition_taxonomy is not scoped by make, model or year");
+  }
+  if (type === "paint_codes" && model !== undefined) return toolErr("paint_codes cannot filter by model");
+
   const limit = Math.min(Math.max(Math.trunc(Number(args.limit)) || 25, 1), LIBRARY_MAX_LIMIT);
   const supabase = sb();
 
@@ -2336,13 +2369,40 @@ async function handleQueryLibrary(args: Record<string, unknown>): Promise<ToolRe
     }
   }
 
-  if (args.make) {
-    query = query.ilike("make", String(args.make));
+  if (make !== undefined) {
+    query = type === "condition_knowledge"
+      ? query.filter("applicable_makes", "cs", libraryArrayLiteral(make))
+      : query.ilike("make", libraryLiteralLike(make));
+  }
+  if (model !== undefined) {
+    query = type === "condition_knowledge"
+      ? query.filter("applicable_models", "cs", libraryArrayLiteral(model))
+      : query.ilike("model", libraryLiteralLike(model));
+  }
+  if (year !== undefined) {
+    if (type === "condition_knowledge") query = query.filter("applicable_years", "ov", `[${year},${year + 1})`);
+    else if (type === "paint_codes") query = query.lte("year_start", year).gte("year_end", year);
+    else if (type === "vehicle_nomenclature") query = query.eq("year", year);
   }
 
   const { data, error } = await query;
   if (error) return toolErr(error.message);
-  return toolOk({ type, count: data?.length ?? 0, results: data || [] });
+  const results = type === "condition_knowledge"
+    ? (data || []).map((row: Record<string, unknown>) => ({
+        ...row,
+        reader_qualification: {
+          source_page: "not_assessed",
+          recorded_chunk_link: row.chunk_id ? "present" : "missing",
+          vehicle_application: "not_assessed",
+        },
+      }))
+    : (data || []);
+  return toolOk({
+    type, count: results.length, results,
+    ...(make !== undefined || model !== undefined || year !== undefined ? {
+      filter_basis: "recorded_metadata_only; unknown values excluded; array matches are case-sensitive",
+    } : {}),
+  });
 }
 
 async function handleSearchServiceManuals(args: Record<string, unknown>): Promise<ToolResult> {
@@ -2365,10 +2425,12 @@ async function handleSearchServiceManuals(args: Record<string, unknown>): Promis
       .ilike("content", `%${q}%`)
       .limit(limit);
     if (e2) return toolErr(e2.message);
-    return toolOk({ query: q, count: fallback?.length ?? 0, chunks: fallback || [] });
+    return toolOk({ query: q, count: fallback?.length ?? 0, chunks: fallback || [],
+      reader_qualification: { verbatim_text: "not_assessed", source_page: "not_assessed", vehicle_application: "not_assessed" } });
   }
 
-  return toolOk({ query: q, count: data?.length ?? 0, chunks: data || [] });
+  return toolOk({ query: q, count: data?.length ?? 0, chunks: data || [],
+    reader_qualification: { verbatim_text: "not_assessed", source_page: "not_assessed", vehicle_application: "not_assessed" } });
 }
 
 // ── Vision ──────────────────────────────────────────────────────────────────
