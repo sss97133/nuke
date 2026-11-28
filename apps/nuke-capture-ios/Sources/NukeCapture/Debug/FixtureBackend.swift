@@ -144,11 +144,15 @@ enum FixtureBackend {
             """)
         }
         let closing = iso.string(from: Date().addingTimeInterval(attempt == 1 ? 10 : 120))
-        let clockOnly = ["browse-clock-extended", "browse-clock-missing-then-extended", "browse-episode-gap"].contains(scenario)
+        let clockOnly = ["browse-clock-extended", "browse-clock-missing-then-extended", "browse-episode-gap", "browse-episode-retry-switch"].contains(scenario)
         let extended = iso.string(from: Date().addingTimeInterval(attempt == 1 ? (clockOnly ? 10 : 20) : 120))
         let open = iso.string(from: Date().addingTimeInterval(3600))
         func row(_ suffix: String, _ title: String, _ end: String) -> String {
-            let link = scenario == "browse-episode-gap" ? #""https://bringatrailer.com/listing/fixture""# : "null"
+            let link: String
+            if scenario == "browse-episode-gap" { link = #""https://bringatrailer.com/listing/fixture""# }
+            else if scenario == "browse-episode-retry-switch" {
+                link = attempt == 1 ? #""https://bringatrailer.com/listing/old-episode""# : #""https://bringatrailer.com/listing/new-episode""#
+            } else { link = "null" }
             return #"["00000000-0000-4000-8000-0000000000\#(suffix)",1973,"Fixture","Coupe",5000,"\#(end)",null,null,"http://[",false,\#(link),"\#(title)",null,null,null,null,null]"#
         }
         if ["browse-clock-missing-then-extended", "browse-episode-gap"].contains(scenario), attempt == 2 {
@@ -628,7 +632,7 @@ enum FixtureBackend {
             && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more"].contains(scenario):
             return browsePagingRead(name, args)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
-            && ["browse-closing-refresh", "browse-clock-extended", "browse-clock-missing-then-extended", "browse-clock-freshness", "browse-clock-boundary", "browse-episode-gap"].contains(scenario):
+            && ["browse-closing-refresh", "browse-clock-extended", "browse-clock-missing-then-extended", "browse-clock-freshness", "browse-clock-boundary", "browse-episode-gap", "browse-episode-retry-switch"].contains(scenario):
             return closingBrowseRead(name)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
             && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):
@@ -683,6 +687,28 @@ enum FixtureBackend {
             "listing_url":"https://bringatrailer.com/listing/fixture","auction_event_id":"00000000-0000-4000-8000-00000000c201",
             "estimate":7200,"low":6000,"high":9000,"estimated_at":"2026-11-28T10:00:00Z","model":32,"analogs":[]}]}
             """)
+        case "live_finish_episode_estimates" where scenario == "browse-episode-retry-switch":
+            let request = (args["p_lots"] as? [[String: Any]])?.first
+            guard (request?["vehicle_id"] as? String)?.lowercased() == "00000000-0000-4000-8000-000000000002",
+                  let listing = request?["listing_url"] as? String,
+                  ["https://bringatrailer.com/listing/old-episode", "https://bringatrailer.com/listing/new-episode"].contains(listing) else {
+                return (400, Data(#"{"message":"wrong episode reference"}"#.utf8))
+            }
+            let old = listing.hasSuffix("old-episode")
+            if old {
+                browseReadLock.lock(); browseEpisodeAttempts += 1; let attempt = browseEpisodeAttempts; browseReadLock.unlock()
+                if attempt == 1 { return (-1, Data()) }
+            }
+            let estimate = old ? 7200 : 8100
+            let title = old ? "Old listing comparable" : "New listing comparable"
+            let response = ok("""
+            {"fresh":true,"rows":[{"vehicle_id":"00000000-0000-4000-8000-000000000002",
+            "listing_url":"\(listing)","auction_event_id":"00000000-0000-4000-8000-00000000c201",
+            "estimate":\(estimate),"low":6000,"high":9000,"estimated_at":"2026-11-28T10:00:00Z","model":32,
+            "analogs":[{"title":"\(title)","final":7000}]}]}
+            """)
+            // -2 delivers asynchronously, allowing a board refresh while the old retry is in flight.
+            return old ? (-2, response.1) : response
         case "record_interaction" where scenario == "social-browse" && args["p_kind"] as? String == "comment":
             switch ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_POST"] {
             case "refused": return ok(#"{"ok":false,"error":"not_authorized"}"#)
@@ -761,7 +787,7 @@ enum FixtureBackend {
 }
 
 /// Every request on the fixture session lands here; nothing is forwarded.
-final class FixtureURLProtocol: URLProtocol {
+final class FixtureURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
@@ -786,6 +812,14 @@ final class FixtureURLProtocol: URLProtocol {
             client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
             return
         }
+        if status == -2 {
+            DispatchQueue.global().asyncAfter(deadline: .now() + 27) { [self] in deliver(status: 200, data: data) }
+            return
+        }
+        deliver(status: status, data: data)
+    }
+
+    private func deliver(status: Int, data: Data) {
         let response = HTTPURLResponse(url: request.url ?? FixtureBackend.baseURL, statusCode: status, httpVersion: "HTTP/1.1",
                                        headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

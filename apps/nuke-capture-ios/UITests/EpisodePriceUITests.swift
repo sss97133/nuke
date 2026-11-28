@@ -64,4 +64,23 @@ final class EpisodePriceUITests: XCTestCase {
         XCTAssertTrue(projection.waitForExistence(timeout: 35), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
+
+    func testSlowRetryCannotReplaceNewListingPriceContext() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor", "-explore.signals.upload", "NO"]
+        app.launchEnvironment = ["NUKE_DEBUG_SCREEN": "explore", "NUKE_FIXTURE_SCENARIO": "browse-episode-retry-switch"]
+        app.launch()
+        let price = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Current bid")).firstMatch
+        XCTAssertTrue(price.waitForExistence(timeout: 20), app.debugDescription); price.tap()
+        let retry = app.buttons["Retry price context"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription); retry.tap()
+        XCTAssertTrue(app.staticTexts["$8,100"].waitForExistence(timeout: 45), app.debugDescription)
+        let wrong = app.staticTexts["$7,200"]
+        let absent = expectation(for: NSPredicate(format: "exists == true"), evaluatedWith: wrong)
+        absent.isInverted = true
+        wait(for: [absent], timeout: 15)
+        XCTAssertTrue(app.staticTexts["$8,100"].exists, app.debugDescription)
+        XCTAssertFalse(app.staticTexts["Old listing comparable"].exists)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
 }

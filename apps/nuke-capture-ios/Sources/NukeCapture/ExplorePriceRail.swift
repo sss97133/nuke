@@ -276,13 +276,17 @@ struct ExploreWhySheet: View {
     private enum AnalogState { case loading, failed(String, episode: Bool), loaded([FinishAnalog]) }
     @State private var analogs: AnalogState = .loading
     @State private var episode: EpisodeFinish?
+    @State private var loadedKey: String?
+    @State private var readGeneration = UUID()
+    @State private var readTask: Task<Void, Never>?
     @Environment(\.dismiss) private var dismiss
 
     private var displayedWhy: ExploreWhy {
-        ExploreWhy(item: why.item, estimate: episode?.estimate ?? why.estimate, fresh: episode != nil || why.fresh)
+        let current = loadedKey == readKey ? episode : nil
+        return ExploreWhy(item: why.item, estimate: current?.estimate ?? why.estimate, fresh: current != nil || why.fresh)
     }
     private var readKey: String {
-        "\(why.item.id)|\(why.item.link?.absoluteString ?? "")|\(why.item.liveStatusUnavailable)"
+        "\(why.item.id)|\(why.item.link?.absoluteString ?? "")|\(why.item.liveStatusUnavailable)|\(why.estimate == nil)"
     }
 
     var body: some View {
@@ -305,7 +309,7 @@ struct ExploreWhySheet: View {
                     }
                     if why.item.kind == .live {
                         Section("Comparable lots") {
-                            switch analogs {
+                            switch loadedKey == readKey ? analogs : .loading {
                             case .loading:
                                 ProgressView()
                             case .failed(let reason, let episode):
@@ -313,7 +317,7 @@ struct ExploreWhySheet: View {
                                     .font(.footnote).foregroundStyle(.secondary)
                                 Text(reason).font(.footnote).foregroundStyle(.secondary)
                                     .accessibilityIdentifier("comparable-read-failure")
-                                Button(episode ? "Retry price context" : "Retry comparable lots") { Task { await loadAnalogs() } }
+                                Button(episode ? "Retry price context" : "Retry comparable lots") { startRead() }
                             case .loaded(let rows):
                                 if rows.isEmpty {
                                     Text("No comparable lots were returned for this one.").font(.footnote).foregroundStyle(.secondary)
@@ -327,7 +331,12 @@ struct ExploreWhySheet: View {
             .navigationTitle(why.item.liveStatusUnavailable ? "Price details" : why.rail.detailsTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task(id: readKey) { await loadAnalogs() }
+            .onChange(of: readKey, initial: true) { _, _ in startRead() }
+            .onDisappear {
+                readTask?.cancel()
+                readGeneration = UUID()
+                loadedKey = nil
+            }
         }
         .presentationDetents([.medium, .large])
     }
@@ -364,17 +373,28 @@ struct ExploreWhySheet: View {
         }
     }
 
-    /// The same read the Market board's bid sheet makes; lots only, one vehicle.
-    private func loadAnalogs() async {
+    /// Start and cancel every read, including retries, under the current listing identity.
+    private func startRead() {
+        readTask?.cancel()
+        let generation = UUID()
+        readGeneration = generation
+        loadedKey = readKey
         episode = nil
         guard why.item.kind == .live, !why.item.liveStatusUnavailable, let id = why.item.lotId else { return }
         analogs = .loading
+        let url = why.item.link?.absoluteString
+        let useExact = why.estimate == nil && url.flatMap(EpisodeFinish.canonicalListing) != nil
+        readTask = Task { await loadAnalogs(id: id, url: url, useExact: useExact, generation: generation) }
+    }
+
+    /// The same read the Market board's bid sheet makes; lots only, one vehicle.
+    private func loadAnalogs(id: String, url: String?, useExact: Bool, generation: UUID) async {
         // The older reader is vehicle-keyed and may withhold a relisted lot. Ask the
         // source-bound reader only when the card did not already receive an estimate.
-        if why.estimate == nil, let url = why.item.link?.absoluteString, EpisodeFinish.canonicalListing(url) != nil {
+        if useExact, let url {
             do {
                 let exact = try await EpisodeFinish.read(vehicleId: id, listingURL: url)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, readGeneration == generation else { return }
                 if let exact {
                     episode = exact
                     analogs = .loaded(exact.analogs)
@@ -384,17 +404,17 @@ struct ExploreWhySheet: View {
                 analogs = .loaded([])
                 return
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, readGeneration == generation else { return }
                 analogs = .failed(ReadFailure.text(error), episode: true)
                 return
             }
         }
         do {
             let rows = try await FinishBoard.readAnalogs(vehicleId: id)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, readGeneration == generation else { return }
             analogs = .loaded(rows)
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, readGeneration == generation else { return }
             analogs = .failed(ReadFailure.text(error), episode: false)
         }
     }
