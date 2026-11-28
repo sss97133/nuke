@@ -83,6 +83,8 @@ struct NukeCaptureApp: App {
                     // Explore is anon/self-contained (its own NavigationStack) — root
                     // straight on it for the market-pulse screenshot. DEBUG only.
                     ExploreView()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "photo-load" {
+                    DebugPhotoLoadHost()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "app" {
                     DebugAppDeepLink()
                 } else if let org = ProcessInfo.processInfo.environment["NUKE_DEBUG_ACTOR_ORG"], !org.isEmpty {
@@ -534,6 +536,21 @@ final class SessionStore: ObservableObject {
 }
 
 #if DEBUG
+/// Local-only image failure and replacement for the UI-test fixture.
+private struct DebugPhotoLoadHost: View {
+    private static let unavailable = URL(string: "http://127.0.0.1:1/unavailable.png")!
+    private static let working = URL(string: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=")!
+    @State private var url = unavailable
+    var body: some View {
+        VStack(spacing: 20) {
+            NukePhoto(url: url).frame(width: 240, height: 180)
+            NukePhoto(url: url, emptyIcon: "person").frame(width: 28, height: 28).clipShape(Circle())
+            Button("Use working photo") { url = Self.working }
+            Button("Use unavailable photo") { url = Self.unavailable }
+        }
+    }
+}
+
 /// Screenshot-loop deep link. Optionally injects a real session (so owner-gated
 /// surfaces — ASSET window, investment proof, CONFIRM — render as the actual
 /// owner) BEFORE showing the vehicle. Tokens come from NUKE_DEBUG_ACCESS_TOKEN /

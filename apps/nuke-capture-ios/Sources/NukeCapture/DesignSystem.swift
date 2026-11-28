@@ -12,6 +12,7 @@
 //   • Motion respects Reduce Motion (shimmer holds still).
 
 import SwiftUI
+import UIKit
 
 // MARK: Spacing, radius, size
 
@@ -356,27 +357,60 @@ struct NukeSourceLogo: View {
 
 // MARK: Photos
 
-/// A cached photo that fills its frame, with a shimmer while it loads and a calm plate when
-/// there is no photo. Never a spinner, never a broken frame.
+/// A cached photo that fills its frame. A failed read is not left shimmering
+/// forever; a later appearance retries it, and a different URL starts fresh.
 struct NukePhoto: View {
     let url: URL?
     var maxPixel: CGFloat = RemoteImageCache.defaultMaxPixel
     var emptyIcon = "car.side"
+    @State private var image: UIImage?
+    @State private var loadedURL: URL?
+    @State private var failedURL: URL?
+
+    init(url: URL?, maxPixel: CGFloat = RemoteImageCache.defaultMaxPixel, emptyIcon: String = "car.side") {
+        self.url = url; self.maxPixel = maxPixel; self.emptyIcon = emptyIcon
+        let cached = url.flatMap { RemoteImageCache.shared.cached($0, maxPixel: maxPixel) }
+        _image = State(initialValue: cached)
+        _loadedURL = State(initialValue: cached == nil ? nil : url)
+    }
 
     var body: some View {
         Color(.tertiarySystemFill)
             .overlay {
-                if url == nil {
+                if let url, loadedURL == url, let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                        .accessibilityLabel("Photo")
+                        .accessibilityIdentifier("nuke-photo-loaded")
+                } else if url == nil {
                     Image(systemName: emptyIcon).font(.largeTitle).foregroundStyle(.tertiary)
-                } else {
-                    CachedAsyncImage(url: url, maxPixel: maxPixel) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        Color(.tertiarySystemFill).nukeShimmer()
+                } else if failedURL == url {
+                    ViewThatFits(in: [.horizontal, .vertical]) {
+                        VStack(spacing: 4) {
+                            Image(systemName: "photo.badge.exclamationmark").font(.title2)
+                            Text("Photo unavailable").font(.caption).lineLimit(2)
+                        }
+                        .padding(4)
+                        Image(systemName: "photo.badge.exclamationmark")
+                            .font(.body)
+                            .accessibilityLabel("Photo unavailable")
                     }
+                    .foregroundStyle(.secondary)
+                } else {
+                    Color(.tertiarySystemFill).nukeShimmer()
                 }
             }
             .clipped()
+            .task(id: url) {
+                guard let requested = url else { image = nil; loadedURL = nil; failedURL = nil; return }
+                if let cached = RemoteImageCache.shared.cached(requested, maxPixel: maxPixel) {
+                    image = cached; loadedURL = requested; failedURL = nil; return
+                }
+                image = nil; loadedURL = nil; failedURL = nil
+                let result = await RemoteImageCache.shared.image(requested, maxPixel: maxPixel)
+                guard !Task.isCancelled else { return }
+                if let result { image = result; loadedURL = requested }
+                else { failedURL = requested }
+            }
     }
 }
 
