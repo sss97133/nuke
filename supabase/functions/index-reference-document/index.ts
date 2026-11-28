@@ -12,6 +12,7 @@ import { geminiFetch } from '../_shared/geminiGuard.ts';
 import { recordSuppliedDocument, recordSuppliedReference, ReferenceError, sha256 } from './suppliedReference.ts';
 import { recordCatalogTextSource } from './catalogTextSource.ts';
 import { recordAttestedPdfText } from './attestedPdfText.ts';
+import { recordCatalogPageMembership } from './catalogPageMembership.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,6 +34,22 @@ Deno.serve(async (req) => {
     )
 
     const body = await req.json();
+    if (body.mode === 'catalog_page_membership') {
+      try {
+        const result = await recordCatalogPageMembership(body, {
+          authorize: () => isServiceCaller(req),
+          async record(catalog, pages) {
+            const { data, error } = await supabase.rpc('record_catalog_page_membership', { p_catalog: catalog, p_pages: pages });
+            if (error) throw new ReferenceError('catalog_page_source_not_recorded', 409);
+            return data;
+          },
+        });
+        return Response.json(result, { headers: corsHeaders });
+      } catch (error) {
+        return Response.json({ success: false, error: error instanceof ReferenceError ? error.code : 'catalog_page_persistence_failed', model_calls: 0 },
+          { status: error instanceof ReferenceError ? error.status : 500, headers: corsHeaders });
+      }
+    }
     if (body.mode === 'attested_pdf_text') {
       try {
         const result = await recordAttestedPdfText(body, {

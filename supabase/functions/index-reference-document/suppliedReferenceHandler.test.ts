@@ -34,6 +34,13 @@ globalThis.fetch = (async (input, init) => {
       page_count: args.p_source.page_count, duplicate: false, pdf_hash_status: 'client_attested_not_server_rehashed',
       text_provenance_status: 'client_attested_extraction_not_server_verified' });
   }
+  if (url.pathname === '/rest/v1/rpc/record_catalog_page_membership') {
+    const args = JSON.parse(String(init?.body));
+    assert(args.p_pages.length === 1 && args.p_catalog.provider === 'LMC');
+    return Response.json({ success: true, catalog_id: '30000000-0000-4000-8000-000000000001',
+      pages_submitted: args.p_pages.length, inserted: 1, replayed: 0,
+      mapping_status: 'client_attested_not_server_reextracted' });
+  }
   if (url.pathname === '/functions/v1/ingest-observation') {
     intake = JSON.parse(String(init?.body)); return Response.json({ success: true, observation_id: obsId });
   }
@@ -51,6 +58,31 @@ Deno.test('actual supplied-reference handler only archives, records, ingests and
   assert(calls.length === 4 && calls[0].startsWith('POST /storage/v1/object/reference-docs/supplied/')
     && calls.slice(1).join('|') === 'POST /rest/v1/rpc/record_supplied_reference_document|POST /functions/v1/ingest-observation|POST /rest/v1/rpc/project_reference_assembly');
   assert(intake.defer_analysis && intake.agent_inferred && !intake.vehicle_id && !intake.vehicle_hints);
+});
+
+function membershipRequest(token = secret, change?: (input: any) => void) {
+  const input: any = { mode: 'catalog_page_membership', catalog: {
+    name: 'Synthetic SUV catalog', provider: 'LMC', base_url: 'https://example.test/suv/full.pdf',
+    full_pdf_sha256: 'f'.repeat(64), expected_page_count: 220, reader_actor: 'agent:test',
+    reader_run_id: 'test', reader_verified_at: new Date().toISOString(),
+  }, pages: [{ catalog_page_number: 11, document_id: '10000000-0000-4000-8000-000000000011',
+    document_page_id: '20000000-0000-4000-8000-000000000011', pdf_sha256: '1'.repeat(64),
+    full_geometry_sha256: '7'.repeat(64), individual_geometry_sha256: '7'.repeat(64),
+    full_render_sha256: '8'.repeat(64), individual_render_sha256: '8'.repeat(64) }] };
+  change?.(input);
+  return new Request(`${project}/functions/v1/index-reference-document`, {
+    method: 'POST', headers: { apikey: token, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+}
+Deno.test('actual page membership handler invokes only the protected source writer', async () => {
+  calls.length = 0; const response = await handler(membershipRequest()), result = await response.json();
+  assert(response.status === 200 && result.source_membership_only === true && result.model_calls === 0);
+  assert(calls.length === 1 && calls[0] === 'POST /rest/v1/rpc/record_catalog_page_membership');
+});
+Deno.test('actual page membership handler rejects anonymous and invented claims', async () => {
+  calls.length = 0; const denied = await handler(membershipRequest('sb_publishable_fixture'));
+  assert(denied.status === 401 && calls.length === 0); await denied.body?.cancel();
+  const invalid = await handler(membershipRequest(secret, input => input.pages[0].fitment = 'invented'));
+  assert(invalid.status === 400 && calls.length === 0); await invalid.body?.cancel();
 });
 Deno.test('actual reference handler rejects anonymous credentials before effects', async () => {
   calls.length = 0; const response = await handler(await request('sb_publishable_fixture')); assert(response.status === 401 && calls.length === 0); await response.body?.cancel();
