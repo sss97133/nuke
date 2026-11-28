@@ -23,9 +23,10 @@ final class VehicleLiveBannerTests: XCTestCase {
         XCTAssertEqual(VehicleLiveBanner.countdown(now.addingTimeInterval(30), now: now), "0m 30s")
     }
 
-    func testCountdownSaysClosedOncePassed() {
-        XCTAssertEqual(VehicleLiveBanner.countdown(now, now: now), "closed")
-        XCTAssertEqual(VehicleLiveBanner.countdown(now.addingTimeInterval(-5), now: now), "closed")
+    func testCountdownDoesNotClaimClosureFromTheRecordedDeadline() {
+        XCTAssertEqual(VehicleLiveBanner.countdown(now, now: now), "Closing")
+        XCTAssertEqual(VehicleLiveBanner.countdown(now.addingTimeInterval(-5), now: now), "Closing")
+        XCTAssertEqual(VehicleLiveBanner.countdown(now.addingTimeInterval(-900), now: now), "Status unknown")
     }
 
     func testBidReadsUnknownWhenMissing() {
