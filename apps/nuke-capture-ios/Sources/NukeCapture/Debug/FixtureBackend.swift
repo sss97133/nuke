@@ -232,17 +232,6 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
-        case "get_vehicle_engagement" where scenario == "social-follow":
-            guard (args["p_vehicle_id"] as? String)?.lowercased() == navigationVehicleId else {
-                return (400, Data(#"{"message":"wrong fixture vehicle"}"#.utf8))
-            }
-            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_READ"] == "failure" {
-                return (400, Data(#"{"message":"fixture follow read failed"}"#.utf8))
-            }
-            let follows = fixtureFollow(toggle: false)
-            return ok("""
-            {"following_count":\(follows ? 1 : 0),"is_following":\(follows),"comment_count":0,"contribution_count":0,"recent_comments":[]}
-            """)
         case "get_image_deep_analysis" where scenario == "navigation-garage" && !analysisMode.isEmpty:
             guard args["p_image_id"] as? String == "00000000-0000-4000-8000-00000000e001" else {
                 return (400, Data(#"{"message":"wrong fixture image requested"}"#.utf8))
@@ -407,6 +396,17 @@ enum FixtureBackend {
             return ok(JobFixtures.statementVisitor
                 .replacingOccurrences(of: #""payments":null,"balance":null"#, with: #""payments":\#(plantedAmount),"balance":\#(plantedAmount)"#)
                 .replacingOccurrences(of: #""payments_total":null,"balance_due":null"#, with: #""payments_total":\#(plantedAmount),"balance_due":\#(plantedAmount)"#))
+        case "get_vehicle_engagement" where scenario == "social-follow":
+            guard (args["p_vehicle_id"] as? String)?.lowercased() == navigationVehicleId else {
+                return (400, Data(#"{"message":"wrong fixture vehicle"}"#.utf8))
+            }
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_READ"] == "failure" {
+                return (400, Data(#"{"message":"fixture follow read failed"}"#.utf8))
+            }
+            let follows = fixtureFollow(toggle: false)
+            return ok("""
+            {"following_count":\(follows ? 1 : 0),"is_following":\(follows),"comment_count":0,"contribution_count":0,"recent_comments":[]}
+            """)
         default: return pending
         }
     }
@@ -441,24 +441,6 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
-        case "market_pulse_live" where scenario == "social-follow":
-            // Use the static fallback instead of an endlessly loading fixture image.
-            return ok("""
-            {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
-              "2026-11-27T10:00:00Z",null,"http://[",false,
-              "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
-            """)
-        case "record_interaction" where scenario == "social-follow" && args["p_kind"] as? String == "follow":
-            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_WRITE"] == "refused" {
-                return ok(#"{"ok":false,"error":"not_authorized"}"#)
-            }
-            let follows = fixtureFollow(toggle: true)
-            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_WRITE"] == "uncertain" {
-                return ok(#"{"ok":true,"kind":"follow"}"#)
-            }
-            return ok("""
-            {"ok":true,"kind":"follow","following":\(follows)}
-            """)
         case "confirm_work_session" where scenario == "financial-qualification":
             let id = (args["p_session_id"] as? String ?? "").lowercased()
             if id.hasSuffix("f004") { return ok(#"{"ok":false,"error":"not_authorized"}"#) }
@@ -481,6 +463,24 @@ enum FixtureBackend {
             return ok(#"{"work_order_id":"\#(args["p_work_order_id"] as? String ?? "")","visibility":"\#(args["p_visibility"] as? String ?? "")","providers_notified":false,"payment_authorized":false}"#)
         case "claim_organization": return ok(ParityFixtures.claimed)
         case "create_supplier_invite": return ok(ParityFixtures.invite)
+        case "market_pulse_live" where scenario == "social-follow":
+            // Use the static fallback instead of an endlessly loading fixture image.
+            return ok("""
+            {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
+              "2026-11-27T10:00:00Z",null,"http://[",false,
+              "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
+            """)
+        case "record_interaction" where scenario == "social-follow" && args["p_kind"] as? String == "follow":
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_WRITE"] == "refused" {
+                return ok(#"{"ok":false,"error":"not_authorized"}"#)
+            }
+            let follows = fixtureFollow(toggle: true)
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_WRITE"] == "uncertain" {
+                return ok(#"{"ok":true,"kind":"follow"}"#)
+            }
+            return ok("""
+            {"ok":true,"kind":"follow","following":\(follows)}
+            """)
         default: return ok("{}")
         }
     }
