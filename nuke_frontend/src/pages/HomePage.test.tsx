@@ -389,3 +389,18 @@ describe('independent market loading', () => {
     expect(container.querySelector('[data-testid="sources-screen"]')).not.toBeNull();
   });
 });
+
+it('opens explicit sales links on the outcome panel and preserves all panels when the order changes',async()=>{
+ installTreemapReads();await render();
+ const market=container.querySelector('[aria-label="Market screen"]')!,sources=container.querySelector('[data-testid="sources-screen"]')!;
+ const tile=()=>container.querySelector('button.market-tile[aria-label="Porsche"]')!;
+ expect(tile().compareDocumentPosition(market)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+ await navigate('/?tab=market&view=sales');
+ expect(market.compareDocumentPosition(tile())&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+ expect(market.compareDocumentPosition(sources)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+ expect(container.querySelector('[aria-label="Market screen"]')).toBe(market);
+ expect(container.querySelector('[data-testid="sources-screen"]')).toBe(sources);
+ await navigate('/?tab=market&view=inventory');
+ expect(tile().compareDocumentPosition(market)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+ expect(container.querySelector('[aria-label="Market screen"]')).toBe(market);
+});

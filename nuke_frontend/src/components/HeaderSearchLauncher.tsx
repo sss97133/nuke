@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './HeaderSearchLauncher.css';
 
-type SearchComponent = React.ComponentType<{ className?: string }>;
+type SearchComponent = React.ComponentType<{ className?: string; initialQuery?: string; pendingSubmitQuery?: string }>;
 let loading: Promise<SearchComponent> | null = null;
 const loadSearch = () => (loading ??= import('./HeaderSearch').then(m => m.default as SearchComponent));
 
@@ -25,7 +25,7 @@ function setReactInputValue(input: HTMLInputElement, value: string) {
 
 export default function HeaderSearchLauncher({ className }: { className?: string }) {
   const [Search, setSearch] = useState<SearchComponent | null>(null);
-  const handoff = useRef({ text: '', focus: false });
+  const handoff = useRef({ text: '', focus: false, submitQuery: undefined as string | undefined });
   const box = useRef<HTMLDivElement>(null);
 
   const activate = useCallback((focus: boolean) => {
@@ -59,17 +59,25 @@ export default function HeaderSearchLauncher({ className }: { className?: string
     if (!Search) return;
     const input = box.current?.querySelector<HTMLInputElement>('input[type="text"]');
     if (!input) return;
-    if (handoff.current.text) setReactInputValue(input, handoff.current.text);
+    if (handoff.current.text && input.value !== handoff.current.text) setReactInputValue(input, handoff.current.text);
     if (handoff.current.focus) input.focus();
   }, [Search]);
 
-  if (Search) return <div ref={box} className="hsl-live"><Search className={className} /></div>;
+  if (Search) return <div ref={box} className="hsl-live"><Search className={className} initialQuery={handoff.current.text} pendingSubmitQuery={handoff.current.submitQuery} /></div>;
 
   return <div ref={box} className="hsl-shell">
     <div className="hsl-box" onDragEnter={() => activate(false)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); activate(true); }}>
       <input type="text" className="hsl-input" placeholder={PLACEHOLDER} aria-label={LABEL}
         onPointerEnter={() => void loadSearch()} onFocus={() => activate(true)}
-        onChange={e => { handoff.current.text = e.target.value; activate(true); }} />
+        onChange={e => { handoff.current.text = e.target.value; handoff.current.submitQuery = undefined; activate(true); }}
+        onKeyDown={e => {
+          if(e.key==='Escape')handoff.current.submitQuery=undefined;
+          if(e.key!=='Enter'||e.shiftKey||e.nativeEvent.isComposing)return;
+          e.preventDefault();e.stopPropagation();
+          handoff.current.text=e.currentTarget.value;
+          handoff.current.submitQuery=e.currentTarget.value;
+          activate(true);
+        }} />
       <button type="button" className="hsl-more" title="Show actions" aria-label="Show actions" onClick={() => activate(true)}>...</button>
     </div>
   </div>;

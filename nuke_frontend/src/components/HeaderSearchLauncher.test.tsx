@@ -4,9 +4,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./HeaderSearch', () => ({
-  default: function RealSearch() {
-    const [value, setValue] = useState('');
-    return <div data-testid="real"><input type="text" aria-label="Magic Box — search, URL, VIN, or image" value={value} onChange={e => setValue(e.target.value)} /></div>;
+  default: function RealSearch({initialQuery,pendingSubmitQuery}: {initialQuery?:string;pendingSubmitQuery?:string}) {
+    const [value, setValue] = useState(initialQuery??'');
+    return <div data-testid="real" data-pending-query={pendingSubmitQuery}><input type="text" aria-label="Magic Box — search, URL, VIN, or image" value={value} onChange={e => setValue(e.target.value)} /></div>;
   },
 }));
 import HeaderSearchLauncher from './HeaderSearchLauncher';
@@ -48,4 +48,26 @@ describe('HeaderSearchLauncher', () => {
     await tick(); await tick();
     expect(document.activeElement).toBe(el.querySelector('[data-testid="real"] input'));
   });
+});
+
+it('carries an Enter pressed before activation without waiting for a second keypress',async()=>{
+ const el=await mount(),input=el.querySelector('input')!;
+ await act(async()=>{
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'Chevrolet K5 Blazer');
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+  input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+ });await tick();
+ expect(el.querySelector('[data-testid="real"]')?.getAttribute('data-pending-query')).toBe('Chevrolet K5 Blazer');
+ expect((el.querySelector('[data-testid="real"] input') as HTMLInputElement).value).toBe('Chevrolet K5 Blazer');
+});
+it.each(['edit','Escape','shift','composition'])('does not queue an unwanted submission for %s',async(reason)=>{
+ const el=await mount(),input=el.querySelector('input')!;
+ await act(async()=>{
+  const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
+  set.call(input,'Camaro');input.dispatchEvent(new Event('input',{bubbles:true}));
+  input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true,shiftKey:reason==='shift',isComposing:reason==='composition'}));
+  if(reason==='edit'){set.call(input,'K5 Blazer');input.dispatchEvent(new Event('input',{bubbles:true}));}
+  if(reason==='Escape')input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ });await tick();
+ expect(el.querySelector('[data-testid="real"]')?.hasAttribute('data-pending-query')).toBe(false);
 });

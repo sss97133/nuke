@@ -3431,6 +3431,19 @@ export default function HomePage() {
 
   if (authLoading) return <TabSkeleton />;
 
+  // An explicit results link opens on its measurements. Keep the existing
+  // navigator and source context, with stable keys so changing views does not
+  // remount them or discard their local state.
+  const marketPanels = [
+    <TreemapHomePage key="family-browser" embedded onBrowse={() => (document.querySelector('.market-sources') ?? document.querySelector('.market-explorer'))
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />,
+    <Suspense key="sources" fallback={<TabSkeleton label="Loading sources" />}><SourcesBoard scope={{
+      make: searchParams.get('make'), family: searchParams.get('family'), familyName: searchParams.get('family_name'),
+      model: searchParams.get('model') ?? searchParams.get('facet'),
+    }} houseMix={sourcesRefresh.populations?.by_house ? { rows: sourcesRefresh.populations.by_house, clock: ledgerViewsClock(sourcesRefresh.refreshedAt) } : null} /></Suspense>,
+    <Suspense key="outcomes" fallback={<TabSkeleton label="Loading live auctions" />}><MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} /></Suspense>,
+  ];
+
   return (
     <div>
       {showOnboarding && (
@@ -3450,18 +3463,8 @@ export default function HomePage() {
       </nav>
 
       <Suspense fallback={<TabSkeleton />}>
-        {activeTab === 'market' && <>
-          <TreemapHomePage embedded onBrowse={() => (document.querySelector('.market-sources') ?? document.querySelector('.market-explorer'))
-            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
-          {/* Every source with the same row, ranked by the lots we hold (owner, 2026-10-15: "treat all sources the same") */}
-          <Suspense fallback={<TabSkeleton label="Loading sources" />}><SourcesBoard scope={{
-            make: searchParams.get('make'),
-            family: searchParams.get('family'),
-            familyName: searchParams.get('family_name'),
-            model: searchParams.get('model') ?? searchParams.get('facet'),
-          }} houseMix={sourcesRefresh.populations?.by_house ? { rows: sourcesRefresh.populations.by_house, clock: ledgerViewsClock(sourcesRefresh.refreshedAt) } : null} /></Suspense>
-          <Suspense fallback={<TabSkeleton label="Loading live auctions" />}><MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} /></Suspense>
-        </>}
+        {activeTab === 'market' && (searchParams.get('view')==='sales'
+          ? [marketPanels[2],marketPanels[0],marketPanels[1]] : marketPanels)}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}
         {activeTab === 'feed' && <FeedPage />}
       </Suspense>

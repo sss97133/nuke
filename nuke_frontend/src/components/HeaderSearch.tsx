@@ -765,10 +765,12 @@ export const HeaderSearchCohortShortcuts: React.FC<HeaderSearchCohortShortcutsPr
 
 export interface HeaderSearchProps {
   className?: string;
+  initialQuery?: string;
+  pendingSubmitQuery?: string;
 }
 
-export const HeaderSearch: React.FC<HeaderSearchProps> = ({ className }) => {
-  return <AIDataIngestionSearch className={className} />;
+export const HeaderSearch: React.FC<HeaderSearchProps> = ({ className, initialQuery, pendingSubmitQuery }) => {
+  return <AIDataIngestionSearch className={className} initialQuery={initialQuery} pendingSubmitQuery={pendingSubmitQuery} />;
 };
 
 export default HeaderSearch;
