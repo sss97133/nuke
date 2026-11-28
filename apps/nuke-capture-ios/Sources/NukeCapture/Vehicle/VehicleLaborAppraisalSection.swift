@@ -255,7 +255,17 @@ enum LaborWords {
             (w?.unknown_min_segments ?? 0) > 0 ? "\(w!.unknown_min_segments!) segments with no witnessed minimum" : nil,
             (w?.unknown_max_segments ?? 0) > 0 ? "\(w!.unknown_max_segments!) with no witnessed maximum" : nil,
         ].compactMap { $0 }
-        return said.isEmpty ? "" : " (" + said.joined(separator: ", ") + ")"
+        return said.joined(separator: ", ")
+    }
+
+    /// A segment is attributed only when all displayed hours come directly from the reported shop-paper total.
+    /// A book range, a mixed basis, or a missing bound remains projected.
+    static func hoursStatus(_ segment: LaborSegment) -> RootStatus {
+        guard segment.hours_basis == "shop_paper", let paper = segment.paper_hours,
+              segment.hours_min == paper, segment.hours_typical == paper, segment.hours_max == paper else {
+            return .projected
+        }
+        return .attributed
     }
 
     /// How the segment's hours are known, then its witness, stages and parts: the web's caption lines in order.
@@ -351,12 +361,13 @@ struct LaborAppraisalContent: View {
         } else if appraisal.applicable == true, !priced.isEmpty {
             section {
                 if let status = LaborWords.foldStatus(appraisal) { caption(status) }
-                caption("Appraised hours are estimates. Segments show any evidence details returned; totals come from the appraisal.")
+                caption("Reported hours and estimates are shown where available; totals come from the appraisal.")
                 if appraisal.totals != nil { caption("This appraisal cannot open the underlying sources here yet.") }
                 if let totals = appraisal.totals, totals.witnessed != nil, let with = LaborWords.range(totals.with_unwitnessed ?? totals.with_unwitnessed_purchases) {
-                    Text("Hours, two totals side by side").font(.caption.weight(.semibold)).padding(.top, 4)
-                    row("Witnessed", (LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
-                        + LaborWords.witnessedUnknown(totals.witnessed))
+                    Text("Appraisal totals").font(.caption.weight(.semibold)).padding(.top, 4)
+                    row("Witnessed", LaborWords.witnessedTotal(totals.witnessed) ?? "none established")
+                    let unknown = LaborWords.witnessedUnknown(totals.witnessed)
+                    if !unknown.isEmpty { caption(unknown) }
                     row("With work not witnessed", with)
                 }
                 if let byGrade = appraisal.totals?.by_grade, !byGrade.isEmpty {
@@ -375,7 +386,7 @@ struct LaborAppraisalContent: View {
                     } label: {
                         RootedValueView(label: ItemText.codeText(segment.segment),
                             value: LaborWords.range(segment.hours_min, segment.hours_typical, segment.hours_max) ?? "No hours",
-                            status: .projected, decay: calculationClock)
+                            status: LaborWords.hoursStatus(segment), decay: calculationClock)
                             .accessibilityIdentifier("labor-segment-\(segment.segment)")
                     }
                 }

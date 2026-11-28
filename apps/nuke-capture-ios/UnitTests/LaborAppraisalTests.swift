@@ -86,7 +86,7 @@ final class LaborAppraisalTests: XCTestCase {
         // 20261125033000: a witnessed max that leaves segments unknown is not a bound either.
         let known = LaborAppraisal.WitnessedTotal(hours_min: 71, hours_typical: 81, hours_max: 92, unknown_min_segments: 4, unknown_max_segments: 4)
         XCTAssertEqual(LaborWords.witnessedTotal(known), "at least 71 h, typical 81 h")
-        XCTAssertEqual(LaborWords.witnessedUnknown(known), " (4 segments with no witnessed minimum, 4 with no witnessed maximum)")
+        XCTAssertEqual(LaborWords.witnessedUnknown(known), "4 segments with no witnessed minimum, 4 with no witnessed maximum")
         XCTAssertEqual(LaborWords.witnessedUnknown(.init(unknown_min_segments: 0)), "")
     }
 
@@ -108,6 +108,19 @@ final class LaborAppraisalTests: XCTestCase {
         XCTAssertEqual(LaborWords.coverage(a), "4 of 5 segments with hours · Nov 24, 2026")
         ProfileClock.timeZone = TimeZone(identifier: "UTC")!
         XCTAssertEqual(LaborWords.coverage(a), "4 of 5 segments with hours · Nov 25, 2026")
+    }
+
+    func testOnlyExactShopPaperHoursAreAttributed() throws {
+        var segment = try appraisal().segments[0]
+        guard case .attributed = LaborWords.hoursStatus(segment) else { return XCTFail("exact shop-paper hours should be attributed") }
+        segment.hours_max = 51
+        guard case .projected = LaborWords.hoursStatus(segment) else { return XCTFail("a mixed range is projected") }
+        segment.hours_max = segment.paper_hours
+        segment.hours_basis = "book_at_or_above_paper"
+        guard case .projected = LaborWords.hoursStatus(segment) else { return XCTFail("a book range is projected") }
+        segment.hours_basis = "shop_paper"
+        segment.paper_hours = nil
+        guard case .projected = LaborWords.hoursStatus(segment) else { return XCTFail("missing paper hours are not attributed") }
     }
 
     func testStoredFoldStatusKeepsStaleAndFailedResultsQualified() throws {
