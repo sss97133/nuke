@@ -139,6 +139,17 @@ enum ExploreFeedPaging {
             .filter { !existing.contains($0.id) }
     }
 
+    /// A successful board refresh can update an extension or omit an expired lot. A missing unexpired
+    /// lot is retained: absence alone does not establish its outcome or close time.
+    static func reconcileLive(_ items: [ExploreFeedItem], current: [String: ExploreFeedItem], now: Date) -> [ExploreFeedItem] {
+        items.compactMap { item in
+            guard item.kind == .live else { return item }
+            if let fresh = current[item.id] { return fresh }
+            if let end = item.endsAt, end <= now { return nil }
+            return item
+        }
+    }
+
     static func endLine(tuned: Bool) -> String {
         tuned ? "End of these results matching your tuning: open auction lots and asks from the last 72 hours. Pull down to refresh."
               : "End of these results: open auction lots and asks from the last 72 hours. Pull down to refresh."
@@ -234,9 +245,24 @@ struct ExploreFeedView: View {
                                    message: "Auctions: \(liveFailure ?? "Read failed.") Classifieds: \(askFailure ?? "Read failed.")",
                                    actionTitle: "Try again") { Task { await load() } }
                 } else if let missingSource {
-                    NukeEmptyState(icon: "wifi.exclamationmark", title: "Some cars couldn't load",
-                                   message: "\(missingSource.title) \(missingSource.reason)",
-                                   actionTitle: "Try again") { Task { await load() } }
+                    VStack(spacing: NukeSpace.md) {
+                        NukeEmptyState(icon: "wifi.exclamationmark", title: "Some cars couldn't load",
+                                       message: "\(missingSource.title) \(missingSource.reason)",
+                                       actionTitle: "Try again") { Task { await load() } }
+                        if let moreFailure {
+                            Text("Couldn't load more classified listings. \(moreFailure)")
+                                .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            Button("Retry more") {
+                                self.moreFailure = nil
+                                Task { await loadMore() }
+                            }
+                            .buttonStyle(.bordered)
+                        } else if hasMore {
+                            Button("Search more") { Task { await loadMore() } }
+                                .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(.horizontal, NukeSpace.lg).padding(.bottom, NukeSpace.xl)
                 } else if let moreFailure {
                     if morePaused && liveShown < liveAll.count {
                         NukeEmptyState(icon: "magnifyingglass", title: "More auctions to check",
@@ -327,13 +353,20 @@ struct ExploreFeedView: View {
             try? await Task.sleep(nanoseconds: 20_000_000_000)
             guard !Task.isCancelled, loaded else { continue }
             guard ExploreClock.needsRefresh(feed, now: ServerClock.now()) else { continue }
-            guard let board = try? await LiveBoard.fetch(maxAge: 15), !Task.isCancelled else { continue }
+            guard let board = try? await LiveBoard.fetch(maxAge: 15), !Task.isCancelled,
+                  !reloading, !loadingMore else { continue }
             let byId = Dictionary(board.auctions.map { ("live:" + $0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            feed = feed.map { item in
-                guard item.kind == .live, let lot = byId[item.id] else { return item }
-                return ExploreFeedItem.from(lot)
+            let current = byId.mapValues(ExploreFeedItem.from)
+            let now = ServerClock.now()
+            liveShown = ExploreFeedPaging.reconcileLive(Array(liveAll.prefix(liveShown)), current: current, now: now).count
+            liveAll = ExploreFeedPaging.reconcileLive(liveAll, current: current, now: now)
+            live = ExploreFeedPaging.reconcileLive(live, current: current, now: now)
+            feed = ExploreFeedPaging.reconcileLive(feed, current: current, now: now)
+            lots = lots.reduce(into: [:]) { result, entry in
+                if let fresh = byId[entry.key] { result[entry.key] = fresh }
+                else if entry.value.endsAtDate.map({ $0 > now }) ?? true { result[entry.key] = entry.value }
             }
-            for (key, lot) in byId where lots[key] != nil { lots[key] = lot }
+            if feed.isEmpty && hasMore { await loadMore() }
         }
     }
 
@@ -690,10 +723,11 @@ struct ExplorePriceButtonStyle: ButtonStyle {
 
 /// The card's countdown. Pure, so it is unit-tested (ExploreFeedTests).
 enum ExploreClock {
-    /// "2d 4h", "3h 12m", then "12:07" in the last hour. At or past the recorded end it reads "Closing": the
-    /// house may have extended the close for a late bid, and the card waits for the board to say.
+    /// At the recorded end, allow time for a soft-close extension. If the board cannot confirm a status
+    /// for 15 minutes, do not keep claiming the lot is closing.
     static func text(ends: Date, now: Date) -> String {
         let s = Int(ends.timeIntervalSince(now).rounded(.down))
+        if s <= -900 { return "Status unknown" }
         if s <= 0 { return "Closing" }
         if s < 3600 { return String(format: "%d:%02d", s / 60, s % 60) }
         if s < 86_400 { return "\(s / 3600)h \((s % 3600) / 60)m" }
@@ -701,7 +735,10 @@ enum ExploreClock {
     }
 
     /// How often the card's clock redraws.
-    static func tick(ends: Date, now: Date) -> TimeInterval { ends.timeIntervalSince(now) < 3600 ? 1 : 30 }
+    static func tick(ends: Date, now: Date) -> TimeInterval {
+        let left = ends.timeIntervalSince(now)
+        return left > -900 && left < 3600 ? 1 : 30
+    }
 
     /// A lot within 3 minutes of its recorded end, or up to 15 minutes past it, needs a fresh board read.
     static func needsRefresh(_ items: [ExploreFeedItem], now: Date) -> Bool {
