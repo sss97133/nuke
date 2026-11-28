@@ -19,9 +19,9 @@ CREATE FUNCTION pg_temp.ok(label text, value boolean) RETURNS void LANGUAGE plpg
 END $$;
 
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean, deleted_at timestamptz, listing_kind text);
-CREATE TABLE public.auction_events_canonical (id uuid PRIMARY KEY, vehicle_id uuid, source text,
+CREATE TABLE public.auction_events_canonical (id uuid PRIMARY KEY, vehicle_id uuid REFERENCES public.vehicles(id), source text,
   source_url text, outcome text, auction_end_date timestamptz);
-CREATE TABLE public.hammer_predictions (vehicle_id uuid, model_version int, predicted_hammer numeric,
+CREATE TABLE public.hammer_predictions (vehicle_id uuid REFERENCES public.vehicles(id), model_version int, predicted_hammer numeric,
   predicted_low numeric, predicted_high numeric, confidence_score numeric, current_bid numeric,
   predicted_at timestamptz, notes text);
 CREATE TABLE public.test_board (payload jsonb);
