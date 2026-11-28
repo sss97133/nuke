@@ -22,6 +22,12 @@ globalThis.fetch = (async (input, init) => {
     const args = JSON.parse(String(init?.body)); assert(!('pdf_base64' in args.p_document));
     return Response.json({ success: true, document_id: docId, file_hash: args.p_document.pdf_sha256, reference_revision: 'r'.repeat(64) });
   }
+  if (url.pathname === '/rest/v1/rpc/record_catalog_text_source') {
+    const args = JSON.parse(String(init?.body));
+    assert(args.p_source.project_origin === project, 'origin comes from the configured project');
+    return Response.json({ success: true, document_id: docId, revision: 'c'.repeat(64),
+      page_count: args.p_source.page_count, duplicate: false, pdf_hash_status: 'client_attested_not_server_rehashed' });
+  }
   if (url.pathname === '/functions/v1/ingest-observation') {
     intake = JSON.parse(String(init?.body)); return Response.json({ success: true, observation_id: obsId });
   }
@@ -80,4 +86,26 @@ Deno.test('actual document replay verifies bytes and refuses changed storage con
   calls.length = 0; wrongBytes = true;
   const changed = await handler(await documentRequest());
   assert(changed.status === 409 && calls.length === 2); await changed.body?.cancel(); duplicate = wrongBytes = false;
+});
+
+function catalogRequest(token = secret, change?: (input: any) => void) {
+  const input: any = { mode: 'retained_catalog_text', source: {
+    catalog_id: '00000000-0000-4000-8000-000000000002', object_id: '00000000-0000-4000-8000-000000000001',
+    object_version: 'v1', object_name: 'test catalog/a.pdf', pdf_sha256: 'a'.repeat(64), text_sha256: 'b'.repeat(64),
+    page_count: 3, chunk_count: 2, reader_actor: 'agent:test', reader_method: 'local_exact_replay', reader_run_id: 'test',
+    reader_verified_at: new Date().toISOString() } };
+  change?.(input);
+  return new Request(`${project}/functions/v1/index-reference-document`, {
+    method: 'POST', headers: { apikey: token, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+}
+Deno.test('actual retained-catalog handler only invokes source-page admission', async () => {
+  calls.length = 0; const response = await handler(catalogRequest()), result = await response.json();
+  assert(response.status === 200 && result.source_pages_only === true && result.model_calls === 0);
+  assert(calls.length === 1 && calls[0] === 'POST /rest/v1/rpc/record_catalog_text_source');
+});
+Deno.test('actual retained-catalog handler rejects anonymous and caller-supplied origins', async () => {
+  calls.length = 0; const denied = await handler(catalogRequest('sb_publishable_fixture'));
+  assert(denied.status === 401 && calls.length === 0); await denied.body?.cancel();
+  const invalid = await handler(catalogRequest(secret, input => input.source.project_origin = 'https://other.example'));
+  assert(invalid.status === 400 && calls.length === 0); await invalid.body?.cancel();
 });
