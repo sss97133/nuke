@@ -34,4 +34,28 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Fixture Coupe"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
+
+    func testBrowseSearchesPastPagesWithoutDisplayableCars() {
+        let app = open("browse-paging-empty")
+        XCTAssertTrue(app.staticTexts["Fixture page 80"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["No cars to show yet"].exists)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testSparseResultsOfferAnotherBoundedSearch() {
+        let app = open("browse-paging-deep")
+        XCTAssertTrue(app.staticTexts["More listings to check"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["No cars to show yet"].exists)
+        app.buttons["Search more"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture page 240"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testEmptyFeedCanRetryAFailedLaterPage() {
+        let app = open("browse-paging-fail-more")
+        XCTAssertTrue(app.staticTexts["Couldn't load more cars"].waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["Try again"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture page 80"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
 }

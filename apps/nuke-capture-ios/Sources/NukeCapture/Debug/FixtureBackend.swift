@@ -66,6 +66,7 @@ enum FixtureBackend {
     private static let browseReadLock = NSLock()
     private static var browseLiveAttempts = 0
     private static var browseAskAttempts = 0
+    private static var browsePageFailureAttempts = 0
 
     /// A terminal first-read failure followed by a normal response lets the UI test
     /// distinguish a partial feed from an empty one and exercise its retry action.
@@ -97,10 +98,18 @@ enum FixtureBackend {
     static func browsePagingRead(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         if name == "market_pulse_live" { return ok(#"{"auctions":[]}"#) }
         let offset = args["p_offset"] as? Int ?? 0
-        let count = offset < 80 ? 40 : (offset == 80 ? 1 : 0)
+        if scenario == "browse-paging-fail-more" && offset == 40 {
+            browseReadLock.lock(); browsePageFailureAttempts += 1; let attempt = browsePageFailureAttempts; browseReadLock.unlock()
+            if attempt == 1 {
+                return (400, Data(#"{"code":"fixture_read_error","message":"fixture page read failed","details":null,"hint":null}"#.utf8))
+            }
+        }
+        let finalOffset = scenario == "browse-paging-deep" ? 240 : 80
+        let count = offset < finalOffset ? 40 : (offset == finalOffset ? 1 : 0)
         let rows: String = (0..<count).map { index -> String in
             let number = offset + index
-            let visible = number == 0 || number == 80
+            let noFirstCard = ["browse-paging-empty", "browse-paging-deep", "browse-paging-fail-more"].contains(scenario)
+            let visible = number == finalOffset || (number == 0 && !noFirstCard)
             let image = visible ? #""http://[""# : "null"
             return #"{"event_id":"fixture-page-\#(number)","source":"classified","title":"Fixture page \#(number)","ask":10000,"image":\#(image)}"#
         }.joined(separator: ",")
@@ -569,7 +578,8 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
-        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName) && scenario == "browse-paging":
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
+            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-fail-more"].contains(scenario):
             return browsePagingRead(name, args)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
             && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):

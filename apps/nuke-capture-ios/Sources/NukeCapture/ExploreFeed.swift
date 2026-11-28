@@ -175,6 +175,7 @@ struct ExploreFeedView: View {
     @State private var liveShown = 0
     @State private var askOffset = 0
     @State private var askExhausted = true
+    @State private var reloading = false
     @State private var loadingMore = false
     @State private var moreFailed = false
     @State private var generation = 0
@@ -225,7 +226,9 @@ struct ExploreFeedView: View {
                 // Shimmering cards in the shape of the real ones: the page looks alive while it loads.
                 NukeFeedSkeleton(message: "Finding cars for you…")
             } else if feed.isEmpty {
-                if liveFailed && askFailed {
+                if loadingMore {
+                    ProgressView("Looking for more cars…")
+                } else if liveFailed && askFailed {
                     NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load cars",
                                    message: "Check your connection, then try again.",
                                    actionTitle: "Try again") { Task { await load() } }
@@ -233,6 +236,17 @@ struct ExploreFeedView: View {
                     NukeEmptyState(icon: "wifi.exclamationmark", title: "Some cars couldn't load",
                                    message: missingSource,
                                    actionTitle: "Try again") { Task { await load() } }
+                } else if moreFailed {
+                    NukeEmptyState(icon: "wifi.exclamationmark", title: "Couldn't load more cars",
+                                   message: "Try again to continue searching the listings.",
+                                   actionTitle: "Try again") {
+                        moreFailed = false
+                        Task { await loadMore() }
+                    }
+                } else if hasMore {
+                    NukeEmptyState(icon: "magnifyingglass", title: "More listings to check",
+                                   message: "No cars to show in the pages checked so far.",
+                                   actionTitle: "Search more") { Task { await loadMore() } }
                 } else if tuning.isActive {
                     NukeEmptyState(icon: "slider.horizontal.3", title: "Nothing matches your tuning",
                                    message: "Widen the place, era or price, or clear them.",
@@ -422,11 +436,14 @@ struct ExploreFeedView: View {
     private func load() async {
         generation += 1
         let gen = generation
+        reloading = true
+        loadingMore = false
+        defer { if gen == generation { reloading = false } }
         let tune = tuning
         async let l = Self.readLive()
         async let a = Self.readClassified(tune, offset: 0)
         let (lr, ar) = await (l, a)
-        guard gen == generation else { return }
+        guard !Task.isCancelled, gen == generation else { return }
         liveFailed = lr == nil
         askFailed = ar == nil
         lots = Dictionary((lr ?? []).map { ($0.item.id, $0.lot) }, uniquingKeysWith: { first, _ in first })
@@ -439,6 +456,11 @@ struct ExploreFeedView: View {
         moreFailed = false
         feed = ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
         loaded = true
+        reloading = false
+        // With no visible first-page cards, no card can trigger prefetch. Continue
+        // through the same bounded empty-page search used while scrolling.
+        if feed.isEmpty && hasMore { await loadMore() }
+        guard !Task.isCancelled, gen == generation else { return }
         // The projection board only fills in the lots' rails (about 220 KB); the cards don't wait for it.
         let board = await FinishBoard.fetch()
         guard gen == generation else { return }
@@ -449,10 +471,10 @@ struct ExploreFeedView: View {
     /// applied and no card already in the feed. A page the tuning or the choices empty out reads on, a few pages
     /// at most, so the feed never stalls on a filtered-out page.
     private func loadMore() async {
-        guard loaded, !loadingMore, !moreFailed, hasMore else { return }
-        loadingMore = true
-        defer { loadingMore = false }
+        guard loaded, !reloading, !loadingMore, !moreFailed, hasMore else { return }
         let gen = generation
+        loadingMore = true
+        defer { if gen == generation { loadingMore = false } }
         let tune = tuning
         for _ in 0..<ExploreFeedPaging.maxEmptyPages {
             let nextLive = Array(liveAll.dropFirst(liveShown).prefix(ExploreFeedPaging.livePage))
@@ -460,14 +482,14 @@ struct ExploreFeedView: View {
             var read = 0, asked = 0
             if !askExhausted {
                 guard let page = await Self.readClassified(tune, offset: askOffset) else {
-                    if gen == generation { moreFailed = true }
+                    if !Task.isCancelled, gen == generation { moreFailed = true }
                     return
                 }
                 nextAsks = tune.apply(page.items)
                 read = page.read
                 asked = page.asked
             }
-            guard gen == generation else { return }
+            guard !Task.isCancelled, gen == generation else { return }
             liveShown += nextLive.count
             if !askExhausted {
                 askOffset += read
