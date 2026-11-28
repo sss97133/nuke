@@ -36,6 +36,8 @@ final class LaborPhotoEvidenceUITests: XCTestCase {
                 XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15), app.debugDescription)
                 let switchAccount = app.buttons["fixture.switch-account"]
                 XCTAssertTrue(switchAccount.waitForExistence(timeout: 5)); switchAccount.tap()
+                let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "00000000-0000-4000-8000-0000000000d3"), object: switchAccount)
+                XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 10), .completed)
                 let refused = app.staticTexts["Your account changed. Return to the vehicle and reopen the photo links."]
                 XCTAssertTrue(refused.waitForExistence(timeout: 5), app.debugDescription)
                 XCTAssertFalse(app.buttons["Close"].exists, "A prior account's photo must not remain visible")
