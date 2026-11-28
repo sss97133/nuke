@@ -146,4 +146,41 @@ final class LaborAppraisalTests: XCTestCase {
         a.state?.error = "internal error"
         XCTAssertEqual(LaborWords.foldStatus(a), "Labor appraisal could not be calculated.")
     }
+
+    func testPhotoLinksUseOnlyExplicitReassemblyImageReferences() throws {
+        let data = Data("""
+        {"segment":"reassembly","evidence_ids":["00000000-0000-4000-8000-000000000002"],
+         "witness_share":{"pieces":[{"image_id":"00000000-0000-4000-8000-000000000003"}]},
+         "reassembly":{"matched":[
+           {"judgment_id":"00000000-0000-4000-8000-000000000004","image_id":"00000000-0000-4000-8000-000000000001","part":{"name":"Carpet"}},
+           {"judgment_id":"00000000-0000-4000-8000-000000000005","image_id":"not-a-uuid","part":{"name":"Bad reference"}},
+           {"image_id":"00000000-0000-4000-8000-000000000006","part":{"name":"Unverifiable association"}}],
+           "unmatched":[{"part":{"name":"No photo returned"}}]}}
+        """.utf8)
+        let segment = try JSONDecoder().decode(LaborSegment.self, from: data)
+        let links = LaborPhotoReference.from(segment, names: nil)
+        XCTAssertEqual(links.count, 1)
+        XCTAssertEqual(links.first?.imageId.uuidString.lowercased(), "00000000-0000-4000-8000-000000000001")
+        XCTAssertEqual(links.first?.judgmentId.uuidString.lowercased(), "00000000-0000-4000-8000-000000000004")
+        XCTAssertEqual(links.first?.part, "Carpet")
+    }
+
+    func testPhotoLinksRefuseAnotherVehicleOrAccount() throws {
+        let data = Data("""
+        {"vehicle_id":"00000000-0000-4000-8000-000000000001",
+         "segments":[{"segment":"reassembly","reassembly":{"matched":[
+           {"judgment_id":"00000000-0000-4000-8000-000000000004","image_id":"00000000-0000-4000-8000-000000000002"}]}}]}
+        """.utf8)
+        let appraisal = try JSONDecoder().decode(LaborAppraisal.self, from: data)
+        XCTAssertEqual(LaborPhotoReference.from(appraisal, vehicleId: "00000000-0000-4000-8000-000000000001", segment: "reassembly")?.count, 1)
+        XCTAssertNil(LaborPhotoReference.from(appraisal, vehicleId: "00000000-0000-4000-8000-000000000003", segment: "reassembly"))
+        XCTAssertNil(LaborPhotoReference.from(appraisal, vehicleId: "not-a-vehicle", segment: "reassembly"))
+        XCTAssertNil(LaborPhotoReference.from(appraisal, vehicleId: "00000000-0000-4000-8000-000000000001", segment: "engine"))
+        XCTAssertTrue(LaborPhotoAccess.allows(openedAs: nil, current: nil, signedIn: false))
+        XCTAssertTrue(LaborPhotoAccess.allows(openedAs: "a", current: "a", signedIn: true))
+        XCTAssertFalse(LaborPhotoAccess.allows(openedAs: "a", current: "b", signedIn: true))
+        XCTAssertFalse(LaborPhotoAccess.allows(openedAs: "a", current: nil, signedIn: false))
+        XCTAssertFalse(LaborPhotoAccess.allows(openedAs: "a", current: "a", signedIn: false))
+        XCTAssertFalse(LaborPhotoAccess.allows(openedAs: nil, current: "a", signedIn: true))
+    }
 }
