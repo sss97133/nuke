@@ -128,4 +128,14 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Fixture extended"].exists, app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
+
+    func testClockDoesNotClaimClosureAtTheRecordedEnd() {
+        let app = open("browse-closing-refresh")
+        let clock = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Time left")).firstMatch
+        XCTAssertTrue(clock.waitForExistence(timeout: 20), app.debugDescription); clock.tap()
+        XCTAssertTrue(app.navigationBars["Auction clock"].waitForExistence(timeout: 10), app.debugDescription)
+        let closing = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "remaining", "closing")).firstMatch
+        XCTAssertTrue(closing.waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
 }
