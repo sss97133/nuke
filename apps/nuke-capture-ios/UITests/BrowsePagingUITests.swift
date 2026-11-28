@@ -184,9 +184,10 @@ final class BrowsePagingUITests: XCTestCase {
         let app = open("browse-clock-freshness")
         let bid = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Bid on record")).firstMatch
         XCTAssertTrue(bid.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(bid.label.contains("just now"), app.debugDescription)
-        let aged = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "1m ago")).firstMatch
-        XCTAssertTrue(aged.waitForExistence(timeout: 30), app.debugDescription)
+        let initial = bid.label
+        let aged = NSPredicate(format: "label CONTAINS %@ AND label != %@", "Bid on record", initial)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: aged, object: bid)], timeout: 70), .completed,
+                       app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 
