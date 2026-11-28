@@ -179,3 +179,83 @@ describe('descriptive outcome scope binding', () => {
     fixture.rpc.mockResolvedValue({data});expect((await fetchRecordedSales(request()) as any).scope_exclusions.records).toEqual([]);
   });
 });
+
+describe('recorded family URL and keyed receipts',()=>{
+  const makeId='94000000-0000-4000-8000-000000000001', familyId='95000000-0000-4000-8000-000000000001';
+  const otherFamily='95000000-0000-4000-8000-000000000002';
+  const selection={familyKey:familyId,familyName:'Camaro',year:null,era:null,model:null};
+  const make={key:`make:${makeId}`,label:'CHEVROLET',make:'CHEVROLET',scope:{kind:'canonical_make' as const,canonical_make_id:makeId}};
+  const request=()=>recordedSalesRequest({kind:'recorded_family',canonical_make_id:makeId,family_key:familyId,year:1969},
+    {event_from:'2026-11-20T00:00:00Z',event_to:'2026-11-27T00:00:00Z'},null,'captured_sell_through');
+  function familyFixture():any{
+    const data:any=capturedFixture();
+    data.knowledge_cutoff='2026-11-28T10:00:00Z';data.generated_at=data.knowledge_cutoff;
+    data.scope={kind:'recorded_family',canonical_make_id:makeId,family_key:familyId,family:'Camaro',label:'CHEVROLET Camaro',
+      year:1969,year_start:null,year_end:null,model_name:null,admission_purpose:'captured_sell_through_recorded_family',
+      membership_method:'recorded_market_family_membership_v1',registry_inputs_fingerprint:'b'.repeat(32),
+      family_rule:{contract_version:1,state:'available',purpose:'recorded_family_rule',method:'recorded_market_family_rule_v1',
+        brand:'Chevrolet',family_key:familyId,family:'Camaro',label_count:1,bucket_kind:'named',family_keys:[familyId],model_contains:[],
+        fingerprint:'c'.repeat(32),metadata_as_of:'2026-11-28T09:00:00Z',dictionary_source:'mv_model_family_names',
+        dictionary_row_clock:'unavailable',historical_dictionary_versions_available:false,factory_configuration_verified:false}};
+    const membership={method:'recorded_market_family_membership_v1',resolved_make_id:makeId,requested_family_key:familyId,
+      recorded_family_id:familyId,recorded_family:'Camaro',matched_phrase:'camaro',family_year_start:1966,family_year_end:null,
+      current_longest_family_count:1,matching_family_ids:[familyId],matching_family_keys_limit:20,matching_family_keys_truncated:false,
+      matching_family_keys_fingerprint:'d'.repeat(32),dictionary_reason:'qualified_recorded_family_phrase',dictionary_current:true,
+      all_longest_families_in_scope:false,series_name_contains:null,dictionary_source:'mv_model_family_names',dictionary_row_clock:'unavailable',
+      family_rule_fingerprint:'c'.repeat(32),identity_basis:'current_parent_record',factory_configuration_verified:false};
+    data.evidence.contributors=[{auction_event_id:'96000000-0000-4000-8000-000000000001',source_event_ids:['96000000-0000-4000-8000-000000000001'],
+      vehicle_id:'97000000-0000-4000-8000-000000000001',source_url:'https://bringatrailer.com/listing/family-member-fixture/',
+      event_at:'2026-11-20T12:00:00Z',series:'selected',outcome_class:'no_sale',numerator_contribution:0,denominator_contribution:1,membership}];
+    data.summary[0]={series:'selected',numerator:0,denominator:1,ratio:0};
+    Object.assign(data.series[0],{numerator:0,denominator:1,value:0,ratio:0});
+    data.coverage.unresolved_scope=1;
+    data.scope_exclusions={contract_version:2,state:'partial',reason:'unresolved_membership_not_assigned_to_either_series',
+      membership_method:data.scope.membership_method,snapshot_hash:data.evidence.snapshot_hash,record_limit:20,
+      complete_external_capture:false,current_parent_identity_only:true,total:1,records_truncated:false,omitted_records:0,
+      reason_counts:[{reason:'ambiguous_longest_registered_family_phrases',episodes:1}],records:[{
+        auction_event_id:'96000000-0000-4000-8000-000000000002',source_event_ids:['96000000-0000-4000-8000-000000000002'],
+        vehicle_id:'97000000-0000-4000-8000-000000000002',source_url:'https://bringatrailer.com/listing/family-conflict-fixture/',
+        event_at:'2026-11-20T13:00:00Z',vehicle_identity:{year:1969,make:'Chevrolet',model:'Shared'},
+        vehicle_identity_basis:'current_representative_parent_record',source_observed_at:null,source_read_basis:'unknown',
+        source_outcome:'reserve_not_met',recorded_outcome_class:'no_sale',membership_reason:'ambiguous_longest_registered_family_phrases',
+        conflicting_listing_aliases:false,recorded_canonical_make_id:makeId,resolved_make_id:makeId,requested_family_key:familyId,
+        membership:{...membership,current_longest_family_count:2,matching_family_ids:[familyId,otherFamily],dictionary_reason:'ambiguous_longest_registered_family_phrases'}}]};
+    return data;
+  }
+  it('uses one keyed hierarchy with exact year, inclusive range and literal model parameters',async()=>{
+    const {recordedFamilySalesOption}=await import('./useRecordedSales');
+    expect(recordedFamilySalesOption(make,{...selection,year:'1969',era:'1967-1969',model:' Camaro Coupe 6-Speed '})?.scope)
+      .toEqual({kind:'recorded_family',canonical_make_id:makeId,family_key:familyId,year:1969,model_name:'camaro coupe 6-speed'});
+    expect(recordedFamilySalesOption(make,{...selection,era:'1967-1969'})?.scope)
+      .toEqual({kind:'recorded_family',canonical_make_id:makeId,family_key:familyId,year_start:1967,year_end:1969});
+    for(const bad of [{familyKey:null},{year:'1969.5'},{year:'1777'},{era:'1969-1967'},{era:'anything'},
+      {year:'1970',era:'1967-1969'},{unsupportedFilters:['truck_drive']},{conflictingScope:true},{model:' '.repeat(2)}]){
+      expect(recordedFamilySalesOption(make,{...selection,...bad})).toBeUndefined();
+    }
+  });
+  it('accepts explicit family scope, keyed contributor and separate v2excluded-family evidence',async()=>{
+    const data=familyFixture();fixture.rpc.mockResolvedValue({data});
+    expect(await fetchRecordedSales(request())).toEqual(data);
+    expect(fixture.rpc).toHaveBeenCalledWith('get_market_trends',{p_request:request()});
+  });
+  it.each(['wrong family','wrong year','wrong model','factory promotion','missing exclusions','old exclusion version','future metadata','unknown cutoff',
+    'stale dictionary contributor','outside group contributor','invented series word','foreign source URL','changed recipe','mixed explanation grain'])(
+    'refuses %s without substituting a broader population',async(reason)=>{
+      const data=familyFixture(),s=data.scope,m=data.evidence.contributors[0].membership;
+      if(reason==='wrong family')s.family_key=otherFamily;
+      if(reason==='wrong year')s.year=1970;
+      if(reason==='wrong model')s.model_name='other';
+      if(reason==='factory promotion')s.family_rule.factory_configuration_verified=true;
+      if(reason==='missing exclusions')delete data.scope_exclusions;
+      if(reason==='old exclusion version')data.scope_exclusions.contract_version=1;
+      if(reason==='future metadata')s.family_rule.metadata_as_of='2027-01-01Z';
+      if(reason==='unknown cutoff')data.knowledge_cutoff=null;
+      if(reason==='stale dictionary contributor')m.dictionary_current=false;
+      if(reason==='outside group contributor'){m.recorded_family_id=otherFamily;m.matching_family_ids=[otherFamily];}
+      if(reason==='invented series word')m.series_name_contains='camaro';
+      if(reason==='foreign source URL')data.evidence.contributors[0].source_url='https://example.com/private';
+      if(reason==='changed recipe')m.family_rule_fingerprint='e'.repeat(32);
+      if(reason==='mixed explanation grain')data.scope_exclusions.records[0].requested_canonical_model_id=familyId;
+      fixture.rpc.mockResolvedValue({data});await expect(fetchRecordedSales(request())).rejects.toThrow();
+    });
+});

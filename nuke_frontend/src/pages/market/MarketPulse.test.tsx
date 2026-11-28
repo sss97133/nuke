@@ -39,7 +39,7 @@ vi.mock('./useMarketRowDetails', async importOriginal => ({
 }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
 vi.mock('./RecordedSalesComparison', () => ({
-  default: () => <section aria-label="Recorded sales comparison">Recorded sales chart</section>,
+  default: ({lens}: any) => <section aria-label="Recorded sales comparison" data-sales-lens={JSON.stringify(lens)}>Recorded sales chart</section>,
   MarketScopeControls: ({ make, onMakeChange, onViewChange, children }: any) => <>
     <span>Comparison scope {make ?? 'all'}</span>
     <button onClick={() => onViewChange('sales')}>Use recorded sales view</button>
@@ -300,7 +300,7 @@ describe('market answer -> supporting lots', () => {
     await click('Bid sounds on');
     expect(button('Bid sounds off').getAttribute('aria-pressed')).toBe('false');
   });
-  it('drills recorded model labels into exactly their records and replaces inventory when switching views', async () => {
+  it('keeps the selected recorded model while changing between inventory and outcomes', async () => {
     fixture.pulse.data.auctions[0].model = 'Recorded model A';
     fixture.pulse.data.auctions[1].model = 'Recorded model B';
     fixture.pulse.data.auctions[2].model = 'Recorded model B';
@@ -311,10 +311,10 @@ describe('market answer -> supporting lots', () => {
     expect(container.querySelector('[aria-label="Inventory drill path"]')?.textContent).toContain('Recorded model B');
     await click('Use recorded sales view');
     expect(window.location.search).toContain('view=sales');
-    expect(window.location.search).not.toContain('model=');
+    expect(window.location.search).toContain('model=Recorded+model+B');
     expect(container.querySelector('[aria-label="Live lots"]')).toBeNull();
     await click('Use inventory view');
-    expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
+    expect(boardTitles()).toEqual(['first', 'unknown']);
   });
   it('attaches its map observer when an initially loading population becomes available', async () => {
     const data = fixture.pulse.data; fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
@@ -1041,4 +1041,15 @@ it('keeps the descriptive scope URL and clears the previous contributor snapshot
  await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Choose Ford model year')!.click());
  const params=new URLSearchParams(window.location.search);expect(params.get('make')).toBe('FORD');expect(params.get('salesScope')).toBe('descriptive:70000000-0000-4000-8000-000000000001');
  for(const key of ['day','series','salesOffset','salesSnapshot','salesOutcome'])expect(params.has(key)).toBe(false);
+});
+
+it('preserves the keyed family/year scope when switching to outcomes and clears the previous source receipt',async()=>{
+ const key='95000000-0000-4000-8000-000000000001';
+ await render('?make=PORSCHE&family='+key+'&family_name=911&year=2000&era=2000-2000&salesScope=descriptive:old&day=2026-10-03&series=selected&salesOffset=20&salesSnapshot='+('a'.repeat(32)));
+ await click('Use recorded sales view');
+ const params=new URLSearchParams(window.location.search);
+ expect(params.get('family')).toBe(key);expect(params.get('year')).toBe('2000');expect(params.get('era')).toBe('2000-2000');
+ for(const k of ['salesScope','day','series','salesOffset','salesSnapshot'])expect(params.has(k)).toBe(false);
+ const lens=JSON.parse(container.querySelector('[data-sales-lens]')!.getAttribute('data-sales-lens')!);
+ expect(lens.recordedFamily).toEqual({familyKey:key,familyName:'911',year:'2000',era:'2000-2000',model:null,unsupportedFilters:[],conflictingScope:false});
 });

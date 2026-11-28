@@ -582,6 +582,12 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const salesOutcome = params.get('salesOutcome');
   const salesLens: MarketSalesLens = {
     scopeKey: params.get('salesScope'), days: params.get('days') === '2' ? 2 : 7,
+    ...([...params.keys()].some(key=>['family','model','year','era','facet'].includes(key)||key.startsWith('truck_')) ? {recordedFamily:{
+      familyKey:params.get('family'),familyName:params.get('family_name'),model:params.get('model'),
+      year:params.get('year'),era:params.get('era'),
+      unsupportedFilters:[...params.keys()].filter(key=>(key==='facet'||key.startsWith('truck_'))&&Boolean(params.get(key))),
+      conflictingScope:params.has('salesScope'),
+    }} : {}),
     metric: salesMetric, weeksBack: ['1','2','3'].includes(params.get('weeksBack') ?? '') ? Number(params.get('weeksBack')) : 0,
     drill: salesDay && /^\d{4}-\d{2}-\d{2}$/.test(salesDay) && Number.isFinite(Date.parse(salesDay))
       ? { bucket: `${salesDay}T00:00:00Z`, series: params.get('series') === 'benchmark' ? 'benchmark' : 'selected',
@@ -604,15 +610,16 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (key === 'live' || key === 'house' || (key === 'make' && value != null) || key === 'bidRange') next.set('board', '1');
     else if (key !== 'board') next.delete('board');
     if (key === 'live' || key === 'make' || key === 'house') next.delete('bidRange');
-    if (key === 'make' || key === 'view') {
+    if (key === 'make') {
       next.delete('model');
       ['family', 'family_name', 'year', 'era', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
     }
     if (key === 'make') next.delete('mapBy');
     if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
     if (key === 'view') next.delete('bidRange');
+    if (key === 'view') ['mapFocus','mapChild'].forEach(k=>next.delete(k));
     if (key === 'view' && value === 'sales' && (!next.get('make') || next.get('make') === 'all') && largestMake) next.set('make', largestMake);
-    if (key === 'make' || key === 'view') ['day', 'series', 'salesScope', 'salesOffset', 'salesSnapshot', 'salesOutcome'].forEach(k => next.delete(k));
+    if (['make','view','model','family','year','era'].includes(key)) ['day', 'series', 'salesScope', 'salesOffset', 'salesSnapshot', 'salesOutcome'].forEach(k => next.delete(k));
     next.delete('lot');
     setParams(next, { replace: key === 'live' || key === 'house' || key === 'bidRange' || key === 'sort', preventScrollReset: true });
   };
@@ -671,6 +678,14 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   };
   const setSalesLens = (change: Partial<MarketSalesLens>) => {
     const next = new URLSearchParams(params);
+    if(change.recordedFamily){
+      const selected=change.recordedFamily;
+      ['family','family_name','model','year','era','axis','facet','salesScope','day','series','salesOffset','salesSnapshot','salesOutcome',
+        ...[...next.keys()].filter(k=>k.startsWith('truck_'))].forEach(k=>next.delete(k));
+      for(const [key,value] of Object.entries({family:selected.familyKey,family_name:selected.familyName,model:selected.model,year:selected.year,era:selected.era})){
+        if(value!==null)next.set(key,value);
+      }
+    }
     if (change.days != null) next.set('days', String(change.days));
     if (change.metric != null) next.set('salesMetric', change.metric);
     if (change.weeksBack != null) { if (change.weeksBack) next.set('weeksBack', String(change.weeksBack)); else next.delete('weeksBack'); }
@@ -900,7 +915,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const scope = (
     <nav className="market-navigation" aria-label="Market views">
       <div className="k-section k-strip market-scope market-scope--tabs" role="group" aria-label="Market scope">
-        <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} view={view} makeSelect={view === 'sales'} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
+        <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} recordedFamily={salesLens.recordedFamily} view={view} makeSelect={view === 'sales'} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
       </div>
     </nav>
   );

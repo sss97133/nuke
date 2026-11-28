@@ -199,6 +199,7 @@ export function applyDrillStackToSearchParams(
     activeFacetAxis !== undefined ? activeFacetAxis : prevAxis;
   const next = new URLSearchParams(params);
   for (const k of SCOPE_PARAM_KEYS) next.delete(k);
+  ['salesScope','day','series','salesOffset','salesSnapshot','salesOutcome'].forEach(k=>next.delete(k));
   const leaf = stack[stack.length - 1];
   if (params.get('make') !== leaf?.make || prevFamily !== leaf?.family) {
     for (const key of [...next.keys()]) if (key.startsWith('truck_')) next.delete(key);
@@ -1463,6 +1464,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       const next = new URLSearchParams(curr);
       if (era) next.set('era', era);
       else next.delete('era');
+      ['salesScope','day','series','salesOffset','salesSnapshot','salesOutcome'].forEach(k=>next.delete(k));
       return next;
     }, { preventScrollReset: true });
   }, [setSearchParams]);

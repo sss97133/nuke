@@ -219,3 +219,12 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
     host.remove();
   });
 });
+
+it('clears previous outcome receipts on family, model and year drill actions',()=>{
+ const pinned='make=Chevrolet&family=old&salesScope=descriptive:old&day=2026-11-20&series=selected&salesOffset=20&salesSnapshot=old&salesOutcome=no_sale&view=sales&days=2';
+ const stack=[{label:'ALL MAKES'},{label:'Chevrolet',make:'Chevrolet'},{label:'Camaro',make:'Chevrolet',family:'new'},
+ {label:'1969',make:'Chevrolet',family:'new',year:1969}];
+ const p=applyDrillStackToSearchParams(new URLSearchParams(pinned),stack);
+ for(const key of ['salesScope','day','series','salesOffset','salesSnapshot','salesOutcome'])expect(p.has(key)).toBe(false);
+ expect(p.get('year')).toBe('1969');expect(p.get('family')).toBe('new');expect(p.get('view')).toBe('sales');expect(p.get('days')).toBe('2');
+});
