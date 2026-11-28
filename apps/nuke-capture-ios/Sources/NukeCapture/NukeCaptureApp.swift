@@ -192,6 +192,15 @@ struct NukeCaptureApp: App {
             .onOpenURL(perform: handleOpenURL)
             #if DEBUG
             .overlay(alignment: .topLeading) { if FixtureBackend.isActive { FixtureWriteLogOverlay() } }
+            .overlay(alignment: .topTrailing) {
+                if FixtureBackend.isActive && ProcessInfo.processInfo.environment["NUKE_FIXTURE_SWITCH_ACCOUNT"] == "1" {
+                    Button("Switch fixture account") {
+                        FixtureBackend.switchFixtureAccount()
+                        session.isSignedIn = true
+                    }
+                    .accessibilityIdentifier("fixture.switch-account")
+                }
+            }
             #endif
         }
         .onChange(of: scenePhase) { _, phase in
