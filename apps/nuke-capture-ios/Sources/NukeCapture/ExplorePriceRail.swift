@@ -280,33 +280,42 @@ struct ExploreWhySheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(ExploreWhyStack.rows(item: why.item, estimate: why.estimate, fresh: why.fresh)) { row in
-                        rowView(row)
+                if why.item.liveStatusUnavailable {
+                    Section {
+                        Text("Auction status unavailable")
+                        Text("The latest board did not return this listing. Its last recorded bid may have changed.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        if let url = why.item.link { Link("Open original listing", destination: url) }
                     }
-                } footer: {
-                    if let footer = why.footer { Text(footer) }
-                }
-                if why.item.kind == .live {
-                    Section("Comparable lots") {
-                        switch analogs {
-                        case .loading:
-                            ProgressView()
-                        case .failed(let reason):
-                            Text("Couldn't load comparable lots.").font(.footnote).foregroundStyle(.secondary)
-                            Text(reason).font(.footnote).foregroundStyle(.secondary)
-                                .accessibilityIdentifier("comparable-read-failure")
-                            Button("Retry comparable lots") { Task { await loadAnalogs() } }
-                        case .loaded(let rows):
-                            if rows.isEmpty {
-                                Text("No comparable lots were returned for this one.").font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    Section {
+                        ForEach(ExploreWhyStack.rows(item: why.item, estimate: why.estimate, fresh: why.fresh)) { row in
+                            rowView(row)
+                        }
+                    } footer: {
+                        if let footer = why.footer { Text(footer) }
+                    }
+                    if why.item.kind == .live {
+                        Section("Comparable lots") {
+                            switch analogs {
+                            case .loading:
+                                ProgressView()
+                            case .failed(let reason):
+                                Text("Couldn't load comparable lots.").font(.footnote).foregroundStyle(.secondary)
+                                Text(reason).font(.footnote).foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("comparable-read-failure")
+                                Button("Retry comparable lots") { Task { await loadAnalogs() } }
+                            case .loaded(let rows):
+                                if rows.isEmpty {
+                                    Text("No comparable lots were returned for this one.").font(.footnote).foregroundStyle(.secondary)
+                                }
+                                ForEach(rows) { a in analogView(a) }
                             }
-                            ForEach(rows) { a in analogView(a) }
                         }
                     }
                 }
             }
-            .navigationTitle(why.rail.detailsTitle)
+            .navigationTitle(why.item.liveStatusUnavailable ? "Price details" : why.rail.detailsTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task { await loadAnalogs() }
