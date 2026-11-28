@@ -49,4 +49,14 @@ final class VehicleDiscussionTests: XCTestCase {
         XCTAssertFalse(try reply(#"{"ok":true,"kind":"comment"}"#).confirmed)
         XCTAssertFalse(try reply(#"{"ok":true,"kind":"follow","comment_id":"00000000-0000-4000-8000-00000000b202"}"#).confirmed)
     }
+
+    @MainActor func testDraftsAreScopedToBothVehicleAndViewer() {
+        let other = "00000000-0000-4000-8000-00000000c002"
+        DiscussionDrafts.save("first draft", vehicle: vehicle, viewer: "person-a")
+        XCTAssertEqual(DiscussionDrafts.read(vehicle: vehicle, viewer: "person-a"), "first draft")
+        XCTAssertEqual(DiscussionDrafts.read(vehicle: vehicle, viewer: "person-b"), "")
+        XCTAssertEqual(DiscussionDrafts.read(vehicle: other, viewer: "person-a"), "")
+        DiscussionDrafts.save("", vehicle: vehicle, viewer: "person-a")
+        XCTAssertEqual(DiscussionDrafts.read(vehicle: vehicle, viewer: "person-a"), "")
+    }
 }
