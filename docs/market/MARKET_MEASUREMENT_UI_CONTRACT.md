@@ -663,6 +663,16 @@ family's models, the live board lists the 48 live Ford Mustangs, the price secti
 change, the Sources board shows the houses behind the 9,173 sales, and Back returns to all makes. Nothing leaves the page.
 
 
+## Exact-episode discussion trajectory
+
+The existing `popup_vehicle_intel(uuid,uuid,jsonb)` reader accepts an explicit `include_trajectory: true` projection. Its `auction_comment_hourly_v1` result groups the same eligible discussion entries into at most 337 UTC hours within the existing recorded-close-minus-fourteen-days window. Source event and database arrival cutoffs still apply separately. It is a reconstruction of retained input, without an observed opening, capture uptime or historical forecast claim.
+
+Hourly text, media, missing-content, token, literal-pattern, seller-flag and unknown-participant totals reconcile to the existing full-window features. The reader returns clipped `window_start`, `window_end` and `window_seconds`; rates divide by those eligible-window seconds. An exact-cutoff entry in a zero-duration terminal bucket remains countable, with a null rate. Zero counts establish zero retained eligible entries. Distinct platform identity counts per hour are not additive people counts.
+
+An optional finite `evidence_bucket` must resolve to an intersecting UTC-hour boundary and requires the trajectory projection. It selects source records under the same source-population hash, cutoffs and evidence filter; it does not replace the full-window measurements or curve. Pages retain twenty keyed records, and a source or close-anchor change refuses continuation. The no-opt-in and explicit-false projections retain their existing payloads and fingerprints. Caller budgets, access gates, the one-argument owner, source testimony and semantic scores remain unchanged. The consumer and real deployed interaction must be verified separately from this database contract.
+
+Native contract: `supabase/sql/test_market_comment_hourly_trajectory.sql`, including the original surface-reader contract, old-projection parity, partial/instant boundaries, source-page selection and continuation, 5,000/5,001-row limits, source changes, anonymous gates and caller budgets.
+
 ## Descriptive year/model outcome scopes
 
 `get_market_trends(jsonb)` accepts `descriptive_subject` only for `captured_sell_through`. The existing `cohort_scope_rule(uuid[],text)` overload qualifies at most 1,000 explicit registry candidate IDs for the `captured_sell_through_descriptive` purpose. It uses the existing canonical model FK, make/name aliases and the subject's declared year or model bounds. An unknown model end remains unknown. Each distinct requested nonnull ID has an admitted/unavailable result and a specific database reason. Canonical display and the original registered label are separate. Equivalent model/year/range subjects share a deterministic catalog representative and count within the requested candidates; these are registry-subject aliases, not vehicle counts. Generation and inconsistent year/range shapes refuse. No registry status is promoted, and the original scope rule, member resolver and valuation policy stay intact.
