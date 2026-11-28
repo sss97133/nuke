@@ -8,7 +8,7 @@ SELECT set_config('lock_timeout', CASE WHEN current_setting('lock_timeout')::int
 DO $$ BEGIN
  IF to_regprocedure('public.lot_order_book_read(uuid)') IS NULL THEN RAISE EXCEPTION 'Existing order-book reader is required'; END IF;
  IF to_regprocedure('public.lot_order_book_read(uuid,jsonb)') IS NOT NULL
-  AND (SELECT md5(prosrc) FROM pg_proc WHERE oid=to_regprocedure('public.lot_order_book_read(uuid,jsonb)'))<>'3625f94e9e074e870c306a1874cd5af1'
+  AND (SELECT md5(prosrc) FROM pg_proc WHERE oid=to_regprocedure('public.lot_order_book_read(uuid,jsonb)'))<>'46be016b759b6e044820c6e3488788b3'
  THEN RAISE EXCEPTION 'Bid-path reader differs from the reviewed body'; END IF;
 END $$;
 
@@ -114,6 +114,9 @@ BEGIN
     p.price-lag(p.price) OVER(ORDER BY p.seq) AS price_change FROM prices p JOIN aggregates a ON a.seq=p.seq
  ), selected AS MATERIALIZED (
   SELECT * FROM states WHERE v_selected IS NULL OR id=v_selected ORDER BY seq DESC LIMIT 1
+ ), selected_book AS MATERIALIZED (
+  SELECT x.*,count(*) OVER(ORDER BY revealed_bid DESC RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS depth_at_revealed_bid
+  FROM book x WHERE x.seq=(SELECT seq FROM selected)
  ), snapshot AS MATERIALIZED (
   SELECT md5(jsonb_build_object('method','captured_bid_path','version',1,'lot',v_lot.id,'vehicle',v_lot.vehicle_id,
     'source_url',v_url,'recorded_close',v_lot.auction_end_date,'currency',v_lot.currency_code,'currency_source',v_lot.currency_source,
@@ -170,10 +173,17 @@ BEGIN
      'entries',s.entrants,'identities',s.identities,'unresolved_entries',s.entrants-s.identities,
      'second_best',s.second_best::text,'depth_90',s.depth_90,'depth_75',s.depth_75) ORDER BY s.seq) FROM states s),'[]'::jsonb),
    'selected_bid_comment_id',(SELECT id FROM selected),'selected_seq',(SELECT seq FROM selected),
+   'selected_book_basis','posted_order_prefix_within_requested_known_inputs',
    'book',coalesce((SELECT jsonb_agg(jsonb_build_object('entry_key',x.entry_key,'external_identity_id',x.keyed_identity,
-     'maximum_revealed_bid',x.revealed_bid::text,'supporting_bid_comment_ids',
-     (SELECT jsonb_agg(b.id ORDER BY b.seq) FROM bids b WHERE b.entry_key=x.entry_key AND b.seq<=x.seq))
-     ORDER BY x.revealed_bid DESC,x.entry_key COLLATE "C") FROM book x WHERE x.seq=(SELECT seq FROM selected)),'[]'::jsonb))
+     'maximum_revealed_bid',x.revealed_bid::text,'depth_at_revealed_bid',x.depth_at_revealed_bid,
+     'bid_count',support.bid_count,'first_bid_comment_id',support.first_bid_comment_id,
+     'last_bid_comment_id',support.last_bid_comment_id,'highest_bid_comment_id',support.highest_bid_comment_id,
+     'supporting_bid_comment_ids',support.ids)
+     ORDER BY x.revealed_bid DESC,x.entry_key COLLATE "C") FROM selected_book x
+     CROSS JOIN LATERAL(SELECT count(*) AS bid_count,(array_agg(b.id ORDER BY b.seq))[1] AS first_bid_comment_id,
+       (array_agg(b.id ORDER BY b.seq DESC))[1] AS last_bid_comment_id,
+       (array_agg(b.id ORDER BY b.seq) FILTER(WHERE b.bid_amount=x.revealed_bid))[1] AS highest_bid_comment_id,
+       jsonb_agg(b.id ORDER BY b.seq) AS ids FROM bids b WHERE b.entry_key=x.entry_key AND b.seq<=x.seq) support),'[]'::jsonb))
  END INTO v_result FROM audit a CROSS JOIN snapshot snap;
  RETURN v_result;
 END;

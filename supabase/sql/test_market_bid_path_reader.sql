@@ -69,6 +69,19 @@ SELECT pg_temp.check_it(r->>'state'='partial' AND jsonb_array_length(r->'states'
  'hand-calculated current bid path, repeated identities and lower later bid') FROM first_read;
 SELECT pg_temp.check_it(r#>>'{states,4,price_change}'='0' AND r#>>'{states,4,top_two_gap}'='25'
  AND r#>'{states,0,price_change}'='null','high-bid change and distinct-entry top-two gap') FROM first_read;
+SELECT pg_temp.check_it(r#>>'{book,1,bid_count}'='2' AND r#>>'{book,1,depth_at_revealed_bid}'='2'
+ AND r#>>'{book,1,first_bid_comment_id}'='30000000-0000-4000-8000-000000000002'
+ AND r#>>'{book,1,last_bid_comment_id}'='30000000-0000-4000-8000-000000000005'
+ AND r#>>'{book,1,highest_bid_comment_id}'='30000000-0000-4000-8000-000000000005',
+ 'book values name their exact first/last/highest source bids and depth') FROM first_read;
+BEGIN;
+UPDATE auction_comments SET bid_amount=350 WHERE id='30000000-0000-4000-8000-000000000005';
+UPDATE auction_comments SET bid_amount=300 WHERE id='30000000-0000-4000-8000-000000000001';
+CREATE TEMP TABLE tied_book AS SELECT lot_order_book_read('20000000-0000-4000-8000-000000000001','{}')r;
+SELECT pg_temp.check_it(r#>>'{book,0,depth_at_revealed_bid}'='2' AND r#>>'{book,1,depth_at_revealed_bid}'='2'
+ AND r#>>'{states,4,top_two_gap}'='0' AND r#>>'{book,2,highest_bid_comment_id}'='30000000-0000-4000-8000-000000000001',
+ 'ties share inclusive depth and repeated maximum keeps earliest source bid') FROM tied_book;
+ROLLBACK;
 SELECT pg_temp.check_it(r#>>'{coverage,bid_marked_unknown_event_time}'='1' AND r#>>'{coverage,bid_marked_unknown_recording_time}'='1'
  AND r#>>'{coverage,bid_marked_unknown_amounts}'='1' AND r#>>'{coverage,amount_without_bid_label}'='1'
  AND r#>>'{summary,bids_in_60_minutes_to_event_cutoff}'='4' AND r#>>'{summary,bids_in_10_minutes_to_event_cutoff}'='2'

@@ -30,7 +30,7 @@ A validated `bat` identity is one entry. Each bid without a validated platform i
 
 These are observed bids and conditional book statistics. A bid is a lower bound on willingness to pay; this is not an intrinsic-value estimate, human population count, demand forecast or profit calculation. The final sale amount is not a feature input.
 
-Each state includes its source comment key, native source anchor when known, event and database clocks, participant key when validated, numeric state fields and coverage. Selecting `selected_bid_comment_id` returns that state's book with all supporting eligible comment keys. A selected bid absent from the requested known inputs refuses rather than silently selecting another one.
+Each state includes its source comment key, native source anchor when known, event and database clocks, participant key when validated, numeric state fields and coverage. Selecting `selected_bid_comment_id` returns that state's book with all supporting eligible comment keys. Each entry names its first, last and earliest highest bid, its bid count and inclusive depth at its revealed maximum. Equal levels share the same inclusive depth. These values are calculated in SQL; the consumer does not rebuild entry statistics or choose the maximum's source. A selected bid absent from the requested known inputs refuses rather than silently selecting another one.
 
 ## Amounts, bounds and consistency
 
