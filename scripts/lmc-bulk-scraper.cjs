@@ -4,6 +4,8 @@
  * Crawls all LMC assembly pages, extracts images and part numbers
  */
 
+require('./guard-unqualified-lmc-writes.cjs')();
+
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');

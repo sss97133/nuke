@@ -4,6 +4,8 @@
  * Extracts callout mappings from assembly pages with numbered diagrams
  */
 
+require('./guard-unqualified-lmc-writes.cjs')();
+
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
