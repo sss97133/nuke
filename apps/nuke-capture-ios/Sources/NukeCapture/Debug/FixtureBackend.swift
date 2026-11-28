@@ -141,7 +141,10 @@ enum FixtureBackend {
                   items.contains(where: { $0.name == "source_url" && ($0.value?.contains("bringatrailer.com/listing/fixture") ?? false) }),
                   items.contains(where: { $0.name == "vehicles.is_public" && $0.value == "eq.true" }),
                   items.contains(where: { $0.name == "vehicles.deleted_at" && $0.value?.lowercased() == "is.null" }),
-                  items.contains(where: { $0.name == "vehicles.or" && ($0.value?.contains("listing_kind.neq.non_vehicle_item") ?? false) }) else {
+                  items.contains(where: { $0.name == "vehicles.merged_into_vehicle_id" && $0.value?.lowercased() == "is.null" }),
+                  items.contains(where: { $0.name == "vehicles.or" && ($0.value?.contains("listing_kind.neq.non_vehicle_item") ?? false) }),
+                  items.contains(where: { $0.name == "or" && ($0.value?.contains("auction_event_id.is.null,canonical.not.is.null") ?? false) }),
+                  items.contains(where: { $0.name == "select" && ($0.value?.contains("canonical:auction_events_canonical(id)") ?? false) }) else {
                 return (400, Data(#"{"message":"fixture source scope or public gate missing"}"#.utf8))
             }
             if ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_SOURCE"] == "failure" {
@@ -151,11 +154,16 @@ enum FixtureBackend {
             return ok("""
             [{"id":"00000000-0000-4000-8000-00000000b101","vehicle_id":"\(navigationVehicleId)",
               "source_url":"https://bringatrailer.com/listing/fixture/","posted_at":"2026-11-27T10:00:00Z",
-              "author_username":"fixture_seller","comment_text":"The original wheels are included.","comment_type":"seller_response","bid_amount":null,
+              "author_username":"fixture_seller","comment_text":"The original wheels are included.","comment_type":"seller_response","bid_amount":null,"auction_event_id":null,"canonical":null,
               "vehicles":{"id":"\(navigationVehicleId)","status":"active","deleted_at":null}},
              {"id":"00000000-0000-4000-8000-00000000b102","vehicle_id":"\(navigationVehicleId)",
               "source_url":"https://bringatrailer.com/listing/another-car/","posted_at":"2026-11-27T09:00:00Z",
-              "author_username":"wrong_listing","comment_text":"Must never be shown.","comment_type":"question","bid_amount":null,
+              "author_username":"wrong_listing","comment_text":"Must never be shown.","comment_type":"question","bid_amount":null,"auction_event_id":null,"canonical":null,
+              "vehicles":{"id":"\(navigationVehicleId)","status":"active","deleted_at":null}},
+             {"id":"00000000-0000-4000-8000-00000000b103","vehicle_id":"\(navigationVehicleId)",
+              "source_url":"https://bringatrailer.com/listing/fixture/","posted_at":"2026-11-27T08:00:00Z",
+              "author_username":"duplicate_event","comment_text":"Duplicate event must never be shown.","comment_type":"question","bid_amount":null,
+              "auction_event_id":"00000000-0000-4000-8000-00000000a001","canonical":null,
               "vehicles":{"id":"\(navigationVehicleId)","status":"active","deleted_at":null}}]
             """)
         }

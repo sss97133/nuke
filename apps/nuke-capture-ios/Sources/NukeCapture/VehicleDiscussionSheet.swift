@@ -9,7 +9,9 @@ struct ListingDiscussionEntry: Decodable, Identifiable {
         let id: UUID
         let status: String?
         let deleted_at: String?
+        let merged_into_vehicle_id: UUID?
     }
+    struct CanonicalEvent: Decodable { let id: UUID }
     let id: UUID
     let vehicle_id: UUID
     let source_url: String?
@@ -19,6 +21,8 @@ struct ListingDiscussionEntry: Decodable, Identifiable {
     let comment_type: String?
     let bid_amount: Decimal?
     let vehicles: Parent
+    let auction_event_id: UUID?
+    let canonical: CanonicalEvent?
 
     var typeLabel: String {
         switch comment_type {
@@ -77,7 +81,9 @@ struct ListingDiscussionScope {
 
     func contains(_ entry: ListingDiscussionEntry) -> Bool {
         entry.vehicle_id == vehicleId && entry.vehicles.id == vehicleId && entry.vehicles.deleted_at == nil
+            && entry.vehicles.merged_into_vehicle_id == nil
             && !["deleted", "merged", "rejected", "duplicate"].contains(entry.vehicles.status ?? "")
+            && (entry.auction_event_id == nil || entry.canonical?.id == entry.auction_event_id)
             && AuctionLocationClock.sourceKey(entry.source_url) == key
     }
 }
@@ -283,11 +289,13 @@ struct VehicleDiscussionSheet: View {
         source = .loading
         do {
             let rows: [ListingDiscussionEntry] = try await SupabaseService.client.from("auction_comments")
-                .select("id,vehicle_id,source_url,posted_at,author_username,comment_text,comment_type,bid_amount,vehicles!inner(id,status,deleted_at)")
+                .select("id,vehicle_id,source_url,posted_at,author_username,comment_text,comment_type,bid_amount,auction_event_id,vehicles!inner(id,status,deleted_at,merged_into_vehicle_id),canonical:auction_events_canonical(id)")
+                .or("auction_event_id.is.null,canonical.not.is.null")
                 .eq("vehicle_id", value: vehicleId).in("source_url", values: scope.aliases)
                 .eq("vehicles.is_public", value: true).is("vehicles.deleted_at", value: nil)
+                .is("vehicles.merged_into_vehicle_id", value: nil)
                 .or("and(or(status.is.null,status.not.in.(deleted,merged,rejected,duplicate)),or(listing_kind.is.null,listing_kind.neq.non_vehicle_item))", referencedTable: "vehicles")
-                .order("posted_at", ascending: false).limit(31).execute().value
+                .order("posted_at", ascending: false).order("id", ascending: true).limit(31).execute().value
             guard current(reader) else { return }
             source = .loaded(Array(rows.filter(scope.contains).prefix(30)))
         } catch {
