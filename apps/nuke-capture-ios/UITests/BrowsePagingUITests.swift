@@ -41,6 +41,7 @@ final class BrowsePagingUITests: XCTestCase {
         let price = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Current bid")).firstMatch
         XCTAssertTrue(price.waitForExistence(timeout: 20), app.debugDescription); price.tap()
         XCTAssertTrue(app.staticTexts["Couldn't load comparable lots."].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["comparable-read-failure"].label, "No network connection.")
         XCTAssertFalse(app.staticTexts["No comparable lots were returned for this one."].exists)
         let retry = app.buttons["Retry comparable lots"]
         for _ in 0..<3 where !retry.isHittable { app.swipeUp() }
@@ -81,6 +82,18 @@ final class BrowsePagingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Couldn't load more cars"].waitForExistence(timeout: 20), app.debugDescription)
         app.buttons["Try again"].tap()
         XCTAssertTrue(app.staticTexts["Fixture page 80"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testCachedAuctionsContinueWhenClassifiedPageFails() {
+        let app = open("browse-paging-auction-failure")
+        XCTAssertTrue(app.staticTexts["Fixture auction 0"].waitForExistence(timeout: 20), app.debugDescription)
+        let later = app.staticTexts["Fixture auction 40"]
+        for _ in 0..<4 where !later.exists { app.swipeUp() }
+        XCTAssertTrue(later.waitForExistence(timeout: 15), app.debugDescription)
+        let retry = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Couldn't load more classified listings")).firstMatch
+        for _ in 0..<3 where !retry.exists { app.swipeUp() }
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 }

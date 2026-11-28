@@ -259,7 +259,7 @@ struct ExploreWhySheet: View {
     let why: ExploreWhy
     /// Opens the existing cohort page; the feed closes this sheet first.
     let onCohort: (CohortTarget) -> Void
-    private enum AnalogState { case loading, failed, loaded([FinishAnalog]) }
+    private enum AnalogState { case loading, failed(String), loaded([FinishAnalog]) }
     @State private var analogs: AnalogState = .loading
     @Environment(\.dismiss) private var dismiss
 
@@ -280,8 +280,10 @@ struct ExploreWhySheet: View {
                         switch analogs {
                         case .loading:
                             ProgressView()
-                        case .failed:
+                        case .failed(let reason):
                             Text("Couldn't load comparable lots.").font(.footnote).foregroundStyle(.secondary)
+                            Text(reason).font(.footnote).foregroundStyle(.secondary)
+                                .accessibilityIdentifier("comparable-read-failure")
                             Button("Retry comparable lots") { Task { await loadAnalogs() } }
                         case .loaded(let rows):
                             if rows.isEmpty {
@@ -342,7 +344,7 @@ struct ExploreWhySheet: View {
             analogs = .loaded(rows)
         } catch {
             guard !Task.isCancelled else { return }
-            analogs = .failed
+            analogs = .failed(ReadFailure.text(error))
         }
     }
 }
