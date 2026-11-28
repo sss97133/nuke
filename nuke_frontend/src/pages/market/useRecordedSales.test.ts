@@ -33,12 +33,24 @@ describe('existing recorded-sales reader contract', () => {
       return builder;
     });
     const options = await fetchSalesScopes();
-    expect(reads[0]).toMatchObject({ fields: 'id,canonical_name', limit: 201 });
+    expect(reads[0]).toMatchObject({ fields: 'id,canonical_name', limit: 1001 });
     expect(reads[1]).toMatchObject({ filter: ['comparison_scope_status', 'supported'], limit: 101 });
     expect(matchSalesMake(options, 'FIXTURE')?.scope).toEqual({ kind: 'canonical_make', canonical_make_id: 'returned-make-id' });
     expect(options[1].scope).toEqual({ kind: 'supported_subject', subject_id: 'returned-subject-id' });
     expect(matchSalesMake([...options, options[0]], 'Fixture')).toBeUndefined();
     expect(matchSalesMake(options, 'unknown')).toBeUndefined();
+  });
+  it('accepts a complete registry above the former 200-row ceiling and refuses a truncated catalog', async () => {
+    let size = 402;
+    fixture.from.mockImplementation(table => {
+      const builder = {select:()=>builder,eq:()=>builder,order:()=>builder,
+        limit:()=>Promise.resolve({data:table==='canonical_makes'
+          ? Array.from({length:size},(_,i)=>({id:`make-${i}`,canonical_name:`Fixture ${i}`})) : []})};
+      return builder;
+    });
+    expect(await fetchSalesScopes()).toHaveLength(402);
+    size=1001;
+    await expect(fetchSalesScopes()).rejects.toThrow('Scope catalog exceeds its display limit');
   });
 });
 
