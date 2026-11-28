@@ -602,7 +602,7 @@ const TOOLS: ToolDef[] = [
         query: { type: "string", description: "Search text" },
         make: { type: "string", description: "Filter by recorded make; array matches are case-sensitive" },
         model: { type: "string", description: "Filter by recorded model where supported; array matches are case-sensitive" },
-        year: { type: "number", description: "Filter by recorded year or range where supported; unknown values are excluded" },
+        year: { type: "number", description: "Filter by recorded year or range where supported; paint ranges with no end year remain open" },
         limit: { type: "number", description: "Max results (default 25)" },
       },
       required: ["type"],
@@ -2381,7 +2381,8 @@ async function handleQueryLibrary(args: Record<string, unknown>): Promise<ToolRe
   }
   if (year !== undefined) {
     if (type === "condition_knowledge") query = query.filter("applicable_years", "ov", `[${year},${year + 1})`);
-    else if (type === "paint_codes") query = query.lte("year_start", year).gte("year_end", year);
+    // paint_codes defines a NULL end year as still in production, not unknown.
+    else if (type === "paint_codes") query = query.lte("year_start", year).or(`year_end.is.null,year_end.gte.${year}`);
     else if (type === "vehicle_nomenclature") query = query.eq("year", year);
   }
 
@@ -2400,7 +2401,7 @@ async function handleQueryLibrary(args: Record<string, unknown>): Promise<ToolRe
   return toolOk({
     type, count: results.length, results,
     ...(make !== undefined || model !== undefined || year !== undefined ? {
-      filter_basis: "recorded_metadata_only; unknown values excluded; array matches are case-sensitive",
+      filter_basis: "recorded_metadata_only; missing required scope excluded; paint end year null is open-ended; array matches are case-sensitive",
     } : {}),
   });
 }

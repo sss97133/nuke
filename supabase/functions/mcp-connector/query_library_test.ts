@@ -103,9 +103,11 @@ Deno.test("year, make and model filter the corresponding recorded fields", async
   assert(connector.reads[0].filters.includes("filter:applicable_years:ov:[1900,1901)"), "a different year gets a different range");
 
   connector.reads.length = 0;
-  await connector.handleQueryLibrary({ type: "paint_codes", year: 1987 });
+  await connector.handleQueryLibrary({ type: "paint_codes", query: "Guards Red", year: 1987 });
   assert(connector.reads[0].filters.includes("lte:year_start:1987"), "paint begins on or before year");
-  assert(connector.reads[0].filters.includes("gte:year_end:1987"), "paint ends on or after year");
+  assert(connector.reads[0].filters.includes("or:year_end.is.null,year_end.gte.1987"), "paint is open-ended or ends on or after year");
+  assert(connector.reads[0].filters.some((f: string) => f.startsWith("or:") && f.includes("name.ilike.%Guards Red%")),
+    "text search and the open-ended year filter are both retained");
 
   connector.reads.length = 0;
   await connector.handleQueryLibrary({ type: "vehicle_nomenclature", year: 1987, model: "V10" });
