@@ -15,7 +15,7 @@
 - Per-vehicle documents → `vehicle_documents` (139 rows, 5 live readers)
 - Title scan → `extract-title-data` fn (caller: TitleScan.tsx; returns structured fields, no title table exists)
 - Manual page serving → `get-manual-pages` fn
-- Reference/manual indexing → `scripts/ingest-service-manual.py` + `scripts/library_ingest_to_db.py` → `service_manual_chunks` (41,941 rows, read by mcp-connector) / `library_documents`
+- Reference/manual indexing: existing `service_manual_chunks` / `library_documents` are read by mcp-connector. `scripts/ingest-service-manual.py` now permits read-only `--list` only; its title-only, delete-and-reinsert writer is disabled. `scripts/library_ingest_to_db.py` is a separate legacy `reference_documents` / `document_pages` writer whose partial-restart behavior remains unresolved.
 - Sensitive docs → `secure_documents` (43 rows; treat READ-ONLY — its write gate `detect-sensitive-document` is undeployed)
 
 **Do NOT:** resurrect the vault-* fn suite ×5 or create vault_*/vehicle_title_documents/vehicle_manuals/vehicle_manual_links tables (they DO NOT EXIST despite CODEBASE_MAP); call `process-receipt` (deployed orphan, 0 callers); touch `smart-receipt-linker` without first recovering its deleted source from git history (⚠ zombie on a LIVE upload path); write to `documents`, `deal_documents`, or `vehicle_receipts` (dead/never took hold); imitate the deleted OCR fns (ds-extract-document, extract-pdf-text, receipt-photo-ocr…) — `document-ocr-worker` even contains a dangling ds-extract-document call, ignore it; never run a "clean up missing functions" sweep.

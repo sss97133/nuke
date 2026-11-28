@@ -1,25 +1,20 @@
 #!/usr/bin/env python3
 """
-Ingest OEM service manuals → library_documents + service_manual_chunks.
+Inspect OEM service manuals and list indexed library documents.
 
-Parses PDF text, detects section boundaries, classifies content types,
-extracts key topics, and writes indexed chunks to the database.
+Legacy writes are disabled: title-only identity and destructive batched
+chunk replacement cannot preserve source identity or partial progress.
 
 Usage:
   cd /Users/skylar/nuke
-  dotenvx run -- python3 scripts/ingest-service-manual.py <path-to-pdf> [--title "..."] [--year 1982] [--make-family "GM C/K"]
-  dotenvx run -- python3 scripts/ingest-service-manual.py --list  # show existing documents
+  dotenvx run -- python3 scripts/ingest-service-manual.py --list  # read-only list
 """
 
 import os
 import re
-import sys
-import json
 import argparse
-import hashlib
 from pathlib import Path
 
-import PyPDF2
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -217,6 +212,7 @@ def parse_pdf(pdf_path: str) -> list:
     Parse PDF into page-by-page text with section tracking.
     Returns list of {page_number, text, section_name, section_heading}.
     """
+    import PyPDF2
     reader = PyPDF2.PdfReader(pdf_path)
     pages = []
     current_section = None
@@ -304,118 +300,13 @@ def _build_chunk(pages: list) -> dict:
 def register_document(conn, pdf_path: str, title: str, year: int = None,
                        make_family: str = None, page_count: int = None,
                        library_id: str = None) -> str:
-    """Register a manual in library_documents. Returns document_id."""
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
-    # Check if already registered (by title)
-    cur.execute("SELECT id FROM library_documents WHERE title = %s", (title,))
-    existing = cur.fetchone()
-    if existing:
-        print(f"  Document already registered: {existing['id']}")
-        cur.close()
-        return str(existing["id"])
-
-    file_size = os.path.getsize(pdf_path)
-
-    # Use provided library_id or look one up
-    if not library_id:
-        cur.execute("SELECT id FROM reference_libraries LIMIT 1")
-        lib = cur.fetchone()
-        if not lib:
-            cur.execute("SELECT DISTINCT library_id FROM library_documents LIMIT 1")
-            lib_row = cur.fetchone()
-            library_id = str(lib_row["library_id"]) if lib_row else None
-            if not library_id:
-                raise RuntimeError("No reference_libraries or library_documents found")
-        else:
-            library_id = str(lib["id"])
-
-    # We need an uploaded_by UUID — use a system account
-    cur.execute("SELECT id FROM auth.users LIMIT 1")
-    user = cur.fetchone()
-    user_id = str(user["id"]) if user else None
-
-    cur.execute("""
-        INSERT INTO library_documents (
-            library_id, document_type, title, description,
-            file_url, file_size_bytes, page_count, mime_type,
-            year_published, uploaded_by,
-            metadata
-        ) VALUES (
-            %s, 'service_manual', %s, %s,
-            %s, %s, %s, 'application/pdf',
-            %s, %s,
-            %s
-        )
-        RETURNING id
-    """, (
-        library_id, title,
-        f"Factory service manual for {make_family or 'GM'} vehicles",
-        f"file://{pdf_path}", file_size, page_count,
-        year, user_id,
-        json.dumps({"make_family": make_family, "source": "local_pdf"}),
-    ))
-    doc = cur.fetchone()
-    conn.commit()
-    cur.close()
-
-    doc_id = str(doc["id"])
-    print(f"  Registered document: {doc_id}")
-    return doc_id
+    """Refuse title-only registration until source identity is qualified."""
+    raise RuntimeError("Manual document writes require source-qualified identity")
 
 
 def ingest_chunks(conn, document_id: str, chunks: list) -> int:
-    """Write chunks to service_manual_chunks. Returns count written."""
-    cur = conn.cursor()
-
-    # Clear existing chunks for this document (idempotent re-ingest)
-    cur.execute("DELETE FROM service_manual_chunks WHERE document_id = %s", (document_id,))
-    deleted = cur.rowcount
-    if deleted:
-        print(f"  Cleared {deleted} existing chunks")
-
-    written = 0
-    for chunk in chunks:
-        # Validate content_type against CHECK constraint
-        valid_types = ('procedure', 'specification', 'chart', 'diagram', 'reference')
-        ct = chunk["content_type"]
-        # Map our extended types to the CHECK constraint values
-        type_map = {
-            'diagnosis': 'chart',       # diagnosis tables → chart
-            'maintenance': 'reference', # maintenance schedules → reference
-        }
-        db_content_type = type_map.get(ct, ct)
-        if db_content_type not in valid_types:
-            db_content_type = 'reference'
-
-        cur.execute("""
-            INSERT INTO service_manual_chunks (
-                document_id, page_number, section_name, section_heading,
-                content, content_type, key_topics, metadata
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            document_id,
-            chunk["page_number"],
-            chunk["section_name"],
-            chunk["section_heading"],
-            chunk["content"],
-            db_content_type,
-            chunk["key_topics"],
-            json.dumps({
-                "original_content_type": chunk["content_type"],
-                "char_count": len(chunk["content"]),
-            }),
-        ))
-        written += 1
-
-        if written % 50 == 0:
-            conn.commit()
-            print(f"  Written {written} chunks...")
-
-    conn.commit()
-    cur.close()
-    print(f"  Total chunks written: {written}")
-    return written
+    """Refuse destructive re-ingestion until a restart-safe writer exists."""
+    raise RuntimeError("Manual chunk writes require source-qualified, restart-safe admission")
 
 
 def list_documents(conn):
@@ -444,85 +335,26 @@ def list_documents(conn):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Ingest OEM service manual PDFs")
+    parser = argparse.ArgumentParser(description="List indexed service manual documents")
     parser.add_argument("pdf_path", nargs="?", help="Path to PDF file")
     parser.add_argument("--title", help="Manual title")
     parser.add_argument("--year", type=int, help="Publication year")
-    parser.add_argument("--make-family", help="Make/family (e.g., 'GM C/K')")
-    parser.add_argument("--chunk-size", type=int, default=2, help="Pages per chunk (default: 2)")
-    parser.add_argument("--library-id", help="UUID of the reference_libraries entry to link to")
-    parser.add_argument("--list", action="store_true", help="List existing documents")
+    parser.add_argument("--make-family", help="Make/family (e.g., GM C/K)")
+    parser.add_argument("--chunk-size", type=int, default=2, help="Pages per chunk")
+    parser.add_argument("--library-id", help="Reference library UUID")
+    parser.add_argument("--list", action="store_true", help="List existing documents, read-only")
     args = parser.parse_args()
+
+    if not args.list:
+        parser.error("manual writes are unavailable until source identity and restart-safe admission are supported; use --list for read-only inspection")
 
     os.chdir(NUKE_DIR)
     conn = get_connection()
-
-    if args.list:
+    try:
+        conn.set_session(readonly=True, autocommit=False)
         list_documents(conn)
+    finally:
         conn.close()
-        return
-
-    if not args.pdf_path:
-        parser.error("PDF path required (or use --list)")
-
-    pdf_path = os.path.abspath(args.pdf_path)
-    if not os.path.exists(pdf_path):
-        print(f"Error: {pdf_path} not found")
-        sys.exit(1)
-
-    # Auto-detect title from filename if not provided
-    title = args.title or Path(pdf_path).stem.replace("_", " ")
-
-    print(f"\n{'='*60}")
-    print(f"Ingesting: {Path(pdf_path).name}")
-    print(f"Title: {title}")
-    print(f"{'='*60}")
-
-    # 1. Parse PDF
-    print("\n[1/3] Parsing PDF...")
-    pages = parse_pdf(pdf_path)
-
-    reader = PyPDF2.PdfReader(pdf_path)
-    page_count = len(reader.pages)
-
-    # Show section summary
-    sections = {}
-    for p in pages:
-        sec = p.get("section_name") or "(unknown)"
-        if sec not in sections:
-            sections[sec] = {"heading": p.get("section_heading"), "pages": 0}
-        sections[sec]["pages"] += 1
-
-    print(f"\n  Sections found: {len(sections)}")
-    for sec, info in sorted(sections.items()):
-        print(f"    {sec:8s} {info['heading'] or '':40s} ({info['pages']} pages)")
-
-    # 2. Chunk pages
-    print(f"\n[2/3] Chunking into {args.chunk_size}-page segments...")
-    chunks = chunk_pages(pages, chunk_size=args.chunk_size)
-
-    # Content type summary
-    type_counts = {}
-    for c in chunks:
-        ct = c["content_type"]
-        type_counts[ct] = type_counts.get(ct, 0) + 1
-
-    print(f"  Total chunks: {len(chunks)}")
-    for ct, count in sorted(type_counts.items(), key=lambda x: -x[1]):
-        print(f"    {ct:20s} {count}")
-
-    # 3. Register and write
-    print(f"\n[3/3] Writing to database...")
-    doc_id = register_document(
-        conn, pdf_path, title,
-        year=args.year, make_family=args.make_family,
-        page_count=page_count,
-        library_id=args.library_id,
-    )
-    written = ingest_chunks(conn, doc_id, chunks)
-
-    print(f"\nDone! {written} chunks ingested for document {doc_id}")
-    conn.close()
 
 
 if __name__ == "__main__":
