@@ -13,6 +13,7 @@ import { recordSuppliedDocument, recordSuppliedReference, ReferenceError, sha256
 import { recordCatalogTextSource } from './catalogTextSource.ts';
 import { recordAttestedPdfText } from './attestedPdfText.ts';
 import { recordCatalogPageMembership } from './catalogPageMembership.ts';
+import { recordCatalogPageWordGeometry } from './catalogPageWordGeometry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +35,24 @@ Deno.serve(async (req) => {
     )
 
     const body = await req.json();
+    if (body.mode === 'catalog_page_word_geometry') {
+      try {
+        const result = await recordCatalogPageWordGeometry(body, {
+          authorize: () => isServiceCaller(req),
+          async record(catalogId, page, edition, geometry, extractorVersion) {
+            const { data, error } = await supabase.rpc('record_catalog_page_word_geometry', {
+              p_catalog: catalogId, p_page: page, p_edition_sha256: edition, p_geometry: geometry, p_extractor_version: extractorVersion,
+            });
+            if (error) throw new ReferenceError('catalog_word_source_not_recorded', 409);
+            return data;
+          },
+        });
+        return Response.json(result, { headers: corsHeaders });
+      } catch (error) {
+        return Response.json({ success:false, error:error instanceof ReferenceError ? error.code : 'catalog_word_persistence_failed', model_calls:0 },
+          { status:error instanceof ReferenceError ? error.status : 500, headers:corsHeaders });
+      }
+    }
     if (body.mode === 'catalog_page_membership') {
       try {
         const result = await recordCatalogPageMembership(body, {
