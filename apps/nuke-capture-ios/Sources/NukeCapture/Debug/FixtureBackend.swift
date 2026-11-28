@@ -82,6 +82,19 @@ enum FixtureBackend {
          "title":"Fixture classified","ask":10000,"image":"http://["}]}
         """)
     }
+
+    static func browsePagingRead(_ name: String, _ args: [String: Any]) -> (Int, Data) {
+        if name == "market_pulse_live" { return ok(#"{"auctions":[]}"#) }
+        let offset = args["p_offset"] as? Int ?? 0
+        let count = offset < 80 ? 40 : (offset == 80 ? 1 : 0)
+        let rows: String = (0..<count).map { index -> String in
+            let number = offset + index
+            let visible = number == 0 || number == 80
+            let image = visible ? #""http://[""# : "null"
+            return #"{"event_id":"fixture-page-\#(number)","source":"classified","title":"Fixture page \#(number)","ask":10000,"image":\#(image)}"#
+        }.joined(separator: ",")
+        return ok("{\"population\":{},\"asks\":[\(rows)]}")
+    }
     private static let garageSourceLock = NSLock()
     private static var garageSourceAttempts = 0
 
@@ -497,6 +510,8 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName) && scenario == "browse-paging":
+            return browsePagingRead(name, args)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
             && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):
             return browseRead(name)
