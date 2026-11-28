@@ -401,8 +401,6 @@ struct VehicleDetailView: View {
     @State private var engagement: VehicleEngagement?
     @State private var testimonySummary: VehicleTestimonySummary?
     @State private var engagementError = false
-    @State private var commentDraft = ""
-    @State private var posting = false
     @State private var followBusy = false
     @State private var showComments = false   // the comment thread lives in a summoned sheet
     // COMMENT INTEL — the stored analysis of auction comments (popup_vehicle_intel)
@@ -486,9 +484,7 @@ struct VehicleDetailView: View {
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
         .sheet(isPresented: $showComments) {
-            CommentsSheet(engagement: engagement,
-                          commentDraft: $commentDraft, posting: $posting,
-                          onPost: { await postComment() })
+            VehicleDiscussionSheet(vehicleId: vehicleId, onPosted: { await loadEngagement() })
         }
         .fullScreenCover(isPresented: $galleryOpen) {
             FullScreenGalleryView(images: galleryURLs)
@@ -1751,8 +1747,8 @@ struct VehicleDetailView: View {
 
     // ─── ENGAGE — the visitor's job, the engagement ladder made real. Every
     // action is a typed interaction through ONE grammar (record_interaction):
-    // FOLLOW is signal (→ user_interactions); COMMENT is testimony (→ a kind=comment
-    // observation on the spine, authored by the user, trust-weighted). The counts
+    // FOLLOW is signal (→ user_interactions); COMMENT is testimony (→ user_comments).
+    // The counts
     // are depth (following · weighed-in · contributions), never hearts.
     // ─── The content-action row, directly under the hero — the slot every social
     // post reserves for the like/comment/share affordances. Follow (signal) + a
@@ -1770,7 +1766,7 @@ struct VehicleDetailView: View {
                     .disabled(followBusy)
 
                     Button { showComments = true } label: {
-                        Label(e.comment_count > 0 ? "\(e.comment_count) comments" : "Comment",
+                        Label(e.comment_count > 0 ? "\(e.comment_count) Nuke comment\(e.comment_count == 1 ? "" : "s")" : "Comment",
                               systemImage: "bubble.left")
                     }
                     .buttonStyle(NukeQuietButtonStyle())
@@ -1809,7 +1805,7 @@ struct VehicleDetailView: View {
         var parts: [String] = []
         if e.following_count > 0 { parts.append("\(e.following_count) following") }
         if e.contribution_count > 0 { parts.append(NukeDisplay.count(e.contribution_count, "contribution")) }
-        if parts.isEmpty { return e.comment_count > 0 ? "" : "Be the first to comment" }
+        if parts.isEmpty { return e.comment_count > 0 ? "" : "No Nuke comments yet" }
         return parts.joined(separator: " · ")
     }
 
@@ -1859,27 +1855,6 @@ struct VehicleDetailView: View {
             await loadEngagement()
         } catch {
             NSLog("NukeCapture follow failed: %@", String(describing: error))
-        }
-    }
-
-    private func postComment() async {
-        let text = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        posting = true
-        defer { posting = false }
-        struct CommentParams: Encodable {
-            let p_kind = "comment"; let p_target_type = "vehicle"
-            let p_target_id: String; let p_payload: [String: String]
-        }
-        do {
-            _ = try await SupabaseService.client
-                .rpc("record_interaction",
-                     params: CommentParams(p_target_id: vehicleId, p_payload: ["text": text]))
-                .execute()
-            commentDraft = ""
-            await loadEngagement()
-        } catch {
-            NSLog("NukeCapture comment post failed: %@", String(describing: error))
         }
     }
 
@@ -2836,77 +2811,6 @@ struct VehicleSpec: Decodable, Identifiable {
 }
 
 /// get_vehicle_valuation — the comp-based market estimate + the basis it leaned on.
-// ─── The comment thread — a summoned bottom sheet (the universal social pattern),
-// never spliced into the page spine. Thread scrolls; the composer is pinned to the
-// bottom above the keyboard. Reuses the page's record_interaction/get_vehicle_engagement
-// grammar verbatim — this is placement, not new data.
-private struct CommentsSheet: View {
-    let engagement: VehicleEngagement?
-    @Binding var commentDraft: String
-    @Binding var posting: Bool
-    let onPost: () async -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    private var count: Int { engagement?.comment_count ?? 0 }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let e = engagement, !e.recent_comments.isEmpty {
-                        ForEach(e.recent_comments) { c in row(c) }
-                    } else {
-                        Text("Be the first to weigh in.")
-                            .font(.callout).foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity).padding(.top, 48)
-                    }
-                }
-                .padding(16)
-            }
-            .navigationTitle(count > 0 ? "\(count) Comment\(count == 1 ? "" : "s")" : "Comments")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
-            .safeAreaInset(edge: .bottom) { composer }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-
-    @ViewBuilder private func row(_ c: VehicleEngagement.Comment) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(c.text ?? "")
-                .font(.footnote).foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("\(c.is_me == true ? "you" : (c.author ?? "someone"))\(c.at.map { " · " + String($0.prefix(10)) } ?? "")")
-                .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    @ViewBuilder private var composer: some View {
-        if SupabaseService.currentUserId != nil {
-            HStack(spacing: 8) {
-                TextField("Add a comment…", text: $commentDraft, axis: .vertical)
-                    .textFieldStyle(.plain).lineLimit(1...4).submitLabel(.send)
-                Button { Task { await onPost() } } label: {
-                    if posting { ProgressView().scaleEffect(0.7) }
-                    else { Image(systemName: "arrow.up.circle.fill").font(.title2) }
-                }
-                .accessibilityLabel("Post comment")
-                .disabled(posting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .padding(12)
-            .background(.bar)
-        } else {
-            Text("Sign in to weigh in.")
-                .font(.caption).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity).padding(12).background(.bar)
-        }
-    }
-}
-
 /// A horizontal strip of tappable "+ field" chips — the record's gaps as one-tap
 /// contribution prompts.
 private struct FlowChips: View {
