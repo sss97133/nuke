@@ -14,6 +14,7 @@ struct LaborRange: Decodable, Equatable {
 
 struct LaborPart: Decodable, Equatable {
     struct CatalogPart: Decodable, Equatable { var catalog_part_id: String?; var name: String? }
+    var judgment_id: String?
     var item_id: String?
     /// A gallery-eligible photo linked by the reassembly reading, when the reader returns one.
     var image_id: String?

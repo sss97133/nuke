@@ -4,14 +4,17 @@ import Supabase
 /// Only the reassembly reader's explicitly named image_id is a photo reference. The generic
 /// evidence_ids array also contains other kinds of IDs and must not be treated as photos.
 struct LaborPhotoReference: Equatable {
+    let judgmentId: UUID
     let imageId: UUID
     let part: String
 
     static func from(_ segment: LaborSegment, names: LaborNames?) -> [LaborPhotoReference] {
         let parts = (segment.reassembly?.matched ?? []) + (segment.reassembly?.unmatched ?? [])
         return parts.compactMap { part in
-            guard let raw = part.image_id, let id = UUID(uuidString: raw) else { return nil }
-            return LaborPhotoReference(imageId: id, part: LaborWords.partWords(part, names) ?? "Part name not returned")
+            guard let raw = part.image_id, let id = UUID(uuidString: raw),
+                  let judgment = part.judgment_id.flatMap(UUID.init(uuidString:)) else { return nil }
+            return LaborPhotoReference(judgmentId: judgment, imageId: id,
+                                       part: LaborWords.partWords(part, names) ?? "Part name not returned")
         }
     }
 
@@ -83,7 +86,7 @@ struct LaborPhotoEvidenceList: View {
                         Section("Photo links") {
                             ForEach(Array(links.enumerated()), id: \.offset) { _, link in
                                 NavigationLink {
-                                    LaborPhotoEvidenceDetail(vehicleId: vehicleId, imageId: link.imageId,
+                                    LaborPhotoEvidenceDetail(vehicleId: vehicleId, segment: segment, reference: link,
                                                              accountAtOpen: accountAtOpen)
                                 } label: {
                                     Label(link.part, systemImage: "photo")
@@ -119,10 +122,11 @@ struct LaborPhotoEvidenceList: View {
     }
 }
 
-/// Resolve the exact photo through the current gallery gate and vehicle, without a cached row.
+/// Recheck the specific judgment association and resolve the photo through the current gallery gate.
 struct LaborPhotoEvidenceDetail: View {
     let vehicleId: String
-    let imageId: UUID
+    let segment: String
+    let reference: LaborPhotoReference
     let accountAtOpen: String?
     @EnvironmentObject private var session: SessionStore
     @Environment(\.scenePhase) private var scenePhase
@@ -149,7 +153,7 @@ struct LaborPhotoEvidenceDetail: View {
                     ProgressView("Reading photo…")
                 case .unavailable:
                     ContentUnavailableView("Photo unavailable", systemImage: "photo.badge.exclamationmark",
-                                           description: Text("This photo is no longer available for this vehicle."))
+                                           description: Text("This link or photo is no longer available for this vehicle."))
                 case .failed:
                     ContentUnavailableView {
                         Label("Couldn't load the photo", systemImage: "wifi.exclamationmark")
@@ -175,7 +179,15 @@ struct LaborPhotoEvidenceDetail: View {
         state = .loading
         guard scenePhase == .active, accountMatches else { return }
         do {
-            let photo = try await VehicleImageLoader.currentSourceImage(id: imageId, vehicleId: vehicleId)
+            let appraisal: LaborAppraisal? = try await SupabaseService.client
+                .rpc("vehicle_labor_appraisal", params: ["p_vehicle_id": vehicleId]).execute().value
+            guard !Task.isCancelled, accountMatches else { return }
+            guard let appraisal,
+                  let links = LaborPhotoReference.from(appraisal, vehicleId: vehicleId, segment: segment),
+                  links.contains(where: { $0.judgmentId == reference.judgmentId && $0.imageId == reference.imageId }) else {
+                state = .unavailable; return
+            }
+            let photo = try await VehicleImageLoader.currentSourceImage(id: reference.imageId, vehicleId: vehicleId)
             guard !Task.isCancelled, accountMatches else { return }
             state = photo.map(LoadState.loaded) ?? .unavailable
         } catch {

@@ -23,6 +23,16 @@ enum FixtureBackend {
     static let providerId = "00000000-0000-4000-8000-0000000000d2"
     static let navigationVehicleId = "00000000-0000-4000-8000-00000000c001"
     static let laborPhotoId = "00000000-0000-4000-8000-00000000e101"
+    private static let laborJudgmentLock = NSLock()
+    private static var laborJudgmentSuperseded = false
+    static func supersedeLaborJudgment() {
+        laborJudgmentLock.lock(); defer { laborJudgmentLock.unlock() }
+        laborJudgmentSuperseded = true
+    }
+    private static var currentLaborJudgmentId: String {
+        laborJudgmentLock.lock(); defer { laborJudgmentLock.unlock() }
+        return laborJudgmentSuperseded ? "00000000-0000-4000-8000-00000000e103" : "00000000-0000-4000-8000-00000000e102"
+    }
     static let analysisMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_ANALYSIS_MODE"] ?? ""
     private static let analysisReadLock = NSLock()
     private static var analysisReadAttempts = 0
@@ -359,7 +369,7 @@ enum FixtureBackend {
             {"vehicle_id":"\(navigationVehicleId)","applicable":true,"as_of":"2026-11-25T12:00:00Z",
              "state":{"fresh":true,"computed":true},"totals":{"priced_segments":1},
              "segments":[{"segment":"reassembly","hours_min":2,"hours_typical":2,"hours_max":2,
-               "reassembly":{"matched":[{"image_id":"\(laborPhotoId)","part":{"name":"Fixture carpet"},"hours":2}],
+               "reassembly":{"matched":[{"judgment_id":"\(currentLaborJudgmentId)","image_id":"\(laborPhotoId)","part":{"name":"Fixture carpet"},"hours":2}],
                              "unmatched":[{"part":{"name":"No photo returned"}}]}}]}
             """)
         case "vehicle_labor_appraisal": return ok("null")

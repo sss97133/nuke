@@ -203,6 +203,12 @@ struct NukeCaptureApp: App {
                     .accessibilityIdentifier("fixture.switch-account")
                 }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if FixtureBackend.isActive && ProcessInfo.processInfo.environment["NUKE_FIXTURE_SUPERSEDE_LABOR"] == "1" {
+                    Button("Supersede fixture judgment") { FixtureBackend.supersedeLaborJudgment() }
+                        .accessibilityIdentifier("fixture.supersede-labor")
+                }
+            }
             #endif
         }
         .onChange(of: scenePhase) { _, phase in
