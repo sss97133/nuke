@@ -78,6 +78,10 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(profile.waitForExistence(timeout: 12)); profile.tap()
         let account = app.buttons["Account"].firstMatch
         XCTAssertTrue(account.waitForExistence(timeout: 5)); account.tap()
+        // On a slow simulator the first tap can land before the Profile tab settles and the sheet never opens.
+        let done = app.buttons["Done"].firstMatch
+        if !done.waitForExistence(timeout: 5) { account.tap() }
+        XCTAssertTrue(done.waitForExistence(timeout: 10), "the Account sheet must open")
         let grant = app.staticTexts["account.photos.status"]
         for _ in 0..<8 {
             if grant.exists && grant.isHittable { break }
@@ -344,8 +348,16 @@ final class NavigationUITests: XCTestCase {
         XCTAssertEqual(seen, headings, "one list in date order, the undated car last")
         let bottom = XCTAttachment(screenshot: app.screenshot()); bottom.name = "garage-cards-bottom"; bottom.lifetime = .keepAlways; add(bottom)
         for _ in 0..<14 where !(first.exists && first.isHittable) { app.swipeDown() }
-        first.press(forDuration: 1.2)
+        // Back at the top the card can sit mostly under the tab bar; bring its photo between the bars, as above,
+        // then hold the photo so the press lands on the card itself.
+        for _ in 0..<8 where !(photo.exists && photo.frame.minY > screen.minY + 120 && photo.frame.maxY < screen.maxY - 100) {
+            let down = photo.exists && photo.frame.minY <= screen.minY + 120
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.35 : 0.6))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.55 : 0.4)))
+        }
         let log = app.buttons["Log book"].firstMatch
+        photo.press(forDuration: 1.2)
+        if !log.waitForExistence(timeout: 5) { photo.press(forDuration: 1.5) }
         XCTAssertTrue(log.waitForExistence(timeout: 5)); log.tap()
         XCTAssertTrue(app.staticTexts["Fixture note: rear end rebuilt over the winter."].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["2026-11-18 · owner · recollection"].waitForExistence(timeout: 5))
