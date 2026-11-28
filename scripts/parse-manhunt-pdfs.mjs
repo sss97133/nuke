@@ -12,15 +12,18 @@
  *   --dry-run         Show what would be processed
  *   --force           Re-parse already-parsed documents
  *   --verbose         Show detailed output
+ *   --inspect-source  Read one --doc-id and output a page inventory as JSON;
+ *                     no chunks or other database records are written
+ *
+ *   Inspection may use SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY with
+ *   the caller's existing read permissions. It does not make the legacy
+ *   writer's --force or interrupted-batch behavior restart-safe.
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { inspectPdfBuffer, resolveReferenceSource } from "./manhunt-source-inspection.mjs";
 
 // ─── CLI ───────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -37,9 +40,70 @@ const specificDocId = getArg("doc-id");
 const dryRun = hasFlag("dry-run");
 const force = hasFlag("force");
 const verbose = hasFlag("verbose");
+const inspectSource = hasFlag("inspect-source");
+// Source inspection only reads, so it can use a publishable key and the
+// caller's existing RLS visibility. The legacy writer retains its old key.
+const key = inspectSource
+  ? (process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(process.env.VITE_SUPABASE_URL, key);
 
 function log(...a) { console.log("[parse]", ...a); }
 function vlog(...a) { if (verbose) console.log("  [v]", ...a); }
+
+// This path is deliberately separate from the legacy writer. It can examine an
+// already-partially-parsed document without treating one chunk as completion,
+// and does not make the legacy --force/partial-insert behavior safe to run.
+async function inspectOneSource() {
+  if (!specificDocId || specificDocId.startsWith("--") || force || dryRun || limit || verbose) {
+    throw new Error("--inspect-source requires only --doc-id <uuid>");
+  }
+  const { data: doc, error } = await supabase.from("library_documents")
+    .select("id, title, file_url, file_size_bytes, document_type")
+    .eq("id", specificDocId).maybeSingle();
+  if (error) throw new Error(`Document lookup failed: ${error.message}`);
+  if (!doc) throw new Error("Document not found");
+
+  const source = resolveReferenceSource(doc.file_url, process.env.VITE_SUPABASE_URL);
+  let bytes;
+  if (source.kind === "storage") {
+    const { data, error: downloadError } = await supabase.storage.from("reference-docs").download(source.path);
+    if (downloadError) throw new Error(`Storage download failed: ${downloadError.message}`);
+    bytes = Buffer.from(await data.arrayBuffer());
+  } else {
+    const response = await fetch(source.url);
+    if (!response.ok) throw new Error(`Source download failed: HTTP ${response.status}`);
+    bytes = Buffer.from(await response.arrayBuffer());
+  }
+  const sourceReceipt = {
+    document_id: doc.id,
+    title: doc.title,
+    document_type: doc.document_type,
+    recorded_file_size_bytes: doc.file_size_bytes,
+    source_kind: source.kind,
+    source_key: source.kind === "storage" ? source.path : null,
+    source_bytes: bytes.length,
+    source_sha256: createHash("sha256").update(bytes).digest("hex"),
+    recorded_size_matches: doc.file_size_bytes == null ? null : doc.file_size_bytes === bytes.length,
+  };
+  try {
+    const inventory = await inspectPdfBuffer(bytes);
+    console.log(JSON.stringify({
+      ...sourceReceipt,
+      status: "pdf_inspected",
+      interpretation: "Source inventory only; low-text pages are not necessarily blank and graphic operators do not identify diagrams.",
+      ...inventory,
+    }, null, 2));
+  } catch (error) {
+    // Preserve the identity of the actual retrieved bytes even when the PDF
+    // parser refuses them; a .pdf name or MIME type is not proof of a PDF.
+    const head = bytes.subarray(0, 1024).toString("latin1").trimStart();
+    const signature = /^(?:<!doctype\s+html|<html[\s>])/i.test(head)
+      ? "html" : head.includes("%PDF-") ? "pdf_header" : "unrecognized";
+    console.log(JSON.stringify({ ...sourceReceipt, status: "pdf_inspection_failed", signature, error: error.message }, null, 2));
+    process.exitCode = 1;
+  }
+}
 
 // ─── Find unparsed manhunt documents ───────────────────────────────
 async function getDocsToParse() {
@@ -269,6 +333,7 @@ async function parsePdf(doc) {
 
 // ─── Main ──────────────────────────────────────────────────────────
 async function main() {
+  if (inspectSource) return inspectOneSource();
   log("Manhunt PDF Parser — free local text extraction");
   log(`Dry run: ${dryRun} | Force: ${force} | Limit: ${limit || "all"}`);
 

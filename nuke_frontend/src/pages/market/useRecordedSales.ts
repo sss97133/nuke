@@ -65,14 +65,17 @@ export function matchSalesMake(options: SalesScopeOption[], make: string | null)
 export async function fetchSalesScopes(): Promise<SalesScopeOption[]> {
   // Existing public registries, not a second model/range policy or an operator catalog.
   const [makes, subjects] = await Promise.all([
-    supabase.from('canonical_makes').select('id,canonical_name').order('canonical_name').limit(201),
+    supabase.from('canonical_makes').select('id,canonical_name', { count: 'exact' }).order('canonical_name').limit(1001),
     supabase.from('make_model_profiles')
-      .select('subject_id,canonical_make,canonical_model,grain,year,year_start,year_end')
+      .select('subject_id,canonical_make,canonical_model,grain,year,year_start,year_end', { count: 'exact' })
       .eq('comparison_scope_status', 'supported').order('subject_id').limit(101),
   ]);
   if (makes.error) throw makes.error;
   if (subjects.error) throw subjects.error;
-  if ((makes.data?.length ?? 0) > 200 || (subjects.data?.length ?? 0) > 100) throw new Error('Scope catalog exceeds its display limit');
+  if ((makes.data?.length ?? 0) > 1000 || (subjects.data?.length ?? 0) > 100) throw new Error('Scope catalog exceeds its display limit');
+  // PostgREST max_rows can hide the sentinel itself; the total must match the returned collection.
+  if (makes.count == null || subjects.count == null || makes.count !== makes.data?.length
+    || subjects.count !== subjects.data?.length) throw new Error('Scope catalog response is incomplete');
   const options: SalesScopeOption[] = (makes.data ?? []).map(m => ({ key: `make:${m.id}`,
     label: m.canonical_name, make: m.canonical_name, scope: { kind: 'canonical_make', canonical_make_id: m.id } }));
   for (const s of subjects.data ?? []) {

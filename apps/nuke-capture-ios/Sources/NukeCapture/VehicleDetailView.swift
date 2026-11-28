@@ -711,6 +711,7 @@ struct VehicleDetailView: View {
                         liveAuctionBanner
                         priceHeadline
                         heroActionRow
+                        workAndLaborShortcut
                         profileHeaderBlock
                         // The organizations behind the vehicle (seller, owner, consigner, shop), each a door to its measures.
                         VehicleActorLinks(vehicleId: vehicleId).id("actors")
@@ -1730,6 +1731,20 @@ struct VehicleDetailView: View {
         }
     }
 
+    /// A direct route to this vehicle's work, before the auto-paging photo grid.
+    private var workAndLaborShortcut: some View {
+        NavigationLink {
+            VehicleWorkLaborDetail(vehicleId: vehicleId, vehicleTitle: vehicle?.title,
+                                   accountAtOpen: SupabaseService.currentUserId)
+        } label: {
+            Label("Work & labor", systemImage: "wrench.and.screwdriver")
+        }
+        .buttonStyle(NukeQuietButtonStyle())
+        .accessibilityIdentifier("vehicle.work-labor")
+        .padding(.horizontal, NukeSpace.lg)
+        .padding(.bottom, NukeSpace.md)
+    }
+
     // ─── ENGAGE — the visitor's job, the engagement ladder made real. Every
     // action is a typed interaction through ONE grammar (record_interaction):
     // FOLLOW is signal (→ user_interactions); COMMENT is testimony (→ user_comments).
@@ -2273,6 +2288,51 @@ struct VehicleDetailView: View {
         } catch {
             NSLog("NukeCapture vehicle relationship load failed: %@", String(describing: error))
         }
+    }
+}
+
+/// Reuses the profile's current readers without navigating past the auto-paging gallery.
+private struct VehicleWorkLaborDetail: View {
+    let vehicleId: String
+    let vehicleTitle: String?
+    let accountAtOpen: String?
+    @EnvironmentObject private var session: SessionStore
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var readGeneration = 0
+    @State private var hasAppeared = false
+
+    private var accountKey: String {
+        "\(SupabaseService.currentUserId ?? "signed-out")|\(session.isSignedIn)|\(readGeneration)"
+    }
+
+    var body: some View {
+        Group {
+            if scenePhase != .active {
+                ProgressView("Refreshing work…")
+            } else if SupabaseService.currentUserId != accountAtOpen || (accountAtOpen != nil && !session.isSignedIn) {
+                Text("Your account changed. Return to the vehicle and reopen Work & labor.")
+                    .padding()
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let title = vehicleTitle, !title.isEmpty {
+                            Text(title).font(.caption).foregroundStyle(.secondary)
+                                .padding(.horizontal, 16)
+                        }
+                        VehicleWorkSection(vehicleId: vehicleId, requireAuthoritativeAccess: true)
+                        VehicleLaborAppraisalSection(vehicleId: vehicleId, showEmptyState: true)
+                    }
+                    .padding(.vertical, 12)
+                }
+                .id(accountKey)
+            }
+        }
+        .onAppear {
+            if hasAppeared { readGeneration += 1 } else { hasAppeared = true }
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Work & labor")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

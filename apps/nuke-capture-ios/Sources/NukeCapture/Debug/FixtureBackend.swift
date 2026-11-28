@@ -71,7 +71,16 @@ enum FixtureBackend {
         default: return ok(GarageCardFixtures.corrections)
         }
     }
+    private static let fixtureAccountLock = NSLock()
+    private static var fixtureAccountSwitched = false
+    static func switchFixtureAccount() {
+        fixtureAccountLock.lock(); defer { fixtureAccountLock.unlock() }
+        fixtureAccountSwitched = true
+    }
+
     static var userId: String? {
+        fixtureAccountLock.lock(); let switched = fixtureAccountSwitched; fixtureAccountLock.unlock()
+        if switched { return "00000000-0000-4000-8000-0000000000d3" }
         switch persona {
         case .visitor: return nil
         case .client: return clientId
@@ -339,6 +348,8 @@ enum FixtureBackend {
         case "facility_read": return scenario == "org" ? ok(FacilityFixtures.read(party: false)) : pending
         case "get_org_page":
             return ok(#"{"org":{"id":"\#(ParityFixtures.orgId)","name":"Fixture Garage","type":"garage","city":"Fixture City","state":"NV"},"as_of":"2026-10-19T20:00:00Z","half_life_hours":6,"dormant_below":0.05,"basis":[],"you":null,"vehicles":[],"vehicles_considered":0,"vehicles_total":0}"#)
+        case "vehicle_work_orders_read" where scenario == "navigation-garage" && ProcessInfo.processInfo.environment["NUKE_FIXTURE_WORK_SHORTCUT"] == "1":
+            return ok(#"{"vehicle_id":"\#(navigationVehicleId)","vehicle_label":{"text":"1973 Fixture Coupe"},"rows":[],"as_of":"2026-11-25T12:00:00Z"}"#)
         case "vehicle_work_orders_read":
             let access = scenario == "post-job" ? #""vehicle_access":{"role":"owner","can_post_work_request":true},"# : ""
             return ok(JobFixtures.vehicleWorkOrders.replacingOccurrences(of: #""viewer":{"#, with: #""viewer":{\#(access)"#))
