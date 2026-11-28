@@ -196,9 +196,13 @@ struct NukeCaptureApp: App {
                 if FixtureBackend.isActive && ProcessInfo.processInfo.environment["NUKE_FIXTURE_SWITCH_ACCOUNT"] == "1" {
                     Button("Switch fixture account") {
                         FixtureBackend.switchFixtureAccount()
+                        session.refreshViewerId()
                         session.isSignedIn = true
                     }
                     .accessibilityIdentifier("fixture.switch-account")
+                    .accessibilityValue(session.viewerId ?? "visitor")
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 48).padding(.trailing, 8)
                 }
             }
             .overlay(alignment: .bottomTrailing) {
@@ -508,6 +512,10 @@ struct NukeCaptureApp: App {
 @MainActor
 final class SessionStore: ObservableObject {
     @Published var isSignedIn: Bool = SupabaseService.currentUserId != nil
+    /// Publish identity changes even when both the old and new sessions are signed in.
+    @Published private(set) var viewerId: String? = SupabaseService.currentUserId
+
+    func refreshViewerId() { viewerId = SupabaseService.currentUserId }
 
     private var watcher: Task<Void, Never>?
 
@@ -525,10 +533,12 @@ final class SessionStore: ObservableObject {
             // Restore the Keychain session (currentUser is only populated
             // after the SDK loads/refreshes it once).
             _ = try? await SupabaseService.client.auth.session
+            self?.refreshViewerId()
             self?.isSignedIn = SupabaseService.currentUserId != nil
 
             // Then follow every subsequent auth event.
             for await _ in SupabaseService.client.auth.authStateChanges {
+                self?.refreshViewerId()
                 self?.isSignedIn = SupabaseService.currentUserId != nil
             }
         }
