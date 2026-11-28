@@ -135,6 +135,30 @@ enum FixtureBackend {
     static func respond(_ request: URLRequest) -> (Int, Data) {
         guard let url = request.url, url.host == baseURL.host else { return (404, Data()) }
         let path = url.path
+        if scenario == "social-browse", path == "/rest/v1/auction_comments" {
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            guard items.contains(where: { $0.name == "vehicle_id" && $0.value == "eq.\(navigationVehicleId)" }),
+                  items.contains(where: { $0.name == "source_url" && ($0.value?.contains("bringatrailer.com/listing/fixture") ?? false) }),
+                  items.contains(where: { $0.name == "vehicles.is_public" && $0.value == "eq.true" }),
+                  items.contains(where: { $0.name == "vehicles.deleted_at" && $0.value?.lowercased() == "is.null" }),
+                  items.contains(where: { $0.name == "vehicles.or" && ($0.value?.contains("listing_kind.neq.non_vehicle_item") ?? false) }) else {
+                return (400, Data(#"{"message":"fixture source scope or public gate missing"}"#.utf8))
+            }
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_SOURCE"] == "failure" {
+                return (400, Data(#"{"message":"fixture source read failed"}"#.utf8))
+            }
+            // The mismatched row must never be shown, even if a reader misbehaves.
+            return ok("""
+            [{"id":"00000000-0000-4000-8000-00000000b101","vehicle_id":"\(navigationVehicleId)",
+              "source_url":"https://bringatrailer.com/listing/fixture/","posted_at":"2026-11-27T10:00:00Z",
+              "author_username":"fixture_seller","comment_text":"The original wheels are included.","comment_type":"seller_response","bid_amount":null,
+              "vehicles":{"id":"\(navigationVehicleId)","status":"active","deleted_at":null}},
+             {"id":"00000000-0000-4000-8000-00000000b102","vehicle_id":"\(navigationVehicleId)",
+              "source_url":"https://bringatrailer.com/listing/another-car/","posted_at":"2026-11-27T09:00:00Z",
+              "author_username":"wrong_listing","comment_text":"Must never be shown.","comment_type":"question","bid_amount":null,
+              "vehicles":{"id":"\(navigationVehicleId)","status":"active","deleted_at":null}}]
+            """)
+        }
         if scenario == "navigation-garage", !dayMode.isEmpty,
            path == "/rest/v1/vehicle_images" || path == "/rest/v1/vehicle_images_public" {
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
@@ -211,6 +235,21 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "get_vehicle_engagement" where scenario == "social-browse":
+            guard (args["p_vehicle_id"] as? String)?.lowercased() == navigationVehicleId else {
+                return (400, Data(#"{"message":"wrong fixture vehicle"}"#.utf8))
+            }
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_NATIVE"] == "failure" {
+                return (400, Data(#"{"message":"fixture native read failed"}"#.utf8))
+            }
+            let comments = ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_NATIVE"] == "empty" ? "[]" : """
+            [{"id":"00000000-0000-4000-8000-00000000b201","text":"A real Nuke fixture comment.",
+              "at":"2026-11-27T11:00:00Z","author":"fixture_member","is_me":false}]
+            """
+            let count = comments == "[]" ? 0 : 1
+            return ok("""
+            {"following_count":0,"is_following":false,"comment_count":\(count),"contribution_count":0,"recent_comments":\(comments)}
+            """)
         case "get_image_deep_analysis" where scenario == "navigation-garage" && !analysisMode.isEmpty:
             guard args["p_image_id"] as? String == "00000000-0000-4000-8000-00000000e001" else {
                 return (400, Data(#"{"message":"wrong fixture image requested"}"#.utf8))
@@ -409,6 +448,18 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case "market_pulse_live" where scenario == "social-browse":
+            return ok("""
+            {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
+              "2026-11-27T10:00:00Z",null,"https://fixture.nuke.invalid/car.jpg",false,
+              "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
+            """)
+        case "record_interaction" where scenario == "social-browse" && args["p_kind"] as? String == "comment":
+            switch ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_POST"] {
+            case "refused": return ok(#"{"ok":false,"error":"not_authorized"}"#)
+            case "uncertain": return ok(#"{"ok":true,"kind":"comment"}"#)
+            default: return ok(#"{"ok":true,"kind":"comment","comment_id":"00000000-0000-4000-8000-00000000b202"}"#)
+            }
         case "confirm_work_session" where scenario == "financial-qualification":
             let id = (args["p_session_id"] as? String ?? "").lowercased()
             if id.hasSuffix("f004") { return ok(#"{"ok":false,"error":"not_authorized"}"#) }
