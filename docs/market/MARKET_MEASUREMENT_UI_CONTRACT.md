@@ -661,3 +661,12 @@ line). (5) `/search` reduced to the fallback.
 **Acceptance.** Type "mustang" on the home page: the URL gains the Ford Mustang scope, the treemap shows the Mustang
 family's models, the live board lists the 48 live Ford Mustangs, the price section reads the Mustang family's like-for-like
 change, the Sources board shows the houses behind the 9,173 sales, and Back returns to all makes. Nothing leaves the page.
+
+
+## Descriptive year/model outcome scopes
+
+`get_market_trends(jsonb)` accepts `descriptive_subject` only for `captured_sell_through`. The existing `cohort_scope_rule(uuid[],text)` overload qualifies at most 1,000 explicit registry candidate IDs for the `captured_sell_through_descriptive` purpose. It uses the existing canonical model FK, make/name aliases and the subject's declared year or model bounds. An unknown model end remains unknown. Each distinct requested nonnull ID has an admitted/unavailable result and a specific database reason. Canonical display and the original registered label are separate. Equivalent model/year/range subjects share a deterministic catalog representative and count within the requested candidates; these are registry-subject aliases, not vehicle counts. Generation and inconsistent year/range shapes refuse. No registry status is promoted, and the original scope rule, member resolver and valuation policy stay intact.
+
+A source row joins this descriptive group only through a unique exact canonical name/alias resolution at its known model year. Unknown year can join a model-only group when the name is unambiguous across the registry; it cannot join an exact-year group. Unknown or competing model labels remain unresolved instead of being inferred from trim words. The returned scope states the purpose, model key and membership method. This is a distribution of recorded labels, not a condition-matched valuation or a factory-generation claim.
+
+The existing public episode gates, source alias reconciliation, seven-day/2,000-candidate bound, sold/known-outcome formula and consistency-pinned source contributors still apply. A bounded catalog consumer must pass candidate IDs through the same SQL purpose rule before offering them. A cohort change resets its contributor snapshot. API/native implementation is separate from catalog/UI release and real user-flow acceptance.
