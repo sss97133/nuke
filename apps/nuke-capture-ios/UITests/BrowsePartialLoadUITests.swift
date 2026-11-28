@@ -17,6 +17,7 @@ final class BrowsePartialLoadUITests: XCTestCase {
     func testClassifiedFailureKeepsAuctionAndRetryRestoresBoth() {
         let app = open("browse-partial-ask")
         XCTAssertTrue(app.staticTexts["Classified listings couldn't load."].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["browse-source-failure-detail"].label, "No network connection.")
         XCTAssertTrue(app.staticTexts["Fixture auction"].exists)
         let endLine = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "End of these results")).firstMatch
         XCTAssertFalse(endLine.exists)
@@ -40,7 +41,7 @@ final class BrowsePartialLoadUITests: XCTestCase {
     func testEmptySuccessfulSourceDoesNotPretendTheFailedSourceIsEmpty() {
         let app = open("browse-partial-empty")
         XCTAssertTrue(app.staticTexts["Some cars couldn't load"].waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["Auction listings couldn't load."].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Auction listings couldn't load.")).firstMatch.exists)
         XCTAssertFalse(app.staticTexts["No cars to show yet"].exists)
         app.buttons["Try again"].tap()
         XCTAssertTrue(app.staticTexts["Fixture auction"].waitForExistence(timeout: 15), app.debugDescription)
@@ -63,7 +64,7 @@ final class BrowsePartialLoadUITests: XCTestCase {
         XCTAssertTrue(toggle.waitForExistence(timeout: 10), app.debugDescription); toggle.tap()
         app.buttons["Apply"].tap()
         XCTAssertTrue(app.staticTexts["Some cars couldn't load"].waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["Auction listings couldn't load."].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Auction listings couldn't load.")).firstMatch.exists)
         XCTAssertFalse(app.staticTexts["Nothing matches your tuning"].exists)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
