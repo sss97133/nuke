@@ -158,8 +158,9 @@ struct ExploreFeedView: View {
     /// The open lots behind live cards, by card id: the bid door hands the lot to the bid reading.
     @State private var lots: [String: LiveAuction] = [:]
     @State private var drill: ExploreCardDrill?
-    /// A tap on a photo or the comments button; pushes the same profile the card has always opened.
+    /// A tap on a photo or title opens the vehicle profile.
     @State private var openVehicle: VehicleHeaderRow?
+    @State private var discussion: ExploreFeedItem?
     /// Browse's explicit filters (kept on the phone) and the sheet that sets them.
     @State private var tuning = ExploreTuning.load()
     @State private var showTune = false
@@ -188,6 +189,12 @@ struct ExploreFeedView: View {
         }
         .sheet(item: $why) { w in
             ExploreWhySheet(why: w, onCohort: showCohort)
+        }
+        .sheet(item: $discussion) { item in
+            if let vehicleId = item.vehicleId {
+                VehicleDiscussionSheet(vehicleId: vehicleId.uuidString.lowercased(),
+                                       listingURL: item.link, listingSource: item.source)
+            }
         }
     }
 
@@ -254,7 +261,8 @@ struct ExploreFeedView: View {
                             ExplorePagerCard(item: item, position: idx, hasBidReading: lots[item.id] != nil,
                                              finish: item.lotId.flatMap { finish?.byId[$0] },
                                              finishFresh: finish?.fresh == true,
-                                             onDrill: openDrill, onOpenProfile: openProfile, onChoice: choose,
+                                             onDrill: openDrill, onOpenProfile: openProfile,
+                                             onOpenDiscussion: { discussion = $0 }, onChoice: choose,
                                              onWhy: openWhy)
                                 .onAppear { prefetch(after: idx) }
                         }
