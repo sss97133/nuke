@@ -4,12 +4,13 @@ import XCTest
 final class BrowseDiscussionUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
-    private func open(persona: String = "visitor", native: String = "", source: String = "", post: String = "") -> XCUIApplication {
+    private func open(persona: String = "visitor", native: String = "", source: String = "", post: String = "",
+                      switchAccount: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", persona]
         app.launchEnvironment = ["NUKE_DEBUG_SCREEN": "explore", "NUKE_FIXTURE_SCENARIO": "social-browse",
                                  "NUKE_FIXTURE_DISCUSSION_NATIVE": native, "NUKE_FIXTURE_DISCUSSION_SOURCE": source,
-                                 "NUKE_FIXTURE_DISCUSSION_POST": post]
+                                 "NUKE_FIXTURE_DISCUSSION_POST": post, "NUKE_FIXTURE_SWITCH_ACCOUNT": switchAccount ? "1" : "0"]
         app.launch()
         let comments = app.buttons["Comments"].firstMatch
         XCTAssertTrue(comments.waitForExistence(timeout: 20))
@@ -87,6 +88,24 @@ final class BrowseDiscussionUITests: XCTestCase {
         XCTAssertTrue(comments.waitForExistence(timeout: 5)); comments.tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         XCTAssertEqual(field.value as? String, "An unfinished fixture thought")
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testReopeningAfterAccountSwitchDoesNotShowTheOtherAccountsDraft() {
+        let app = open(persona: "client", native: "empty", switchAccount: true)
+        let field = app.textFields["discussion-composer"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("First account draft")
+        app.buttons["Done"].tap()
+        app.buttons["fixture.switch-account"].tap()
+        let comments = app.buttons["Comments"].firstMatch
+        XCTAssertTrue(comments.waitForExistence(timeout: 5)); comments.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertNotEqual(field.value as? String, "First account draft")
+        field.tap(); field.typeText("Second account draft")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(comments.waitForExistence(timeout: 5)); comments.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, "Second account draft")
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 }
