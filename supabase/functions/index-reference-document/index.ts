@@ -10,6 +10,7 @@ import { isServiceCaller, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from '../_shared/geminiGuard.ts';
 import { recordSuppliedDocument, recordSuppliedReference, ReferenceError, sha256 } from './suppliedReference.ts';
+import { recordCatalogTextSource } from './catalogTextSource.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +32,23 @@ Deno.serve(async (req) => {
     )
 
     const body = await req.json();
+    if (body.mode === 'retained_catalog_text') {
+      try {
+        const result = await recordCatalogTextSource(body, {
+          authorize: () => isServiceCaller(req),
+          projectUrl: Deno.env.get('SUPABASE_URL') ?? '',
+          async record(source) {
+            const { data, error } = await supabase.rpc('record_catalog_text_source', { p_source: source });
+            if (error) throw new ReferenceError('catalog_text_source_not_recorded', 409);
+            return data;
+          },
+        });
+        return Response.json(result, { headers: corsHeaders });
+      } catch (error) {
+        return Response.json({ success: false, error: error instanceof ReferenceError ? error.code : 'catalog_text_persistence_failed', model_calls: 0 },
+          { status: error instanceof ReferenceError ? error.status : 500, headers: corsHeaders });
+      }
+    }
     if (body.mode === 'supplied_reference' || body.mode === 'supplied_document') {
       try {
         const record = body.mode === 'supplied_document' ? recordSuppliedDocument : recordSuppliedReference;
