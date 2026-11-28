@@ -5,6 +5,14 @@ import XCTest
 @testable import NukeCapture
 
 final class ExploreFeedTests: XCTestCase {
+    func testPagingFixtureCanDecodeItsPages() throws {
+        for (offset, expected) in [(0, 40), (40, 40), (80, 1)] {
+            let (status, data) = FixtureBackend.browsePagingRead("classified_ask_board", ["p_offset": offset])
+            XCTAssertEqual(status, 200)
+            let board = try JSONDecoder().decode(AskBoard.self, from: data)
+            XCTAssertEqual(board.rows.count, expected)
+        }
+    }
     private func item(_ id: String, _ kind: ExploreFeedItem.Kind, image: String? = "https://x/y.jpg") -> ExploreFeedItem {
         ExploreFeedItem(id: id, kind: kind, title: id, image: image, amount: 1000, amountLabel: "Asking",
                         endsAt: nil, source: "S", location: nil, facts: nil, seen: nil, vehicleId: nil,
