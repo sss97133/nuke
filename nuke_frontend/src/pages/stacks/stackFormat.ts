@@ -70,7 +70,7 @@ export function layerReadings(read: OrderBookRead, view: OrderBookView, baseline
   return {
     log: `${count(view.bids.length)} bids`,
     key: `${count(last?.identities ?? 0)} identities`,
-    dimension: `${count(view.kinds.length)} kinds`,
+    dimension: 'SQL measurements',
     fold: `${count(view.states.length)} states`,
     ...(baseline ? { baseline } : {}),
     ...(lot ? { outcome: view.window.open ? 'pending' : lot.winning_bid != null ? usd(Number(lot.winning_bid)) : outcomeWord(lot, false) } : {}),

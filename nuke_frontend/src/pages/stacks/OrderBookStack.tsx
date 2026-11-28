@@ -6,11 +6,12 @@ import { useLiveLotTemperature } from '../market/useLiveLotTemperature';
 import { ORDER_BOOK_STACK, type LayerId, type StackLayer } from './stackDefinitions';
 import {
   LOT_WINDOW_DAYS, UUID_RE, depthAt, shapeOrderBook, useOrderBook,
-  type BidEvent, type CommentRow, type FoldState, type OrderBookRead, type OrderBookView,
+  type BidEvent, type FoldState, type OrderBookRead, type OrderBookView,
 } from './orderBookReader';
 import { CoverageTable, LayerPath } from './stackParts';
 import { ForecastPanel } from './ForecastPanel';
 import VehicleCohort from './VehicleCohort';
+import CommentMeasurements from './CommentMeasurements';
 import { stackBackParams } from './bidExpression';
 import { STATE_WORD, clock, count, layerReadings, outcomeWord, span, usd } from './stackFormat';
 import './stacks.css';
@@ -261,51 +262,6 @@ function KeyLayer({ read, view }: { read: OrderBookRead; view: OrderBookView }) 
 }
 
 // --- Dimension -----------------------------------------------------------------------------------------------------
-
-function DimensionLayer({ read, view }: { read: OrderBookRead; view: OrderBookView }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const total = view.partition.inWindow.length;
-  const rowsOf = (kind: string): CommentRow[] => view.partition.inWindow
-    .filter((c) => (c.comment_type || 'unknown') === kind)
-    .sort((a, b) => Date.parse(a.posted_at ?? '') - Date.parse(b.posted_at ?? ''));
-  return (
-    <>
-      <p className="stack-note">
-        {count(total)} rows keyed to this lot inside its window, by the kind the comment builder wrote. That rule is mechanical
-        (an amount makes a bid, the seller's name a seller response, a question mark a question); it does not read stance.
-      </p>
-      <table className="stack-table">
-        <thead><tr><th scope="col">Kind as written</th><th scope="col" className="num">Rows</th><th scope="col" className="num">Of rows in window</th></tr></thead>
-        <tbody>
-          {view.kinds.map((k) => (
-            <tr key={k.kind} aria-selected={open === k.kind}>
-              <td><button type="button" className="stack-link" aria-expanded={open === k.kind} onClick={() => setOpen(open === k.kind ? null : k.kind)}>{k.kind.replace(/_/g, ' ')}</button></td>
-              <td className="num">{count(k.count)}</td>
-              <td className="num">{count(k.count)} / {count(total)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {open && (
-        <div className="stack-scroll" style={{ marginTop: 8 }}>
-          <table className="stack-table">
-            <thead><tr><th scope="col">Posted</th><th scope="col">Author</th><th scope="col">Text</th><th scope="col">Source</th></tr></thead>
-            <tbody>
-              {rowsOf(open).map((c) => (
-                <tr key={c.id}>
-                  <td className="mono">{c.posted_at ? clock(Date.parse(c.posted_at), true) : 'unknown'}</td>
-                  <td>{c.external_identity_id ? <Link to={`/profile/external/${c.external_identity_id}`} className="stack-mono">{read.identities[c.external_identity_id]?.handle ?? c.author_username}</Link> : <span className="stack-mono">{c.author_username ?? 'unknown'}</span>}</td>
-                  <td>{c.comment_type === 'bid' && c.bid_amount != null ? usd(Number(c.bid_amount)) : (c.comment_text ?? '').slice(0, 280) || <span className="stack-basis">no text</span>}</td>
-                  <td><a href={sourceAnchor(c.source_url ?? read.lot!.source_url, c.bat_comment_id)} target="_blank" rel="noopener noreferrer">BaT ↗</a></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </>
-  );
-}
 
 // --- Fold ----------------------------------------------------------------------------------------------------------
 
@@ -636,7 +592,7 @@ export default function OrderBookStack() {
         <LayerHead layer={current} index={layerIndex}>
           {layer === 'log' && <LogLayer read={read} view={view} onPickBid={pickBidFromLog} />}
           {layer === 'key' && <KeyLayer read={read} view={view} />}
-          {layer === 'dimension' && (<><DimensionLayer read={read} view={view} /><MissingNote layer={current} name="Stance" tail="No comment is labelled with a stance." /></>)}
+          {layer === 'dimension' && (<><CommentMeasurements key={lot.id} vehicleId={read.vehicle.id} lotId={lot.id} closeAt={lot.auction_end_date} /><MissingNote layer={current} name="Stance" tail="No comment is labelled with a stance." /></>)}
           {layer === 'fold' && <FoldLayer view={view} selected={selected} onSelect={selectBid} sourceUrl={lot.source_url} />}
           {layer === 'baseline' && <BaselineLayer applies={baselineApplies} temperature={temperature} layer={current} />}
           {(layer === 'residual' || layer === 'feature' || layer === 'prediction') && <MissingNote layer={current} />}
