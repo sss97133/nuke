@@ -133,19 +133,18 @@ struct VehicleDiscussionSheet: View {
     @State private var showListing = true
 
     private var viewer: String {
-        // SessionStore publishes auth events, including an account change.
-        _ = session.isSignedIn
-        return SupabaseService.currentUserId ?? "visitor"
+        session.viewerId ?? "visitor"
     }
+    private var viewerIsCurrent: Bool { session.viewerId == SupabaseService.currentUserId }
     private var scope: ListingDiscussionScope? { ListingDiscussionScope(vehicleId: vehicleId, listingURL: listingURL) }
     private func current(_ reader: String) -> Bool {
-        !Task.isCancelled && scenePhase == .active && viewer == reader && loadedForViewer == reader
+        !Task.isCancelled && scenePhase == .active && viewerIsCurrent && viewer == reader && loadedForViewer == reader
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if scenePhase == .active && loadedForViewer == viewer {
+                if scenePhase == .active && viewerIsCurrent && loadedForViewer == viewer {
                     VStack(spacing: 0) {
                         if scope != nil {
                             Picker("Discussion source", selection: $showListing) {

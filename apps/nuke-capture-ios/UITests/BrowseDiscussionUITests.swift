@@ -96,7 +96,10 @@ final class BrowseDiscussionUITests: XCTestCase {
         let field = app.textFields["discussion-composer"]
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("First account draft")
         app.buttons["Done"].tap()
-        app.buttons["fixture.switch-account"].tap()
+        let switchAccount = app.buttons["fixture.switch-account"]
+        switchAccount.tap()
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "00000000-0000-4000-8000-0000000000d3"), object: switchAccount)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 10), .completed)
         let comments = app.buttons["Comments"].firstMatch
         XCTAssertTrue(comments.waitForExistence(timeout: 5)); comments.tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10))
