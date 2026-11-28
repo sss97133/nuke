@@ -42,7 +42,8 @@ CREATE TEMP TABLE test_source AS SELECT jsonb_build_object(
  'object_id','00000000-0000-4000-8000-000000000001','object_version','version-1',
  'object_name','test catalog/a.pdf','project_origin','https://sample.supabase.co',
  'pdf_sha256',repeat('a',64),'text_sha256',encode(extensions.digest(convert_to('first'||chr(12)||chr(12)||'third'||chr(12),'UTF8'),'sha256'),'hex'),
- 'chunk_count',2,'page_count',3,'reader_actor','agent:test','reader_method','synthetic','reader_run_id','test') AS source;
+ 'chunk_count',2,'page_count',3,'reader_actor','agent:test','reader_method','synthetic','reader_run_id','test',
+ 'reader_verified_at',to_char(clock_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')) AS source;
 
 SELECT pg_temp.refuses((SELECT source FROM test_source),'missing service role');
 SELECT set_config('request.jwt.claim.role','service_role',false);
@@ -87,6 +88,10 @@ UPDATE public.reference_documents SET extraction_quality='unreviewed_source_text
 UPDATE public.reference_documents SET source_capture=jsonb_set(source_capture,'{reader_actor}','"different"'::jsonb);
 SELECT pg_temp.ok((SELECT public.catalog_text_source_evidence((result->>'document_id')::uuid) IS NULL FROM receipt),'reader attribution mutation held');
 UPDATE public.reference_documents SET source_capture=jsonb_set(source_capture,'{reader_actor}','"agent:test"'::jsonb);
+UPDATE public.reference_documents SET source_capture=jsonb_set(source_capture,'{reader_verified_at}','"invalid-time"'::jsonb);
+SELECT pg_temp.ok((SELECT public.catalog_text_source_evidence((result->>'document_id')::uuid) IS NULL FROM receipt),'malformed reader clock held');
+UPDATE public.reference_documents SET source_capture=jsonb_set(source_capture,'{reader_verified_at}',
+ (SELECT source->'reader_verified_at' FROM test_source));
 UPDATE storage.buckets SET public=false;
 SELECT pg_temp.ok((SELECT public.catalog_text_source_evidence((result->>'document_id')::uuid) IS NULL FROM receipt),'private bucket held');
 UPDATE storage.buckets SET public=true;

@@ -92,7 +92,8 @@ function catalogRequest(token = secret, change?: (input: any) => void) {
   const input: any = { mode: 'retained_catalog_text', source: {
     catalog_id: '00000000-0000-4000-8000-000000000002', object_id: '00000000-0000-4000-8000-000000000001',
     object_version: 'v1', object_name: 'test catalog/a.pdf', pdf_sha256: 'a'.repeat(64), text_sha256: 'b'.repeat(64),
-    page_count: 3, chunk_count: 2, reader_actor: 'agent:test', reader_method: 'local_exact_replay', reader_run_id: 'test' } };
+    page_count: 3, chunk_count: 2, reader_actor: 'agent:test', reader_method: 'local_exact_replay', reader_run_id: 'test',
+    reader_verified_at: new Date().toISOString() } };
   change?.(input);
   return new Request(`${project}/functions/v1/index-reference-document`, {
     method: 'POST', headers: { apikey: token, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });

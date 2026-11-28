@@ -23,6 +23,7 @@ import json
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
@@ -85,7 +86,8 @@ def main():
               'pdf_sha256': local_hash, 'text_sha256': hashlib.sha256(transcript).hexdigest(),
               'page_count': page_count, 'chunk_count': manifest['chunk_count'],
               'reader_actor': manifest['reader_actor'], 'reader_method': 'client_sha256_and_pdftotext_default_replay_v1',
-              'reader_run_id': manifest['reader_run_id']}
+              'reader_run_id': manifest['reader_run_id'],
+              'reader_verified_at': datetime.now(timezone.utc).isoformat().replace('+00:00','Z')}
     if not args.execute:
         print(json.dumps({'status': 'verified_no_write', 'source': source, 'source_bytes': size,
                           'notice': 'Database validates the source version and text on admission; PDF hash is client-attested.'}))

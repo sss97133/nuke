@@ -38,7 +38,7 @@ BEGIN
  IF jsonb_typeof(p_source) IS DISTINCT FROM 'object'
  OR EXISTS (SELECT 1 FROM jsonb_object_keys(p_source) key WHERE key NOT IN (
    'catalog_id','object_id','object_version','object_name','pdf_sha256','text_sha256','page_count','chunk_count',
-   'project_origin','reader_actor','reader_method','reader_run_id'))
+   'project_origin','reader_actor','reader_method','reader_run_id','reader_verified_at'))
  OR coalesce(p_source->>'catalog_id','') !~* '^[0-9a-f-]{36}$'
  OR coalesce(p_source->>'object_id','') !~* '^[0-9a-f-]{36}$'
  OR length(coalesce(p_source->>'object_version','')) NOT BETWEEN 1 AND 200
@@ -53,6 +53,10 @@ BEGIN
  OR length(coalesce(p_source->>'reader_actor','')) NOT BETWEEN 1 AND 100
  OR length(coalesce(p_source->>'reader_method','')) NOT BETWEEN 1 AND 100
  OR length(coalesce(p_source->>'reader_run_id','')) NOT BETWEEN 1 AND 150
+ OR coalesce(p_source->>'reader_verified_at','') !~ '^\d{4}-\d\d-\d\dT'
+ OR coalesce(p_source->>'reader_verified_at','') !~ '(Z|[+-][0-9]{2}:[0-9]{2})$'
+ OR isfinite((p_source->>'reader_verified_at')::timestamptz) IS DISTINCT FROM true
+ OR (p_source->>'reader_verified_at')::timestamptz > clock_timestamp()+interval '5 minutes'
  THEN RAISE EXCEPTION 'Invalid catalog source contract'; END IF;
  origin:=p_source->>'project_origin'; expected_pdf_hash:=p_source->>'pdf_sha256';
  expected_text_hash:=p_source->>'text_sha256'; page_count:=(p_source->>'page_count')::int;
@@ -119,8 +123,9 @@ BEGIN
    'text_sha256',expected_text_hash,'pdf_sha256_attestation',expected_pdf_hash,
    'pdf_hash_status','client_attested_not_server_rehashed','reader_actor',p_source->>'reader_actor',
    'reader_method',p_source->>'reader_method','reader_run_id',p_source->>'reader_run_id',
+   'reader_verified_at',p_source->>'reader_verified_at',
    'reader_receipt_sha256',encode(extensions.digest(jsonb_build_object('actor',p_source->>'reader_actor',
-    'method',p_source->>'reader_method','run_id',p_source->>'reader_run_id','pdf_sha256',expected_pdf_hash,
+    'method',p_source->>'reader_method','run_id',p_source->>'reader_run_id','verified_at',p_source->>'reader_verified_at','pdf_sha256',expected_pdf_hash,
     'text_sha256',expected_text_hash,'object_id',obj.id,'object_version',obj.version)::text,'sha256'),'hex'),
    'recorded_at',clock_timestamp())) RETURNING * INTO d;
  INSERT INTO public.catalog_reference_documents(catalog_id,reference_document_id,source_revision)
@@ -165,9 +170,11 @@ BEGIN
   OR d.page_count NOT BETWEEN 1 AND 5000 THEN RETURN NULL; END IF;
  IF length(coalesce(d.source_capture->>'reader_actor','')) NOT BETWEEN 1 AND 100
   OR length(coalesce(d.source_capture->>'reader_run_id','')) NOT BETWEEN 1 AND 150
+  OR isfinite((d.source_capture->>'reader_verified_at')::timestamptz) IS DISTINCT FROM true
+  OR (d.source_capture->>'reader_verified_at')::timestamptz > (d.source_capture->>'recorded_at')::timestamptz+interval '5 minutes'
   OR d.source_capture->>'reader_receipt_sha256' IS DISTINCT FROM
    encode(extensions.digest(jsonb_build_object('actor',d.source_capture->>'reader_actor',
-    'method',d.source_capture->>'reader_method','run_id',d.source_capture->>'reader_run_id',
+    'method',d.source_capture->>'reader_method','run_id',d.source_capture->>'reader_run_id','verified_at',d.source_capture->>'reader_verified_at',
     'pdf_sha256',d.file_hash,'text_sha256',d.source_capture->>'text_sha256',
     'object_id',obj.id,'object_version',obj.version)::text,'sha256'),'hex')
   THEN RETURN NULL; END IF;
@@ -186,8 +193,11 @@ BEGIN
  IF revision IS DISTINCT FROM d.source_capture->>'revision' THEN RETURN NULL; END IF;
  RETURN jsonb_build_object('document_id',d.id,'catalog_id',c.id,'revision',revision,'page_count',d.page_count,
   'source_url',d.source_url,'pdf_sha256_attestation',d.file_hash,'text_sha256',d.source_capture->>'text_sha256',
-  'pdf_hash_status','client_attested_not_server_rehashed','page_status','unreviewed_source_text');
-EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range OR invalid_parameter_value THEN RETURN NULL;
+  'pdf_hash_status','client_attested_not_server_rehashed','page_status','unreviewed_source_text',
+  'reader_actor',d.source_capture->>'reader_actor','reader_method',d.source_capture->>'reader_method',
+  'reader_run_id',d.source_capture->>'reader_run_id','reader_verified_at',d.source_capture->>'reader_verified_at');
+EXCEPTION WHEN invalid_text_representation OR invalid_datetime_format OR datetime_field_overflow
+ OR numeric_value_out_of_range OR invalid_parameter_value THEN RETURN NULL;
 END $fn$;
 REVOKE ALL ON FUNCTION public.catalog_text_source_evidence(uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.catalog_text_source_evidence(uuid) TO service_role;

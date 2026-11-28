@@ -7,6 +7,7 @@ const source = {
   object_version: 'v1', object_name: 'test catalog/a.pdf',
   pdf_sha256: 'a'.repeat(64), text_sha256: 'b'.repeat(64),
   page_count: 3, chunk_count: 2, reader_actor: 'agent:test', reader_method: 'local_exact_replay', reader_run_id: 'test',
+  reader_verified_at: new Date().toISOString(),
 };
 function deps() {
   const calls: Record<string, unknown>[] = [];
@@ -32,6 +33,8 @@ Deno.test('catalog source requires service authority before any record attempt',
 Deno.test('catalog source rejects malformed snapshots and caller-supplied project origin', async () => {
   for (const bad of [
     { ...source, page_count: 0 }, { ...source, chunk_count: 1.5 }, { ...source, text_sha256: 'x' },
+    { ...source, reader_verified_at: 'not-a-date' }, { ...source, reader_verified_at: '2020-01-01T00:00:00' },
+    { ...source, reader_verified_at: '2099-01-01T00:00:00Z' },
     { ...source, object_name: '../other.pdf' }, { ...source, project_origin: 'https://other.example' },
   ]) {
     const d = deps();
