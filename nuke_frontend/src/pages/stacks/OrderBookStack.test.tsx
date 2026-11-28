@@ -113,7 +113,7 @@ it('opens on the fold and moves the book to the chosen bid, using only bids post
   expect(container.querySelector('.stack-asof')?.textContent).toContain('1 of 3');
   const rows = [...container.querySelectorAll('.stack-table tbody tr')];
   expect(rows).toHaveLength(1);
-  expect(rows[0].textContent).toContain('$100');
+  expect(rows[0].textContent).toContain('100');
 });
 
 it('names missing layers with no number in them', async () => {
@@ -139,14 +139,14 @@ it('keeps key conflicts visible in the log and out of the fold', async () => {
   fixture.query = { data, isPending: false, isError: false };
   await render(`/stacks/order-book/${VEHICLE}?layer=log`);
   expect(container.querySelector('[data-coverage="key_conflicts"]')?.textContent).toContain('1 / 5');
-  expect(container.querySelector('.stack-missing')?.textContent).toContain('$99,000');
+  expect(container.querySelector('.stack-missing')?.textContent).toContain('99,000');
   await click(layerButton('Fold'));
-  expect(container.querySelector('.stack-asof')?.textContent).toContain('$300');
+  expect(container.querySelector('.stack-asof')?.textContent).toContain('300');
 });
 
 it('reports the outcome as recorded and links the keyed winner', async () => {
   await render(`/stacks/order-book/${VEHICLE}?layer=outcome`);
-  expect(container.textContent).toContain('$300 (buyer fee excluded)');
+  expect(container.textContent).toContain('300 (fee basis unestablished)');
   expect(container.querySelector(`a[href="/profile/external/${ID_A}"]`)?.textContent).toBe('bidder-a');
 });
 
@@ -164,4 +164,12 @@ it.each(['query', 'internal address'])('returns to the exact source exploration 
   const back = 'stack=SA&by=auction&measure=typical&make=Chevrolet&model=Corvette&from=2026&to=2026&group=lot';
   await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}&back=${encodeURIComponent(format === 'query' ? back : `/stacks?${back}`)}`);
   expect(container.querySelector('.stack-eyebrow a')?.getAttribute('href')).toBe(`/stacks?${back}`);
+});
+
+it('does not turn unitless source bids into dollars or round away their fractional input', async () => {
+  const data = read(); data.comments[0].bid_amount = 100.25; fixture.query.data = data;
+  await render(); await click(container.querySelectorAll('svg [role="button"]')[0]);
+  expect(container.querySelector('[data-source-amount-basis]')?.textContent).toContain('Currency and fee basis are not established');
+  expect(container.querySelector('.stack-asof')?.textContent).toContain('100.25');
+  expect(container.querySelector('.stack-layer')?.textContent).not.toMatch(/\$/);
 });

@@ -11,6 +11,11 @@ export function usd(n: number): string {
   return `$${Math.round(n).toLocaleString('en-US')}`;
 }
 
+/** This lot reader supplies numeric bid amounts, without a currency or fee-basis field. */
+export function sourceAmount(n: number): string {
+  return Number.isFinite(n) ? n.toLocaleString('en-US',{maximumFractionDigits:20}) : 'unknown';
+}
+
 export function count(n: number): string {
   return n.toLocaleString('en-US');
 }
@@ -73,7 +78,7 @@ export function layerReadings(read: OrderBookRead, view: OrderBookView, baseline
     dimension: 'SQL measurements',
     fold: `${count(view.states.length)} states`,
     ...(baseline ? { baseline } : {}),
-    ...(lot ? { outcome: view.window.open ? 'pending' : lot.winning_bid != null ? usd(Number(lot.winning_bid)) : outcomeWord(lot, false) } : {}),
+    ...(lot ? { outcome: view.window.open ? 'pending' : lot.winning_bid != null ? sourceAmount(Number(lot.winning_bid)) : outcomeWord(lot, false) } : {}),
   };
 }
 

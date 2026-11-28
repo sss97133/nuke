@@ -1,5 +1,7 @@
 .comment-measure { min-width: 0; font-family: var(--font-family); font-size: var(--fs-14,14px); }
 .comment-measure h3 { margin: 12px 0 8px; }
+.comment-measure .stack-note, .comment-measure .stack-basis, .comment-measure .stack-table { font-size: var(--fs-12,12px); }
+.comment-measure .stack-chip { font: inherit; min-height: 44px; border-width: 1px; border-radius: var(--radius); }
 .comment-measure__controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .comment-measure__controls button, .comment-measure__cutoff button { white-space: normal; text-align: left; }
 .comment-measure__cutoff { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0; }
