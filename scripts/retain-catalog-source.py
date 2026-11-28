@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 
 def require(value, message):
@@ -43,6 +43,16 @@ def sha256_file(path):
         for block in iter(lambda: stream.read(1024 * 1024), b''):
             digest.update(block)
     return digest.hexdigest()
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def open_service_request(request):
+    # Do not forward the service credential to a redirect destination.
+    return build_opener(NoRedirect()).open(request, timeout=60)
 
 
 def main():
@@ -98,7 +108,7 @@ def main():
                       data=json.dumps({'mode': 'retained_catalog_text', 'source': source}).encode(),
                       headers={'Content-Type': 'application/json', 'apikey': key, 'Authorization': 'Bearer ' + key}, method='POST')
     try:
-        with urlopen(request, timeout=60) as response:
+        with open_service_request(request) as response:
             result = json.load(response)
     except HTTPError as error:
         raise RuntimeError(f'Catalog source intake refused HTTP {error.code}') from None

@@ -58,6 +58,7 @@ class SourceClientTest(unittest.TestCase):
              mock.patch.dict(os.environ, {'VITE_SUPABASE_URL':'https://sample.supabase.co',
                                          'SUPABASE_SERVICE_ROLE_KEY':'sb_secret_test'}, clear=True), \
              mock.patch.object(module, 'urlopen', side_effect=self.fake_urlopen), \
+             mock.patch.object(module, 'open_service_request', side_effect=lambda req:self.fake_urlopen(req,60)), \
              mock.patch.object(module.subprocess, 'run', side_effect=self.fake_run), \
              contextlib.redirect_stdout(output):
             module.main()
@@ -91,6 +92,11 @@ class SourceClientTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'Local PDF changed'):
             self.run_client(execute=True)
         self.assertEqual([r.get_method() for r in self.requests], ['GET'])
+
+    def test_service_credential_is_not_followed_to_a_redirect(self):
+        request = module.Request('https://sample.supabase.co/functions/v1/index-reference-document',
+                                 headers={'Authorization':'Bearer sb_secret_test'}, method='POST')
+        self.assertIsNone(module.NoRedirect().redirect_request(request,None,302,'redirect',{},'https://other.example'))
 
 
 if __name__ == '__main__':
