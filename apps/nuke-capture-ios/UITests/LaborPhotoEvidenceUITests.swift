@@ -10,11 +10,12 @@ final class LaborPhotoEvidenceUITests: XCTestCase {
     }
 
     func testReassemblyPhotoUsesVehicleGateAndHandlesWithdrawal() {
-        for mode in ["available", "withdrawn", "account_changed"] {
+        for mode in ["available", "withdrawn", "account_changed", "superseded_before_open", "superseded_on_return"] {
             let app = XCUIApplication()
             app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
             app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_LABOR_STATE": "photos",
                                      "NUKE_FIXTURE_LABOR_PHOTO": mode,
+                                     "NUKE_FIXTURE_SUPERSEDE_LABOR": mode.hasPrefix("superseded") ? "1" : "0",
                                      "NUKE_FIXTURE_SWITCH_ACCOUNT": mode == "account_changed" ? "1" : "0",
                                      "NUKE_DEBUG_VEHICLE_ID": "00000000-0000-4000-8000-00000000c001"]
             app.launch()
@@ -28,7 +29,9 @@ final class LaborPhotoEvidenceUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars["Photo links"].waitForExistence(timeout: 15))
             XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "does not confirm installation")).firstMatch.waitForExistence(timeout: 15))
             let carpet = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Fixture carpet")).firstMatch
-            XCTAssertTrue(carpet.waitForExistence(timeout: 10)); carpet.tap()
+            XCTAssertTrue(carpet.waitForExistence(timeout: 10))
+            if mode == "superseded_before_open" { app.buttons["fixture.supersede-labor"].tap() }
+            carpet.tap()
             if mode == "account_changed" {
                 XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15), app.debugDescription)
                 let switchAccount = app.buttons["fixture.switch-account"]
@@ -36,6 +39,14 @@ final class LaborPhotoEvidenceUITests: XCTestCase {
                 let refused = app.staticTexts["Your account changed. Return to the vehicle and reopen the photo links."]
                 XCTAssertTrue(refused.waitForExistence(timeout: 5), app.debugDescription)
                 XCTAssertFalse(app.buttons["Close"].exists, "A prior account's photo must not remain visible")
+            } else if mode == "superseded_on_return" {
+                XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15), app.debugDescription)
+                app.buttons["fixture.supersede-labor"].tap()
+                XCUIDevice.shared.press(.home)
+                app.activate()
+                XCTAssertTrue(app.staticTexts["Photo unavailable"].waitForExistence(timeout: 15), app.debugDescription)
+                XCTAssertFalse(app.buttons["Close"].exists, "A superseded association must not remain visible")
+                app.navigationBars["Photo source"].buttons.firstMatch.tap()
             } else if mode == "available" {
                 XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15), app.debugDescription)
                 app.buttons["Close"].tap()

@@ -152,14 +152,16 @@ final class LaborAppraisalTests: XCTestCase {
         {"segment":"reassembly","evidence_ids":["00000000-0000-4000-8000-000000000002"],
          "witness_share":{"pieces":[{"image_id":"00000000-0000-4000-8000-000000000003"}]},
          "reassembly":{"matched":[
-           {"image_id":"00000000-0000-4000-8000-000000000001","part":{"name":"Carpet"}},
-           {"image_id":"not-a-uuid","part":{"name":"Bad reference"}}],
+           {"judgment_id":"00000000-0000-4000-8000-000000000004","image_id":"00000000-0000-4000-8000-000000000001","part":{"name":"Carpet"}},
+           {"judgment_id":"00000000-0000-4000-8000-000000000005","image_id":"not-a-uuid","part":{"name":"Bad reference"}},
+           {"image_id":"00000000-0000-4000-8000-000000000006","part":{"name":"Unverifiable association"}}],
            "unmatched":[{"part":{"name":"No photo returned"}}]}}
         """.utf8)
         let segment = try JSONDecoder().decode(LaborSegment.self, from: data)
         let links = LaborPhotoReference.from(segment, names: nil)
         XCTAssertEqual(links.count, 1)
         XCTAssertEqual(links.first?.imageId.uuidString.lowercased(), "00000000-0000-4000-8000-000000000001")
+        XCTAssertEqual(links.first?.judgmentId.uuidString.lowercased(), "00000000-0000-4000-8000-000000000004")
         XCTAssertEqual(links.first?.part, "Carpet")
     }
 
@@ -167,7 +169,7 @@ final class LaborAppraisalTests: XCTestCase {
         let data = Data("""
         {"vehicle_id":"00000000-0000-4000-8000-000000000001",
          "segments":[{"segment":"reassembly","reassembly":{"matched":[
-           {"image_id":"00000000-0000-4000-8000-000000000002"}]}}]}
+           {"judgment_id":"00000000-0000-4000-8000-000000000004","image_id":"00000000-0000-4000-8000-000000000002"}]}}]}
         """.utf8)
         let appraisal = try JSONDecoder().decode(LaborAppraisal.self, from: data)
         XCTAssertEqual(LaborPhotoReference.from(appraisal, vehicleId: "00000000-0000-4000-8000-000000000001", segment: "reassembly")?.count, 1)
