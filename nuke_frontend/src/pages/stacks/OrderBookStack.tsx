@@ -216,15 +216,17 @@ function OutcomeLayer({ read, view }: { read: OrderBookRead; view: OrderBookView
 export default function OrderBookStack() {
   const { vehicleId = '' } = useParams<{ vehicleId: string }>();
   const [params, setParams] = useSearchParams();
-  const lotParam = UUID_RE.test(params.get('lot') ?? '') ? params.get('lot') : null;
+  const lotValue = params.get('lot');
+  const invalidLot = params.getAll('lot').length > 1 || (lotValue !== null && !UUID_RE.test(lotValue));
+  const lotParam = !invalidLot ? lotValue : null;
   const layerParam = params.get('layer') as LayerId | null;
   const layer: LayerId = layerParam && LAYER_IDS.includes(layerParam) ? layerParam : 'fold';
-  const query = useOrderBook(vehicleId, lotParam);
+  const query = useOrderBook(invalidLot ? '' : vehicleId, lotParam);
   const read = query.data ?? null;
   // This page consumes SQL bid states. The retained-source reader supplies current metadata only.
   const view = useMemo(() => (read ? shapeOrderBook(read, { fold: false }) : null), [read]);
   const request = useMemo(() => bidRequestFromParams(params), [params]);
-  const bidQuery = useBidPath(vehicleId, read?.lot?.id ?? '', request);
+  const bidQuery = useBidPath(vehicleId, invalidLot ? '' : read?.lot?.id ?? '', request);
   const path = !bidQuery.isError && bidQuery.data?.state === 'partial' ? bidQuery.data : null;
   const bookReady = Boolean(path && !bidQuery.isPlaceholderData);
   const inputContextReason = !path ? 'The SQL bid measurement is unavailable.'
@@ -252,6 +254,7 @@ export default function OrderBookStack() {
     if (value == null) next.delete(key); else next.set(key, value);
     setParams(next);
   };
+  const openCurrentAuction = () => { const next = resetEpisodeInputs(params); next.delete('lot'); setParams(next); };
   const selectBid = (id: string) => {
     if (path) setParams(selectBidParams(params, path, id), { replace: true });
   };
@@ -267,6 +270,7 @@ export default function OrderBookStack() {
   const header = (
     <div className="stack-eyebrow"><Link to={back ? `/stacks?${back}` : '/stacks'}>Stacks</Link> / Stack {STACK.letter} · {STACK.name}</div>
   );
+  if (invalidLot) return <main className="stack-page">{header}<p className="stack-status" role="status">This address does not name one valid auction. No auction was read.</p><button type="button" onClick={openCurrentAuction}>Read current auction</button></main>;
   if (query.isPending) return <main className="stack-page">{header}<p className="stack-status" role="status">Reading the lot…</p></main>;
   if (query.isError) {
     return (
@@ -279,7 +283,8 @@ export default function OrderBookStack() {
   if (!read.lot || !view) {
     return (
       <main className="stack-page">{header}<h1 className="stack-title">{lotName(read)}</h1>
-        <p className="stack-status" role="status">This vehicle has no Bring a Trailer lot. Stack {STACK.letter} reads BaT lots only.</p>
+        <p className="stack-status" role="status">{lotParam ? 'The requested auction is not among this vehicle’s retained public episodes. No other auction was selected.' : `This vehicle has no Bring a Trailer lot. Stack ${STACK.letter} reads BaT lots only.`}</p>
+        {lotParam && <button type="button" onClick={openCurrentAuction}>Read current auction</button>}
       </main>
     );
   }

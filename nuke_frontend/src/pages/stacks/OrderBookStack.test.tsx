@@ -5,10 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ query: {} as Record<string, unknown>, temperature: {} as Record<string, unknown>, bid: null as null | ((request: import('./bidPathReader').BidPathRequest) => unknown), bidState: {} as Record<string,unknown> }));
+const fixture = vi.hoisted(() => ({ query: {} as Record<string, unknown>, temperature: {} as Record<string, unknown>, bid: null as null | ((request: import('./bidPathReader').BidPathRequest) => unknown), bidState: {} as Record<string,unknown>, metadataArgs: [] as unknown[] }));
 vi.mock('./orderBookReader', async (importActual) => ({
   ...(await importActual<typeof import('./orderBookReader')>()),
-  useOrderBook: () => fixture.query,
+  useOrderBook: (vehicle:string,lot:string|null) => {fixture.metadataArgs=[vehicle,lot];return fixture.query;},
 }));
 vi.mock('../market/useLiveLotTemperature', () => ({ useLiveLotTemperature: () => fixture.temperature }));
 vi.mock('../../components/PrefetchLink', () => ({
@@ -223,4 +223,15 @@ it('uses a single cutoff control and embeds the comment consumer',async()=>{
   expect(container.querySelector('[data-comment-embedded]')?.getAttribute('data-comment-embedded')).toBe('true');
   expect(container.textContent).toContain('Recorded-input reconstruction');
   expect(container.querySelector('.stack-path')?.textContent).toContain('2 SQL states');
+});
+
+it.each(['lot=bad','lot=','lot='+LOT+'&lot='+LOT])('does not replace a malformed explicit auction with the current lot: %s',async search=>{
+  await render(`/stacks/order-book/${VEHICLE}?${search}`);
+  expect(fixture.metadataArgs[0]).toBe('');expect(container.textContent).toContain('No auction was read');expect(container.querySelector('svg')).toBeNull();
+  await click([...container.querySelectorAll('button')].find(b=>b.textContent==='Read current auction'));
+  expect(container.querySelector('.stack-asof')).toBeTruthy();expect(fixture.metadataArgs).toEqual([VEHICLE,null]);
+});
+it('keeps an absent historical auction distinct from a vehicle with no auctions',async()=>{
+  fixture.query.data=read({lot:null});await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}`);
+  expect(container.textContent).toContain('No other auction was selected');expect(container.textContent).not.toContain('has no Bring a Trailer lot');
 });
