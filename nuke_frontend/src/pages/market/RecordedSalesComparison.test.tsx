@@ -282,4 +282,15 @@ describe('captured sell-through through the existing comparison', () => {
     await captured();await select('Recorded sales event window','7:1');
     expect(fixture.request).toMatchObject({event_from:'2026-09-20T00:00:00.000Z',event_to:'2026-09-27T00:00:00.000Z'});
   });
+  it('keeps matched unresolved episodes distinct from an empty population', async () => {
+    const r=capturedReceipt();r.series[0]={...r.series[0],value:null,ratio:null,numerator:0,denominator:0};
+    r.summary![0]={...r.summary![0],numerator:0,denominator:0,ratio:null};
+    r.evidence.contributors=[];r.evidence.has_more=false;r.evidence.next_offset=null;
+    fixture.query.data=r;await render();await select('Market outcome measure','captured_sell_through');
+    expect(countButton('no known bidding outcomes; fraction unknown').disabled).toBe(true);
+    expect(container.textContent).toContain('unresolved and withdrawn records remain inspectable');
+    expect(container.textContent).not.toContain('No matched captured episodes');
+    await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Inspect unresolved outcomes')!.click());
+    expect(fixture.request).toMatchObject({evidence_outcome:'unresolved',evidence_series:'selected'});
+  });
 });

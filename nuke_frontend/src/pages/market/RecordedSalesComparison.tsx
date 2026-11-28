@@ -22,7 +22,8 @@ function CountBucket({ point, name, max, refused, active, onClick, captured = fa
   const unavailable = refused || point.value == null || point.denominator == null;
   return <div style={{ minWidth: 0 }}>
     <button onClick={onClick} disabled={unavailable || (!captured && point.value === 0)} aria-pressed={active}
-      aria-label={`${day(point.bucket_start)} UTC · ${name}: ${unavailable ? 'counts refused' : captured
+      aria-label={`${day(point.bucket_start)} UTC · ${name}: ${unavailable ? captured && !refused && point.denominator === 0
+        ? 'no known bidding outcomes; fraction unknown' : 'counts refused' : captured
         ? `${percent(point.value)} captured sell-through, ${point.numerator} sold of ${point.denominator} known outcomes`
         : `${point.value} recorded sales, ${point.denominator} eligible ended episodes`}. Show contributors`}
       className="sales-count-point" data-value={unavailable ? undefined : point.value}
@@ -224,7 +225,9 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
           {day(point.bucket_start)} UTC · {seriesName(point.series, selectedName, captured)}: {captured
             ? `${percent(point.value)} · ${number(point.numerator)}/${number(point.denominator)} known outcomes`
             : `${number(point.value)} recorded sales · ${number(point.denominator)} captured ended listings`}.
-          <div>{point.denominator === 0 ? 'No matched captured episodes; this does not establish zero demand.' :
+          <div>{point.denominator === 0 ? captured
+            ? 'No known bidding outcomes in this bucket; unresolved and withdrawn records remain inspectable.'
+            : 'No matched captured episodes; this does not establish zero demand.' :
             `Source clocks: ${number(point.coverage.source_clock_known)} recorded · ${number(point.coverage.source_clock_unknown)} unknown.${captured ? '' : ` Ended pending: ${number(point.coverage.ended_pending)}.`}`}
             {point.coverage.incomplete_bucket && ' Partial UTC bucket.'}</div>
           <div>Explicit no-sale: {number(point.coverage.explicit_no_sale)} · {captured
