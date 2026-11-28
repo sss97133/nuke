@@ -66,4 +66,9 @@ describe('episode comment measurement contract',()=>{
   it.each(['text','media_only','no_captured_content'] as const)('validates the %s evidence denominator',filter=>{
     const r={evidence_filter:filter};expect(()=>assertCommentSurface(commentFixture(r),VEHICLE,LOT,r)).not.toThrow();
   });
+  it.each(['media_only','no_captured_content'] as const)('accepts a long whitespace source entry in %s without a text excerpt',filter=>{
+    const r={evidence_filter:filter},d=commentFixture(r);
+    d.evidence.contributors[0].excerpt_truncated=true;
+    expect(()=>assertCommentSurface(d,VEHICLE,LOT,r)).not.toThrow();
+  });
 });

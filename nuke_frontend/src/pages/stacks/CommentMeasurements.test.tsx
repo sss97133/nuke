@@ -20,7 +20,11 @@ async function render(search='?layer=dimension'){
   </MemoryRouter></QueryClientProvider>));await settle();
 }
 const button=(name:string)=>[...container.querySelectorAll('button')].find(el=>el.textContent===name)!;
-async function click(name:string){await act(async()=>button(name).click());await settle();}
+async function click(name:string){await act(async()=>{
+  const target=button(name),details=target.closest('details');
+  if(details&&!details.open)details.querySelector('summary')!.click();
+  target.click();
+});await settle();}
 beforeEach(()=>{
   (globalThis as {IS_REACT_ACT_ENVIRONMENT?:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
   fixture.revision=0;fixture.refuse=false;fixture.rpc.mockReset().mockImplementation(async(_name,args:{p_request:CommentSurfaceRequest})=>({
@@ -39,6 +43,7 @@ it('draws SQL partitions and literal-pattern denominators with exact source entr
   expect(container.textContent).toContain('1 distinct BaT identity keys');
   expect(container.textContent).toContain('These patterns do not measure expertise or literacy');
   expect(container.querySelectorAll('[data-comment-id]')).toHaveLength(20);
+  expect(container.querySelector<HTMLDetailsElement>('.comment-measure__time-controls')?.open).toBe(false);
 });
 it('paginates through the real hook, pins both cutoffs and restores the same first page',async()=>{
   await render();await click('Next comment entries');
@@ -91,8 +96,18 @@ it('restores the applied cutoff input with browser history',async()=>{
   await click('Current recorded state');expect(container.querySelector('input')?.value).toBe('');
   await click('Back comment controls');expect(container.querySelector('input')?.value).toBe('2026-11-25T20:50:00Z');
   expect(container.textContent).toContain('Retrospective recorded-input reconstruction');
+  expect(container.querySelector<HTMLDetailsElement>('.comment-measure__time-controls')?.open).toBe(true);
 });
 it('withholds every measurement after a response fails the contract',async()=>{
   fixture.rpc.mockResolvedValue({data:{...commentFixture(),auction_event_id:VEHICLE},error:null});
   await render();expect(container.textContent).toContain('could not be read completely');expect(container.querySelector('.comment-measure__bar')).toBeNull();
+});
+it('does not attach a shortened-text label to a long whitespace-only media entry',async()=>{
+  fixture.rpc.mockImplementation(async(_name,args:{p_request:CommentSurfaceRequest})=>{
+    const data=commentFixture(args.p_request);data.evidence.contributors[0].excerpt_truncated=true;
+    return {data,error:null};
+  });
+  await render('?layer=dimension&csFilter=media_only');
+  expect(container.textContent).toContain('Media-only source entry');
+  expect(container.querySelector('[data-comment-id]')?.textContent).not.toContain('excerpt shortened');
 });

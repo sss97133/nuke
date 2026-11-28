@@ -45,7 +45,7 @@ The native PG17 contract checks the old function body/ACL, invoker execution, na
 
 The exact candidate SELECT was also executed read-only against three real public lots. It returned discussion/text/media counts of 38/30/8 (BMW), 25/25/0 (Subaru), and 74/69/5 (Sprinter), matching the separately inspected source assay. That proves candidate calculations on those records; it does not prove deployed RPC access or population coverage.
 
-Production anonymous RPC verification and the existing auction evidence consumer are still required. Cohort-level rollups, calibrated semantic dimensions, historical prediction evaluation, and builder/reputation/profit measurements remain separate open outcomes.
+Database PR #4097 deployed through normal CI on 2026-11-28. Anonymous real-reader checks confirmed the three sampled lots, pinned pagination, reconstruction, changed-hash refusal and private-auction withholding; the legacy reader body remained unchanged. The existing auction consumer is implemented and locally verified against that deployed reader; its production UI release and browser verification remain separate requirements. Cohort-level rollups, calibrated semantic dimensions, historical prediction evaluation, and builder/reputation/profit measurements remain separate open outcomes.
 
 ## Existing auction consumer
 

@@ -50,7 +50,7 @@ function ContributionTable({ receipt, evidenceRef }: { receipt:CommentSurfaceRec
       <tbody>{receipt.evidence.contributors.map(row=><tr key={row.comment_id} data-comment-id={row.comment_id}>
         <td className="stack-mono"><time dateTime={row.posted_at}>{utc(row.posted_at)}</time><br/><time dateTime={row.db_recorded_at}>{utc(row.db_recorded_at)}</time></td>
         <td><div className="stack-label">{row.source_comment_type.replace(/_/g,' ')} · seller flag {row.is_seller===null?'unknown':row.is_seller?'yes':'no'}</div>
-          <p className="comment-measure__excerpt">{row.excerpt ?? (row.media_reference_count>0?'Media-only source entry':'No captured text or media')}{row.excerpt_truncated?'… (excerpt shortened)':''}</p>
+          <p className="comment-measure__excerpt">{row.excerpt ?? (row.media_reference_count>0?'Media-only source entry':'No captured text or media')}{row.excerpt!==null&&row.excerpt_truncated?'… (excerpt shortened)':''}</p>
           <div className="stack-basis">{number(row.media_reference_count)} nonblank stored media references</div></td>
         <td>{row.excerpt === null ? 'Text measurements do not apply' : <>
           <span className="stack-mono">{number(row.whitespace_tokens)} token runs · {number(row.characters)} characters · {number(row.question_marks)} question marks</span><br/>
@@ -117,9 +117,14 @@ export default function CommentMeasurements({ vehicleId, lotId, closeAt }: { veh
     <p className="stack-note">Retained discussion on this exact auction. Bids are separate. No literacy, expertise, buyer-intent or profit score is established.</p>
     <div className="comment-measure__controls" role="group" aria-label="Comment measurement time">
       <button type="button" className="stack-chip" aria-pressed={Boolean(request&&!request.cutoff)} onClick={()=>apply(filter)}>Current recorded state</button>
-      {closeAt && finiteCommentClock(closeAt) && <><button type="button" className="stack-chip" onClick={()=>preset(60)}>Reconstruct 1 hour before recorded close</button>
-        <button type="button" className="stack-chip" onClick={()=>preset(10)}>Reconstruct 10 minutes before recorded close</button></>}
+      <button type="button" className="stack-chip" disabled={query.isFetching||refreshing} onClick={()=>void refresh()}>Refresh comment measurements</button>
     </div>
+    <details className="comment-measure__time-controls" open={Boolean(request?.cutoff)}>
+    <summary>Reconstruct an earlier cutoff</summary>
+    {closeAt && finiteCommentClock(closeAt) && <div className="comment-measure__controls" role="group" aria-label="Reconstruction shortcuts">
+      <button type="button" className="stack-chip" onClick={()=>preset(60)}>Reconstruct 1 hour before recorded close</button>
+      <button type="button" className="stack-chip" onClick={()=>preset(10)}>Reconstruct 10 minutes before recorded close</button>
+    </div>}
     <form className="comment-measure__cutoff" onSubmit={event=>{
       event.preventDefault();
       if (!finiteCommentClock(draft)) {setFormError('Enter a finite timestamp including seconds and Z or a UTC offset.');return;}
@@ -130,7 +135,7 @@ export default function CommentMeasurements({ vehicleId, lotId, closeAt }: { veh
       <button type="submit" className="stack-chip">Reconstruct cutoff</button>
     </form>
     {formError&&<p id={`${inputId}-error`} role="alert">{formError}</p>}
-    <button type="button" className="stack-chip" disabled={query.isFetching||refreshing} onClick={()=>void refresh()}>Refresh comment measurements</button>
+    </details>
     {!request&&<p role="status">The shared comment controls are incomplete or invalid. Refresh to reset them; no measurement was read.</p>}
     {request&&query.isFetching&&<p role="status">Reading comment measurements and source records…</p>}
     {query.isError&&<p role="status">Comment measurements could not be read completely. Refresh to retry. No previous measurement is displayed.</p>}

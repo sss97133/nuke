@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ query: {} as Record<string, unknown>, temperature: {} as Record<string, unknown> }));
@@ -56,11 +56,12 @@ function read(changes: Partial<OrderBookRead> = {}): OrderBookRead {
 
 let root: Root;
 let container: HTMLDivElement;
+function LocationProbe(){return <output data-order-address>{useLocation().search}</output>;}
 async function render(path = `/stacks/order-book/${VEHICLE}`) {
   await act(async () => root.render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/stacks/order-book/:vehicleId" element={<OrderBookStack />} />
+        <Route path="/stacks/order-book/:vehicleId" element={<><OrderBookStack/><LocationProbe/></>} />
       </Routes>
     </MemoryRouter>,
   ));
@@ -172,4 +173,15 @@ it('does not turn unitless source bids into dollars or round away their fraction
   expect(container.querySelector('[data-source-amount-basis]')?.textContent).toContain('Currency and fee basis are not established');
   expect(container.querySelector('.stack-asof')?.textContent).toContain('100.25');
   expect(container.querySelector('.stack-layer')?.textContent).not.toMatch(/\$/);
+});
+
+it('starts another auction with its own first-page comment controls',async()=>{
+  const data=read(),other='00000000-0000-4000-8000-0000000000a2';
+  data.lots.push({...data.lot!,id:other,source_url:'https://bringatrailer.com/listing/other-synthetic-lot',auction_end_date:'2025-11-25T21:00:00Z'});
+  fixture.query.data=data;
+  await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}&at=old-bid&csFilter=media_only&csOffset=20&csHash=${'1'.repeat(32)}&csEvent=2026-11-25T21:00:00Z&csRecorded=2026-11-28T06:00:00Z&csCutoff=2026-11-25T20:50:00Z`);
+  await click(container.querySelectorAll('.stack-lots button')[1]);
+  const params=new URLSearchParams(container.querySelector('[data-order-address]')!.textContent!);
+  expect(params.get('lot')).toBe(other);expect(params.has('at')).toBe(false);
+  expect([...params.keys()].filter(k=>k.startsWith('cs'))).toEqual([]);
 });

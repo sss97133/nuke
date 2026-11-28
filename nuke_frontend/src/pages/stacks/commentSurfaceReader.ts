@@ -156,7 +156,7 @@ export function assertCommentSurface(value: unknown, vehicle: string, lot: strin
       || (text ? !count(row.characters) || row.characters < 1 || !count(row.whitespace_tokens) || row.whitespace_tokens < 1
         || !count(row.question_marks) || typeof row.url_marker !== 'boolean' || typeof row.numeric_unit_marker !== 'boolean'
         : row.excerpt !== null || row.characters !== null || row.whitespace_tokens !== null || row.question_marks !== null
-          || row.url_marker !== null || row.numeric_unit_marker !== null || row.excerpt_truncated)
+          || row.url_marker !== null || row.numeric_unit_marker !== null)
       || (e.filter === 'text' && !text) || (e.filter === 'media_only' && (text || row.media_reference_count < 1))
       || (e.filter === 'no_captured_content' && (text || row.media_reference_count !== 0))) fail();
     seen.add(row.comment_id);

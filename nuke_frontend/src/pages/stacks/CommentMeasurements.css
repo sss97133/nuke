@@ -4,6 +4,7 @@
 .comment-measure .stack-chip { font: inherit; min-height: 44px; border-width: 1px; border-radius: var(--radius); }
 .comment-measure__controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .comment-measure__controls button, .comment-measure__cutoff button { white-space: normal; text-align: left; }
+.comment-measure__time-controls > summary { cursor: pointer; min-height: 44px; display: list-item; align-content: center; }
 .comment-measure__cutoff { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0; }
 .comment-measure__cutoff label { flex-basis: 100%; }
 .comment-measure__cutoff input { width: 32ch; max-width: 100%; min-width: 0; box-sizing: border-box; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); padding: 8px; }

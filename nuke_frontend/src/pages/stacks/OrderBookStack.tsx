@@ -12,6 +12,7 @@ import { CoverageTable, LayerPath } from './stackParts';
 import { ForecastPanel } from './ForecastPanel';
 import VehicleCohort from './VehicleCohort';
 import CommentMeasurements from './CommentMeasurements';
+import { commentParams } from './commentSurfaceReader';
 import { stackBackParams } from './bidExpression';
 import { STATE_WORD, clock, count, layerReadings, outcomeWord, span, sourceAmount } from './stackFormat';
 import './stacks.css';
@@ -571,7 +572,8 @@ export default function OrderBookStack() {
           <span className="stack-label">Lots on this vehicle</span>
           {read.lots.map((l) => (
             <button key={l.id} type="button" className="stack-chip" aria-pressed={l.id === lot.id}
-              onClick={() => { const next = new URLSearchParams(params); next.set('lot', l.id); next.delete('at'); setParams(next); }}>
+              onClick={() => { const next = new URLSearchParams(params); next.set('lot', l.id); next.delete('at');
+                setParams(commentParams(next,{evidence_filter:'all_discussion'})); }}>
               {l.auction_end_date ? new Date(l.auction_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) : 'no close'} · {l.outcome ?? 'unknown'}
             </button>
           ))}
