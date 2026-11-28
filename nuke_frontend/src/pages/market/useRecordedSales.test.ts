@@ -114,3 +114,33 @@ describe('captured-only outcome receipts', () => {
       await expect(fetchRecordedSales(request())).rejects.toThrow(/Unsupported/);
     });
 });
+
+describe('descriptive outcome scope binding', () => {
+  const id='70000000-0000-4000-8000-000000000001';
+  const request=()=>recordedSalesRequest({kind:'descriptive_subject',subject_id:id},
+    {event_from:'2026-11-20T00:00:00Z',event_to:'2026-11-27T00:00:00Z'},null,'captured_sell_through');
+  const scope=()=>({kind:'descriptive_subject',subject_id:id,label:'Fixture model',grain:'year',year:1977,
+    year_start:null,year_end:null,canonical_model_id:'20000000-0000-4000-8000-000000000001',
+    admission_purpose:'captured_sell_through_descriptive',membership_method:'unique_exact_registered_model_alias_with_declared_year_scope_v1'});
+  it('accepts the SQL year definition with its exact subject and purpose',async()=>{
+    const data={...capturedFixture(),scope:scope()};fixture.rpc.mockResolvedValue({data});
+    expect((await fetchRecordedSales(request()) as any).scope).toEqual(scope());
+  });
+  it.each(['other subject','valuation purpose','unknown method','mixed year range','missing year'])(
+    'withholds a percentage for a differently qualified population: %s',async kind=>{
+      const data={...capturedFixture(),scope:scope()};
+      if(kind==='other subject')data.scope.subject_id='70000000-0000-4000-8000-000000000002';
+      if(kind==='valuation purpose')data.scope.admission_purpose='valuation';
+      if(kind==='unknown method')data.scope.membership_method='inferred from title';
+      if(kind==='mixed year range')data.scope.year_start=1970 as any;
+      if(kind==='missing year')data.scope.year=null as any;
+      fixture.rpc.mockResolvedValue({data});await expect(fetchRecordedSales(request())).rejects.toThrow(/Unsupported/);
+    });
+  it('keeps the SQL refusal reason while rejecting a refusal bound to another subject',async()=>{
+    const data={state:'unavailable',reason:'unsupported_or_unknown_descriptive_subject',scope_admission:{
+      subject_id:id,state:'unavailable',reason:'unknown_subject',admission_purpose:'captured_sell_through_descriptive'}};
+    fixture.rpc.mockResolvedValue({data});expect(await fetchRecordedSales(request())).toEqual(data);
+    data.scope_admission.subject_id='70000000-0000-4000-8000-000000000002';
+    await expect(fetchRecordedSales(request())).rejects.toThrow('Unsupported descriptive-scope refusal');
+  });
+});

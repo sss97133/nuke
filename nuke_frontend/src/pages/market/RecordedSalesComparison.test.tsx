@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import type { RecordedSalesReceipt, SalesScopeOption, SalesRequest } from './useRecordedSales';
 
-const fixture = vi.hoisted(() => ({ catalog: {} as any, query: {} as any, request: null as SalesRequest | null, retry: vi.fn(), client: null as import('@tanstack/react-query').QueryClient | null }));
+const fixture = vi.hoisted(() => ({ catalog: {} as any, descriptive: {} as any, query: {} as any, request: null as SalesRequest | null, retry: vi.fn(), client: null as import('@tanstack/react-query').QueryClient | null }));
 vi.mock('@tanstack/react-query', async original => ({ ...await original<typeof import('@tanstack/react-query')>(), useQueryClient: () => fixture.client }));
 vi.mock('./useRecordedSales', async original => ({ ...await original<typeof import('./useRecordedSales')>(),
-  useSalesScopes: () => fixture.catalog, useRecordedSales: (request: SalesRequest | null) => { fixture.request = request; return fixture.query; } }));
+  useSalesScopes: () => fixture.catalog, useDescriptiveSalesScopes: () => fixture.descriptive, useRecordedSales: (request: SalesRequest | null) => { fixture.request = request; return fixture.query; } }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
 import RecordedSalesComparison, { MarketScopeControls } from './RecordedSalesComparison';
 
@@ -61,6 +61,7 @@ beforeEach(() => {
   fixture.retry.mockReset(); fixture.request = null;
   fixture.client = new QueryClient();
   fixture.catalog = { data: [make, subject], isLoading: false, isError: false, refetch: fixture.retry };
+  fixture.descriptive={data:{candidateCount:0,options:[],rules:[]},isPending:false,isFetching:false,isError:false,refetch:fixture.retry};
   fixture.query = { data: receipt(), isFetching: false, isError: false, refetch: fixture.retry };
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
@@ -313,4 +314,43 @@ describe('captured sell-through through the existing comparison', () => {
     await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Inspect withdrawn outcomes')!.click());
     expect(fixture.request).toMatchObject({evidence_outcome:'withdrawn',evidence_series:'selected',evidence_bucket:bucket});
   });
+});
+
+const descId='70000000-0000-4000-8000-000000000001';
+const desc:SalesScopeOption={key:`descriptive:${descId}`,label:'FIXTURE MAKE MODEL · 1969 model year',make:'FIXTURE MAKE',
+ scope:{kind:'descriptive_subject',subject_id:descId},descriptive:{model:'MODEL',grain:'year',year:1969,yearStart:null,yearEnd:null}};
+function withDescriptive(){fixture.descriptive.data={candidateCount:2,options:[desc],rules:[
+ {subject_id:descId,canonical_make:'FIXTURE MAKE',canonical_model:'MODEL',registered_model_label:'MODEL',grain:'year',year:1969,
+  state:'admitted',reason:'canonical_registry_scope_shape_supported_for_descriptive_outcomes',catalog_subject_id:descId,
+  equivalent_catalog_subjects:1,canonical_model_id:'20000000-0000-4000-8000-000000000001'},
+ {subject_id:'70000000-0000-4000-8000-000000000002',canonical_model:'MODEL',registered_model_label:'MODEL',grain:'model',year_start:1970,year_end:null,
+  state:'unavailable',reason:'model_bounds_do_not_match_registry',catalog_subject_id:null,equivalent_catalog_subjects:0,canonical_model_id:'20000000-0000-4000-8000-000000000001'}]};}
+function descriptiveReceipt(){const r=capturedReceipt();r.scope={kind:'descriptive_subject',subject_id:descId,label:'FIXTURE MAKE MODEL',grain:'year',year:1977,year_start:null,year_end:null};return r;}
+it('keeps make selection separate and sends the SQL-admitted model/year scope to the captured reader',async()=>{
+ withDescriptive();fixture.query.data=descriptiveReceipt();fixture.query.data.coverage.unresolved_scope=3;await render();await select('Recorded model and year group',desc.key);
+ expect(fixture.request).toBeNull();expect(container.textContent).toContain('currently measure captured sell-through');
+ expect(container.querySelector('[aria-label="Daily recorded sales counts"]')).toBeNull();
+ await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Show captured sell-through')!.click());
+ expect(fixture.request?.scope).toEqual(desc.scope);expect(fixture.request?.metric).toBe('captured_sell_through');
+ expect((container.querySelector('[aria-label="Recorded sales scope"]') as HTMLSelectElement).value).toBe(make.key);
+ expect(container.textContent).toContain('1977 model year: 0% recorded sold');
+ expect(container.textContent).toContain('3 captured episodes have unresolved group membership and are excluded from both series');
+});
+it('clears contributor pins when the shared model/year control selects another scope',async()=>{
+ withDescriptive();const change=vi.fn();await act(async()=>root.render(<MarketScopeControls make="FIXTURE MAKE" scopeKey={make.key} view="sales" onMakeChange={change} onViewChange={vi.fn()}/>));
+ await select('Recorded model and year group',desc.key);expect(change).toHaveBeenCalledWith('FIXTURE MAKE',desc.key);
+ expect(container.querySelector(`[data-scope-rule-id="${descId}"]`)).toBeTruthy();expect(container.textContent).toContain('model bounds do not match registry');
+});
+it('does not replace a missing descriptive scope with the make population',async()=>{
+ withDescriptive();await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={{scopeKey:'descriptive:missing',days:7,metric:'captured_sell_through',drill:null,benchmark:false}}/>));
+ expect(fixture.request).toBeNull();expect(container.textContent).toContain('requested group is not admitted');expect(container.querySelector('.sales-count-point')).toBeNull();
+});
+it('withholds a selected descriptive group when its SQL catalog cannot be read',async()=>{
+ withDescriptive();fixture.descriptive.isError=true;await act(async()=>root.render(<RecordedSalesComparison make="FIXTURE MAKE" lens={{scopeKey:desc.key,days:7,metric:'captured_sell_through',drill:null,benchmark:false}}/>));
+ expect(fixture.request).toBeNull();expect(container.textContent).toContain('No make population is substituted');expect(container.querySelector('.sales-count-point')).toBeNull();
+});
+it('clears local evidence selection when changing between year and make scopes',async()=>{
+ withDescriptive();fixture.query.data=descriptiveReceipt();await render();await select('Market outcome measure','captured_sell_through');
+ await select('Recorded model and year group',desc.key);expect(fixture.request?.scope).toEqual(desc.scope);
+ await select('Recorded model and year group','');expect(fixture.request?.scope).toEqual(make.scope);expect(fixture.request?.evidence_snapshot_hash).toBeUndefined();
 });

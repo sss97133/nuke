@@ -56,7 +56,8 @@ export interface RecordedSalesReceipt extends SalesWindow {
   contract_version: number; metric_id: string; state: 'partial'; reason: string;
   unit?: string; method_id?: string; method_version?: number;
   scope: { kind?: SalesScope['kind']; canonical_make_id?: string; subject_id?: string;
-    label?: string; comparison_basis?: string; comparison_scope_basis?: string };
+    label?: string; comparison_basis?: string; comparison_scope_basis?: string; grain?: string; year?: number|null;
+    year_start?: number|null; year_end?: number|null; canonical_model_id?: string; membership_method?: string; admission_purpose?: string };
   knowledge_cutoff: string; knowledge_mode: string; generated_at: string;
   candidate_limit: number; captured_candidates: number; truncated: boolean;
   coverage: {
@@ -185,7 +186,13 @@ export function useDescriptiveSalesScopes(make:string|null,enabled=true){
 export async function fetchRecordedSales(request: SalesRequest): Promise<SalesResponse> {
   const { data, error } = await supabase.rpc('get_market_trends', { p_request: request });
   if (error) throw error;
-  if (data?.state === 'unavailable' && typeof data.reason === 'string') return data as SalesResponse;
+  if (data?.state === 'unavailable' && typeof data.reason === 'string') {
+    if(data.scope_admission!==undefined&&(request.scope.kind!=='descriptive_subject'
+      ||data.scope_admission?.subject_id!==request.scope.subject_id||data.scope_admission.state!=='unavailable'
+      ||data.scope_admission.admission_purpose!==SCOPE_PURPOSE||typeof data.scope_admission.reason!=='string'))
+      throw new Error('Unsupported descriptive-scope refusal');
+    return data as SalesResponse;
+  }
   if (!data || data.state !== 'partial' || data.contract_version !== 1 || data.metric_id !== request.metric
     || !Array.isArray(data.series) || !data.evidence || !Array.isArray(data.evidence.contributors)) {
     throw new Error('Unsupported recorded-sales receipt');
@@ -217,6 +224,15 @@ function assertCapturedOutcomes(data: RecordedSalesReceipt, request: SalesReques
     || data.evidence.pagination_supported !== true || !count(data.evidence.offset) || data.evidence.offset > 2000
     || (data.evidence.has_more && (!count(data.evidence.next_offset)
       || data.evidence.next_offset <= data.evidence.offset || data.evidence.next_offset > 2000))) fail();
+  if(request.scope.kind==='descriptive_subject'){
+    const scope=data.scope;
+    const year=(v:unknown)=>v===null||typeof v==='number'&&Number.isSafeInteger(v);
+    if(scope.admission_purpose!==SCOPE_PURPOSE||scope.membership_method!==SCOPE_METHOD
+      ||!scope.canonical_model_id||!SCOPE_UUID.test(scope.canonical_model_id)||!scope.label
+      ||!['year','model'].includes(scope.grain??'')||![scope.year,scope.year_start,scope.year_end].every(year)
+      ||scope.grain==='year'&&(scope.year===null||scope.year_start!==null||scope.year_end!==null)
+      ||scope.grain==='model'&&scope.year!==null)fail();
+  }
   const keys = new Set<string>();
   for (const p of data.series) {
     const key = `${p.bucket_start}:${p.series}`;

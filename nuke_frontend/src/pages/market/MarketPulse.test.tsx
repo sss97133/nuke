@@ -45,6 +45,7 @@ vi.mock('./RecordedSalesComparison', () => ({
     <button onClick={() => onViewChange('sales')}>Use recorded sales view</button>
     <button onClick={() => onViewChange('inventory')}>Use inventory view</button>
     <button onClick={() => onMakeChange('FORD')}>Choose Ford cohort</button>
+    <button onClick={() => onMakeChange('FORD','descriptive:70000000-0000-4000-8000-000000000001')}>Choose Ford model year</button>
     <button onClick={() => onMakeChange(null)}>Choose all live makes</button>
     {children}
   </>,
@@ -1033,4 +1034,11 @@ describe('every live house on one board', () => {
     expect(new Set(ticks).size).toBe(4);
     expect(container.querySelector('.market-stock__tag')?.textContent).toBe('$45.60M');
   });
+});
+
+it('keeps the descriptive scope URL and clears the previous contributor snapshot on cohort change',async()=>{
+ await render('?view=sales&make=PORSCHE&day=2026-10-03&series=selected&salesOffset=20&salesSnapshot='+('a'.repeat(32))+'&salesOutcome=sold');
+ await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Choose Ford model year')!.click());
+ const params=new URLSearchParams(window.location.search);expect(params.get('make')).toBe('FORD');expect(params.get('salesScope')).toBe('descriptive:70000000-0000-4000-8000-000000000001');
+ for(const key of ['day','series','salesOffset','salesSnapshot','salesOutcome'])expect(params.has(key)).toBe(false);
 });

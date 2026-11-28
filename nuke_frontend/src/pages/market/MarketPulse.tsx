@@ -620,7 +620,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     const next = new URLSearchParams(params);
     next.set('make', nextMake ?? 'all');
     ['model', 'family', 'family_name', 'year', 'era', 'bidRange', 'day', 'series', 'salesScope', 'salesOffset', 'salesSnapshot', 'salesOutcome', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
-    if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
+    if (scopeKey?.startsWith('subject:')||scopeKey?.startsWith('descriptive:')) next.set('salesScope', scopeKey);
     next.delete('lot');
     setParams(next);
   };
