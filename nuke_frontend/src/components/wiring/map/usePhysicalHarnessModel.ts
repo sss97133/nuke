@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 import { readPhysicalSourceWorkspace, type PhysicalHarnessModel } from './physicalHarnessModel';
 
 interface Read { vehicleId?: string; viewerId?: string | null; model: PhysicalHarnessModel | null; error: string | null; loaded: boolean; refreshing: boolean }
+export type PhysicalHarnessRead = Read & { refresh: () => void };
 const EMPTY: Read = { model: null, error: null, loaded: false, refreshing: false };
-export function usePhysicalHarnessModel(vehicleId: string | undefined): Read {
+export function usePhysicalHarnessModel(vehicleId: string | undefined): PhysicalHarnessRead {
   const { session } = useAuth();
   const viewerId: string | null = session?.user?.id ?? null;
   const [read, setRead] = useState<Read>(EMPTY);
+  const refreshAction = useRef<(() => void) | null>(null);
+  const refreshNow = useCallback(() => { refreshAction.current?.(); }, []);
   useEffect(() => {
     let cancelled = false;
     let pending = false;
@@ -35,6 +38,7 @@ export function usePhysicalHarnessModel(vehicleId: string | undefined): Read {
       }
     };
     const recheck = () => { void refresh(); };
+    refreshAction.current = recheck;
     recheck();
     // The raw source includes fields outside the evaluation cursor. Recheck
     // actual content instead of claiming that cursor covers every source field.
@@ -43,9 +47,10 @@ export function usePhysicalHarnessModel(vehicleId: string | undefined): Read {
     document.addEventListener('visibilitychange', recheck);
     return () => {
       cancelled = true; controller?.abort(); window.clearInterval(timer);
+      if (refreshAction.current === recheck) refreshAction.current = null;
       window.removeEventListener('focus', recheck);
       document.removeEventListener('visibilitychange', recheck);
     };
   }, [vehicleId, viewerId]);
-  return read.vehicleId === vehicleId && read.viewerId === viewerId ? read : EMPTY;
+  return { ...(read.vehicleId === vehicleId && read.viewerId === viewerId ? read : EMPTY), refresh: refreshNow };
 }

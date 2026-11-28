@@ -1,15 +1,22 @@
 // Physical edges come from segment keys, never from sorting a circuit's ends.
 import { cavOf, wireGaugeDisplay } from './useWorkspaceSelection';
 export interface PhysicalCircuit {
-  id: string; code: string; name: string; section: string | null; design_status: string;
+  id: string; code: string; name: string | null; section: string | null; design_status: string | null;
+  gauge_awg?: number | null; colour?: string | null; wire_type?: string | null;
 }
-export interface PhysicalEndpoint { id: string; code: string; name: string; node_kind: string | null }
-export interface PhysicalTermination { id: string; circuit_id: string; endpoint_id: string; cavity: string | null; cavity_layout_id: string | null }
+export interface PhysicalEndpoint { id: string; code: string; name: string | null; node_kind: string | null; type?: string | null; part_number?: string | null }
+export interface PhysicalTermination {
+  id: string; circuit_id: string; endpoint_id: string; cavity: string | null; cavity_layout_id: string | null;
+  terminal_contact_catalog_id?: string | null; terminal_contact_pn?: string | null;
+  pin_seal_catalog_id?: string | null; pin_seal_pn?: string | null;
+  crimp_tool_catalog_id?: string | null; crimp_tool_pn?: string | null;
+}
 export interface PhysicalSegment {
   id: string; net_id: string; circuit_id: string; design_status: string | null;
   from_termination_id: string | null; to_termination_id: string | null;
   gauge_awg: number | null; circuit_gauge_awg: number | null; colour: string | null;
   keyed_part_number: string | null; planned_length_ft: number | null; measured_length_ft: number | null;
+  wire_part_id?: string | null; planned_length_method?: string | null; measured_at?: string | null; build_state?: string | null;
   link_state: 'linked' | 'incomplete' | 'stale'; specification_state: 'agrees' | 'incomplete' | 'conflict';
   legacy_check_state: 'unversioned' | 'not_checked';
 }
@@ -20,7 +27,10 @@ export interface PhysicalHarnessModel {
   circuits: PhysicalCircuit[]; endpoints: PhysicalEndpoint[]; terminations: PhysicalTermination[];
   segments: PhysicalSegment[]; connector_matings: PhysicalMating[];
   nets: { id: string }[];
+  unsegmented_end_records?: { id: string; circuit_id: string; endpoint_id: string; endpoint_node_kind: string | null }[];
   design_selection?: PhysicalDesignSelection;
+  read_at?: string;
+  source_snapshot_hash?: string;
 }
 
 export interface PhysicalDesignSelection {
@@ -46,7 +56,8 @@ export function readPhysicalSourceWorkspace(value: unknown, vehicleId: string): 
     || source.segments.some(s => selection.segment_ids.includes(s.id) && !selection.circuit_ids.includes(s.circuit_id))) {
     throw new Error('The physical wiring selection contains unavailable records.');
   }
-  return { ...source, snapshot_hash: envelope.snapshot_hash, design_selection: selection };
+  return { ...source, read_at: typeof envelope.read_at === 'string' ? envelope.read_at : undefined,
+    source_snapshot_hash: source.snapshot_hash, snapshot_hash: envelope.snapshot_hash, design_selection: selection };
 }
 
 /** Reject an incompatible or misrouted response instead of falling back to an invented legacy chain. */

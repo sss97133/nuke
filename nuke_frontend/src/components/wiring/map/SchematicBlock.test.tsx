@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { COLORWAYS } from '../connector-inspector/colorways';
 import { physicalSchematicPieces, readPhysicalHarnessModel, type PhysicalHarnessModel, type PhysicalSegment } from './physicalHarnessModel';
 import type { Rel } from './useWorkspaceSelection';
+import type { SourceRecordTarget } from './wiringSchedule';
 
 const transport = vi.hoisted(() => ({ rpc: vi.fn() }));
 const viewer = vi.hoisted(() => ({ id: null as string | null }));
@@ -61,9 +62,9 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
-async function render(id = vehicleId, isOwner = false) {
+async function render(id = vehicleId, isOwner = false, onPieceSelect?: (id: string) => void, onSourceSelect?: (target: SourceRecordTarget) => void) {
   await act(async () => root.render(<SchematicBlock cw={COLORWAYS.paper} vehicleId={id}
-    section="engine" sel="w:110" rel={rel} isOwner={isOwner} onSelect={onSelect} />));
+    section="engine" sel="w:110" rel={rel} isOwner={isOwner} onSelect={onSelect} onPieceSelect={onPieceSelect} onSourceSelect={onSourceSelect} />));
 }
 it('draws exactly the two keyed physical pieces, retaining a separate connector mate', async () => {
   await render();
@@ -193,4 +194,31 @@ it('clears the previous viewer records as soon as the signed-in identity changes
   await render();
   expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(0);
   expect(host.textContent).toContain('Reading the physical wiring model');
+});
+
+it('accounts for an unplaced piece by exact ID without manufacturing diagram endpoints', async () => {
+  model.segments[1].from_termination_id = null; model.segments[1].to_termination_id = null;
+  const pickPiece = vi.fn(); await render(vehicleId, false, pickPiece);
+  expect(host.querySelectorAll('[data-segment-id]')).toHaveLength(1);
+  const unplaced = host.querySelector('[data-unplaced-segment-id="piece-engine"]')!;
+  expect(unplaced.textContent).toContain('both ends need identification');
+  await act(async () => unplaced.querySelector('button')!.click());
+  expect(pickPiece).toHaveBeenCalledWith('piece-engine'); expect(onSelect).not.toHaveBeenCalled();
+  await act(async () => host.querySelector('[data-segment-id]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(pickPiece).toHaveBeenCalledWith('piece-cabin');
+});
+
+it('opens typed piece, termination and endpoint records and does not choose an arbitrary shared end', async () => {
+  model.circuits.push({ ...model.circuits[0], id: 'c2', code: 'RETURN' });
+  model.terminations.push({ ...model.terminations.find(t => t.id === 't1')!, id: 'shared-end', circuit_id: 'c2' });
+  model.segments.push({ ...model.segments[0], id: 'branch-piece', circuit_id: 'c2', from_termination_id: 'shared-end', to_termination_id: null });
+  const source = vi.fn(); await render(vehicleId, false, undefined, source);
+  const shared = host.querySelector('[data-termination-ids="t1,shared-end"]')!;
+  await act(async () => shared.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(source).toHaveBeenLastCalledWith({ kind: 'endpoints', id: 'ecu' });
+  await act(async () => host.querySelector('[data-termination-ids="t4"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(source).toHaveBeenLastCalledWith({ kind: 'ends', id: 't4' });
+  await act(async () => host.querySelector('[data-segment-id="piece-engine"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(source).toHaveBeenLastCalledWith({ kind: 'segments', id: 'piece-engine' });
+  expect(onSelect).not.toHaveBeenCalled();
 });
