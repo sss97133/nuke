@@ -2,23 +2,30 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 
 export type SalesSeries = 'selected' | 'benchmark';
+export type SalesMetric = 'recorded_sale_events' | 'captured_sell_through';
+export type SalesOutcome = 'known_bidding_outcome' | 'sold' | 'no_sale' | 'withdrawn' | 'unresolved';
 export type SalesScope = { kind: 'canonical_make'; canonical_make_id: string }
   | { kind: 'supported_subject'; subject_id: string };
 export interface SalesScopeOption { key: string; label: string; make: string; scope: SalesScope }
 export interface SalesWindow { event_from: string; event_to: string }
-export interface SalesDrill { bucket: string; series: SalesSeries }
+export interface SalesDrill { bucket: string; series: SalesSeries; offset?: number; snapshotHash?: string; outcome?: SalesOutcome }
 export interface SalesRequest extends SalesWindow {
-  metric: 'recorded_sale_events'; source_registry_slug: 'bringatrailer';
+  metric: SalesMetric; source_registry_slug: 'bringatrailer';
   benchmark: 'same_platform_excluding_scope'; scope: SalesScope; evidence_limit: number;
   evidence_bucket?: string; evidence_series?: SalesSeries;
+  reserve_policy?: 'all_recorded_policies'; evidence_offset?: number;
+  evidence_snapshot_hash?: string; evidence_outcome?: SalesOutcome;
 }
 export interface SalesPoint {
   bucket_start: string; series: SalesSeries; value: number | null; denominator: number | null;
   ratio: number | null; absolute_change: number | null; relative_change: number | null;
+  numerator?: number | null; difference_vs_benchmark?: number | null; value_reason?: string;
+  unit?: string;
   source_observed_at: string | null;
   coverage: {
-    captured_eligible: number | null; ended_pending: number | null; explicit_no_sale: number | null;
-    bid_to: number | null; sold_without_supported_amount: number | null;
+    captured_eligible: number | null; ended_pending?: number | null; explicit_no_sale: number | null;
+    bid_to?: number | null; sold_without_supported_amount?: number | null;
+    withdrawn?: number | null; unresolved?: number | null; captured_sold?: number | null;
     source_clock_known: number | null; source_clock_unknown: number | null;
     incomplete_bucket: boolean; bucket_elapsed_seconds: number; full_bucket_seconds: number;
   };
@@ -27,10 +34,15 @@ export interface SalesContributor {
   auction_event_id: string; vehicle_id: string; source_url: string; event_at: string;
   bucket_start: string; series: SalesSeries; source_read_basis: string;
   source_observed_at: string | null; latest_source_row_write: string | null;
+  outcome_class?: 'sold' | 'no_sale' | 'withdrawn' | 'unresolved'; source_outcome?: string | null;
+  outcome_reason?: string; numerator_contribution?: number; denominator_contribution?: number;
+  vehicle_identity?: { year: number | null; make: string | null; model: string | null };
 }
 export interface RecordedSalesReceipt extends SalesWindow {
   contract_version: number; metric_id: string; state: 'partial'; reason: string;
-  scope: { label?: string; comparison_basis?: string; comparison_scope_basis?: string };
+  unit?: string; method_id?: string; method_version?: number;
+  scope: { kind?: SalesScope['kind']; canonical_make_id?: string; subject_id?: string;
+    label?: string; comparison_basis?: string; comparison_scope_basis?: string };
   knowledge_cutoff: string; knowledge_mode: string; generated_at: string;
   candidate_limit: number; captured_candidates: number; truncated: boolean;
   coverage: {
@@ -38,21 +50,30 @@ export interface RecordedSalesReceipt extends SalesWindow {
     eligible_recorded_episodes: number | null; complete_external_capture: boolean;
   };
   series: SalesPoint[];
+  summary?: { series: SalesSeries; numerator: number | null; denominator: number | null;
+    ratio: number | null; withdrawn: number | null; unresolved: number | null }[];
   evidence: { has_more: boolean; per_bucket_series_limit: number; pagination_supported: boolean;
+    snapshot_hash?: string; offset?: number; next_offset?: number | null; outcome_filter?: SalesOutcome;
     contributors: SalesContributor[] };
 }
 export type SalesResponse = RecordedSalesReceipt | { state: 'unavailable'; reason: string };
 
 /** Full UTC days: today is excluded, so even seven days stays within the RPC's limit. */
-export function recordedSalesWindow(days: 2 | 7, now = Date.now()): SalesWindow {
+export function recordedSalesWindow(days: 2 | 7, now = Date.now(), weeksBack = 0): SalesWindow {
   const date = new Date(now);
-  const end = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const back = Number.isInteger(weeksBack) && weeksBack >= 0 && weeksBack <= 3 ? weeksBack : 0;
+  const end = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - back * 7 * 86_400_000;
   return { event_from: new Date(end - days * 86_400_000).toISOString(), event_to: new Date(end).toISOString() };
 }
 
-export function recordedSalesRequest(scope: SalesScope, window: SalesWindow, drill: SalesDrill | null): SalesRequest {
-  return { metric: 'recorded_sale_events', source_registry_slug: 'bringatrailer',
+export function recordedSalesRequest(scope: SalesScope, window: SalesWindow, drill: SalesDrill | null,
+  metric: SalesMetric = 'recorded_sale_events'): SalesRequest {
+  return { metric, source_registry_slug: 'bringatrailer',
     benchmark: 'same_platform_excluding_scope', scope, ...window, evidence_limit: 20,
+    ...(metric === 'captured_sell_through' ? { reserve_policy: 'all_recorded_policies' as const,
+      ...(drill?.offset ? { evidence_offset: drill.offset } : {}),
+      ...(drill?.snapshotHash ? { evidence_snapshot_hash: drill.snapshotHash } : {}),
+      ...(drill?.outcome ? { evidence_outcome: drill.outcome } : {}) } : {}),
     ...(drill ? { evidence_bucket: drill.bucket, evidence_series: drill.series } : {}) };
 }
 
@@ -90,11 +111,49 @@ export async function fetchRecordedSales(request: SalesRequest): Promise<SalesRe
   const { data, error } = await supabase.rpc('get_market_trends', { p_request: request });
   if (error) throw error;
   if (data?.state === 'unavailable' && typeof data.reason === 'string') return data as SalesResponse;
-  if (!data || data.state !== 'partial' || data.contract_version !== 1 || data.metric_id !== 'recorded_sale_events'
+  if (!data || data.state !== 'partial' || data.contract_version !== 1 || data.metric_id !== request.metric
     || !Array.isArray(data.series) || !data.evidence || !Array.isArray(data.evidence.contributors)) {
     throw new Error('Unsupported recorded-sales receipt');
   }
+  if (request.metric === 'captured_sell_through') assertCapturedOutcomes(data, request);
   return data as RecordedSalesReceipt;
+}
+
+/** A captured rate can only be drawn when its source counts and fraction agree. */
+function assertCapturedOutcomes(data: RecordedSalesReceipt, request: SalesRequest) {
+  const fail = () => { throw new Error('Unsupported captured-outcome receipt'); };
+  const count = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+  const fraction = (value: unknown, numerator: unknown, denominator: unknown) => {
+    if (data.truncated) return value === null && numerator === null && denominator === null;
+    if (!count(numerator) || !count(denominator) || numerator > denominator) return false;
+    return denominator === 0 ? value === null : typeof value === 'number' && Number.isFinite(value)
+      && value >= 0 && value <= 1 && Math.abs(value - numerator / denominator) < 1e-12;
+  };
+  const unit = 'fraction_of_known_retained_bidding_outcomes';
+  if (data.scope?.kind !== request.scope.kind
+    || (request.scope.kind === 'canonical_make' ? data.scope.canonical_make_id !== request.scope.canonical_make_id
+      : data.scope.subject_id !== request.scope.subject_id)
+    || Date.parse(data.event_from) !== Date.parse(request.event_from) || Date.parse(data.event_to) !== Date.parse(request.event_to)
+    || data.unit !== unit || data.method_id !== 'captured_auction_outcomes' || data.method_version !== 1
+    || data.knowledge_mode !== 'current_recorded_state' || data.coverage.complete_external_capture !== false
+    || !data.summary || data.summary.length !== 2 || new Set(data.summary.map(s => s.series)).size !== 2
+    || data.summary.some(s => !['selected', 'benchmark'].includes(s.series) || !fraction(s.ratio,s.numerator,s.denominator))
+    || !/^[0-9a-f]{32}$/.test(data.evidence.snapshot_hash ?? '')
+    || data.evidence.pagination_supported !== true || !count(data.evidence.offset) || data.evidence.offset > 2000
+    || (data.evidence.has_more && (!count(data.evidence.next_offset)
+      || data.evidence.next_offset <= data.evidence.offset || data.evidence.next_offset > 2000))) fail();
+  const keys = new Set<string>();
+  for (const p of data.series) {
+    const key = `${p.bucket_start}:${p.series}`;
+    if (p.unit !== unit || !['selected', 'benchmark'].includes(p.series) || !Number.isFinite(Date.parse(p.bucket_start))
+      || keys.has(key) || !fraction(p.value,p.numerator,p.denominator) || p.ratio !== p.value) fail();
+    keys.add(key);
+  }
+  for (const c of data.evidence.contributors) {
+    if (!['sold', 'no_sale', 'withdrawn', 'unresolved'].includes(c.outcome_class ?? '')
+      || c.numerator_contribution !== (c.outcome_class === 'sold' ? 1 : 0)
+      || c.denominator_contribution !== (c.outcome_class === 'sold' || c.outcome_class === 'no_sale' ? 1 : 0)) fail();
+  }
 }
 
 export function useSalesScopes() {
@@ -114,7 +173,8 @@ export function useRecordedSales(request: SalesRequest | null) {
     // Keep the chart while a focused evidence read arrives, but never carry one population into another.
     placeholderData: (data, previousQuery) => {
       const previous = previousQuery?.queryKey[1] as SalesRequest | null | undefined;
-      return request && previous && request.event_from === previous.event_from && request.event_to === previous.event_to
+      return request && previous && request.metric === previous.metric
+        && request.event_from === previous.event_from && request.event_to === previous.event_to
         && JSON.stringify(request.scope) === JSON.stringify(previous.scope) ? data : undefined;
     } });
 }

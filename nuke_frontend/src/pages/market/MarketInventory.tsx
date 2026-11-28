@@ -4,7 +4,7 @@ import { Text } from '../../kit';
 import CapturedListings from './CapturedListings';
 const MarketPulse = lazy(() => import('./MarketPulse'));
 const AuctionCalendar = lazy(() => import('./AuctionCalendar'));
-const AUCTION_LENS_PARAMS = ['view', 'lot', 'make', 'model', 'live', 'sort', 'bidRange', 'inspect', 'day', 'salesScope', 'days', 'benchmark', 'series', 'board'];
+const AUCTION_LENS_PARAMS = ['view', 'lot', 'make', 'model', 'live', 'sort', 'bidRange', 'inspect', 'day', 'salesScope', 'salesMetric', 'salesOffset', 'salesSnapshot', 'salesOutcome', 'weeksBack', 'days', 'benchmark', 'series', 'board'];
 const COLLECTIONS = [
   { key: 'auctions', label: 'BaT live auctions' },
   { key: 'calendar', label: 'Calendar' },
