@@ -50,18 +50,25 @@ def retained_links(origin,key,catalog,pages):
       and isinstance(catalogs[0].get('id'),str) and membership.UUID.fullmatch(catalogs[0]['id']) is not None,
       'Catalog source identity differs or is ambiguous')
     catalog_id=catalogs[0]['id']
-    params=urllib.parse.urlencode({'select':'catalog_page_number,reference_document_id,document_page_id,page_mapping_receipt',
-                                  'catalog_id':'eq.'+catalog_id,'limit':'5000'})
-    links=membership.service_json(origin+'/rest/v1/catalog_reference_documents?'+params,key)
-    membership.require(isinstance(links,list),'Unexpected catalog source links')
-    edition=catalog['full_pdf_sha256'];by_page={}
-    for link in links:
-        receipt=link.get('page_mapping_receipt')
-        if not isinstance(receipt,dict) or receipt.get('full_pdf_sha256')!=edition:
-            continue
-        page=link.get('catalog_page_number')
-        membership.require(isinstance(page,int) and not isinstance(page,bool) and page not in by_page,'Duplicate catalog page links')
-        by_page[page]=link
+    edition=catalog['full_pdf_sha256'];by_page={};offset=0;batch_size=500
+    while True:
+        params=urllib.parse.urlencode({'select':'catalog_page_number,reference_document_id,document_page_id,page_mapping_receipt',
+          'catalog_id':'eq.'+catalog_id,'page_mapping_receipt->>full_pdf_sha256':'eq.'+edition,
+          'order':'reference_document_id.asc','limit':str(batch_size),'offset':str(offset)})
+        links=membership.service_json(origin+'/rest/v1/catalog_reference_documents?'+params,key)
+        membership.require(isinstance(links,list) and len(links)<=batch_size,'Unexpected catalog source links')
+        for link in links:
+            receipt=link.get('page_mapping_receipt')
+            membership.require(isinstance(receipt,dict) and receipt.get('full_pdf_sha256')==edition,
+                               'Catalog edition filter returned different source links')
+            page=link.get('catalog_page_number')
+            membership.require(isinstance(page,int) and not isinstance(page,bool) and 1<=page<=5000,
+                               'Invalid catalog page link')
+            membership.require(page not in by_page,'Duplicate catalog page links')
+            by_page[page]=link
+        if len(links)<batch_size:
+            break
+        offset+=len(links)
     for item in pages:
         source=item['source'];page=source['catalog_page_number'];link=by_page.get(page)
         membership.require(isinstance(link,dict) and link.get('reference_document_id')==source['document_id']

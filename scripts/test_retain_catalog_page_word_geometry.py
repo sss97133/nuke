@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from pathlib import Path
 from unittest.mock import patch
 
@@ -53,6 +54,30 @@ class Contract(unittest.TestCase):
    return rows+rows if '/catalog_reference_documents?' in url else rows
   with patch.object(client.membership,'service_json',side_effect=duplicate):
    with self.assertRaisesRegex(RuntimeError,'Duplicate catalog page'):client.retained_links('https://p.supabase.co','sb_secret_test',self.catalog,[dict(self.item)])
+ def test_catalog_links_page_past_api_cap_and_hold_cross_batch_duplicates(self):
+  rows=[]
+  for n in range(1,1003):
+   rows.append({'catalog_page_number':n,'reference_document_id':f'10000000-0000-4000-8000-{n:012d}',
+    'document_page_id':f'20000000-0000-4000-8000-{n:012d}',
+    'page_mapping_receipt':{'full_pdf_sha256':'f'*64,'word_geometry_sha256':self.geo_hash,'source_pdf_sha256':'a'*64}})
+  selected={'source':dict(self.source,catalog_page_number=1002,document_id=rows[-1]['reference_document_id']),
+            'geometry':self.geometry,'word_count':1}
+  offsets=[]
+  def paginated(url,key,**kw):
+   if '/catalog_sources?' in url:return self.service(url,key,**kw)
+   query=urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+   self.assertEqual(query['page_mapping_receipt->>full_pdf_sha256'],['eq.'+'f'*64])
+   self.assertEqual(query['order'],['reference_document_id.asc'])
+   self.assertEqual(query['limit'],['500'])
+   start=int(query['offset'][0]);offsets.append(start)
+   return rows[start:start+500]
+  with patch.object(client.membership,'service_json',side_effect=paginated):
+   pages=[dict(selected)];self.assertEqual(client.retained_links('https://p.supabase.co','sb_secret_test',self.catalog,pages),self.catalog_id)
+   self.assertEqual(pages[0]['document_page_id'],rows[-1]['document_page_id'])
+   self.assertEqual(offsets,[0,500,1000])
+   rows[1000]['catalog_page_number']=1
+   with self.assertRaisesRegex(RuntimeError,'Duplicate catalog page'):
+    client.retained_links('https://p.supabase.co','sb_secret_test',self.catalog,[dict(selected)])
  def test_default_is_read_only_and_execute_uses_protected_mode(self):
   manifest=self.root/'manifest.json';manifest.write_text('{}')
   def run(execute):
