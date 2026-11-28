@@ -290,6 +290,48 @@ final class NavigationUITests: XCTestCase {
         }
     }
 
+    func testVehicleWorkShortcutReachesLaborAndReturns() {
+        for mode in ["stale", "empty"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+            app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_LABOR_STATE": mode,
+                                     "NUKE_FIXTURE_WORK_SHORTCUT": "1", "NUKE_FIXTURE_SWITCH_ACCOUNT": "1"]
+            app.launch()
+            let garage = app.tabBars.buttons["Garage"].firstMatch
+            XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+            let vehicle = app.staticTexts["1973 Fixture Coupe"].firstMatch
+            XCTAssertTrue(vehicle.waitForExistence(timeout: 10)); vehicle.tap()
+            let shortcut = app.buttons["vehicle.work-labor"].firstMatch
+            guard reveal(shortcut, in: app, swipes: 5) else { XCTFail("Work shortcut not reachable before the gallery"); return }
+            shortcut.tap()
+            XCTAssertTrue(app.navigationBars["Work & labor"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.staticTexts["1973 FIXTURE COUPE"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.staticTexts["No jobs on this vehicle yet."].waitForExistence(timeout: 10))
+            if mode == "stale" {
+                XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "An update is needed")).firstMatch.waitForExistence(timeout: 10))
+                let engine = app.buttons.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "engine", "8 h to 16 h")).firstMatch
+                guard reveal(engine, in: app) else { XCTFail("Labor engine row unavailable"); return }
+                engine.tap()
+                XCTAssertTrue(app.staticTexts["labor-source-unavailable-engine"].waitForExistence(timeout: 5))
+            } else {
+                XCTAssertTrue(app.staticTexts["labor.empty"].waitForExistence(timeout: 10))
+            }
+            let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "vehicle-work-shortcut-\(mode)"; shot.lifetime = .keepAlways; add(shot)
+            if mode == "stale" {
+                app.buttons["fixture.switch-account"].tap()
+                let refused = app.staticTexts["Your account changed. Return to the vehicle and reopen Work & labor."]
+                let explore = app.navigationBars["Explore"]
+                XCTAssertTrue(refused.waitForExistence(timeout: 3) || explore.waitForExistence(timeout: 5))
+                XCTAssertFalse(app.staticTexts["labor-source-unavailable-engine"].exists)
+            } else {
+                app.navigationBars["Work & labor"].buttons.firstMatch.tap()
+                XCTAssertTrue(app.buttons["vehicle.work-labor"].waitForExistence(timeout: 5))
+            }
+            XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+            app.terminate()
+        }
+    }
+
     /// The garage cards (garage-cards fixture): newest activity first under year headings, the undated car last,
     /// the price only from the profile's masthead Claim, the log book read from the card's menu, and no writes.
     func testGarageCardsOrderByActivityAndOpenTheLogBook() {

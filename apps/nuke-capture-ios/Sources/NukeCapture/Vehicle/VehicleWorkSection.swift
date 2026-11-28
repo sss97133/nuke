@@ -12,22 +12,30 @@ struct VehicleWorkSection: View {
     /// The vehicle page knows the viewer owns it; uploaders and access holders post from their profile.
     var ownerContext = false
     var vehicleTitle: String? = nil
+    /// A separately opened screen can outlive its parent account context; wait for the reader's own verdict.
+    var requireAuthoritativeAccess = false
 
     @Environment(\.vehicleListingContext) private var listingContext
     @State private var jobs: JobLoad<MyWorkOrders> = .loading
 
     /// The reader's vehicle_access decides when it states it (owners and access holders alike); else the page's owner check.
-    static func postEntry(signedIn: Bool, ownerContext: Bool, jobs: JobLoad<MyWorkOrders>) -> VehicleWorkCard.PostEntry {
+    static func postEntry(signedIn: Bool, ownerContext: Bool, jobs: JobLoad<MyWorkOrders>,
+                          requireAuthoritativeAccess: Bool = false) -> VehicleWorkCard.PostEntry {
         guard signedIn else { return .none }
         if case .loaded(let page) = jobs, let can = page.canPostWorkRequest { return can ? .post : .inspect }
+        if requireAuthoritativeAccess { return .none }
         return ownerContext ? .post : .inspect
     }
 
     var body: some View {
-        VehicleWorkCard(vehicleId: vehicleId, jobs: jobs, planEntry: listingContext,
-                        postEntry: Self.postEntry(signedIn: SupabaseService.currentUserId != nil, ownerContext: ownerContext, jobs: jobs),
-                        vehicleTitle: vehicleTitle)
-            .task(id: vehicleId) { jobs = await JobReaders.vehicleWorkOrders(vehicleId: vehicleId) }
+        // Keep a concrete task host even when the loading card has no action to render.
+        VStack(alignment: .leading, spacing: 0) {
+            VehicleWorkCard(vehicleId: vehicleId, jobs: jobs, planEntry: listingContext,
+                            postEntry: Self.postEntry(signedIn: SupabaseService.currentUserId != nil, ownerContext: ownerContext, jobs: jobs,
+                                                      requireAuthoritativeAccess: requireAuthoritativeAccess),
+                            vehicleTitle: vehicleTitle)
+        }
+        .task(id: vehicleId) { jobs = await JobReaders.vehicleWorkOrders(vehicleId: vehicleId) }
     }
 }
 
