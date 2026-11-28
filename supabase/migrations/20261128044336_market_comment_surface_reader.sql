@@ -14,7 +14,7 @@ DO $$ BEGIN
   END IF;
   IF to_regprocedure('public.popup_vehicle_intel(uuid,uuid,jsonb)') IS NOT NULL
     AND (SELECT md5(prosrc) FROM pg_proc WHERE oid=to_regprocedure('public.popup_vehicle_intel(uuid,uuid,jsonb)'))
-      <> '441884d785078d7cae35aa9a49a50d04' THEN
+      <> 'd3048a22eafa1dccdcadac5d73069c1e' THEN
     RAISE EXCEPTION 'Auction comment measurement reader differs from the reviewed body';
   END IF;
 END $$;
@@ -208,7 +208,10 @@ BEGIN
           'source_comment_type',f.comment_type,'is_seller',f.is_seller,'posted_at',f.posted_at,'db_recorded_at',f.created_at,
           'characters',CASE WHEN f.has_text THEN f.characters END,
           'whitespace_tokens',CASE WHEN f.has_text THEN f.whitespace_tokens END,
-          'question_marks',CASE WHEN f.has_text THEN f.question_marks END,'media_reference_count',f.media_links,
+          'question_marks',CASE WHEN f.has_text THEN f.question_marks END,
+          'url_marker',CASE WHEN f.has_text THEN f.url_marker END,
+          'numeric_unit_marker',CASE WHEN f.has_text THEN f.numeric_unit_marker END,
+          'external_identity_id',f.keyed_identity,'media_reference_count',f.media_links,
           'excerpt',CASE WHEN f.has_text THEN left(f.comment_text,600) END,
           'excerpt_truncated',coalesce(f.characters>600,false)) ORDER BY f.ordinal)
           FROM filtered f WHERE f.ordinal>v_offset AND f.ordinal<=v_offset+20),'[]'::jsonb)))

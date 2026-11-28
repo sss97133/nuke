@@ -53,7 +53,8 @@ INSERT INTO auction_comments SELECT ('30000000-0000-4000-8000-'||lpad(g::text,12
  '10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','question',null,
  now()-interval '2 days'+g*interval '1 second',CASE WHEN g=25 THEN now()-interval '12 hours' ELSE now()-interval '2 days'+g*interval '1 second' END,
  g%2=0,CASE WHEN g<=20 THEN '90000000-0000-4000-8000-000000000001'::uuid ELSE '90000000-0000-4000-8000-000000000002'::uuid END,
- CASE WHEN g=1 THEN E'\tShow 10 psi?\n' WHEN g=2 THEN '😀 Show 10 psi?' ELSE 'Show 10 psi?' END,
+ CASE WHEN g=1 THEN E'\tShow 10 psi?\n' WHEN g=2 THEN '😀 Show 10 psi?'
+  WHEN g=3 THEN 'See https://example.org 10 psi?' ELSE 'Show 10 psi?' END,
  null,1000+g,'https://bringatrailer.com/listing/native-fixture/' FROM generate_series(1,25) g;
 INSERT INTO auction_comments(id,vehicle_id,auction_event_id,comment_type,posted_at,created_at,comment_text,media_urls,is_seller,source_url) VALUES
  ('30000000-0000-4000-8000-000000000026','10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','seller_response',now()-interval '46 hours',now()-interval '46 hours',null,ARRAY['https://bringatrailer.com/retained-media'],true,'https://bringatrailer.com/listing/native-fixture/'),
@@ -70,12 +71,17 @@ DO $$ DECLARE r jsonb; n jsonb; q jsonb; h text; bad jsonb; g integer; BEGIN
  PERFORM pg_temp.check_it(r->>'state'='partial' AND r->>'method_id'='auction_comment_surface','typed method receipt');
  PERFORM pg_temp.check_it(r#>>'{features,discussion_entries}'='27' AND r#>>'{features,text_entries}'='25','eligible entries exclude unknown clocks/bids/system');
  PERFORM pg_temp.check_it(r#>>'{features,media_only_entries}'='1' AND r#>>'{features,no_captured_text_or_media_entries}'='1','media and whitespace-only entries separated');
- PERFORM pg_temp.check_it(r#>>'{features,whitespace_tokens}'='76' AND r#>>'{features,question_mark_entries}'='25'
+ PERFORM pg_temp.check_it(r#>>'{features,whitespace_tokens}'='77' AND r#>>'{features,question_mark_entries}'='25'
   AND r#>>'{features,numeric_unit_marker_entries}'='25','SQL literal patterns and whitespace runs');
  PERFORM pg_temp.check_it(r#>>'{coverage,unknown_event_time}'='1' AND r#>>'{coverage,unknown_recording_time}'='1','unknown clocks explicit');
  PERFORM pg_temp.check_it(r#>>'{features,keyed_participant_count}'='2' AND r#>>'{features,unkeyed_participant_entries}'='2','platform keys, no handle identity inference');
  PERFORM pg_temp.check_it(r#>>'{units,expertise}'='unmeasured' AND r->'historical_forecast_receipt'='false','no inferred expertise or historical forecast badge');
  PERFORM pg_temp.check_it(jsonb_array_length(r#>'{evidence,contributors}')=20 AND r#>>'{evidence,next_offset}'='20','bounded first page');
+ PERFORM pg_temp.check_it(r#>>'{features,url_marker_entries}'='1'
+  AND r#>'{evidence,contributors,2,url_marker}'='true'
+  AND r#>'{evidence,contributors,2,numeric_unit_marker}'='true'
+  AND r#>>'{evidence,contributors,2,external_identity_id}'='90000000-0000-4000-8000-000000000001',
+  'aggregate patterns and participant identity remain inspectable in their source contribution');
  q:=jsonb_build_object('event_cutoff',r->>'event_cutoff','recorded_cutoff',r->>'recorded_cutoff','offset',20,'snapshot_hash',r#>>'{evidence,snapshot_hash}');
  n:=popup_vehicle_intel('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001',q);
  PERFORM pg_temp.check_it(n#>>'{evidence,snapshot_hash}'=r#>>'{evidence,snapshot_hash}' AND jsonb_array_length(n#>'{evidence,contributors}')=7,'pinned second page');
