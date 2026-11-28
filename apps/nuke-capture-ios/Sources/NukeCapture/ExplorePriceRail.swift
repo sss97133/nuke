@@ -240,7 +240,7 @@ enum ExploreWhyStack {
                 if let b = dollars(e.bidAtEstimate) { out.append(ExploreWhyRow(label: "Bid at estimate", value: b)) }
                 out.append(ExploreWhyRow(label: "Estimated", value: e.estimatedAt.formatted(date: .abbreviated, time: .shortened)))
             } else {
-                out.append(ExploreWhyRow(label: "Projection", value: "No fresh projection for this lot"))
+                out.append(ExploreWhyRow(label: "Projection", value: "No fresh projection was returned for this lot"))
             }
             out.append(ExploreWhyRow(label: "Source", value: item.source, url: item.link))
         }
@@ -273,9 +273,17 @@ struct ExploreWhySheet: View {
     let why: ExploreWhy
     /// Opens the existing cohort page; the feed closes this sheet first.
     let onCohort: (CohortTarget) -> Void
-    private enum AnalogState { case loading, failed(String), loaded([FinishAnalog]) }
+    private enum AnalogState { case loading, failed(String, episode: Bool), loaded([FinishAnalog]) }
     @State private var analogs: AnalogState = .loading
+    @State private var episode: EpisodeFinish?
     @Environment(\.dismiss) private var dismiss
+
+    private var displayedWhy: ExploreWhy {
+        ExploreWhy(item: why.item, estimate: episode?.estimate ?? why.estimate, fresh: episode != nil || why.fresh)
+    }
+    private var readKey: String {
+        "\(why.item.id)|\(why.item.link?.absoluteString ?? "")|\(why.item.liveStatusUnavailable)"
+    }
 
     var body: some View {
         NavigationStack {
@@ -289,22 +297,23 @@ struct ExploreWhySheet: View {
                     }
                 } else {
                     Section {
-                        ForEach(ExploreWhyStack.rows(item: why.item, estimate: why.estimate, fresh: why.fresh)) { row in
+                        ForEach(ExploreWhyStack.rows(item: why.item, estimate: displayedWhy.estimate, fresh: displayedWhy.fresh)) { row in
                             rowView(row)
                         }
                     } footer: {
-                        if let footer = why.footer { Text(footer) }
+                        if let footer = displayedWhy.footer { Text(footer) }
                     }
                     if why.item.kind == .live {
                         Section("Comparable lots") {
                             switch analogs {
                             case .loading:
                                 ProgressView()
-                            case .failed(let reason):
-                                Text("Couldn't load comparable lots.").font(.footnote).foregroundStyle(.secondary)
+                            case .failed(let reason, let episode):
+                                Text(episode ? "Couldn't load price context." : "Couldn't load comparable lots.")
+                                    .font(.footnote).foregroundStyle(.secondary)
                                 Text(reason).font(.footnote).foregroundStyle(.secondary)
                                     .accessibilityIdentifier("comparable-read-failure")
-                                Button("Retry comparable lots") { Task { await loadAnalogs() } }
+                                Button(episode ? "Retry price context" : "Retry comparable lots") { Task { await loadAnalogs() } }
                             case .loaded(let rows):
                                 if rows.isEmpty {
                                     Text("No comparable lots were returned for this one.").font(.footnote).foregroundStyle(.secondary)
@@ -318,7 +327,7 @@ struct ExploreWhySheet: View {
             .navigationTitle(why.item.liveStatusUnavailable ? "Price details" : why.rail.detailsTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task { await loadAnalogs() }
+            .task(id: readKey) { await loadAnalogs() }
         }
         .presentationDetents([.medium, .large])
     }
@@ -357,15 +366,36 @@ struct ExploreWhySheet: View {
 
     /// The same read the Market board's bid sheet makes; lots only, one vehicle.
     private func loadAnalogs() async {
-        guard why.item.kind == .live, let id = why.item.lotId else { return }
+        episode = nil
+        guard why.item.kind == .live, !why.item.liveStatusUnavailable, let id = why.item.lotId else { return }
         analogs = .loading
+        // The older reader is vehicle-keyed and may withhold a relisted lot. Ask the
+        // source-bound reader only when the card did not already receive an estimate.
+        if why.estimate == nil, let url = why.item.link?.absoluteString, EpisodeFinish.canonicalListing(url) != nil {
+            do {
+                let exact = try await EpisodeFinish.read(vehicleId: id, listingURL: url)
+                guard !Task.isCancelled else { return }
+                if let exact {
+                    episode = exact
+                    analogs = .loaded(exact.analogs)
+                    return
+                }
+                // A vehicle-only fallback could name an earlier or simultaneous auction.
+                analogs = .loaded([])
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                analogs = .failed(ReadFailure.text(error), episode: true)
+                return
+            }
+        }
         do {
             let rows = try await FinishBoard.readAnalogs(vehicleId: id)
             guard !Task.isCancelled else { return }
             analogs = .loaded(rows)
         } catch {
             guard !Task.isCancelled else { return }
-            analogs = .failed(ReadFailure.text(error))
+            analogs = .failed(ReadFailure.text(error), episode: false)
         }
     }
 }

@@ -240,7 +240,7 @@ final class ExplorePagerTests: XCTestCase {
         let fresh = ExploreWhyStack.rows(item: lot, estimate: estimate(), fresh: true).map(\.label)
         XCTAssertTrue(fresh.contains("Model") && fresh.contains("Grade") && fresh.contains("Comps through") && fresh.contains("Factor"))
         let stale = ExploreWhyStack.rows(item: lot, estimate: estimate(), fresh: false)
-        XCTAssertEqual(stale.first?.value, "No fresh projection for this lot")
+        XCTAssertEqual(stale.first?.value, "No fresh projection was returned for this lot")
     }
 
     func testFactorLinesReadDictionariesAndLists() {

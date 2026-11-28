@@ -10,6 +10,7 @@
 
 import SwiftUI
 import Supabase
+import CoreFoundation
 
 /// One open lot, as the board returns it.
 struct LiveAuction: Decodable, Identifiable {
@@ -447,6 +448,74 @@ struct FinishBoard: Equatable {
 
     static func fetchAnalogs(vehicleId: String) async -> [FinishAnalog] {
         (try? await readAnalogs(vehicleId: vehicleId)) ?? []
+    }
+}
+
+/// A projection returned for one exact, verified auction episode. The ordinary finish board is
+/// keyed by vehicle; a vehicle may have another listing, so this read also checks the source URL.
+struct EpisodeFinish: Equatable {
+    let estimate: FinishEstimate
+    let analogs: [FinishAnalog]
+
+    static func canonicalListing(_ raw: String) -> String? {
+        let value = raw.hasSuffix("/") ? String(raw.dropLast()) : raw
+        guard value.range(of: #"^https://bringatrailer\.com/listing/[A-Za-z0-9._~%-]+$"#,
+                          options: .regularExpression) != nil else { return nil }
+        return value
+    }
+
+    static func decode(_ data: Data, vehicleId: String, listingURL: String) -> EpisodeFinish? {
+        guard let id = UUID(uuidString: vehicleId)?.uuidString.lowercased(),
+              let source = canonicalListing(listingURL),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              obj["fresh"] as? Bool == true, let rows = obj["rows"] as? [[String: Any]] else { return nil }
+        let matching = rows.filter {
+            ($0["vehicle_id"] as? String)?.lowercased() == id
+                && ($0["listing_url"] as? String).flatMap(canonicalListing) == source
+        }
+        guard rows.count == 1, matching.count == 1, let row = matching.first,
+              let event = row["auction_event_id"] as? String, let eventID = UUID(uuidString: event),
+              eventID.uuidString != "00000000-0000-0000-0000-000000000000",
+              let model = row["model"] as? Int, model == 32,
+              let estimatedAt = (row["estimated_at"] as? String).flatMap(ProfileClock.date) else { return nil }
+        func number(_ name: String) -> Double? {
+            let raw = row[name]
+            if let n = raw as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID(), n.doubleValue.isFinite { return n.doubleValue }
+            if let s = raw as? String, let n = Double(s), n.isFinite { return n }
+            return nil
+        }
+        guard let estimate = number("estimate"), let low = number("low"), let high = number("high"),
+              low > 0, low <= estimate, estimate <= high else { return nil }
+        let grade = row["grade"] as? String
+        let value = FinishEstimate(vehicleId: id, estimate: estimate, low: low, high: high,
+                                   grade: ["A", "B", "C"].contains(grade ?? "") ? grade : nil,
+                                   coverage: number("coverage"), sentence: row["sentence"] as? String,
+                                   estimatedAt: estimatedAt, bidAtEstimate: number("bid_at_estimate"),
+                                   compsThrough: row["comps_through"] as? String, model: "32")
+        let wrapped: [String: Any] = ["analogs": [id: row["analogs"] as? [[String: Any]] ?? []]]
+        guard let analogData = try? JSONSerialization.data(withJSONObject: wrapped) else { return nil }
+        return EpisodeFinish(estimate: value, analogs: FinishBoard.decodeAnalogs(analogData, vehicleId: id))
+    }
+
+    private struct Lot: Encodable { let vehicle_id: String; let listing_url: String }
+    private struct Params: Encodable { let p_lots: [Lot] }
+    private enum ReadError: LocalizedError {
+        case invalidResponse
+        var errorDescription: String? { "The price context response could not be verified." }
+    }
+
+    static func read(vehicleId: String, listingURL: String) async throws -> EpisodeFinish? {
+        guard let id = UUID(uuidString: vehicleId)?.uuidString.lowercased(),
+              let source = canonicalListing(listingURL) else { return nil }
+        let params = Params(p_lots: [Lot(vehicle_id: id, listing_url: source)])
+        let data = try await SupabaseService.client.rpc("live_finish_episode_estimates", params: params).execute().data
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let fresh = obj["fresh"] as? Bool, let rows = obj["rows"] as? [[String: Any]] else {
+            throw ReadError.invalidResponse
+        }
+        if rows.isEmpty { return nil }
+        guard fresh, let value = decode(data, vehicleId: id, listingURL: source) else { throw ReadError.invalidResponse }
+        return value
     }
 }
 
