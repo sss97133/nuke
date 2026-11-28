@@ -123,6 +123,9 @@ enum ExploreFeedPaging {
     static let livePage = 40
     static let askPage = 40
     static let tunedAskPage = 100
+    /// classified_ask_board clamps the starting offset to 5,000.
+    static let askOffsetLimit = 5_000
+    static let askLimitMessage = "You've reached the browsing limit for classified listings. More may be available; adjust filters or refresh."
     /// The next page starts loading when a card this close to the end appears.
     static let lookahead = 6
     /// Pages read in a row that add no card (all tuned out, hidden or already shown) before the feed waits.
@@ -134,6 +137,20 @@ enum ExploreFeedPaging {
 
     /// The ask board returned fewer rows than asked: it has no more.
     static func exhausted(read: Int, asked: Int) -> Bool { read < asked }
+
+    struct AskProgress {
+        let nextOffset: Int
+        let exhausted: Bool
+        let limited: Bool
+    }
+
+    static func askProgress(offset: Int, read: Int, asked: Int) -> AskProgress {
+        let start = min(max(offset, 0), askOffsetLimit)
+        if exhausted(read: read, asked: asked) { return AskProgress(nextOffset: start, exhausted: true, limited: false) }
+        if start == askOffsetLimit { return AskProgress(nextOffset: start, exhausted: true, limited: true) }
+        let advance = min(max(read, 0), askOffsetLimit - start)
+        return AskProgress(nextOffset: start + advance, exhausted: false, limited: false)
+    }
 
     static func nextCards(live: [ExploreFeedItem], classified: [ExploreFeedItem], existing: Set<String>,
                           prefs: ExplorePreferences) -> [ExploreFeedItem] {
@@ -189,6 +206,7 @@ struct ExploreFeedView: View {
     @State private var liveShown = 0
     @State private var askOffset = 0
     @State private var askExhausted = true
+    @State private var askLimited = false
     @State private var reloading = false
     @State private var loadingMore = false
     @State private var moreFailure: String?
@@ -252,6 +270,10 @@ struct ExploreFeedView: View {
                         NukeEmptyState(icon: "wifi.exclamationmark", title: "Some cars couldn't load",
                                        message: "\(missingSource.title) \(missingSource.reason)",
                                        actionTitle: "Try again") { Task { await load() } }
+                        if askLimited {
+                            Text(ExploreFeedPaging.askLimitMessage)
+                                .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        }
                         if let moreFailure {
                             Text("Couldn't load more classified listings. \(moreFailure)")
                                 .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -283,6 +305,10 @@ struct ExploreFeedView: View {
                     NukeEmptyState(icon: "magnifyingglass", title: "More listings to check",
                                    message: "No cars to show in the pages checked so far.",
                                    actionTitle: "Search more") { Task { await loadMore() } }
+                } else if askLimited {
+                    NukeEmptyState(icon: "magnifyingglass", title: "Classified browsing limit reached",
+                                   message: ExploreFeedPaging.askLimitMessage,
+                                   actionTitle: "Adjust filters") { showTune = true }
                 } else if tuning.isActive {
                     NukeEmptyState(icon: "slider.horizontal.3", title: "Nothing matches your tuning",
                                    message: "Widen the place, era or price, or clear them.",
@@ -413,6 +439,12 @@ struct ExploreFeedView: View {
                 .frame(maxWidth: .infinity, minHeight: NukeSize.minTap)
                 .buttonStyle(.bordered)
                 .padding(.horizontal, NukeSpace.lg)
+        } else if !hasMore && askLimited {
+            Text(ExploreFeedPaging.askLimitMessage)
+                .font(.footnote).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, NukeSpace.xl).padding(.vertical, NukeSpace.lg)
         } else if !hasMore && !liveFailed && !askFailed {
             Text(ExploreFeedPaging.endLine(tuned: tuning.isActive))
                 .font(.footnote).foregroundStyle(.secondary)
@@ -524,8 +556,16 @@ struct ExploreFeedView: View {
         live = Array(liveAll.prefix(ExploreFeedPaging.livePage))
         liveShown = live.count
         classified = tune.apply(askPage?.items ?? [])
-        askOffset = askPage?.read ?? 0
-        askExhausted = askPage.map { ExploreFeedPaging.exhausted(read: $0.read, asked: $0.asked) } ?? true
+        let progress = askPage.map { ExploreFeedPaging.askProgress(offset: 0, read: $0.read, asked: $0.asked) }
+        askOffset = progress?.nextOffset ?? 0
+        askExhausted = progress?.exhausted ?? true
+        askLimited = progress?.limited ?? false
+        #if DEBUG
+        // Exercise the real end-of-range UI without making 125 fixture page requests.
+        if FixtureBackend.isActive && FixtureBackend.scenario.hasSuffix("-ceiling") && !askExhausted {
+            askOffset = 4_960
+        }
+        #endif
         moreFailure = nil
         morePaused = false
         feed = ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
@@ -570,8 +610,10 @@ struct ExploreFeedView: View {
             guard !Task.isCancelled, gen == generation else { return }
             liveShown += nextLive.count
             if !askExhausted && !moreFailed {
-                askOffset += read
-                askExhausted = ExploreFeedPaging.exhausted(read: read, asked: asked)
+                let progress = ExploreFeedPaging.askProgress(offset: askOffset, read: read, asked: asked)
+                askOffset = progress.nextOffset
+                askExhausted = progress.exhausted
+                askLimited = progress.limited
             }
             live += nextLive
             classified += nextAsks
