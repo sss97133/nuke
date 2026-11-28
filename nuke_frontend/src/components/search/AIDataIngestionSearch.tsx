@@ -240,8 +240,10 @@ interface ExtractionPreview {
   existingVehicleId?: string;
 }
 
-export default function AIDataIngestionSearch() {
-  const [input, setInput] = useState('');
+interface AIDataIngestionSearchProps { className?: string; initialQuery?: string; pendingSubmitQuery?: string }
+export default function AIDataIngestionSearch({ initialQuery = '', pendingSubmitQuery }: AIDataIngestionSearchProps = {}) {
+  const [input, setInput] = useState(initialQuery);
+  const consumedLauncherSubmit = useRef(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractionPreview, setExtractionPreview] = useState<ExtractionPreview | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -1232,6 +1234,24 @@ export default function AIDataIngestionSearch() {
     }
   };
 
+  // The same unselected Enter action serves a warm input and a queued cold
+  // submission. URL/VIN intake and ordinary market/search routing keep one owner.
+  const submitUnselectedInput = () => {
+    if(showPreview){void confirmAndSave();return;}
+    const trimmedInput=input.trim(),maybeUrl=normalizeUrlInput(trimmedInput);
+    if(trimmedInput&&!trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i)&&!maybeUrl){
+      void navigateSearchOrScopeMarket(trimmedInput);setInput('');return;
+    }
+    if(maybeUrl&&maybeUrl!==trimmedInput)setInput(maybeUrl);
+    void processInput();
+  };
+
+  useEffect(()=>{
+    if(pendingSubmitQuery===undefined||consumedLauncherSubmit.current||input!==pendingSubmitQuery)return;
+    consumedLauncherSubmit.current=true;
+    if(pendingSubmitQuery.trim())submitUnselectedInput();
+  },[pendingSubmitQuery,input,submitUnselectedInput]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Handle autocomplete navigation: cohort shortcuts first, then results
     const navigableCount = cohortShortcuts.length + autocompleteResults.length;
@@ -1261,19 +1281,7 @@ export default function AIDataIngestionSearch() {
           // No item highlighted - close autocomplete and navigate to full search
           setShowAutocomplete(false);
           setSelectedAutocompleteIndex(-1);
-          const trimmedInput = input.trim();
-          if (trimmedInput && !showPreview) {
-            const maybeUrl = normalizeUrlInput(trimmedInput);
-            if (!trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
-              // Simple text search - scope Market in place if on Market tab, else navigate to search page
-              void navigateSearchOrScopeMarket(trimmedInput);
-              setInput('');
-            } else {
-              processInput();
-            }
-          } else if (showPreview) {
-            confirmAndSave();
-          }
+          if(input.trim()||showPreview)submitUnselectedInput();
         }
         return;
       }
@@ -1289,24 +1297,7 @@ export default function AIDataIngestionSearch() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
-      if (!showPreview) {
-        const trimmedInput = input.trim();
-        const maybeUrl = normalizeUrlInput(trimmedInput);
-        // If it's a simple text query (not VIN, not URL), scope Market in place or navigate to search
-        if (trimmedInput && !trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
-          void navigateSearchOrScopeMarket(trimmedInput);
-          setInput('');
-          return;
-        }
-        // Normalize URL-like inputs so the downstream extractor/router sees a real URL.
-        if (maybeUrl && maybeUrl !== trimmedInput) {
-          setInput(maybeUrl);
-        }
-        // Otherwise, process through AI extraction
-        processInput();
-      } else {
-        confirmAndSave();
-      }
+      submitUnselectedInput();
     }
     if (e.key === 'Escape') {
       setShowPreview(false);

@@ -1,18 +1,17 @@
 {
-  "generated": "2026-11-25",
+  "generated": "2026-11-28",
   "note": "Ratchet floor for scripts/ci/typecheck-ratchet.mjs (npm run type-check). Per-file tsc error counts over the nuke_frontend projects; a file may not rise and a file not listed may not have errors. Lowered automatically by a clean local run; never raise it by hand.",
   "projects": [
     "tsconfig.app.json",
     "tsconfig.node.json"
   ],
-  "total": 433,
+  "total": 432,
   "files": {
     "nuke_frontend/src/branding/ModeSwitcher.tsx": 1,
     "nuke_frontend/src/components/AdminDashboard.tsx": 1,
     "nuke_frontend/src/components/ComprehensiveWorkOrderReceipt.tsx": 14,
     "nuke_frontend/src/components/EnhancedTimelineEventForm.tsx": 3,
     "nuke_frontend/src/components/HeaderSearch.test.ts": 4,
-    "nuke_frontend/src/components/HeaderSearch.tsx": 1,
     "nuke_frontend/src/components/NotificationCenter.tsx": 4,
     "nuke_frontend/src/components/PurchaseAgreementManager.tsx": 1,
     "nuke_frontend/src/components/SmartInvoiceUploader.tsx": 5,

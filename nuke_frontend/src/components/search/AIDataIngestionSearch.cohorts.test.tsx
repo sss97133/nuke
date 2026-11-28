@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => {
   const anything = (): any => new Proxy(function () {}, { get: () => anything(), apply: () => Promise.resolve({ results: [], total: 0 }) });
-  return { navigate: vi.fn(), search: vi.fn(), vehicleOps: [] as string[], anything };
+  return { navigate: vi.fn(), search: vi.fn(), resolveScope:vi.fn(), buildScopeUrl:vi.fn(), onMarket:false, vehicleOps: [] as string[], anything };
 });
 vi.mock('react-router-dom', () => ({
   useNavigate: () => fixture.navigate,
@@ -30,9 +30,9 @@ vi.mock('../../lib/supabase', () => ({
   },
 }));
 vi.mock('../../lib/search/marketScopeResolver', () => ({
-  buildMarketScopeUrl: () => '/',
-  isOnMarketTab: () => false,
-  resolveMarketScopeQuery: () => Promise.resolve(null),
+  buildMarketScopeUrl:fixture.buildScopeUrl,
+  isOnMarketTab:()=>fixture.onMarket,
+  resolveMarketScopeQuery:fixture.resolveScope,
 }));
 vi.mock('../../services/aiDataIngestion', () => ({ aiDataIngestion: fixture.anything(), ingestVehicle: vi.fn() }));
 vi.mock('../../services/dataRouter', () => ({ dataRouter: fixture.anything() }));
@@ -71,7 +71,7 @@ const VEHICLE_RESULTS = [
 let container: HTMLDivElement, root: Root;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.navigate.mockReset();
+  fixture.navigate.mockReset();fixture.onMarket=false;fixture.resolveScope.mockReset().mockResolvedValue(null);fixture.buildScopeUrl.mockReset().mockReturnValue('/');
   fixture.search.mockReset();
   fixture.vehicleOps = [];
   fixture.search.mockResolvedValue({ success: true, results: VEHICLE_RESULTS, total_count: 3, query_type: 'text', search_time_ms: 1 });
@@ -164,4 +164,26 @@ describe('header search result era marks', () => {
     expect(c10Row.querySelectorAll('[data-testid="header-search-facet-emblem"]').length).toBe(0);
     expect(c10Row.querySelector('[data-testid="header-search-facet-trim"]')?.textContent).toContain('Silverado');
   });
+});
+
+it('runs a queued cold query through the same market scope resolver once after initialization',async()=>{
+ fixture.onMarket=true;const scope={make:'Chevrolet',family:'registered-k5',family_name:'K5 Blazer'};
+ fixture.resolveScope.mockResolvedValue(scope);fixture.buildScopeUrl.mockReturnValue('/?tab=market&make=Chevrolet&family=registered-k5');
+ await act(async()=>root.render(<AIDataIngestionSearch initialQuery="Chevrolet K5 Blazer" pendingSubmitQuery="Chevrolet K5 Blazer"/>));
+ expect(fixture.resolveScope).toHaveBeenCalledWith('Chevrolet K5 Blazer');
+ expect(fixture.navigate).toHaveBeenCalledTimes(1);expect(fixture.navigate).toHaveBeenCalledWith('/?tab=market&make=Chevrolet&family=registered-k5');
+ expect((container.querySelector('input[type="text"]') as HTMLInputElement).value).toBe('');
+ await act(async()=>root.render(<AIDataIngestionSearch initialQuery="Chevrolet K5 Blazer" pendingSubmitQuery="Chevrolet K5 Blazer"/>));
+ expect(fixture.navigate).toHaveBeenCalledTimes(1);
+});
+it('preserves a cold draft without submitting it when no Enter was queued',async()=>{
+ await act(async()=>root.render(<AIDataIngestionSearch initialQuery="Chevrolet K5 Blazer"/>));
+ expect((container.querySelector('input[type="text"]') as HTMLInputElement).value).toBe('Chevrolet K5 Blazer');
+ expect(fixture.navigate).not.toHaveBeenCalled();
+});
+it('consumes a queued submission only once under StrictMode effects',async()=>{
+ fixture.onMarket=true;fixture.resolveScope.mockResolvedValue({make:'Chevrolet',family:'registered-k5',family_name:'K5 Blazer'});
+ fixture.buildScopeUrl.mockReturnValue('/?tab=market&family=registered-k5');
+ await act(async()=>root.render(<React.StrictMode><AIDataIngestionSearch initialQuery="Chevrolet K5 Blazer" pendingSubmitQuery="Chevrolet K5 Blazer"/></React.StrictMode>));
+ expect(fixture.navigate).toHaveBeenCalledTimes(1);expect(fixture.resolveScope).toHaveBeenCalledTimes(1);
 });
