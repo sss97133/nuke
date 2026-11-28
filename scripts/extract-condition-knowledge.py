@@ -2,6 +2,9 @@
 """
 Extract condition knowledge from service manual chunks → condition_knowledge table.
 
+Writes are currently refused: the legacy extraction does not qualify source
+pages or vehicle scope. `--dry-run` performs read-only inspection.
+
 Reads diagnosis tables, specifications, and maintenance schedules from
 service_manual_chunks, parses structured entries where possible, uses
 Claude Haiku for ambiguous content, and writes to condition_knowledge.
@@ -600,62 +603,8 @@ Return ONLY the JSON array, no other text. If no extractable knowledge, return [
 
 
 def write_entries(conn, entries: list) -> int:
-    """Write condition_knowledge entries to the database."""
-    cur = conn.cursor()
-    written = 0
-
-    for entry in entries:
-        try:
-            cur.execute("""
-                INSERT INTO condition_knowledge (
-                    chunk_id, manual_section, page_range,
-                    system, component, sub_component,
-                    condition_type,
-                    symptom, possible_causes, corrections, severity_class,
-                    spec_name, spec_value, spec_unit, spec_min, spec_max,
-                    inspection_interval, inspection_method, pass_criteria, fail_indicators,
-                    condition_domain, related_zones,
-                    applicable_makes, applicable_models, applicable_years
-                ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s
-                )
-            """, (
-                entry.get("chunk_id"),
-                entry.get("manual_section"),
-                entry.get("page_range"),
-                entry["system"],
-                entry["component"],
-                entry.get("sub_component"),
-                entry["condition_type"],
-                entry.get("symptom"),
-                entry.get("possible_causes"),
-                entry.get("corrections"),
-                entry.get("severity_class"),
-                entry.get("spec_name"),
-                entry.get("spec_value"),
-                entry.get("spec_unit"),
-                entry.get("spec_min"),
-                entry.get("spec_max"),
-                entry.get("inspection_interval"),
-                entry.get("inspection_method"),
-                entry.get("pass_criteria"),
-                entry.get("fail_indicators"),
-                entry["condition_domain"],
-                entry.get("related_zones"),
-                ['Chevrolet', 'GMC'],  # applicable_makes
-                ['C10', 'C20', 'C30', 'K10', 'K20', 'K30', 'Blazer', 'Suburban', 'Jimmy'],
-                '[1967, 1992)',  # applicable_years (square body era)
-            ))
-            written += 1
-        except Exception as e:
-            print(f"    Write error: {e}")
-            conn.rollback()
-            continue
-
-    conn.commit()
-    cur.close()
-    return written
+    """Refuse legacy writes until source and vehicle scope can be qualified."""
+    raise RuntimeError("Condition-knowledge writes require source-qualified pages and vehicle scope")
 
 
 def main():
@@ -667,28 +616,26 @@ def main():
     parser.add_argument("--haiku-limit", type=int, default=100, help="Max chunks to send to Haiku")
     args = parser.parse_args()
 
+    if not args.dry_run:
+        parser.error("writes are unavailable until source pages and vehicle scope can be qualified; use --dry-run for read-only inspection")
+
     os.chdir(NUKE_DIR)
     conn = get_connection()
+    # Enforce the dry-run guarantee at the database transaction as well.
+    conn.set_session(readonly=True, autocommit=False)
 
-    # Get API key for Haiku
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        for line in (NUKE_DIR / ".env").read_text().splitlines():
-            if line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            if key.strip() == "ANTHROPIC_API_KEY":
-                api_key = val.strip('"').strip("'")
-                break
-
-    # Clear existing condition_knowledge (idempotent re-extraction)
-    cur = conn.cursor()
-    cur.execute("DELETE FROM condition_knowledge")
-    deleted = cur.rowcount
-    conn.commit()
-    cur.close()
-    if deleted:
-        print(f"Cleared {deleted} existing condition_knowledge entries")
+    # Only read the optional provider credential when that path is requested.
+    api_key = None
+    if args.use_haiku:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            for line in (NUKE_DIR / ".env").read_text().splitlines():
+                if line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                if key.strip() == "ANTHROPIC_API_KEY":
+                    api_key = val.strip('"').strip("'")
+                    break
 
     # Fetch chunks
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -787,18 +734,14 @@ def main():
     for s, c in sorted(system_counts.items(), key=lambda x: -x[1]):
         print(f"  {s:30s} {c}")
 
-    if args.dry_run:
-        print("\n[DRY RUN] No entries written")
-        # Print a few sample entries
-        for e in all_entries[:5]:
-            print(f"\n  {e['condition_type']:20s} | {e['system']:15s} | {e['component']:20s}")
-            if e.get('symptom'):
-                print(f"    symptom: {e['symptom'][:80]}")
-            if e.get('spec_name'):
-                print(f"    spec: {e['spec_name'][:40]} = {e.get('spec_value', '?')}")
-    else:
-        written = write_entries(conn, all_entries)
-        print(f"\nWritten {written} entries to condition_knowledge")
+    print("\n[DRY RUN] No entries written")
+    # Print a few sample entries
+    for e in all_entries[:5]:
+        print(f"\n  {e['condition_type']:20s} | {e['system']:15s} | {e['component']:20s}")
+        if e.get('symptom'):
+            print(f"    symptom: {e['symptom'][:80]}")
+        if e.get('spec_name'):
+            print(f"    spec: {e['spec_name'][:40]} = {e.get('spec_value', '?')}")
 
     conn.close()
 
