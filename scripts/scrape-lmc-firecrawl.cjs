@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./guard-unqualified-lmc-writes.cjs')();
 /**
  * LMC PRODUCT IMAGE SCRAPER - FIRECRAWL VERSION
  * Uses Firecrawl API to scrape product data from LMC website

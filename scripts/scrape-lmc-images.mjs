@@ -4,9 +4,11 @@
  * Fetches product images and metadata from LMC website for each part
  */
 
-import { createClient } from '@supabase/supabase-js';
-import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
+import guardUnqualifiedCatalogWrites from './guard-unqualified-lmc-writes.cjs';
+guardUnqualifiedCatalogWrites();
+const { createClient } = await import('@supabase/supabase-js');
+const { default: fetch } = await import('node-fetch');
+const cheerio = await import('cheerio');
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./guard-unqualified-lmc-writes.cjs')();
 /**
  * PROPER LMC SCRAPER USING FIRECRAWL EXTRACT
  * Uses Firecrawl's structured extraction to get clean product data

@@ -59,6 +59,8 @@ jobs:
           supabase/functions/ingest-observation/wireResistanceReferenceHandler.test.ts
           supabase/functions/ingest-observation/wireCurrentRatingReference.test.ts
           supabase/functions/ingest-observation/wireCurrentRatingReferenceHandler.test.ts
+      - name: Verify unqualified catalog writers fail before effects
+        run: node --test scripts/guard-unqualified-lmc-writes.test.mjs
       - name: Verify stored catalog source client
         run: python3 scripts/test_retain_catalog_source.py
       - name: Verify resumable public catalog source client

@@ -4,9 +4,11 @@
  * Extracts ALL data: parts, prices, categories, page references, sections
  */
 
-import { createClient } from '@supabase/supabase-js';
-import { default as pdfParse } from 'pdf-parse';
-import fetch from 'node-fetch';
+import guardUnqualifiedCatalogWrites from './guard-unqualified-lmc-writes.cjs';
+guardUnqualifiedCatalogWrites();
+const { createClient } = await import('@supabase/supabase-js');
+const { default: pdfParse } = await import('pdf-parse');
+const { default: fetch } = await import('node-fetch');
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

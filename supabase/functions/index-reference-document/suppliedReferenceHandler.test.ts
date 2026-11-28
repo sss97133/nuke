@@ -117,6 +117,16 @@ Deno.test('actual word geometry handler rejects anonymous or invented claims',as
   const invalid=await handler(wordGeometryRequest(secret,input=>input.fitment='invented'));
   assert(invalid.status===400 && calls.length===0);await invalid.body?.cancel();
 });
+Deno.test('legacy model part extraction refuses before source, model or database effects',async()=>{
+  calls.length=0;
+  const response=await handler(new Request(`${project}/functions/v1/index-reference-document`,{
+    method:'POST',headers:{apikey:secret,'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'extract_parts',pdf_url:'https://example.test/catalog.pdf',page_start:1,page_end:50}),
+  }));
+  const result=await response.json();
+  assert(response.status===409 && result.error==='catalog_source_scope_unqualified' && result.model_calls===0);
+  assert(calls.length===0,'unqualified extraction reached an external or database request');
+});
 function documentWordGeometryRequest(token=secret,change?:(input:any)=>void) {
   const input:any={mode:'catalog_document_page_word_geometry',catalog_id:'30000000-0000-4000-8000-000000000001',
     document_id:docId,catalog_page_number:2,pdf_sha256:'f'.repeat(64),extractor_version:'pdftotext version fixture',
