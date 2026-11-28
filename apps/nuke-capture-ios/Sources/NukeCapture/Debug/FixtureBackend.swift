@@ -54,6 +54,18 @@ enum FixtureBackend {
     private static var workPageAttempts = 0
     private static let garageSourceLock = NSLock()
     private static var garageSourceAttempts = 0
+    private static let fixtureFollowLock = NSLock()
+    private static var fixtureFollowingByUser: [String: Bool] = [:]
+
+    private static func fixtureFollow(toggle: Bool) -> Bool {
+        fixtureFollowLock.lock(); defer { fixtureFollowLock.unlock() }
+        let user = userId ?? "visitor"
+        var following = fixtureFollowingByUser[user]
+            ?? (user == clientId && ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_INITIAL"] == "following")
+        if toggle { following.toggle() }
+        fixtureFollowingByUser[user] = following
+        return following
+    }
 
     private static func garageCorrections(_ args: [String: Any]) -> (Int, Data) {
         // The detail read names its account explicitly. The list read still sees the original row so the
@@ -71,7 +83,16 @@ enum FixtureBackend {
         default: return ok(GarageCardFixtures.corrections)
         }
     }
+    private static let fixtureAccountLock = NSLock()
+    private static var fixtureAccountSwitched = false
+    static func switchFixtureAccount() {
+        fixtureAccountLock.lock(); defer { fixtureAccountLock.unlock() }
+        fixtureAccountSwitched = true
+    }
+
     static var userId: String? {
+        fixtureAccountLock.lock(); let switched = fixtureAccountSwitched; fixtureAccountLock.unlock()
+        if switched { return "00000000-0000-4000-8000-0000000000d3" }
         switch persona {
         case .visitor: return nil
         case .client: return clientId
@@ -211,6 +232,17 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "get_vehicle_engagement" where scenario == "social-follow":
+            guard (args["p_vehicle_id"] as? String)?.lowercased() == navigationVehicleId else {
+                return (400, Data(#"{"message":"wrong fixture vehicle"}"#.utf8))
+            }
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_READ"] == "failure" {
+                return (400, Data(#"{"message":"fixture follow read failed"}"#.utf8))
+            }
+            let follows = fixtureFollow(toggle: false)
+            return ok("""
+            {"following_count":\(follows ? 1 : 0),"is_following":\(follows),"comment_count":0,"contribution_count":0,"recent_comments":[]}
+            """)
         case "get_image_deep_analysis" where scenario == "navigation-garage" && !analysisMode.isEmpty:
             guard args["p_image_id"] as? String == "00000000-0000-4000-8000-00000000e001" else {
                 return (400, Data(#"{"message":"wrong fixture image requested"}"#.utf8))
@@ -409,6 +441,23 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case "market_pulse_live" where scenario == "social-follow":
+            return ok("""
+            {"auctions":[["\(navigationVehicleId)",1973,"Fixture","Coupe",5000,"2099-11-27T12:00:00Z",
+              "2026-11-27T10:00:00Z",null,"https://fixture.nuke.invalid/car.jpg",false,
+              "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
+            """)
+        case "record_interaction" where scenario == "social-follow" && args["p_kind"] as? String == "follow":
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_WRITE"] == "refused" {
+                return ok(#"{"ok":false,"error":"not_authorized"}"#)
+            }
+            let follows = fixtureFollow(toggle: true)
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_FOLLOW_WRITE"] == "uncertain" {
+                return ok(#"{"ok":true,"kind":"follow"}"#)
+            }
+            return ok("""
+            {"ok":true,"kind":"follow","following":\(follows)}
+            """)
         case "confirm_work_session" where scenario == "financial-qualification":
             let id = (args["p_session_id"] as? String ?? "").lowercased()
             if id.hasSuffix("f004") { return ok(#"{"ok":false,"error":"not_authorized"}"#) }

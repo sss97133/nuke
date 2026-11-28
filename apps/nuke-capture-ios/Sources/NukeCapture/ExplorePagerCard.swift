@@ -53,6 +53,7 @@ final class ExploreCardTracker {
 /// record_interaction('follow') answers {"ok": true, "following": bool}, or {"ok": false, "error": …} signed out.
 private struct ExploreFollowReply: Decodable {
     let ok: Bool?
+    let kind: String?
     let following: Bool?
 }
 
@@ -91,10 +92,16 @@ struct ExplorePagerCard: View {
     @State private var mapWarm = false
     @State private var tracker = ExploreCardTracker()
     @State private var following: Bool?
+    @State private var followViewer: String?
     @State private var followBusy = false
+    @State private var followNeedsCheck = false
+    @State private var followMessage: String?
+    @State private var followEpoch = 0
     @State private var tick = 0
     @State private var followTick = 0
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var session: SessionStore
 
     // MARK: Pages
 
@@ -131,6 +138,9 @@ struct ExplorePagerCard: View {
                 ExploreCardPreview(item: item) { record(.press) }
             }
             actions
+            if let followMessage {
+                Text(followMessage).font(.caption).foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, NukeSpace.lg)
         .onScrollVisibilityChange(threshold: 0.5) { visible in
@@ -138,6 +148,20 @@ struct ExplorePagerCard: View {
         }
         .onDisappear { ended() }
         .onChange(of: selected) { _, now in selectionChanged(now) }
+        .onChange(of: viewer) { _, _ in
+            followEpoch += 1; following = nil; followViewer = nil
+            followNeedsCheck = false; followMessage = nil
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase != .active else { return }
+            followEpoch += 1; following = nil; followViewer = nil
+            if followBusy {
+                followNeedsCheck = true
+                followMessage = "Couldn't confirm the follow change. Tap Check follow to see its current status."
+            } else {
+                followNeedsCheck = false; followMessage = nil
+            }
+        }
         .onChange(of: pageIDs) { _, ids in
             // The waiting page goes away once the reel is read; never leave the pager on a page that is gone.
             if !ids.contains(selected) { selected = .photo(0) }
@@ -327,7 +351,12 @@ struct ExplorePagerCard: View {
 
     // MARK: Actions under the card
 
-    private var canFollow: Bool { item.vehicleId != nil && SupabaseService.currentUserId != nil }
+    private var viewer: String? {
+        _ = session.isSignedIn
+        return SupabaseService.currentUserId
+    }
+    private var canFollow: Bool { item.vehicleId != nil && viewer != nil }
+    private var shownFollowing: Bool { followViewer == viewer && following == true }
 
     private var actions: some View {
         HStack(spacing: 0) {
@@ -338,8 +367,8 @@ struct ExplorePagerCard: View {
                 }
             }
             if canFollow {
-                actionButton(following == true ? "Following" : "Follow",
-                             following == true ? "checkmark.circle.fill" : "plus.circle") {
+                actionButton(followNeedsCheck ? "Check follow" : (shownFollowing ? "Following" : "Follow"),
+                             shownFollowing ? "checkmark.circle.fill" : "plus.circle") {
                     Task { await follow() }
                 }
                 .disabled(followBusy)
@@ -414,31 +443,55 @@ struct ExplorePagerCard: View {
         openURL(link)
     }
 
-    /// Follow toggles on the server (record_interaction), so a first tap reads whether the person already
-    /// follows: if so it only shows that, and the next tap unfollows. Signed in only; one tap, one write.
+    /// The server writer toggles. Read before every change and only toggle if
+    /// the fresh state differs from the action the person actually selected.
+    /// An uncertain write requires a read-only check before another toggle.
     private func follow() async {
-        guard let vid = item.vehicleId?.uuidString.lowercased(), SupabaseService.currentUserId != nil, !followBusy else { return }
+        guard let vid = item.vehicleId?.uuidString.lowercased(), let user = viewer,
+              scenePhase == .active, !followBusy else { return }
         followBusy = true
         defer { followBusy = false }
-        if following == nil {
-            let engagement: VehicleEngagement? = try? await SupabaseService.client
+        let epoch = followEpoch
+        let checkOnly = followNeedsCheck
+        let desired = !shownFollowing
+        var writing = false
+        func current() -> Bool { !Task.isCancelled && viewer == user && scenePhase == .active && followEpoch == epoch }
+        do {
+            let engagement: VehicleEngagement = try await SupabaseService.client
                 .rpc("get_vehicle_engagement", params: ["p_vehicle_id": vid])
                 .execute().value
-            if engagement?.is_following == true {
-                following = true
-                return
-            }
-        }
-        do {
+            guard current() else { return }
+            following = engagement.is_following; followViewer = user
+            followNeedsCheck = false; followMessage = nil
+            if checkOnly || engagement.is_following == desired { return }
+            writing = true
             let reply: ExploreFollowReply = try await SupabaseService.client
                 .rpc("record_interaction", params: ["p_kind": "follow", "p_target_type": "vehicle", "p_target_id": vid])
                 .execute().value
-            guard reply.ok != false else { return }
-            following = reply.following ?? !(following ?? false)
+            guard current() else { return }
+            if reply.ok == false {
+                followMessage = "Nuke didn't change follow. Try again."
+                return
+            }
+            guard reply.ok == true, reply.kind == "follow", let actual = reply.following else {
+                following = nil; followNeedsCheck = true
+                followMessage = "Couldn't confirm the follow change. Tap Check follow to see its current status."
+                return
+            }
+            following = actual
+            if actual != desired {
+                followNeedsCheck = true
+                followMessage = "Follow status changed. Tap Check follow to see its current status."
+                return
+            }
             followTick += 1
             record(.follow)
         } catch {
-            NSLog("NukeCapture explore follow failed: %@", String(describing: error))
+            guard current() else { return }
+            following = nil; followNeedsCheck = true
+            followMessage = writing
+                ? "Couldn't confirm the follow change. Tap Check follow to see its current status."
+                : "Couldn't check follow status. Tap Check follow to try again."
         }
     }
 
