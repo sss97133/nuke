@@ -438,11 +438,15 @@ struct FinishBoard: Equatable {
     }
 
     private struct AnalogParams: Encodable { let p_vehicle_ids: [String] }
-    static func fetchAnalogs(vehicleId: String) async -> [FinishAnalog] {
-        guard let res = try? await SupabaseService.client
+    static func readAnalogs(vehicleId: String) async throws -> [FinishAnalog] {
+        let res = try await SupabaseService.client
             .rpc("live_finish_estimates", params: AnalogParams(p_vehicle_ids: [vehicleId]))
-            .execute() else { return [] }
+            .execute()
         return decodeAnalogs(res.data, vehicleId: vehicleId)
+    }
+
+    static func fetchAnalogs(vehicleId: String) async -> [FinishAnalog] {
+        (try? await readAnalogs(vehicleId: vehicleId)) ?? []
     }
 }
 
