@@ -179,6 +179,28 @@ final class ExplorePagerTests: XCTestCase {
         XCTAssertNil(ExplorePriceRail.projected(bid: 15_000, estimate: nil, fresh: true).caption)
     }
 
+    func testPriceDetailsOnlyCallsItARangeWhenOneIsShown() {
+        XCTAssertEqual(ExplorePriceRail.projected(bid: 15_000, estimate: estimate(), fresh: true).detailsTitle,
+                       "Why this range")
+        XCTAssertEqual(ExplorePriceRail.projected(bid: 15_000, estimate: estimate(), fresh: false).detailsTitle,
+                       "Price details")
+        XCTAssertEqual(ExplorePriceRail.projected(bid: 30_000, estimate: estimate(), fresh: true).detailsTitle,
+                       "Price details")
+        XCTAssertEqual(ExplorePriceRail.cohort(ask: 30_000, position: position(thin: true)).detailsTitle,
+                       "Price details")
+        XCTAssertEqual(ExplorePriceRail.cohort(ask: 30_000, position: position()).detailsTitle,
+                       "Why this range")
+    }
+
+    func testPriceDetailsExplainsAnAvailableProjectionEvenWhenBidIsAboveItsBand() {
+        let lot = item("live:abc", kind: .live, amount: 30_000)
+        let available = ExploreWhy(item: lot, estimate: estimate(), fresh: true)
+        XCTAssertEqual(available.rail.detailsTitle, "Price details")
+        XCTAssertNotNil(available.footer)
+        XCTAssertNil(ExploreWhy(item: lot, estimate: estimate(), fresh: false).footer)
+        XCTAssertNil(ExploreWhy(item: lot, estimate: nil, fresh: true).footer)
+    }
+
     func testRailChoosesBySourceKind() {
         let ask = item(position: position())
         XCTAssertEqual(ExplorePriceRail.make(item: ask, estimate: estimate(), fresh: true).basis, .cohort)

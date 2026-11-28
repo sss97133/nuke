@@ -46,6 +46,8 @@ struct ExploreFeedItem: Identifiable, Equatable {
     var asOf: Date? = nil
     /// A live lot's last record write (the board's updated_at): the bid on the card is no newer than this.
     var recordUpdatedAt: Date? = nil
+    /// A successful refresh omitted this lot. Its last bid is retained, but its current status is unknown.
+    var liveStatusUnavailable = false
 
     /// The vehicle id a live lot's finish estimate is keyed by (the card id without its "live:" prefix).
     var lotId: String? {
@@ -137,6 +139,18 @@ enum ExploreFeedPaging {
                           prefs: ExplorePreferences) -> [ExploreFeedItem] {
         ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
             .filter { !existing.contains($0.id) }
+    }
+
+    /// An omitted lot may have an extension that has not reached the board. Keep it available for a
+    /// later refresh, but mark its current status unknown until that source returns it again.
+    static func reconcileLive(_ items: [ExploreFeedItem], current: [String: ExploreFeedItem]) -> [ExploreFeedItem] {
+        items.map { item in
+            guard item.kind == .live else { return item }
+            if let fresh = current[item.id] { return fresh }
+            var unavailable = item
+            unavailable.liveStatusUnavailable = true
+            return unavailable
+        }
     }
 
     static func endLine(tuned: Bool) -> String {
@@ -234,9 +248,24 @@ struct ExploreFeedView: View {
                                    message: "Auctions: \(liveFailure ?? "Read failed.") Classifieds: \(askFailure ?? "Read failed.")",
                                    actionTitle: "Try again") { Task { await load() } }
                 } else if let missingSource {
-                    NukeEmptyState(icon: "wifi.exclamationmark", title: "Some cars couldn't load",
-                                   message: "\(missingSource.title) \(missingSource.reason)",
-                                   actionTitle: "Try again") { Task { await load() } }
+                    VStack(spacing: NukeSpace.md) {
+                        NukeEmptyState(icon: "wifi.exclamationmark", title: "Some cars couldn't load",
+                                       message: "\(missingSource.title) \(missingSource.reason)",
+                                       actionTitle: "Try again") { Task { await load() } }
+                        if let moreFailure {
+                            Text("Couldn't load more classified listings. \(moreFailure)")
+                                .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            Button("Retry more") {
+                                self.moreFailure = nil
+                                Task { await loadMore() }
+                            }
+                            .buttonStyle(.bordered)
+                        } else if hasMore {
+                            Button("Search more") { Task { await loadMore() } }
+                                .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(.horizontal, NukeSpace.lg).padding(.bottom, NukeSpace.xl)
                 } else if let moreFailure {
                     if morePaused && liveShown < liveAll.count {
                         NukeEmptyState(icon: "magnifyingglass", title: "More auctions to check",
@@ -283,7 +312,8 @@ struct ExploreFeedView: View {
                             .padding(.horizontal, NukeSpace.lg)
                         }
                         ForEach(Array(feed.enumerated()), id: \.element.id) { idx, item in
-                            ExplorePagerCard(item: item, position: idx, hasBidReading: lots[item.id] != nil,
+                            ExplorePagerCard(item: item, position: idx,
+                                             hasBidReading: !item.liveStatusUnavailable && lots[item.id] != nil,
                                              finish: item.lotId.flatMap { finish?.byId[$0] },
                                              finishFresh: finish?.fresh == true,
                                              onDrill: openDrill, onOpenProfile: openProfile,
@@ -327,11 +357,19 @@ struct ExploreFeedView: View {
             try? await Task.sleep(nanoseconds: 20_000_000_000)
             guard !Task.isCancelled, loaded else { continue }
             guard ExploreClock.needsRefresh(feed, now: ServerClock.now()) else { continue }
-            guard let board = try? await LiveBoard.fetch(maxAge: 15), !Task.isCancelled else { continue }
+            guard let board = try? await LiveBoard.fetch(maxAge: 15), !Task.isCancelled,
+                  !reloading, !loadingMore else { continue }
             let byId = Dictionary(board.auctions.map { ("live:" + $0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            feed = feed.map { item in
-                guard item.kind == .live, let lot = byId[item.id] else { return item }
-                return ExploreFeedItem.from(lot)
+            let current = byId.mapValues(ExploreFeedItem.from)
+            liveAll = ExploreFeedPaging.reconcileLive(liveAll, current: current)
+            live = ExploreFeedPaging.reconcileLive(live, current: current)
+            feed = ExploreFeedPaging.reconcileLive(feed, current: current)
+            if let open = drill, let refreshed = ExploreFeedPaging.reconcileLive([open.item], current: current).first {
+                drill = ExploreCardDrill(kind: open.kind, item: refreshed)
+            }
+            if let open = why, open.item.kind == .live,
+               let refreshed = ExploreFeedPaging.reconcileLive([open.item], current: current).first {
+                why = ExploreWhy(item: refreshed, estimate: open.estimate, fresh: open.fresh)
             }
             for (key, lot) in byId where lots[key] != nil { lots[key] = lot }
         }
@@ -386,7 +424,7 @@ struct ExploreFeedView: View {
 
     private var footer: String {
         var parts: [String] = []
-        if !live.isEmpty { parts.append("Current bids are Bring a Trailer's, in US dollars — not sold prices.") }
+        if !live.isEmpty { parts.append("Bids are Bring a Trailer's recorded bids, in US dollars — not sold prices.") }
         if !classified.isEmpty { parts.append("An asking price is what the seller listed when we saw it, not a sale.") }
         return parts.joined(separator: " ")
     }
@@ -588,19 +626,18 @@ struct ExploreCardOverlay: View {
     var onWhy: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .bottom) {
-            if let amt = item.amount {
-                priceButton(amt)
-            }
-            Spacer(minLength: NukeSpace.sm)
-            if let ends = item.endsAt {
-                // Ticks against the server's clock (ServerClock): every second in the last hour, where it reads m:ss,
-                // and every 30 s before that, where it shows hours and minutes.
-                TimelineView(.periodic(from: .now, by: ExploreClock.tick(ends: ends, now: ServerClock.now()))) { ctx in
-                    let now = ServerClock.now(ctx.date)
-                    let text = ExploreClock.text(ends: ends, now: now)
-                    if let onDrill {
+        TimelineView(ExploreClockSchedule(ends: item.endsAt)) { ctx in
+            let now = ServerClock.now(ctx.date)
+            HStack(alignment: .bottom) {
+                if let amt = item.amount {
+                    priceButton(amt, now: now)
+                }
+                Spacer(minLength: NukeSpace.sm)
+                if let ends = item.endsAt {
+                    let text = item.liveStatusUnavailable ? "Status unavailable" : ExploreClock.text(ends: ends, now: now)
+                    if let onDrill, !item.liveStatusUnavailable {
                         ExploreDoor(kind: .clock, item: item, alignment: .bottomTrailing, open: onDrill) { clock(text) }
+                            .accessibilityValue(Text(text))
                     } else {
                         clock(text)
                     }
@@ -611,7 +648,7 @@ struct ExploreCardOverlay: View {
 
     /// The price is a button: a tap opens the evidence behind it ("Why this range"; a live lot without that
     /// stack opens its bid reading). It looks like one: a chip with a chevron, not a number painted on a photo.
-    @ViewBuilder private func priceButton(_ amt: Double) -> some View {
+    @ViewBuilder private func priceButton(_ amt: Double, now: Date) -> some View {
         let action: (() -> Void)? = onWhy ?? {
             guard let onDrill, hasBidReading, item.kind == .live else { return nil }
             return { onDrill(ExploreCardDrill(kind: .bid, item: item)) }
@@ -621,19 +658,19 @@ struct ExploreCardOverlay: View {
                 Haptics.drill(depth: 1)
                 action()
             } label: {
-                priceChip(amt, tappable: true)
+                priceChip(amt, tappable: true, now: now)
             }
             .buttonStyle(ExplorePriceButtonStyle())
             .accessibilityHint(Text("Shows the evidence behind this price."))
         } else {
-            priceChip(amt, tappable: false)
+            priceChip(amt, tappable: false, now: now)
         }
     }
 
-    private func priceChip(_ amt: Double, tappable: Bool) -> some View {
+    private func priceChip(_ amt: Double, tappable: Bool, now: Date) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
-                Text(priceLabel)
+                Text(priceLabel(now: now))
                     .font(.system(.caption, design: .rounded).weight(.semibold))
                     .foregroundStyle(.white.opacity(0.85))
                 if tappable {
@@ -665,9 +702,12 @@ struct ExploreCardOverlay: View {
 
     /// In a lot's last hour the label says how old the bid on record is, since the board is rebuilt every
     /// 2 minutes and the house's bid can move faster than that.
-    private var priceLabel: String {
-        guard item.kind == .live, let ends = item.endsAt else { return item.amountLabel }
-        let now = ServerClock.now()
+    private func priceLabel(now: Date) -> String {
+        guard item.kind == .live else { return item.amountLabel }
+        if item.liveStatusUnavailable {
+            return item.recordUpdatedAt.map { "Bid on record · " + ExploreAnalytics.ago($0, now: now) } ?? "Bid on record"
+        }
+        guard let ends = item.endsAt else { return item.amountLabel }
         guard ends.timeIntervalSince(now) < 3600, let at = item.recordUpdatedAt else { return item.amountLabel }
         return "Bid on record · " + ExploreAnalytics.ago(at, now: now)
     }
@@ -675,6 +715,20 @@ struct ExploreCardOverlay: View {
     private func clock(_ text: String) -> some View {
         NukePill(text: text, icon: "clock", onPhoto: true, textColor: Color.red)
             .monospacedDigit()
+    }
+}
+
+/// A single schedule drives both the bid-age label and countdown. It reaches the one-hour boundary
+/// exactly, then ticks every second; distant or long-unconfirmed lots update every 30 seconds.
+struct ExploreClockSchedule: TimelineSchedule {
+    let ends: Date?
+
+    func entries(from startDate: Date, mode: Mode) -> AnySequence<Date> {
+        let offset = ServerClock.offset
+        return AnySequence(sequence(first: startDate) { date in
+            let now = date.addingTimeInterval(offset)
+            return date.addingTimeInterval(ExploreClock.nextInterval(ends: ends, now: now))
+        })
     }
 }
 
@@ -690,10 +744,11 @@ struct ExplorePriceButtonStyle: ButtonStyle {
 
 /// The card's countdown. Pure, so it is unit-tested (ExploreFeedTests).
 enum ExploreClock {
-    /// "2d 4h", "3h 12m", then "12:07" in the last hour. At or past the recorded end it reads "Closing": the
-    /// house may have extended the close for a late bid, and the card waits for the board to say.
+    /// At the recorded end, allow time for a soft-close extension. If the board cannot confirm a status
+    /// for 15 minutes, do not keep claiming the lot is closing.
     static func text(ends: Date, now: Date) -> String {
         let s = Int(ends.timeIntervalSince(now).rounded(.down))
+        if s <= -900 { return "Status unknown" }
         if s <= 0 { return "Closing" }
         if s < 3600 { return String(format: "%d:%02d", s / 60, s % 60) }
         if s < 86_400 { return "\(s / 3600)h \((s % 3600) / 60)m" }
@@ -701,7 +756,18 @@ enum ExploreClock {
     }
 
     /// How often the card's clock redraws.
-    static func tick(ends: Date, now: Date) -> TimeInterval { ends.timeIntervalSince(now) < 3600 ? 1 : 30 }
+    static func tick(ends: Date, now: Date) -> TimeInterval {
+        let left = ends.timeIntervalSince(now)
+        return left > -900 && left < 3600 ? 1 : 30
+    }
+
+    /// Do not jump over the transition into the last hour when the current interval is 30 seconds.
+    static func nextInterval(ends: Date?, now: Date) -> TimeInterval {
+        guard let ends else { return 30 }
+        let left = ends.timeIntervalSince(now)
+        if left > 3600 { return max(0.001, min(30, left - 3600)) }
+        return left > -900 ? 1 : 30
+    }
 
     /// A lot within 3 minutes of its recorded end, or up to 15 minutes past it, needs a fresh board read.
     static func needsRefresh(_ items: [ExploreFeedItem], now: Date) -> Bool {

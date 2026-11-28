@@ -9,9 +9,9 @@
 //   • an auction lot: the live finish estimate's low..high from FinishBoard (read once per feed load),
 //     labelled "Projected hammer", only while the board is fresh and the current bid sits at or under the
 //     band's top. No action zone: the repo has no validated one.
-// A long press on the rail opens "Why this range" (ExploreWhySheet), which serves the rest of the evidence
-// once: cohort size and period, basis, venues, mileage, source, as-of; for lots the model, grade, comps
-// date, factors and the analog lots with their links.
+// Tapping the price opens its evidence sheet: cohort size and period, basis, venues, mileage, source,
+// and as-of; for lots the model, grade, comps date, factors and the analog lots with their links. The
+// sheet says "Why this range" only when the card actually displays a range.
 
 import SwiftUI
 
@@ -31,6 +31,8 @@ struct ExplorePriceRail: Equatable {
     let marker: Double
 
     var hasBand: Bool { basis != .none }
+    /// A plain price has context too, but there is no range to explain.
+    var detailsTitle: String { hasBand ? "Why this range" : "Price details" }
 
     static func plain(caption: String?) -> ExplorePriceRail {
         ExplorePriceRail(basis: .none, caption: caption, low: nil, high: nil, bandStart: 0, bandEnd: 0, marker: 0)
@@ -253,6 +255,18 @@ struct ExploreWhy: Identifiable, Equatable {
     let estimate: FinishEstimate?
     let fresh: Bool
     var id: String { item.id }
+
+    var rail: ExplorePriceRail { .make(item: item, estimate: estimate, fresh: fresh) }
+    var footer: String? {
+        switch item.kind {
+        case .live:
+            guard fresh, ExploreWhyStack.dollars(estimate?.estimate) != nil else { return nil }
+            return "A projection from comparable finished lots. It is not a guarantee."
+        case .classified:
+            guard rail.hasBand else { return nil }
+            return "A cohort's sold spread. It is not a condition-adjusted value."
+        }
+    }
 }
 
 struct ExploreWhySheet: View {
@@ -266,35 +280,42 @@ struct ExploreWhySheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(ExploreWhyStack.rows(item: why.item, estimate: why.estimate, fresh: why.fresh)) { row in
-                        rowView(row)
+                if why.item.liveStatusUnavailable {
+                    Section {
+                        Text("Auction status unavailable")
+                        Text("The latest board did not return this listing. Its last recorded bid may have changed.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        if let url = why.item.link { Link("Open original listing", destination: url) }
                     }
-                } footer: {
-                    Text(why.item.kind == .live
-                         ? "A projection from comparable finished lots. It is not a guarantee."
-                         : "A cohort's sold spread. It is not a condition-adjusted value.")
-                }
-                if why.item.kind == .live {
-                    Section("Comparable lots") {
-                        switch analogs {
-                        case .loading:
-                            ProgressView()
-                        case .failed(let reason):
-                            Text("Couldn't load comparable lots.").font(.footnote).foregroundStyle(.secondary)
-                            Text(reason).font(.footnote).foregroundStyle(.secondary)
-                                .accessibilityIdentifier("comparable-read-failure")
-                            Button("Retry comparable lots") { Task { await loadAnalogs() } }
-                        case .loaded(let rows):
-                            if rows.isEmpty {
-                                Text("No comparable lots were returned for this one.").font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    Section {
+                        ForEach(ExploreWhyStack.rows(item: why.item, estimate: why.estimate, fresh: why.fresh)) { row in
+                            rowView(row)
+                        }
+                    } footer: {
+                        if let footer = why.footer { Text(footer) }
+                    }
+                    if why.item.kind == .live {
+                        Section("Comparable lots") {
+                            switch analogs {
+                            case .loading:
+                                ProgressView()
+                            case .failed(let reason):
+                                Text("Couldn't load comparable lots.").font(.footnote).foregroundStyle(.secondary)
+                                Text(reason).font(.footnote).foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("comparable-read-failure")
+                                Button("Retry comparable lots") { Task { await loadAnalogs() } }
+                            case .loaded(let rows):
+                                if rows.isEmpty {
+                                    Text("No comparable lots were returned for this one.").font(.footnote).foregroundStyle(.secondary)
+                                }
+                                ForEach(rows) { a in analogView(a) }
                             }
-                            ForEach(rows) { a in analogView(a) }
                         }
                     }
                 }
             }
-            .navigationTitle("Why this range")
+            .navigationTitle(why.item.liveStatusUnavailable ? "Price details" : why.rail.detailsTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task { await loadAnalogs() }

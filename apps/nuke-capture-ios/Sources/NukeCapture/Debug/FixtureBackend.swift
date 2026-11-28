@@ -99,6 +99,9 @@ enum FixtureBackend {
 
     static func browsePagingRead(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         if name == "market_pulse_live" {
+            if scenario.hasPrefix("browse-paging-live-failed") {
+                return (400, Data(#"{"code":"fixture_read_error","message":"fixture auction read failed","details":null,"hint":null}"#.utf8))
+            }
             guard scenario == "browse-paging-auction-failure" else { return ok(#"{"auctions":[]}"#) }
             let rows: String = (0..<41).map { index -> String in
                 let id = String(format: "00000000-0000-4000-8000-%012d", index + 1)
@@ -110,22 +113,51 @@ enum FixtureBackend {
         }
         let offset = args["p_offset"] as? Int ?? 0
         if scenario == "browse-paging-auction-failure" && offset == 40 { return (-1, Data()) }
-        if scenario == "browse-paging-fail-more" && offset == 40 {
+        if ["browse-paging-fail-more", "browse-paging-live-failed-more"].contains(scenario) && offset == 40 {
             browseReadLock.lock(); browsePageFailureAttempts += 1; let attempt = browsePageFailureAttempts; browseReadLock.unlock()
             if attempt == 1 {
                 return (400, Data(#"{"code":"fixture_read_error","message":"fixture page read failed","details":null,"hint":null}"#.utf8))
             }
         }
-        let finalOffset = scenario.hasPrefix("browse-paging-deep") ? 240 : 80
+        let finalOffset = (scenario.hasPrefix("browse-paging-deep") || scenario == "browse-paging-live-failed-deep") ? 240 : 80
         let count = offset < finalOffset ? 40 : (offset == finalOffset ? 1 : 0)
         let rows: String = (0..<count).map { index -> String in
             let number = offset + index
-            let noFirstCard = ["browse-paging-empty", "browse-paging-deep", "browse-paging-fail-more", "browse-paging-auction-failure"].contains(scenario)
+            let noFirstCard = ["browse-paging-empty", "browse-paging-deep", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more"].contains(scenario)
             let visible = number == finalOffset || (number == 0 && !noFirstCard)
             let image = visible ? #""http://[""# : "null"
             return #"{"event_id":"fixture-page-\#(number)","source":"classified","title":"Fixture page \#(number)","ask":10000,"image":\#(image)}"#
         }.joined(separator: ",")
         return ok("{\"population\":{},\"asks\":[\(rows)]}")
+    }
+
+    private static func closingBrowseRead(_ name: String) -> (Int, Data) {
+        guard name == "market_pulse_live" else { return ok(#"{"population":{},"asks":[]}"#) }
+        browseReadLock.lock(); browseLiveAttempts += 1; let attempt = browseLiveAttempts; browseReadLock.unlock()
+        let iso = ISO8601DateFormatter()
+        if ["browse-clock-freshness", "browse-clock-boundary"].contains(scenario) {
+            let end = iso.string(from: Date().addingTimeInterval(scenario == "browse-clock-boundary" ? 3612 : 2700))
+            let updated = iso.string(from: Date().addingTimeInterval(-40))
+            return ok("""
+            {"auctions":[["00000000-0000-4000-8000-000000000002",1973,"Fixture","Coupe",5000,"\(end)","\(updated)",null,"http://[",false,null,"Fixture freshness",null,null,null,null,null]]}
+            """)
+        }
+        let closing = iso.string(from: Date().addingTimeInterval(attempt == 1 ? 10 : 120))
+        let clockOnly = ["browse-clock-extended", "browse-clock-missing-then-extended"].contains(scenario)
+        let extended = iso.string(from: Date().addingTimeInterval(attempt == 1 ? (clockOnly ? 10 : 20) : 120))
+        let open = iso.string(from: Date().addingTimeInterval(3600))
+        func row(_ suffix: String, _ title: String, _ end: String) -> String {
+            #"["00000000-0000-4000-8000-0000000000\#(suffix)",1973,"Fixture","Coupe",5000,"\#(end)",null,null,"http://[",false,null,"\#(title)",null,null,null,null,null]"#
+        }
+        if scenario == "browse-clock-missing-then-extended", attempt == 2 {
+            return ok(#"{"auctions":[]}"#)
+        }
+        if clockOnly {
+            return ok("{\"auctions\":[\(row("02", "Fixture extended", extended))]}")
+        }
+        let rows = (attempt == 2 ? [] : [row("01", "Fixture closing", closing)])
+            + [row("02", "Fixture extended", extended), row("03", "Fixture still open", open)]
+        return ok("{\"auctions\":[\(rows.joined(separator: ","))]}")
     }
     private static let garageSourceLock = NSLock()
     private static var garageSourceAttempts = 0
@@ -591,8 +623,11 @@ enum FixtureBackend {
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
-            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure"].contains(scenario):
+            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more", "browse-paging-auction-failure", "browse-paging-live-failed-deep", "browse-paging-live-failed-more"].contains(scenario):
             return browsePagingRead(name, args)
+        case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
+            && ["browse-closing-refresh", "browse-clock-extended", "browse-clock-missing-then-extended", "browse-clock-freshness", "browse-clock-boundary"].contains(scenario):
+            return closingBrowseRead(name)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
             && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):
             return browseRead(name)
