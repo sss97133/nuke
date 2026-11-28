@@ -236,7 +236,8 @@ and invoker permissions stay in force. A truncated read withholds fractions.
 
 The numerator is the existing supported source-sold outcome: explicit `sold` with
 a positive finite winning amount. The denominator adds explicit `reserve_not_met`
-and `no_sale` episodes. `cancelled` is a separate withdrawal. Past-close `live`,
+episodes. A bare `no_sale` label remains unresolved: the extractor can assign it
+when no result was extracted. `cancelled` is a separate withdrawal. Past-close `live`,
 `pending`, `relisted`, `bid_to`, unsupported sold amounts and other outcomes remain
 unresolved. Empty known-outcome populations yield a null ratio and a reason.
 Daily points and whole-window totals are computed in SQL; the latter divides

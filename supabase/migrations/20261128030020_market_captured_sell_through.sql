@@ -9,7 +9,7 @@ SET LOCAL statement_timeout='10s';
 SET LOCAL lock_timeout='5s';
 DO $guard$ BEGIN
   IF (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.get_market_trends(jsonb)'::regprocedure)
-    NOT IN ('8f34cf3c8e358485fe10a3cac4425754','3eeec9ed39e373075f141d3dd72f37db') THEN
+    NOT IN ('8f34cf3c8e358485fe10a3cac4425754','eb483b42ae1927944fad5cab59fef3dc') THEN
     RAISE EXCEPTION 'get_market_trends(jsonb) differs from the reviewed canonical-listing reader';
   END IF;
 END $guard$;
@@ -245,7 +245,9 @@ BEGIN
     ORDER BY c.source_key,c.scraped_at DESC NULLS LAST,c.id
   ), measured AS MATERIALIZED (
     SELECT e.*,CASE WHEN e.recorded_sold THEN 'sold'
-      WHEN NOT e.conflict AND e.outcome IN('reserve_not_met','no_sale') THEN 'no_sale'
+      -- The lander can default no_sale when extraction found no result. Only its
+      -- affirmative reserve-not-met result is admitted as a known failure here.
+      WHEN NOT e.conflict AND e.outcome='reserve_not_met' THEN 'no_sale'
       WHEN NOT e.conflict AND e.outcome='cancelled' THEN 'withdrawn'
       ELSE 'unresolved' END AS outcome_class
     FROM episodes e
@@ -362,6 +364,7 @@ BEGIN
           'source_outcome',e.outcome,
           'outcome_reason',CASE WHEN e.outcome_class<>'unresolved' THEN 'explicit_source_outcome'
             WHEN e.outcome='sold' THEN 'sold_without_positive_finite_amount'
+            WHEN e.outcome='no_sale' THEN 'no_sale_without_affirmative_result_witness'
             WHEN e.outcome='bid_to' THEN 'bid_to_not_a_supported_sale'
             WHEN e.outcome IN('live','pending','relisted') THEN 'ended_without_final_outcome'
             ELSE 'unrecognized_or_missing_outcome' END,

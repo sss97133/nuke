@@ -33,9 +33,9 @@ SELECT ('80000000-0000-0000-0000-'||lpad(i::text,12,'0'))::uuid,
   'https://bringatrailer.com/listing/captured-'||CASE WHEN i=11 THEN '10' ELSE i::text END,
   date_trunc('day',now())-interval '6 days'+i*interval '1 hour',
   CASE WHEN i IN(2,11,13) THEN 'reserve_not_met' WHEN i=3 THEN 'cancelled'
-    WHEN i=4 THEN 'live' WHEN i=6 THEN 'bid_to' ELSE 'sold' END,
+    WHEN i=4 THEN 'live' WHEN i=6 THEN 'bid_to' WHEN i=17 THEN 'no_sale' ELSE 'sold' END,
   CASE WHEN i=5 THEN 0 ELSE 1000 END
-FROM generate_series(1,16) i WHERE i<>15;
+FROM generate_series(1,17) i WHERE i<>15;
 -- Conflicting source URL on another parent must be excluded, not latest-wins.
 UPDATE auction_events SET auction_end_date=date_trunc('day',now())-interval '6 days'+interval '10 hours'
   WHERE id='80000000-0000-0000-0000-000000000011';
@@ -58,8 +58,8 @@ SELECT assert_count(captured_total(get_market_trends(captured_request()),'select
  AND abs(captured_total(get_market_trends(captured_request()),'selected','ratio')-2::numeric/3)<1e-12,
  'captured: two sale episodes and one explicit no-sale yield2/3; not one count per vehicle');
 SELECT assert_count(captured_total(get_market_trends(captured_request()),'selected','withdrawn')=1
- AND captured_total(get_market_trends(captured_request()),'selected','unresolved')=3,
- 'captured: cancelled separate; past-close live, bid-to and unsupported sold stay unresolved');
+ AND captured_total(get_market_trends(captured_request()),'selected','unresolved')=4,
+ 'captured: cancelled separate; live, bid-to, unsupported sold and unwitnessed no-sale stay unresolved');
 SELECT assert_count(captured_total(get_market_trends(captured_request()),'benchmark','numerator')=1
  AND captured_total(get_market_trends(captured_request()),'benchmark','denominator')=2,
  'captured: rest-of-source excludes selected and unresolved membership');
@@ -79,10 +79,16 @@ SELECT assert_count((SELECT count(*)=1 AND bool_and(e->>'outcome_class'='withdra
   AND e->>'denominator_contribution'='0') FROM jsonb_array_elements(get_market_trends(
   captured_request()||'{"evidence_outcome":"withdrawn"}')#>'{evidence,contributors}') e),
  'captured: excluded withdrawals retain an explicit record drill');
-SELECT assert_count((SELECT count(*)=3 AND bool_and(e->>'outcome_class'='unresolved')
+SELECT assert_count((SELECT count(*)=4 AND bool_and(e->>'outcome_class'='unresolved')
  FROM jsonb_array_elements(get_market_trends(captured_request()||
  '{"evidence_outcome":"unresolved","evidence_series":"selected"}')#>'{evidence,contributors}') e),
  'captured: unknown outcomes remain inspectable rather than silently becoming no-sales');
+SELECT assert_count((SELECT count(*)=1 AND bool_and(e->>'denominator_contribution'='0'
+ AND e->>'outcome_reason'='no_sale_without_affirmative_result_witness')
+ FROM jsonb_array_elements(get_market_trends(captured_request()||
+ '{"evidence_outcome":"unresolved","evidence_series":"selected"}')#>'{evidence,contributors}') e
+ WHERE e->>'source_outcome'='no_sale'),
+ 'captured: extractor no-sale fallback has no denominator weight without a result witness');
 SELECT assert_count(get_market_trends(captured_request()-'reserve_policy')->>'reason'='unsupported_or_missing_reserve_policy'
  AND get_market_trends(captured_request()||'{"knowledge_as_of":"2020-01-01"}')->>'reason'='historical_knowledge_versions_unavailable',
  'captured: explicit reserve policy required; historical knowledge unsupported');

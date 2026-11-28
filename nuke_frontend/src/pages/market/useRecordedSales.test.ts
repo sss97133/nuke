@@ -27,7 +27,7 @@ describe('existing recorded-sales reader contract', () => {
       const builder = { select: (fields: string) => { read.fields = fields; return builder; },
         eq: (key: string, value: string) => { read.filter = [key, value]; return builder; },
         order: (key: string) => { read.order = key; return builder; },
-        limit: (n: number) => { read.limit = n; return Promise.resolve({ data: table === 'canonical_makes'
+        limit: (n: number) => { read.limit = n; return Promise.resolve({ count: 1, data: table === 'canonical_makes'
           ? [{ id: 'returned-make-id', canonical_name: 'Fixture' }]
           : [{ subject_id: 'returned-subject-id', canonical_make: 'Fixture', canonical_model: 'Model', grain: 'year', year: 2000 }] }); } };
       return builder;
@@ -44,13 +44,13 @@ describe('existing recorded-sales reader contract', () => {
     let size = 402;
     fixture.from.mockImplementation(table => {
       const builder = {select:()=>builder,eq:()=>builder,order:()=>builder,
-        limit:()=>Promise.resolve({data:table==='canonical_makes'
-          ? Array.from({length:size},(_,i)=>({id:`make-${i}`,canonical_name:`Fixture ${i}`})) : []})};
+        limit:()=>Promise.resolve({count:table==='canonical_makes'?size:0,data:table==='canonical_makes'
+          ? Array.from({length:Math.min(size,1000)},(_,i)=>({id:`make-${i}`,canonical_name:`Fixture ${i}`})) : []})};
       return builder;
     });
     expect(await fetchSalesScopes()).toHaveLength(402);
     size=1001;
-    await expect(fetchSalesScopes()).rejects.toThrow('Scope catalog exceeds its display limit');
+    await expect(fetchSalesScopes()).rejects.toThrow('Scope catalog response is incomplete');
   });
 });
 
