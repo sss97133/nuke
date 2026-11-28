@@ -103,6 +103,27 @@ enum GarageReaders {
         return OwnGarage(vehicles: GarageVehicle.applying(corrections, to: rows), unresolved: unresolved)
     }
 
+    /// Recheck the exact statement before showing its private source text. A saved garage row can outlive
+    /// a withdrawal or account change, so it is only a navigation hint, not permission to show its excerpt.
+    static func unresolvedSource(userId: String, sourceId: String) async -> JobLoad<GarageUnresolvedSource?> {
+        let account = userId.lowercased()
+        let accountChanged = JobRefusal(reader: correctionsName, kind: .signInRefused,
+            title: "Account changed", detail: "Return to Garage and use the current account.")
+        guard SupabaseService.currentUserId == account else { return .refused(accountChanged) }
+        struct Params: Encodable { let p_user_id: String; let p_include_unresolved: Bool }
+        do {
+            let rows: [GarageOwnerCorrection] = try await SupabaseService.client
+                .rpc(correctionsName, params: Params(p_user_id: account, p_include_unresolved: true))
+                .eq("id", value: sourceId)
+                .execute().value
+            guard !Task.isCancelled, SupabaseService.currentUserId == account else { return .refused(accountChanged) }
+            return .loaded(GarageUnresolvedSource.from(rows).first { $0.id == sourceId })
+        } catch {
+            guard SupabaseService.currentUserId == account else { return .refused(accountChanged) }
+            return .refused(JobReaders.refusal(correctionsName, error))
+        }
+    }
+
     // MARK: Pure parts (unit-tested)
 
     struct Metadata: Decodable {

@@ -142,16 +142,21 @@ struct GarageView: View {
             if let unresolved = garage?.unresolved, !unresolved.isEmpty {
                 DisclosureGroup {
                     ForEach(unresolved) { source in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(source.label).font(.subheadline)
-                            Text("Account stated · photo evidence still needs to identify this vehicle")
-                                .font(.caption).foregroundStyle(.secondary)
+                        NavigationLink {
+                            GarageUnresolvedSourceView(userId: userId, sourceId: source.id)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(source.label).font(.subheadline)
+                                Text("Account statement · vehicle not linked")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                         }
+                        .accessibilityIdentifier("garage.unresolved.\(source.id)")
                     }
                 } label: {
                     Label("Identity pending · \(unresolved.count)", systemImage: "questionmark.circle")
+                        .accessibilityIdentifier("garage.identityPending")
                 }
-                .accessibilityIdentifier("garage.identityPending")
             }
         } footer: {
             Text(GarageCopy.organizeScope)
@@ -211,6 +216,76 @@ struct GarageView: View {
         garage = OwnGarage(vehicles: GarageVehicle.applying([], to: cached.vehicles.map(\.projection)), unresolved: unresolved)
         cachedAt = cached.cachedAt
         failure = nil
+    }
+}
+
+/// The account's recorded source excerpt, re-read on open so changed sources are not shown from cache.
+struct GarageUnresolvedSourceView: View {
+    let userId: String
+    let sourceId: String
+    @State private var state: JobLoad<GarageUnresolvedSource?> = .loading
+    @State private var requests = ReadRequestGuard()
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var session: SessionStore
+
+    var body: some View {
+        List {
+            if !session.isSignedIn || SupabaseService.currentUserId != userId.lowercased() {
+                Section { Text("Your account changed. Return to Garage to continue.") }
+            } else {
+                switch state {
+                case .loading:
+                    ProgressView("Reading statement…")
+                case .refused(let refusal):
+                    Section {
+                        JobRefusalRow(refusal: refusal)
+                        Button("Retry") { Task { await load() } }
+                    }
+                case .loaded(let source):
+                    if let source {
+                        Section("Account statement") {
+                            Text(source.label).font(.headline)
+                            if !source.statedRoles.isEmpty {
+                                Text("Stated relationship: " + source.statedRoles.map(GarageVehicle.statedRole).joined(separator: ", "))
+                            }
+                            if let date = ProfileClock.day(source.observedAt) { Text("Recorded \(date)") }
+                            if let excerpt = source.sourceExcerpt, !excerpt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Source excerpt").font(.caption).foregroundStyle(.secondary)
+                                    Text(excerpt).accessibilityIdentifier("garage.statement.source")
+                                }
+                            } else {
+                                Text("The statement text is unavailable in this read.").foregroundStyle(.secondary)
+                            }
+                        }
+                        Section("Vehicle identity") {
+                            Text("No identified vehicle is linked to this statement.")
+                            Text("Photo sessions group dated photos uploaded by this app. They may not relate to this statement; other photos aren't included.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            NavigationLink("Review photo sessions") { SessionConfirmView() }
+                        }
+                    } else {
+                        Section { Text("This statement wasn't returned in the current Garage read.") }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Vehicle statement")
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: sourceId) { await load() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { _ = requests.begin(); state = .loading }
+            if phase == .active { Task { await load() } }
+        }
+    }
+
+    private func load() async {
+        let request = requests.begin()
+        state = .loading
+        let result = await GarageReaders.unresolvedSource(userId: userId, sourceId: sourceId)
+        guard !Task.isCancelled, requests.isCurrent(request) else { return }
+        guard SupabaseService.currentUserId == userId.lowercased() else { state = .loading; return }
+        state = result
     }
 }
 

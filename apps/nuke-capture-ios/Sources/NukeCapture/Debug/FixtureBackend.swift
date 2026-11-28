@@ -52,6 +52,25 @@ enum FixtureBackend {
     }
     private static let workPageLock = NSLock()
     private static var workPageAttempts = 0
+    private static let garageSourceLock = NSLock()
+    private static var garageSourceAttempts = 0
+
+    private static func garageCorrections(_ args: [String: Any]) -> (Int, Data) {
+        // The detail read names its account explicitly. The list read still sees the original row so the
+        // test can exercise withdrawal and a failed recheck after the user selects that exact statement.
+        guard args["p_user_id"] != nil else { return ok(GarageCardFixtures.corrections) }
+        garageSourceLock.lock()
+        garageSourceAttempts += 1
+        let attempt = garageSourceAttempts
+        garageSourceLock.unlock()
+        switch ProcessInfo.processInfo.environment["NUKE_FIXTURE_GARAGE_SOURCE"] {
+        case "withdrawn": return ok("[]")
+        case "withdrawn_on_return" where attempt > 1: return ok("[]")
+        case "failure" where attempt == 1:
+            return (400, Data(#"{"code":"fixture_read_error","message":"fixture statement read failed","details":null,"hint":null}"#.utf8))
+        default: return ok(GarageCardFixtures.corrections)
+        }
+    }
     static var userId: String? {
         switch persona {
         case .visitor: return nil
@@ -155,6 +174,12 @@ enum FixtureBackend {
         if path.hasPrefix("/rest/v1/rpc/") {
             let name = String(path.dropFirst("/rest/v1/rpc/".count))
             let args = (FixtureURLProtocol.body(of: request)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+            if scenario == "garage-cards", name == "get_my_garage_owner_corrections", args["p_user_id"] != nil {
+                let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+                guard items.contains(where: { $0.name == "id" && $0.value == "eq.00000000-0000-4000-8000-00000000d301" }) else {
+                    return (400, Data(#"{"code":"fixture_read_error","message":"statement id filter missing","details":null,"hint":null}"#.utf8))
+                }
+            }
             if !isReader(name) {
                 // Public market reads (Explore's feed, map and terminal) are not writes: answer as
                 // before but keep them out of the write log the UI tests assert on.
@@ -230,7 +255,7 @@ enum FixtureBackend {
             [{"session_day":"2026-10-31","gps_cell":"fixture","photo_count":1,"image_ids":["00000000-0000-4000-8000-00000000e001"],"sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
             """)
         case "get_user_garage" where scenario == "garage-cards": return ok(GarageCardFixtures.garage())
-        case "get_my_garage_owner_corrections" where scenario == "garage-cards": return ok(GarageCardFixtures.corrections)
+        case "get_my_garage_owner_corrections" where scenario == "garage-cards": return garageCorrections(args)
         case "my_unorganized_photo_count" where scenario == "garage-cards": return ok("37")
         case "get_vehicle_contribution_days_batch":
             // The garage cards' day reader: rows for the cards scenario, a successful empty answer elsewhere.
