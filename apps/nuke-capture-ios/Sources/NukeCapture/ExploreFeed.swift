@@ -178,6 +178,7 @@ struct ExploreFeedView: View {
     @State private var reloading = false
     @State private var loadingMore = false
     @State private var moreFailed = false
+    @State private var morePaused = false
     @State private var generation = 0
 
     var body: some View {
@@ -348,6 +349,11 @@ struct ExploreFeedView: View {
             }
             .buttonStyle(.bordered)
             .padding(.horizontal, NukeSpace.lg)
+        } else if morePaused && hasMore {
+            Button("Search more") { Task { await loadMore() } }
+                .frame(maxWidth: .infinity, minHeight: NukeSize.minTap)
+                .buttonStyle(.bordered)
+                .padding(.horizontal, NukeSpace.lg)
         } else if !hasMore && !liveFailed && !askFailed {
             Text(ExploreFeedPaging.endLine(tuned: tuning.isActive))
                 .font(.footnote).foregroundStyle(.secondary)
@@ -454,6 +460,7 @@ struct ExploreFeedView: View {
         askOffset = ar?.read ?? 0
         askExhausted = ar.map { ExploreFeedPaging.exhausted(read: $0.read, asked: $0.asked) } ?? true
         moreFailed = false
+        morePaused = false
         feed = ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
         loaded = true
         reloading = false
@@ -474,6 +481,7 @@ struct ExploreFeedView: View {
         guard loaded, !reloading, !loadingMore, !moreFailed, hasMore else { return }
         let gen = generation
         loadingMore = true
+        morePaused = false
         defer { if gen == generation { loadingMore = false } }
         let tune = tuning
         for _ in 0..<ExploreFeedPaging.maxEmptyPages {
@@ -502,6 +510,7 @@ struct ExploreFeedView: View {
             feed += fresh
             if !fresh.isEmpty || !hasMore { return }
         }
+        if !Task.isCancelled, gen == generation, hasMore { morePaused = true }
     }
 
     /// Every open lot, soonest to end first. The feed reveals them a page at a time (ExploreFeedPaging.livePage).

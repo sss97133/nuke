@@ -56,6 +56,7 @@ enum FixtureBackend {
     private static var browseLiveAttempts = 0
     private static var browseAskAttempts = 0
     private static var browsePageFailureAttempts = 0
+    private static var browseAnalogAttempts = 0
 
     /// A terminal first-read failure followed by a normal response lets the UI test
     /// distinguish a partial feed from an empty one and exercise its retry action.
@@ -93,7 +94,7 @@ enum FixtureBackend {
                 return (400, Data(#"{"code":"fixture_read_error","message":"fixture page read failed","details":null,"hint":null}"#.utf8))
             }
         }
-        let finalOffset = scenario == "browse-paging-deep" ? 240 : 80
+        let finalOffset = scenario.hasPrefix("browse-paging-deep") ? 240 : 80
         let count = offset < finalOffset ? 40 : (offset == finalOffset ? 1 : 0)
         let rows: String = (0..<count).map { index -> String in
             let number = offset + index
@@ -520,7 +521,7 @@ enum FixtureBackend {
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
-            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-fail-more"].contains(scenario):
+            && ["browse-paging", "browse-paging-empty", "browse-paging-deep", "browse-paging-deep-visible", "browse-paging-fail-more"].contains(scenario):
             return browsePagingRead(name, args)
         case let marketName where ["market_pulse_live", "classified_ask_board"].contains(marketName)
             && (scenario.hasPrefix("browse-partial") || scenario == "browse-both-fail"):
@@ -533,6 +534,12 @@ enum FixtureBackend {
               "2026-11-27T10:00:00Z",null,"http://[",false,
               "https://bringatrailer.com/listing/fixture/","Fixture Coupe",null,null,null,null,null]]}
             """)
+        case "live_finish_estimates" where scenario == "social-browse" && args["p_vehicle_ids"] != nil:
+            browseReadLock.lock(); browseAnalogAttempts += 1; let attempt = browseAnalogAttempts; browseReadLock.unlock()
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_ANALOGS"] == "failure" && attempt == 1 {
+                return (400, Data(#"{"code":"fixture_read_error","message":"fixture comparable read failed","details":null,"hint":null}"#.utf8))
+            }
+            return ok(#"{"analogs":{}}"#)
         case "record_interaction" where scenario == "social-browse" && args["p_kind"] as? String == "comment":
             switch ProcessInfo.processInfo.environment["NUKE_FIXTURE_DISCUSSION_POST"] {
             case "refused": return ok(#"{"ok":false,"error":"not_authorized"}"#)
